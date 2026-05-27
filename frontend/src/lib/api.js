@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://budget-pro-4jlg.onrender.com';
+const BACKEND_URL = (process.env.REACT_APP_BACKEND_URL || 'https://budget-pro-4jlg.onrender.com').replace(/\/+$/, '');
 export const API = `${BACKEND_URL}/api`;
 
 export const api = axios.create({
