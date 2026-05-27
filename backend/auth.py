@@ -124,30 +124,36 @@ def _user_to_dict(u: User) -> dict:
 async def get_current_user(request: Request) -> dict:
     sm = request.app.state.db
     async with sm() as session:
-        token = request.cookies.get("access_token")
-        if not token:
-            auth = request.headers.get("Authorization", "")
-            if auth.startswith("Bearer "):
-                token = auth[7:]
-        if token:
-            try:
-                payload = jwt.decode(token, _secret(), algorithms=[JWT_ALGORITHM])
-                if payload.get("type") == "access":
-                    result = await session.execute(
-                        select(User).where(User.user_id == payload["sub"])
-                    )
-                    user = result.scalar_one_or_none()
-                    if user:
-                        return _user_to_dict(user)
-            except jwt.PyJWTError:
-                pass
+        candidates = []
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            candidates.append(("bearer", auth[7:]))
+        cookie_token = request.cookies.get("access_token")
+        if cookie_token:
+            candidates.append(("cookie", cookie_token))
+        for source, token in candidates:
+            if token:
+                try:
+                    payload = jwt.decode(token, _secret(), algorithms=[JWT_ALGORITHM])
+                    if payload.get("type") == "access":
+                        result = await session.execute(
+                            select(User).where(User.user_id == payload["sub"])
+                        )
+                        user = result.scalar_one_or_none()
+                        if user:
+                            return _user_to_dict(user)
+                except jwt.PyJWTError:
+                    pass
 
-        session_token = request.cookies.get("session_token")
-        if not session_token:
-            auth = request.headers.get("Authorization", "")
-            if auth.startswith("Bearer "):
-                session_token = auth[7:]
-        if session_token:
+        candidates = []
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            candidates.append(("bearer", auth[7:]))
+        cookie_session = request.cookies.get("session_token")
+        if cookie_session:
+            candidates.append(("cookie", cookie_session))
+        for source, session_token in candidates:
+            if session_token:
             result = await session.execute(
                 select(UserSession).where(UserSession.session_token == session_token)
             )
