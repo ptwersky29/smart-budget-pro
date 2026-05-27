@@ -20,27 +20,41 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && window.location.hash?.includes("session_id=")) {
-      setLoading(false);
-      return;
+    const params = new URLSearchParams(window.location.search);
+    const accessToken = params.get("access_token");
+    if (accessToken) {
+      localStorage.setItem("access_token", accessToken);
+      const refreshToken = params.get("refresh_token");
+      if (refreshToken) localStorage.setItem("refresh_token", refreshToken);
+      window.history.replaceState(null, "", window.location.pathname);
     }
     checkAuth();
   }, [checkAuth]);
 
   const login = useCallback(async (email, password) => {
     const { data } = await api.post("/auth/login", { email, password });
+    if (data.access_token) {
+      localStorage.setItem("access_token", data.access_token);
+      localStorage.setItem("refresh_token", data.refresh_token || "");
+    }
     setUser(data);
     return data;
   }, []);
 
   const register = useCallback(async (payload) => {
     const { data } = await api.post("/auth/register", payload);
+    if (data.access_token) {
+      localStorage.setItem("access_token", data.access_token);
+      localStorage.setItem("refresh_token", data.refresh_token || "");
+    }
     setUser(data);
     return data;
   }, []);
 
   const logout = useCallback(async () => {
     try { await api.post("/auth/logout"); } catch (err) { console.error("logout error", err); }
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
     setUser(false);
   }, []);
 

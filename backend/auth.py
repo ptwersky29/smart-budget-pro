@@ -196,7 +196,10 @@ def build_router() -> APIRouter:
             access = create_access_token(user_id, email)
             refresh = create_refresh_token(user_id)
             set_auth_cookies(response, access, refresh)
-            return _user_to_dict(user)
+            ud = _user_to_dict(user)
+            ud["access_token"] = access
+            ud["refresh_token"] = refresh
+            return ud
 
     @router.post("/login", response_model=UserOut)
     async def login(payload: LoginIn, request: Request, response: Response):
@@ -211,7 +214,10 @@ def build_router() -> APIRouter:
             access = create_access_token(user.user_id, email)
             refresh = create_refresh_token(user.user_id)
             set_auth_cookies(response, access, refresh)
-            return _user_to_dict(user)
+            ud = _user_to_dict(user)
+            ud["access_token"] = access
+            ud["refresh_token"] = refresh
+            return ud
 
     @router.post("/logout")
     async def logout(request: Request, response: Response):
@@ -333,8 +339,10 @@ def build_router() -> APIRouter:
             access = create_access_token(user.user_id, email)
             refresh = create_refresh_token(user.user_id)
             frontend_url = os.environ.get("FRONTEND_URL", "https://smart-budget-pro-ewtm.vercel.app")
+            import urllib.parse
             from starlette.responses import RedirectResponse
-            resp = RedirectResponse(url=frontend_url)
+            redirect_url = f"{frontend_url}?access_token={urllib.parse.quote(access)}&refresh_token={urllib.parse.quote(refresh)}"
+            resp = RedirectResponse(url=redirect_url)
             set_auth_cookies(resp, access, refresh)
             return resp
 
