@@ -19,7 +19,7 @@ from auth import get_current_user
 logger = logging.getLogger("ai_insights")
 
 EMERGENT_PROVIDER = "openai"
-EMERGENT_MODEL = "gpt-4o-mini"
+EMERGENT_MODEL = "google/gemini-2.0-flash-lite-preview-02-05:free"
 FREE_TIER_DAILY_LIMIT = 5
 
 SYSTEM_PROMPT = (

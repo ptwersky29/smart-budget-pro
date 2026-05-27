@@ -15,7 +15,7 @@ from auth import get_current_user
 logger = logging.getLogger("ai")
 
 DEFAULT_PROVIDER = "openai"
-DEFAULT_MODEL = "gpt-4o-mini"
+DEFAULT_MODEL = "google/gemini-2.0-flash-lite-preview-02-05:free"
 
 SYSTEM_PROMPT = (
     "You are FinanceAI, a premium AI financial assistant specialized in UK personal finance, "
