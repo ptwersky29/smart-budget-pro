@@ -34,8 +34,10 @@ export default function AIInsightPanel({ title = "AI Insights", subtitle, endpoi
     } finally { setBusy(false); }
   };
 
-  // eslint-disable-next-line
-  React.useEffect(() => { if (autoLoad && !loaded && !busy) generate(); }, [autoLoad]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  React.useEffect(() => {
+    if (autoLoad && !loaded && !busy) generate();
+  }, [autoLoad]);
 
   return (
     <div className="rounded-2xl border border-border bg-card p-6" data-testid="ai-insight-panel">
