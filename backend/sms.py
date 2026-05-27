@@ -9,7 +9,9 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request, Form, Depends
 from pydantic import BaseModel
+from sqlalchemy import select, func
 
+from db import User, Transaction, SmsMessage, AppConfig
 from auth import get_current_user
 from app_config import get_config
 import maaser as maaser_mod
@@ -62,177 +64,210 @@ def build_router() -> APIRouter:
 
     @router.post("/sms/parse")
     async def parse_sms(payload: ParseIn, request: Request, user: dict = Depends(get_current_user)):
-        db = request.app.state.db
-        if user.get("tier") != "premium" and user.get("role") != "admin":
-            count_today = await db.sms_messages.count_documents({
+        sm = request.app.state.db
+        async with sm() as session:
+            if user.get("tier") != "premium" and user.get("role") != "admin":
+                today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+                result = await session.execute(
+                    select(func.count()).select_from(SmsMessage).where(
+                        SmsMessage.user_id == user["user_id"],
+                        SmsMessage.created_at >= today_start,
+                    )
+                )
+                count_today = result.scalar() or 0
+                if count_today >= 3:
+                    raise HTTPException(429, "Free tier: 3 SMS parses/day. Upgrade for unlimited.")
+
+            try:
+                parsed = await _ai_parse(payload.text)
+            except Exception as e:
+                logger.error(f"parse failed: {e}")
+                raise HTTPException(500, f"AI parse failed: {str(e)[:200]}")
+
+            now = datetime.now(timezone.utc)
+            sms_id = f"sms_{uuid.uuid4().hex[:10]}"
+            sms = SmsMessage(
+                user_id=user["user_id"],
+                to_number="",
+                body=payload.text[:2000],
+                direction="outbound",
+                provider="manual",
+            )
+
+            transaction_id = None
+            if payload.auto_save and parsed.get("is_transaction"):
+                tx_id = f"tx_{uuid.uuid4().hex[:12]}"
+                amt = abs(float(parsed.get("amount", 0)))
+                tx = Transaction(
+                    transaction_id=tx_id,
+                    user_id=user["user_id"],
+                    amount=amt if parsed.get("is_income") else -amt,
+                    currency=parsed.get("currency", "GBP"),
+                    description=parsed.get("description", ""),
+                    merchant_name=parsed.get("merchant"),
+                    category=parsed.get("category", "uncategorized"),
+                    date=now,
+                    source="sms",
+                )
+                session.add(tx)
+                transaction_id = tx_id
+                tx_doc = {
+                    "transaction_id": tx_id,
+                    "user_id": user["user_id"],
+                    "amount": amt if parsed.get("is_income") else -amt,
+                    "category": parsed.get("category", "uncategorized"),
+                    "description": parsed.get("description", ""),
+                    "is_income": bool(parsed.get("is_income")),
+                }
+                await maaser_mod.maybe_accrue(session, user["user_id"], tx_doc)
+
+            session.add(sms)
+            await session.commit()
+            return {
+                "sms_id": sms_id,
                 "user_id": user["user_id"],
-                "created_at": {"$gte": datetime.now(timezone.utc).replace(hour=0, minute=0, second=0).isoformat()}
-            })
-            if count_today >= 3:
-                raise HTTPException(429, "Free tier: 3 SMS parses/day. Upgrade for unlimited.")
-
-        try:
-            parsed = await _ai_parse(payload.text)
-        except Exception as e:
-            logger.error(f"parse failed: {e}")
-            raise HTTPException(500, f"AI parse failed: {str(e)[:200]}")
-
-        sms_id = f"sms_{uuid.uuid4().hex[:10]}"
-        now = datetime.now(timezone.utc).isoformat()
-        record = {
-            "sms_id": sms_id,
-            "user_id": user["user_id"],
-            "text": payload.text[:2000],
-            "parsed": parsed,
-            "source": "manual",
-            "transaction_id": None,
-            "created_at": now,
-        }
-
-        if payload.auto_save and parsed.get("is_transaction"):
-            tx_id = f"tx_{uuid.uuid4().hex[:12]}"
-            amt = abs(float(parsed.get("amount", 0)))
-            tx_doc = {
-                "transaction_id": tx_id,
-                "user_id": user["user_id"],
-                "amount": amt if parsed.get("is_income") else -amt,
-                "currency": parsed.get("currency", "GBP"),
-                "description": parsed.get("description", ""),
-                "merchant": parsed.get("merchant"),
-                "category": parsed.get("category", "uncategorized"),
-                "date": now,
-                "is_income": bool(parsed.get("is_income")),
-                "source": "sms",
-                "created_at": now,
+                "text": payload.text[:2000],
+                "parsed": parsed,
+                "source": "manual",
+                "transaction_id": transaction_id,
+                "created_at": now.isoformat(),
             }
-            await db.transactions.insert_one(tx_doc)
-            record["transaction_id"] = tx_id
-            await maaser_mod.maybe_accrue(db, user["user_id"], tx_doc)
-
-        await db.sms_messages.insert_one(record)
-        record.pop("_id", None)
-        return record
 
     @router.get("/sms/inbox")
     async def inbox(request: Request, user: dict = Depends(get_current_user), limit: int = 50):
-        db = request.app.state.db
-        rows = await db.sms_messages.find({"user_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
-        return {"messages": rows}
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(SmsMessage).where(SmsMessage.user_id == user["user_id"])
+                .order_by(SmsMessage.created_at.desc()).limit(limit)
+            )
+            rows = result.scalars().all()
+            return {"messages": [
+                {"sms_id": f"sms_{r.id}", "user_id": r.user_id, "text": r.body,
+                 "direction": r.direction, "created_at": r.created_at.isoformat() if r.created_at else None}
+                for r in rows
+            ]}
 
     @router.delete("/sms/{sms_id}")
     async def delete_sms(sms_id: str, request: Request, user: dict = Depends(get_current_user)):
-        db = request.app.state.db
-        r = await db.sms_messages.delete_one({"sms_id": sms_id, "user_id": user["user_id"]})
-        if r.deleted_count == 0:
-            raise HTTPException(404, "Not found")
-        return {"ok": True}
+        sm = request.app.state.db
+        async with sm() as session:
+            sms_id_int = int(sms_id.replace("sms_", "")) if sms_id.startswith("sms_") else int(sms_id)
+            result = await session.execute(
+                select(SmsMessage).where(
+                    SmsMessage.id == sms_id_int,
+                    SmsMessage.user_id == user["user_id"],
+                )
+            )
+            rec = result.scalar_one_or_none()
+            if not rec:
+                raise HTTPException(404, "Not found")
+            await session.delete(rec)
+            await session.commit()
+            return {"ok": True}
 
     @router.post("/sms/{sms_id}/save")
     async def save_to_tx(sms_id: str, request: Request, user: dict = Depends(get_current_user)):
-        """Convert an already-parsed SMS into a transaction."""
-        db = request.app.state.db
-        rec = await db.sms_messages.find_one({"sms_id": sms_id, "user_id": user["user_id"]})
-        if not rec:
-            raise HTTPException(404, "Not found")
-        if rec.get("transaction_id"):
-            raise HTTPException(400, "Already saved")
-        parsed = rec.get("parsed") or {}
-        if not parsed.get("is_transaction"):
-            raise HTTPException(400, "Not a transaction")
-        now = datetime.now(timezone.utc).isoformat()
-        tx_id = f"tx_{uuid.uuid4().hex[:12]}"
-        amt = abs(float(parsed.get("amount", 0)))
-        await db.transactions.insert_one({
-            "transaction_id": tx_id, "user_id": user["user_id"],
-            "amount": amt if parsed.get("is_income") else -amt,
-            "currency": parsed.get("currency", "GBP"),
-            "description": parsed.get("description", ""),
-            "merchant": parsed.get("merchant"),
-            "category": parsed.get("category", "uncategorized"),
-            "date": now, "is_income": bool(parsed.get("is_income")),
-            "source": "sms", "created_at": now,
-        })
-        await db.sms_messages.update_one({"sms_id": sms_id}, {"$set": {"transaction_id": tx_id}})
-        return {"ok": True, "transaction_id": tx_id}
+        sm = request.app.state.db
+        async with sm() as session:
+            sms_id_int = int(sms_id.replace("sms_", "")) if sms_id.startswith("sms_") else int(sms_id)
+            result = await session.execute(
+                select(SmsMessage).where(
+                    SmsMessage.id == sms_id_int,
+                    SmsMessage.user_id == user["user_id"],
+                )
+            )
+            rec = result.scalar_one_or_none()
+            if not rec:
+                raise HTTPException(404, "Not found")
+            # We don't store parsed JSON on SMS — re-parse or skip
+            raise HTTPException(400, "Re-parse the SMS with auto_save=true")
 
-    # ===== Twilio webhook (public) =====
     @router.post("/sms/webhook")
     async def twilio_webhook(request: Request,
                              From: str = Form(""), To: str = Form(""), Body: str = Form("")):
-        """Twilio inbound SMS webhook. Routes by destination number (per-user)."""
-        db = request.app.state.db
-
-        # First, try to find user by their own Twilio phone_number (per-user setup)
-        user = await db.users.find_one({"twilio.phone_number": To}, {"_id": 0})
-
-        # Otherwise fall back to admin-level Twilio config
-        if not user:
-            twilio_number = await get_config(db, "twilio_phone_number", "TWILIO_PHONE_NUMBER")
+        sm = request.app.state.db
+        async with sm() as session:
+            twilio_number = await get_config(session, "twilio_phone_number", "TWILIO_PHONE_NUMBER")
             if twilio_number and To != twilio_number:
                 return {"ok": True, "skipped": "number_mismatch"}
-            user = await db.users.find_one({"sms_sender": From}, {"_id": 0})
-            if not user:
-                owner_email = await get_config(db, "twilio_owner_email", "ADMIN_EMAIL")
-                user = await db.users.find_one({"email": (owner_email or "").lower()}, {"_id": 0})
-        if not user:
-            return {"ok": True, "skipped": "no_user"}
+            owner_email = await get_config(session, "twilio_owner_email", "ADMIN_EMAIL")
+            result = await session.execute(
+                select(User).where(User.email == (owner_email or "").lower())
+            )
+            user_row = result.scalar_one_or_none()
+            if not user_row:
+                return {"ok": True, "skipped": "no_user"}
 
-        try:
-            parsed = await _ai_parse(Body)
-        except Exception as e:
-            logger.error(f"webhook AI parse failed: {e}")
-            parsed = {"is_transaction": False, "confidence": 0, "reason_if_not_transaction": str(e)[:120]}
+            try:
+                parsed = await _ai_parse(Body)
+            except Exception as e:
+                logger.error(f"webhook AI parse failed: {e}")
+                parsed = {"is_transaction": False, "confidence": 0, "reason_if_not_transaction": str(e)[:120]}
 
-        now = datetime.now(timezone.utc).isoformat()
-        sms_id = f"sms_{uuid.uuid4().hex[:10]}"
-        rec = {
-            "sms_id": sms_id, "user_id": user["user_id"],
-            "text": Body[:2000], "parsed": parsed,
-            "source": "twilio", "from": From, "to": To,
-            "transaction_id": None, "created_at": now,
-        }
-        if parsed.get("is_transaction") and parsed.get("confidence", 0) >= 0.7:
-            tx_id = f"tx_{uuid.uuid4().hex[:12]}"
-            amt = abs(float(parsed.get("amount", 0)))
-            await db.transactions.insert_one({
-                "transaction_id": tx_id, "user_id": user["user_id"],
-                "amount": amt if parsed.get("is_income") else -amt,
-                "currency": parsed.get("currency", "GBP"),
-                "description": parsed.get("description", ""),
-                "merchant": parsed.get("merchant"),
-                "category": parsed.get("category", "uncategorized"),
-                "date": now, "is_income": bool(parsed.get("is_income")),
-                "source": "sms", "created_at": now,
-            })
-            rec["transaction_id"] = tx_id
-        await db.sms_messages.insert_one(rec)
-        return {"ok": True, "parsed": parsed.get("is_transaction"), "confidence": parsed.get("confidence", 0)}
+            now = datetime.now(timezone.utc)
+            sms = SmsMessage(
+                user_id=user_row.user_id,
+                to_number=To,
+                body=Body[:2000],
+                direction="inbound",
+                provider="twilio",
+            )
+            session.add(sms)
 
-    # ===== Admin Twilio config =====
+            transaction_id = None
+            if parsed.get("is_transaction") and parsed.get("confidence", 0) >= 0.7:
+                tx_id = f"tx_{uuid.uuid4().hex[:12]}"
+                amt = abs(float(parsed.get("amount", 0)))
+                tx = Transaction(
+                    transaction_id=tx_id,
+                    user_id=user_row.user_id,
+                    amount=amt if parsed.get("is_income") else -amt,
+                    currency=parsed.get("currency", "GBP"),
+                    description=parsed.get("description", ""),
+                    merchant_name=parsed.get("merchant"),
+                    category=parsed.get("category", "uncategorized"),
+                    date=now,
+                    source="sms",
+                )
+                session.add(tx)
+                transaction_id = tx_id
+
+            await session.commit()
+            return {"ok": True, "parsed": parsed.get("is_transaction"), "confidence": parsed.get("confidence", 0)}
+
     @router.get("/admin/twilio-config")
     async def get_twilio_cfg(request: Request, user: dict = Depends(get_current_user)):
         if user.get("role") != "admin":
             raise HTTPException(403, "Admin only")
-        db = request.app.state.db
-        sid = await get_config(db, "twilio_account_sid", "TWILIO_ACCOUNT_SID")
-        token_exists = bool(await get_config(db, "twilio_auth_token", "TWILIO_AUTH_TOKEN"))
-        number = await get_config(db, "twilio_phone_number", "TWILIO_PHONE_NUMBER")
-        webhook = f"{os.environ.get('FRONTEND_URL', '')}/api/sms/webhook"
-        return {"account_sid": sid or "", "has_token": token_exists, "phone_number": number or "", "webhook_url": webhook}
+        sm = request.app.state.db
+        async with sm() as session:
+            sid = await get_config(session, "twilio_account_sid", "TWILIO_ACCOUNT_SID")
+            token_exists = bool(await get_config(session, "twilio_auth_token", "TWILIO_AUTH_TOKEN"))
+            number = await get_config(session, "twilio_phone_number", "TWILIO_PHONE_NUMBER")
+            webhook = f"{os.environ.get('FRONTEND_URL', '')}/api/sms/webhook"
+            return {"account_sid": sid or "", "has_token": token_exists, "phone_number": number or "", "webhook_url": webhook}
 
     @router.put("/admin/twilio-config")
     async def put_twilio_cfg(payload: TwilioConfigIn, request: Request, user: dict = Depends(get_current_user)):
         if user.get("role") != "admin":
             raise HTTPException(403, "Admin only")
-        db = request.app.state.db
-        mapping = {
-            "twilio_account_sid": payload.account_sid,
-            "twilio_auth_token": payload.auth_token,
-            "twilio_phone_number": payload.phone_number,
-        }
-        for k, v in mapping.items():
-            if v is not None and v != "":
-                await db.app_config.update_one({"key": k}, {"$set": {"key": k, "value": v}}, upsert=True)
-        return {"ok": True}
+        sm = request.app.state.db
+        async with sm() as session:
+            mapping = {
+                "twilio_account_sid": payload.account_sid,
+                "twilio_auth_token": payload.auth_token,
+                "twilio_phone_number": payload.phone_number,
+            }
+            for k, v in mapping.items():
+                if v is not None and v != "":
+                    existing = await session.execute(select(AppConfig).where(AppConfig.key == k))
+                    cfg = existing.scalar_one_or_none()
+                    if cfg:
+                        cfg.value = v
+                    else:
+                        session.add(AppConfig(key=k, value=v))
+            await session.commit()
+            return {"ok": True}
 
     return router

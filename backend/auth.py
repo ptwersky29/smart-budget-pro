@@ -10,11 +10,14 @@ import bcrypt
 import jwt
 from fastapi import APIRouter, HTTPException, Request, Response, Depends
 from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy import select, update, delete
+
+from db import User, UserSession, PasswordResetToken
 
 logger = logging.getLogger(__name__)
 
 JWT_ALGORITHM = "HS256"
-ACCESS_TOKEN_MINUTES = 60 * 24  # 24h for SaaS comfort
+ACCESS_TOKEN_MINUTES = 60 * 24
 REFRESH_TOKEN_DAYS = 7
 EMERGENT_SESSION_DAYS = 7
 
@@ -66,7 +69,6 @@ def clear_auth_cookies(response: Response):
     response.delete_cookie("session_token", path="/")
 
 
-# Pydantic models
 class RegisterIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6)
@@ -101,46 +103,60 @@ class UserOut(BaseModel):
     created_at: Optional[str] = None
 
 
-async def _get_db_from_request(request: Request):
-    return request.app.state.db
+def _user_to_dict(u: User) -> dict:
+    return {
+        "user_id": u.user_id,
+        "email": u.email,
+        "name": u.name or u.email.split("@")[0],
+        "role": "admin" if u.is_admin else "user",
+        "tier": u.tier,
+        "created_at": u.created_at.isoformat() if u.created_at else None,
+        "onboarded": u.onboarded,
+        "preferences": u.preferences or {},
+        "disabled": u.disabled,
+    }
 
 
 async def get_current_user(request: Request) -> dict:
-    db = request.app.state.db
-    # 1. Try JWT access cookie / bearer
-    token = request.cookies.get("access_token")
-    if not token:
-        auth = request.headers.get("Authorization", "")
-        if auth.startswith("Bearer "):
-            token = auth[7:]
-    if token:
-        try:
-            payload = jwt.decode(token, _secret(), algorithms=[JWT_ALGORITHM])
-            if payload.get("type") == "access":
-                user = await db.users.find_one({"user_id": payload["sub"]}, {"_id": 0, "password_hash": 0})
-                if user:
-                    return user
-        except jwt.PyJWTError:
-            pass
+    sm = request.app.state.db
+    async with sm() as session:
+        token = request.cookies.get("access_token")
+        if not token:
+            auth = request.headers.get("Authorization", "")
+            if auth.startswith("Bearer "):
+                token = auth[7:]
+        if token:
+            try:
+                payload = jwt.decode(token, _secret(), algorithms=[JWT_ALGORITHM])
+                if payload.get("type") == "access":
+                    result = await session.execute(
+                        select(User).where(User.user_id == payload["sub"])
+                    )
+                    user = result.scalar_one_or_none()
+                    if user:
+                        return _user_to_dict(user)
+            except jwt.PyJWTError:
+                pass
 
-    # 2. Try Emergent session_token cookie
-    session_token = request.cookies.get("session_token")
-    if not session_token:
-        auth = request.headers.get("Authorization", "")
-        if auth.startswith("Bearer "):
-            session_token = auth[7:]
-    if session_token:
-        session = await db.user_sessions.find_one({"session_token": session_token}, {"_id": 0})
-        if session:
-            expires = session["expires_at"]
-            if isinstance(expires, str):
-                expires = datetime.fromisoformat(expires)
-            if expires.tzinfo is None:
-                expires = expires.replace(tzinfo=timezone.utc)
-            if expires > datetime.now(timezone.utc):
-                user = await db.users.find_one({"user_id": session["user_id"]}, {"_id": 0, "password_hash": 0})
+        session_token = request.cookies.get("session_token")
+        if not session_token:
+            auth = request.headers.get("Authorization", "")
+            if auth.startswith("Bearer "):
+                session_token = auth[7:]
+        if session_token:
+            result = await session.execute(
+                select(UserSession).where(UserSession.session_token == session_token)
+            )
+            sess = result.scalar_one_or_none()
+            if sess and sess.expires_at.tzinfo is None:
+                sess.expires_at = sess.expires_at.replace(tzinfo=timezone.utc)
+            if sess and sess.expires_at > datetime.now(timezone.utc):
+                result = await session.execute(
+                    select(User).where(User.user_id == sess.user_id)
+                )
+                user = result.scalar_one_or_none()
                 if user:
-                    return user
+                    return _user_to_dict(user)
 
     raise HTTPException(status_code=401, detail="Not authenticated")
 
@@ -156,49 +172,53 @@ def build_router() -> APIRouter:
 
     @router.post("/register", response_model=UserOut)
     async def register(payload: RegisterIn, request: Request, response: Response):
-        db = request.app.state.db
-        email = payload.email.lower()
-        if await db.users.find_one({"email": email}):
-            raise HTTPException(400, "Email already registered")
-        user_id = f"user_{uuid.uuid4().hex[:12]}"
-        doc = {
-            "user_id": user_id,
-            "email": email,
-            "name": payload.name or email.split("@")[0],
-            "picture": None,
-            "password_hash": hash_password(payload.password),
-            "role": "user",
-            "tier": "free",
-            "ai_provider_configs": [],
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-        await db.users.insert_one(doc)
-        access = create_access_token(user_id, email)
-        refresh = create_refresh_token(user_id)
-        set_auth_cookies(response, access, refresh)
-        doc.pop("password_hash", None)
-        doc.pop("_id", None)
-        return doc
+        sm = request.app.state.db
+        async with sm() as session:
+            email = payload.email.lower()
+            result = await session.execute(select(User).where(User.email == email))
+            if result.scalar_one_or_none():
+                raise HTTPException(400, "Email already registered")
+
+            user_id = f"user_{uuid.uuid4().hex[:12]}"
+            user = User(
+                user_id=user_id,
+                email=email,
+                name=payload.name or email.split("@")[0],
+                hashed_password=hash_password(payload.password),
+            )
+            session.add(user)
+            await session.commit()
+
+            access = create_access_token(user_id, email)
+            refresh = create_refresh_token(user_id)
+            set_auth_cookies(response, access, refresh)
+            return _user_to_dict(user)
 
     @router.post("/login", response_model=UserOut)
     async def login(payload: LoginIn, request: Request, response: Response):
-        db = request.app.state.db
-        email = payload.email.lower()
-        user = await db.users.find_one({"email": email})
-        if not user or not user.get("password_hash") or not verify_password(payload.password, user["password_hash"]):
-            raise HTTPException(401, "Invalid email or password")
-        access = create_access_token(user["user_id"], email)
-        refresh = create_refresh_token(user["user_id"])
-        set_auth_cookies(response, access, refresh)
-        user.pop("password_hash", None)
-        user.pop("_id", None)
-        return user
+        sm = request.app.state.db
+        async with sm() as session:
+            email = payload.email.lower()
+            result = await session.execute(select(User).where(User.email == email))
+            user = result.scalar_one_or_none()
+            if not user or not verify_password(payload.password, user.hashed_password):
+                raise HTTPException(401, "Invalid email or password")
+
+            access = create_access_token(user.user_id, email)
+            refresh = create_refresh_token(user.user_id)
+            set_auth_cookies(response, access, refresh)
+            return _user_to_dict(user)
 
     @router.post("/logout")
     async def logout(request: Request, response: Response):
-        session_token = request.cookies.get("session_token")
-        if session_token:
-            await request.app.state.db.user_sessions.delete_one({"session_token": session_token})
+        sm = request.app.state.db
+        async with sm() as session:
+            session_token = request.cookies.get("session_token")
+            if session_token:
+                await session.execute(
+                    delete(UserSession).where(UserSession.session_token == session_token)
+                )
+                await session.commit()
         clear_auth_cookies(response)
         return {"ok": True}
 
@@ -215,70 +235,86 @@ def build_router() -> APIRouter:
             payload = jwt.decode(token, _secret(), algorithms=[JWT_ALGORITHM])
             if payload.get("type") != "refresh":
                 raise HTTPException(401, "Invalid token type")
-            user = await request.app.state.db.users.find_one({"user_id": payload["sub"]}, {"_id": 0})
-            if not user:
-                raise HTTPException(401, "User not found")
-            access = create_access_token(user["user_id"], user["email"])
-            response.set_cookie("access_token", access, httponly=True, secure=True, samesite="none",
-                                max_age=ACCESS_TOKEN_MINUTES * 60, path="/")
-            return {"ok": True}
+            sm = request.app.state.db
+            async with sm() as session:
+                result = await session.execute(
+                    select(User).where(User.user_id == payload["sub"])
+                )
+                user = result.scalar_one_or_none()
+                if not user:
+                    raise HTTPException(401, "User not found")
+                access = create_access_token(user.user_id, user.email)
+                response.set_cookie("access_token", access, httponly=True, secure=True, samesite="none",
+                                    max_age=ACCESS_TOKEN_MINUTES * 60, path="/")
+                return {"ok": True}
         except jwt.PyJWTError:
             raise HTTPException(401, "Invalid refresh token")
 
     @router.post("/forgot-password")
     async def forgot_password(payload: ForgotPasswordIn, request: Request):
-        db = request.app.state.db
-        user = await db.users.find_one({"email": payload.email.lower()})
-        if user:
-            token = secrets.token_urlsafe(32)
-            await db.password_reset_tokens.insert_one({
-                "token": token,
-                "user_id": user["user_id"],
-                "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
-                "used": False,
-            })
-            logger.info(f"PASSWORD RESET LINK: {os.environ.get('FRONTEND_URL', '')}/reset?token={token}")
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(User).where(User.email == payload.email.lower())
+            )
+            user = result.scalar_one_or_none()
+            if user:
+                token = secrets.token_urlsafe(32)
+                reset = PasswordResetToken(
+                    user_id=user.user_id,
+                    token=token,
+                    expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+                )
+                session.add(reset)
+                await session.commit()
+                logger.info(f"PASSWORD RESET LINK: {os.environ.get('FRONTEND_URL', '')}/reset?token={token}")
         return {"ok": True, "message": "If the email exists, a reset link has been sent."}
 
     @router.post("/reset-password")
     async def reset_password(payload: ResetPasswordIn, request: Request):
-        db = request.app.state.db
-        rec = await db.password_reset_tokens.find_one({"token": payload.token})
-        if not rec or rec.get("used"):
-            raise HTTPException(400, "Invalid or used token")
-        expires = rec["expires_at"]
-        if isinstance(expires, str):
-            expires = datetime.fromisoformat(expires)
-        if expires.tzinfo is None:
-            expires = expires.replace(tzinfo=timezone.utc)
-        if expires < datetime.now(timezone.utc):
-            raise HTTPException(400, "Token expired")
-        await db.users.update_one({"user_id": rec["user_id"]},
-                                  {"$set": {"password_hash": hash_password(payload.new_password)}})
-        await db.password_reset_tokens.update_one({"token": payload.token}, {"$set": {"used": True}})
-        return {"ok": True}
-
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(PasswordResetToken).where(PasswordResetToken.token == payload.token)
+            )
+            rec = result.scalar_one_or_none()
+            if not rec:
+                raise HTTPException(400, "Invalid or used token")
+            if rec.expires_at.tzinfo is None:
+                rec.expires_at = rec.expires_at.replace(tzinfo=timezone.utc)
+            if rec.expires_at < datetime.now(timezone.utc):
+                raise HTTPException(400, "Token expired")
+            await session.execute(
+                update(User).where(User.user_id == rec.user_id).values(
+                    hashed_password=hash_password(payload.new_password)
+                )
+            )
+            await session.delete(rec)
+            await session.commit()
+            return {"ok": True}
 
     return router
 
 
-async def seed_admin(db):
+async def seed_admin(session):
     email = os.environ.get("ADMIN_EMAIL", "admin@financeai.app")
     password = os.environ.get("ADMIN_PASSWORD", "FinanceAI2026!")
-    existing = await db.users.find_one({"email": email})
+    result = await session.execute(select(User).where(User.email == email))
+    existing = result.scalar_one_or_none()
     if existing is None:
-        await db.users.insert_one({
-            "user_id": f"user_{uuid.uuid4().hex[:12]}",
-            "email": email,
-            "name": "Admin",
-            "password_hash": hash_password(password),
-            "role": "admin",
-            "tier": "premium",
-            "ai_provider_configs": [],
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        })
+        user = User(
+            user_id=f"user_{uuid.uuid4().hex[:12]}",
+            email=email,
+            name="Admin",
+            hashed_password=hash_password(password),
+            is_admin=True,
+            tier="premium",
+        )
+        session.add(user)
+        await session.commit()
         logger.info("Seeded admin user.")
-    elif not verify_password(password, existing.get("password_hash", "")):
-        await db.users.update_one({"email": email},
-                                  {"$set": {"password_hash": hash_password(password),
-                                            "role": "admin", "tier": "premium"}})
+    elif not verify_password(password, existing.hashed_password):
+        existing.hashed_password = hash_password(password)
+        existing.is_admin = True
+        existing.tier = "premium"
+        await session.commit()

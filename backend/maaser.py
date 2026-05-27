@@ -3,13 +3,16 @@ import uuid
 import logging
 from datetime import datetime, timezone
 
+from sqlalchemy import select
+
+from db import User, MaaserLedger, Transaction
+
 logger = logging.getLogger("maaser")
 
 INCOME_CATEGORIES = {"salary", "income"}
 
 
 def _is_income_tx(tx: dict) -> bool:
-    """A transaction counts as income if flagged is_income OR amount>0 OR category is salary/income."""
     if tx.get("is_income"):
         return True
     if (tx.get("category") or "").lower() in INCOME_CATEGORIES:
@@ -19,23 +22,25 @@ def _is_income_tx(tx: dict) -> bool:
     return False
 
 
-async def maybe_accrue(db, user_id: str, tx: dict) -> dict | None:
-    """If the user has auto-maaser ON and tx is income/salary, create a pending Tzedakah entry.
-    Returns the created tzedakah doc (without _id) or None if skipped.
-    """
+async def maybe_accrue(session, user_id: str, tx: dict) -> dict | None:
     if not _is_income_tx(tx):
         return None
 
-    u = await db.users.find_one({"user_id": user_id}, {"_id": 0, "maaser": 1})
-    settings = (u or {}).get("maaser") or {}
+    result = await session.execute(select(User).where(User.user_id == user_id))
+    u = result.scalar_one_or_none()
+    prefs = u.preferences or {} if u else {}
+    settings = prefs.get("maaser") or {}
     if not settings.get("enabled"):
         return None
 
-    # Don't double-accrue for the same transaction
     if tx.get("transaction_id"):
-        existing = await db.tzedakah.find_one(
-            {"user_id": user_id, "source_tx_id": tx["transaction_id"]}, {"_id": 1})
-        if existing:
+        existing = await session.execute(
+            select(MaaserLedger).where(
+                MaaserLedger.user_id == user_id,
+                MaaserLedger.transaction_id == tx["transaction_id"],
+            )
+        )
+        if existing.scalar_one_or_none():
             return None
 
     percent = float(settings.get("percent", 10))
@@ -43,61 +48,77 @@ async def maybe_accrue(db, user_id: str, tx: dict) -> dict | None:
     if amount <= 0:
         return None
 
-    now = datetime.now(timezone.utc).isoformat()
-    doc = {
-        "entry_id": f"tz_{uuid.uuid4().hex[:12]}",
+    now = datetime.now(timezone.utc)
+    entry = MaaserLedger(
+        user_id=user_id,
+        transaction_id=tx.get("transaction_id"),
+        income_amount=abs(float(tx.get("amount", 0))),
+        maaser_due=amount,
+        paid_to="Maaser (pending allocation)",
+        note=f"Auto-Maaser {percent:.1f}% of {tx.get('description', 'income')}",
+        date=now,
+    )
+    session.add(entry)
+    await session.commit()
+    await session.refresh(entry)
+    return {
+        "entry_id": f"tz_{entry.id}",
         "user_id": user_id,
         "amount": amount,
         "recipient": "Maaser (pending allocation)",
-        "note": f"Auto-Maaser {percent:.1f}% of {tx.get('description', 'income')}",
-        "date": tx.get("date") or now,
         "status": "pending",
-        "source_tx_id": tx.get("transaction_id"),
-        "created_at": now,
     }
-    await db.tzedakah.insert_one(doc)
-    doc.pop("_id", None)
-    return doc
 
 
-async def backfill_for_user(db, user_id: str) -> dict:
-    """Scan all existing income transactions for this user and create
-    pending Maaser entries for any that don't already have one.
-    Returns {created, skipped, total_amount}.
-    """
-    u = await db.users.find_one({"user_id": user_id}, {"_id": 0, "maaser": 1})
-    settings = (u or {}).get("maaser") or {}
+async def backfill_for_user(session, user_id: str) -> dict:
+    result = await session.execute(select(User).where(User.user_id == user_id))
+    u = result.scalar_one_or_none()
+    prefs = u.preferences or {} if u else {}
+    settings = prefs.get("maaser") or {}
     if not settings.get("enabled"):
         return {"created": 0, "skipped": 0, "total_amount": 0, "enabled": False}
 
     percent = float(settings.get("percent", 10))
-    txs = await db.transactions.find({"user_id": user_id}, {"_id": 0}).to_list(5000)
+    tx_result = await session.execute(
+        select(Transaction).where(Transaction.user_id == user_id)
+    )
+    txs = tx_result.scalars().all()
     created = 0
     skipped = 0
     total_amount = 0.0
-    for tx in txs:
-        if not _is_income_tx(tx):
+    for t in txs:
+        tx_dict = {
+            "transaction_id": t.transaction_id,
+            "amount": t.amount,
+            "category": t.category,
+            "description": t.description,
+            "is_income": t.amount > 0,
+        }
+        if not _is_income_tx(tx_dict):
             continue
-        existing = await db.tzedakah.find_one(
-            {"user_id": user_id, "source_tx_id": tx.get("transaction_id")}, {"_id": 1})
-        if existing:
+        existing = await session.execute(
+            select(MaaserLedger).where(
+                MaaserLedger.user_id == user_id,
+                MaaserLedger.transaction_id == t.transaction_id,
+            )
+        )
+        if existing.scalar_one_or_none():
             skipped += 1
             continue
-        amount = round(abs(float(tx.get("amount", 0))) * percent / 100, 2)
-        if amount <= 0:
+        amt = round(abs(float(t.amount)) * percent / 100, 2)
+        if amt <= 0:
             continue
-        now = datetime.now(timezone.utc).isoformat()
-        await db.tzedakah.insert_one({
-            "entry_id": f"tz_{uuid.uuid4().hex[:12]}",
-            "user_id": user_id,
-            "amount": amount,
-            "recipient": "Maaser (pending allocation)",
-            "note": f"Auto-Maaser {percent:.1f}% of {tx.get('description', 'income')} (backfill)",
-            "date": tx.get("date") or now,
-            "status": "pending",
-            "source_tx_id": tx.get("transaction_id"),
-            "created_at": now,
-        })
+        entry = MaaserLedger(
+            user_id=user_id,
+            transaction_id=t.transaction_id,
+            income_amount=abs(float(t.amount)),
+            maaser_due=amt,
+            paid_to="Maaser (pending allocation)",
+            note=f"Auto-Maaser {percent:.1f}% of {t.description} (backfill)",
+            date=t.date or datetime.now(timezone.utc),
+        )
+        session.add(entry)
         created += 1
-        total_amount += amount
+        total_amount += amt
+    await session.commit()
     return {"created": created, "skipped": skipped, "total_amount": round(total_amount, 2), "enabled": True}

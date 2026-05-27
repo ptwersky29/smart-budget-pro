@@ -7,6 +7,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Request, Depends, Query, HTTPException
 from fastapi.responses import StreamingResponse
+from sqlalchemy import select
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -16,6 +17,7 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak,
 )
 
+from db import Transaction, Budget, MaaserLedger
 from auth import require_premium
 
 logger = logging.getLogger("reports")
@@ -48,17 +50,14 @@ def _styles():
 
 def _header_footer(canvas, doc, user_email: str, kind: str):
     canvas.saveState()
-    # Top emerald bar
     canvas.setFillColor(EMERALD)
     canvas.rect(0, A4[1] - 6, A4[0], 6, fill=1, stroke=0)
-    # Brand
     canvas.setFont("Helvetica-Bold", 9)
     canvas.setFillColor(INK)
     canvas.drawString(15 * mm, A4[1] - 14 * mm, "FinanceAI")
     canvas.setFont("Helvetica", 8)
     canvas.setFillColor(MUTED)
     canvas.drawRightString(A4[0] - 15 * mm, A4[1] - 14 * mm, kind)
-    # Footer
     canvas.setFont("Helvetica", 7)
     canvas.setFillColor(MUTED)
     canvas.drawString(15 * mm, 10 * mm,
@@ -71,7 +70,6 @@ def _kpi_table(s, items):
     cells = [[
         Paragraph(label, s["label"]), Paragraph(value, s["kpi"])
     ] for label, value in items]
-    # arrange into 4 columns
     grouped = [cells[i:i + 4] for i in range(0, len(cells), 4)]
     table_data = []
     for g in grouped:
@@ -148,17 +146,42 @@ def _cat_table(s, categories):
     return t
 
 
-async def _gather(db, user_id: str, month: Optional[str] = None, year: Optional[int] = None):
-    """Pull all data needed for reports. Returns dict of structured results."""
-    q = {"user_id": user_id}
+async def _gather(session, user_id: str, month: Optional[str] = None, year: Optional[int] = None):
+    base_q = select(Transaction).where(Transaction.user_id == user_id)
     if month:
-        q["date"] = {"$regex": f"^{month}"}  # YYYY-MM
+        start = datetime.strptime(f"{month}-01", "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        if month[5:7] == "12":
+            end = datetime(int(month[:4]) + 1, 1, 1, tzinfo=timezone.utc)
+        else:
+            end = datetime(int(month[:4]), int(month[5:7]) + 1, 1, tzinfo=timezone.utc)
+        base_q = base_q.where(Transaction.date >= start, Transaction.date < end)
     elif year:
-        q["date"] = {"$regex": f"^{year}"}
-    txs = await db.transactions.find(q, {"_id": 0}).sort("date", -1).to_list(5000)
+        start = datetime(year, 1, 1, tzinfo=timezone.utc)
+        end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+        base_q = base_q.where(Transaction.date >= start, Transaction.date < end)
 
-    income = sum(t["amount"] for t in txs if t["amount"] > 0)
-    spend = sum(-t["amount"] for t in txs if t["amount"] < 0)
+    result = await session.execute(base_q.order_by(Transaction.date.desc()).limit(5000))
+    txs_raw = result.scalars().all()
+
+    txs = []
+    income = 0.0
+    spend = 0.0
+    for t in txs_raw:
+        d = {
+            "transaction_id": t.transaction_id,
+            "amount": t.amount,
+            "currency": t.currency,
+            "description": t.description,
+            "merchant": t.merchant_name,
+            "category": t.category,
+            "date": t.date.isoformat() if t.date else "",
+        }
+        txs.append(d)
+        if t.amount > 0:
+            income += t.amount
+        else:
+            spend += -t.amount
+
     balance = income - spend
     savings_rate = ((income - spend) / income * 100) if income > 0 else 0
     health_score = max(0, min(100, int(savings_rate * 2 + (50 if balance > 0 else 0))))
@@ -169,12 +192,34 @@ async def _gather(db, user_id: str, month: Optional[str] = None, year: Optional[
             cats[t.get("category", "uncategorized")] += -t["amount"]
     cat_list = [{"name": k, "value": v} for k, v in sorted(cats.items(), key=lambda x: -x[1])]
 
-    budgets = await db.budgets.find({"user_id": user_id}, {"_id": 0}).to_list(100)
-    for b in budgets:
-        b["spent"] = sum(-t["amount"] for t in txs if t["amount"] < 0 and t["category"] == b["category"])
+    budget_result = await session.execute(select(Budget).where(Budget.user_id == user_id))
+    budgets_raw = budget_result.scalars().all()
+    budgets = []
+    for b in budgets_raw:
+        spent = sum(-t["amount"] for t in txs if t["amount"] < 0 and t["category"] == b.category)
+        budgets.append({
+            "budget_id": b.budget_id,
+            "category": b.category,
+            "limit": b.amount,
+            "spent": spent,
+        })
 
-    tzedakah = await db.tzedakah.find({"user_id": user_id}, {"_id": 0}).sort("date", -1).to_list(500)
-    total_tz = sum(t["amount"] for t in tzedakah)
+    tz_result = await session.execute(
+        select(MaaserLedger).where(MaaserLedger.user_id == user_id)
+        .order_by(MaaserLedger.date.desc()).limit(500)
+    )
+    tzedakah_raw = tz_result.scalars().all()
+    tzedakah = []
+    total_tz = 0.0
+    for t in tzedakah_raw:
+        amt = t.maaser_paid or t.income_amount or 0
+        tzedakah.append({
+            "amount": amt,
+            "recipient": t.paid_to or "",
+            "note": t.note or "",
+            "date": t.date.isoformat() if t.date else "",
+        })
+        total_tz += amt
 
     return {
         "txs": txs, "income": income, "spend": spend, "balance": balance,
@@ -192,7 +237,9 @@ def build_router() -> APIRouter:
                       user: dict = Depends(require_premium)):
         if not month:
             month = datetime.now(timezone.utc).strftime("%Y-%m")
-        data = await _gather(request.app.state.db, user["user_id"], month=month)
+        sm = request.app.state.db
+        async with sm() as session:
+            data = await _gather(session, user["user_id"], month=month)
         return _build_pdf(user, data, kind=f"Monthly report · {month}", filename=f"financeai-{month}.pdf")
 
     @router.get("/yearly")
@@ -200,12 +247,16 @@ def build_router() -> APIRouter:
                      user: dict = Depends(require_premium)):
         if not year:
             year = datetime.now(timezone.utc).year
-        data = await _gather(request.app.state.db, user["user_id"], year=year)
+        sm = request.app.state.db
+        async with sm() as session:
+            data = await _gather(session, user["user_id"], year=year)
         return _build_pdf(user, data, kind=f"Yearly report · {year}", filename=f"financeai-{year}.pdf", yearly=True)
 
     @router.get("/full")
     async def full(request: Request, user: dict = Depends(require_premium)):
-        data = await _gather(request.app.state.db, user["user_id"])
+        sm = request.app.state.db
+        async with sm() as session:
+            data = await _gather(session, user["user_id"])
         return _build_pdf(user, data, kind="Full financial snapshot",
                           filename=f"financeai-snapshot-{datetime.now(timezone.utc).strftime('%Y%m%d')}.pdf",
                           full=True)
@@ -241,9 +292,9 @@ def _build_pdf(user: dict, data: dict, kind: str, filename: str,
     elems.append(Paragraph("AI insights", s["h2"]))
     insights = [
         f"Savings rate is <b>{data['savings_rate']:.1f}%</b>. "
-        + ("Excellent discipline." if data["savings_rate"] >= 20 else "Aim for 20% to build wealth steadily." if data["savings_rate"] >= 10 else "Tighten discretionary spend this month."),
+        + ("Excellent discipline." if data['savings_rate'] >= 20 else "Aim for 20% to build wealth steadily." if data['savings_rate'] >= 10 else "Tighten discretionary spend this month."),
         f"Top spending category is <b>{data['categories'][0]['name'].capitalize() if data['categories'] else '—'}</b>"
-        + (f" at <b>£{data['categories'][0]['value']:.2f}</b>." if data["categories"] else "."),
+        + (f" at <b>£{data['categories'][0]['value']:.2f}</b>." if data['categories'] else "."),
         f"Total given to Tzedakah on file: <b>£{data['total_tzedakah']:.2f}</b>.",
         "Build an emergency fund of 3-6 months expenses before increasing investments.",
     ]

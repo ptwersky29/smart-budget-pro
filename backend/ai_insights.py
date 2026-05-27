@@ -2,11 +2,6 @@
 
 One-shot prompts (no chat history) — fetches relevant user data, asks the
 user's chosen LLM provider for insights, returns structured JSON.
-
-Provider selection:
-  1. If the user has a configured AI provider marked as default → use THEIR key.
-  2. Otherwise fall back to the Emergent universal LLM key (free-tier users
-     are rate-limited to 5 insight calls per day; premium has no limit).
 """
 import os
 import json
@@ -16,14 +11,16 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel
+from sqlalchemy import select, func
 
+from db import Transaction, Budget, AiUsage
 from auth import get_current_user
 
 logger = logging.getLogger("ai_insights")
 
 EMERGENT_PROVIDER = "anthropic"
 EMERGENT_MODEL = "claude-sonnet-4-5-20250929"
-FREE_TIER_DAILY_LIMIT = 5  # only applies when using the shared Emergent key
+FREE_TIER_DAILY_LIMIT = 5
 
 SYSTEM_PROMPT = (
     "You are FinanceAI's analytics engine. Generate clear, actionable, UK-focused "
@@ -35,11 +32,6 @@ SYSTEM_PROMPT = (
 
 
 def _pick_provider(user: dict) -> tuple[str, str, str, bool]:
-    """Return (provider, model, api_key, is_user_key).
-
-    is_user_key = True when we're using the user's own bring-your-own key
-    (in which case no rate-limit is applied — they pay their own provider).
-    """
     active = next(
         (p for p in user.get("ai_provider_configs", []) if p.get("is_default") and p.get("api_key")),
         None,
@@ -52,18 +44,20 @@ def _pick_provider(user: dict) -> tuple[str, str, str, bool]:
     return EMERGENT_PROVIDER, EMERGENT_MODEL, api_key, False
 
 
-async def _enforce_free_limit_if_needed(db, user: dict, is_user_key: bool) -> None:
-    """Free users on the shared key get 5 insight calls per day."""
+async def _enforce_free_limit_if_needed(session, user: dict, is_user_key: bool) -> None:
     if is_user_key:
-        return  # using their own key, no limit
+        return
     if user.get("tier") == "premium" or user.get("role") == "admin":
-        return  # premium / admin unlimited on Emergent key
-    start_of_day = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
-    count = await db.ai_usage.count_documents({
-        "user_id": user["user_id"],
-        "feature": "insight",
-        "created_at": {"$gte": start_of_day},
-    })
+        return
+    start_of_day = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    result = await session.execute(
+        select(func.count()).select_from(AiUsage).where(
+            AiUsage.user_id == user["user_id"],
+            AiUsage.date >= start_of_day,
+            AiUsage.endpoint == "insight",
+        )
+    )
+    count = result.scalar() or 0
     if count >= FREE_TIER_DAILY_LIMIT:
         raise HTTPException(
             429,
@@ -72,26 +66,29 @@ async def _enforce_free_limit_if_needed(db, user: dict, is_user_key: bool) -> No
         )
 
 
-async def _track_usage(db, user_id: str, provider: str, model: str, prompt: str, response: str, is_user_key: bool) -> None:
+async def _track_usage(session, user_id: str, provider: str, model: str, prompt: str, response: str, is_user_key: bool) -> None:
     try:
-        await db.ai_usage.insert_one({
-            "user_id": user_id, "feature": "insight",
-            "provider": provider, "model": model, "is_user_key": is_user_key,
-            "approx_tokens": len(prompt.split()) + len(response.split()),
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        })
+        usage = AiUsage(
+            user_id=user_id,
+            prompt_tokens=len(prompt.split()),
+            completion_tokens=len(response.split()),
+            provider=provider,
+            endpoint="insight",
+        )
+        session.add(usage)
+        await session.commit()
     except Exception as e:
         logger.warning(f"usage tracking failed: {e}")
 
 
-async def _call_llm(db, user: dict, system: str, user_prompt: str) -> str:
+async def _call_llm(session, user: dict, system: str, user_prompt: str) -> str:
     from emergentintegrations.llm.chat import LlmChat, UserMessage
     provider, model, api_key, is_user_key = _pick_provider(user)
-    await _enforce_free_limit_if_needed(db, user, is_user_key)
+    await _enforce_free_limit_if_needed(session, user, is_user_key)
     import uuid as _uuid
-    session_id = f"insight_{_uuid.uuid4().hex[:10]}"
+    sess_id = f"insight_{_uuid.uuid4().hex[:10]}"
     try:
-        client = LlmChat(api_key=api_key, session_id=session_id, system_message=system).with_model(provider, model)
+        client = LlmChat(api_key=api_key, session_id=sess_id, system_message=system).with_model(provider, model)
         resp = await client.send_message(UserMessage(text=user_prompt))
         text = str(resp or "")
     except HTTPException:
@@ -103,15 +100,13 @@ async def _call_llm(db, user: dict, system: str, user_prompt: str) -> str:
         raise HTTPException(502, f"AI provider error: {str(e)[:200]}")
     if not text:
         raise HTTPException(502, "AI returned an empty response")
-    await _track_usage(db, user["user_id"], provider, model, user_prompt, text, is_user_key)
+    await _track_usage(session, user["user_id"], provider, model, user_prompt, text, is_user_key)
     return text
 
 
 def _parse_json(text: str) -> dict:
-    """Strip code-fences and parse JSON."""
     t = text.strip()
     if t.startswith("```"):
-        # remove first line and trailing fence
         lines = t.split("\n")
         if lines and lines[0].startswith("```"):
             lines = lines[1:]
@@ -121,7 +116,6 @@ def _parse_json(text: str) -> dict:
     try:
         return json.loads(t)
     except json.JSONDecodeError:
-        # Try to extract the first JSON object substring
         start = t.find("{")
         end = t.rfind("}")
         if start >= 0 and end > start:
@@ -132,7 +126,6 @@ def _parse_json(text: str) -> dict:
         raise HTTPException(502, "AI returned unparseable JSON")
 
 
-# ===== Request models =====
 class ForecastInsightIn(BaseModel):
     symbol: str
     initial_value: float
@@ -152,38 +145,42 @@ def build_router() -> APIRouter:
 
     @router.post("/dashboard")
     async def dashboard_insights(request: Request, user: dict = Depends(get_current_user)):
-        """Analyse the user's recent transactions and return 3-5 actionable insights."""
-        db = request.app.state.db
-        # Last 60 days of transactions
-        since = (datetime.now(timezone.utc) - timedelta(days=60)).isoformat()
-        txs = await db.transactions.find(
-            {"user_id": user["user_id"], "date": {"$gte": since}}, {"_id": 0}
-        ).sort("date", -1).to_list(500)
-        if not txs:
-            return {"insights": [], "note": "Not enough transactions yet — add some to unlock insights."}
+        sm = request.app.state.db
+        async with sm() as session:
+            since = datetime.now(timezone.utc) - timedelta(days=60)
+            result = await session.execute(
+                select(Transaction).where(
+                    Transaction.user_id == user["user_id"],
+                    Transaction.date >= since,
+                ).order_by(Transaction.date.desc()).limit(500)
+            )
+            txs = result.scalars().all()
+            if not txs:
+                return {"insights": [], "note": "Not enough transactions yet — add some to unlock insights."}
 
-        # Aggregate
-        income = sum(t["amount"] for t in txs if t.get("amount", 0) > 0)
-        spend = sum(-t["amount"] for t in txs if t.get("amount", 0) < 0)
-        by_cat: dict[str, float] = {}
-        for t in txs:
-            if t.get("amount", 0) < 0:
-                c = (t.get("category") or "uncategorized").lower()
-                by_cat[c] = by_cat.get(c, 0) + (-t["amount"])
-        top_cats = sorted(by_cat.items(), key=lambda kv: -kv[1])[:6]
-        savings_rate = round((income - spend) / income * 100, 1) if income > 0 else 0
+            income = sum(t.amount for t in txs if t.amount > 0)
+            spend = sum(-t.amount for t in txs if t.amount < 0)
+            by_cat: dict[str, float] = {}
+            for t in txs:
+                if t.amount < 0:
+                    c = (t.category or "uncategorized").lower()
+                    by_cat[c] = by_cat.get(c, 0) + (-t.amount)
+            top_cats = sorted(by_cat.items(), key=lambda kv: -kv[1])[:6]
+            savings_rate = round((income - spend) / income * 100, 1) if income > 0 else 0
 
-        budgets = await db.budgets.find({"user_id": user["user_id"]}, {"_id": 0}).to_list(50)
-        over_budget = [b for b in budgets if b.get("spent", 0) > b.get("limit", 0)]
+            budget_result = await session.execute(
+                select(Budget).where(Budget.user_id == user["user_id"])
+            )
+            budgets = budget_result.scalars().all()
 
-        prompt = f"""Analyse this user's last 60 days of UK personal finance and return 3-5 specific, actionable insights.
+            prompt = f"""Analyse this user's last 60 days of UK personal finance and return 3-5 specific, actionable insights.
 
 Income: £{income:.2f}
 Spending: £{spend:.2f}
 Net: £{income - spend:.2f}
 Savings rate: {savings_rate}%
 Top spending categories: {", ".join(f"{c}: £{v:.0f}" for c, v in top_cats)}
-Active budgets: {len(budgets)} ({len(over_budget)} over limit)
+Active budgets: {len(budgets)}
 Tier: {user.get('tier', 'free')}
 
 Return JSON in this exact shape:
@@ -196,33 +193,40 @@ Return JSON in this exact shape:
 }}
 
 Make insights specific (cite actual amounts/categories). Mix positive observations with improvements. Use British English."""
-        text = await _call_llm(db, user, SYSTEM_PROMPT, prompt)
-        data = _parse_json(text)
-        return data
+            text = await _call_llm(session, user, SYSTEM_PROMPT, prompt)
+            return _parse_json(text)
 
     @router.post("/budget")
     async def budget_insights(request: Request, user: dict = Depends(get_current_user)):
-        """Recommend budget improvements based on actual spending."""
-        db = request.app.state.db
-        since = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
-        txs = await db.transactions.find(
-            {"user_id": user["user_id"], "date": {"$gte": since}, "amount": {"$lt": 0}}, {"_id": 0}
-        ).to_list(1000)
-        by_cat: dict[str, list[float]] = {}
-        for t in txs:
-            c = (t.get("category") or "uncategorized").lower()
-            by_cat.setdefault(c, []).append(-t["amount"])
-        cat_summary = {c: {"total": round(sum(v), 2), "count": len(v), "avg": round(sum(v) / len(v), 2)}
-                       for c, v in by_cat.items()}
-        budgets = await db.budgets.find({"user_id": user["user_id"]}, {"_id": 0}).to_list(50)
+        sm = request.app.state.db
+        async with sm() as session:
+            since = datetime.now(timezone.utc) - timedelta(days=90)
+            result = await session.execute(
+                select(Transaction).where(
+                    Transaction.user_id == user["user_id"],
+                    Transaction.date >= since,
+                    Transaction.amount < 0,
+                )
+            )
+            txs = result.scalars().all()
+            by_cat: dict[str, list[float]] = {}
+            for t in txs:
+                c = (t.category or "uncategorized").lower()
+                by_cat.setdefault(c, []).append(-t.amount)
+            cat_summary = {c: {"total": round(sum(v), 2), "count": len(v), "avg": round(sum(v) / len(v), 2)}
+                           for c, v in by_cat.items()}
+            budget_result = await session.execute(
+                select(Budget).where(Budget.user_id == user["user_id"])
+            )
+            budgets = budget_result.scalars().all()
 
-        prompt = f"""Suggest budget improvements for this UK user.
+            prompt = f"""Suggest budget improvements for this UK user.
 
 Last 90 days spending by category (monthly averages can be derived by dividing total by 3):
 {json.dumps(cat_summary, indent=2)}
 
 Existing budgets:
-{json.dumps([{"category": b["category"], "limit": b["limit"], "spent": b.get("spent", 0)} for b in budgets], indent=2)}
+{json.dumps([{"category": b.category, "limit": b.amount} for b in budgets], indent=2)}
 
 Return JSON:
 {{
@@ -235,14 +239,14 @@ Return JSON:
 }}
 
 Suggest realistic limits (not too aggressive). Use British English."""
-        text = await _call_llm(db, user, SYSTEM_PROMPT, prompt)
-        return _parse_json(text)
+            text = await _call_llm(session, user, SYSTEM_PROMPT, prompt)
+            return _parse_json(text)
 
     @router.post("/forecast")
     async def forecast_insights(payload: ForecastInsightIn, request: Request, user: dict = Depends(get_current_user)):
-        """Generate ideas about an investment forecast scenario."""
-        db = request.app.state.db
-        prompt = f"""A UK user is forecasting this investment:
+        sm = request.app.state.db
+        async with sm() as session:
+            prompt = f"""A UK user is forecasting this investment:
 - Symbol: {payload.symbol}
 - Initial: £{payload.initial_value:.0f}
 - Monthly contribution: £{payload.monthly_contribution:.0f}
@@ -265,40 +269,44 @@ Return JSON:
 }}
 
 Provide 3-5 ideas, 3 risks, 3 alternative ETFs. British English."""
-        text = await _call_llm(db, user, SYSTEM_PROMPT, prompt)
-        return _parse_json(text)
+            text = await _call_llm(session, user, SYSTEM_PROMPT, prompt)
+            return _parse_json(text)
 
     @router.post("/report")
     async def report_insights(payload: ReportInsightIn, request: Request, user: dict = Depends(get_current_user)):
-        """Generate a narrative AI summary of the user's month."""
-        db = request.app.state.db
-        start = datetime(payload.year, payload.month, 1, tzinfo=timezone.utc)
-        end_month = payload.month + 1 if payload.month < 12 else 1
-        end_year = payload.year if payload.month < 12 else payload.year + 1
-        end = datetime(end_year, end_month, 1, tzinfo=timezone.utc)
-        txs = await db.transactions.find({
-            "user_id": user["user_id"],
-            "date": {"$gte": start.isoformat(), "$lt": end.isoformat()},
-        }, {"_id": 0}).to_list(2000)
-        if not txs:
-            return {"narrative": f"No transactions found for {start.strftime('%B %Y')}. Add some to generate a report.",
-                    "highlights": [], "metrics": {}}
+        sm = request.app.state.db
+        async with sm() as session:
+            start = datetime(payload.year, payload.month, 1, tzinfo=timezone.utc)
+            end_month = payload.month + 1 if payload.month < 12 else 1
+            end_year = payload.year if payload.month < 12 else payload.year + 1
+            end = datetime(end_year, end_month, 1, tzinfo=timezone.utc)
+            result = await session.execute(
+                select(Transaction).where(
+                    Transaction.user_id == user["user_id"],
+                    Transaction.date >= start,
+                    Transaction.date < end,
+                )
+            )
+            txs = result.scalars().all()
+            if not txs:
+                return {"narrative": f"No transactions found for {start.strftime('%B %Y')}. Add some to generate a report.",
+                        "highlights": [], "metrics": {}}
 
-        income = sum(t["amount"] for t in txs if t.get("amount", 0) > 0)
-        spend = sum(-t["amount"] for t in txs if t.get("amount", 0) < 0)
-        by_cat: dict[str, float] = {}
-        for t in txs:
-            if t.get("amount", 0) < 0:
-                c = (t.get("category") or "uncategorized").lower()
-                by_cat[c] = by_cat.get(c, 0) + (-t["amount"])
-        top_merchants: dict[str, float] = {}
-        for t in txs:
-            if t.get("amount", 0) < 0:
-                m = (t.get("description") or "Unknown")[:40]
-                top_merchants[m] = top_merchants.get(m, 0) + (-t["amount"])
-        top5 = sorted(top_merchants.items(), key=lambda kv: -kv[1])[:5]
+            income = sum(t.amount for t in txs if t.amount > 0)
+            spend = sum(-t.amount for t in txs if t.amount < 0)
+            by_cat: dict[str, float] = {}
+            for t in txs:
+                if t.amount < 0:
+                    c = (t.category or "uncategorized").lower()
+                    by_cat[c] = by_cat.get(c, 0) + (-t.amount)
+            top_merchants: dict[str, float] = {}
+            for t in txs:
+                if t.amount < 0:
+                    m = (t.description or "Unknown")[:40]
+                    top_merchants[m] = top_merchants.get(m, 0) + (-t.amount)
+            top5 = sorted(top_merchants.items(), key=lambda kv: -kv[1])[:5]
 
-        prompt = f"""Write a friendly monthly finance narrative for {start.strftime('%B %Y')} for a UK user.
+            prompt = f"""Write a friendly monthly finance narrative for {start.strftime('%B %Y')} for a UK user.
 
 Income: £{income:.2f}
 Spending: £{spend:.2f}
@@ -323,7 +331,7 @@ Return JSON:
 }}
 
 5-7 highlights. British English."""
-        text = await _call_llm(db, user, SYSTEM_PROMPT, prompt)
-        return _parse_json(text)
+            text = await _call_llm(session, user, SYSTEM_PROMPT, prompt)
+            return _parse_json(text)
 
     return router

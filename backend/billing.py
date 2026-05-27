@@ -5,7 +5,9 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel
+from sqlalchemy import select, update
 
+from db import PaymentTransaction, User
 from auth import get_current_user
 
 logger = logging.getLogger("billing")
@@ -52,45 +54,46 @@ def build_router() -> APIRouter:
             metadata={"user_id": user["user_id"], "package_id": payload.package_id},
         )
         session = await sc.create_checkout_session(req_obj)
-        # persist initiation
-        await request.app.state.db.payment_transactions.insert_one({
-            "session_id": session.session_id,
-            "user_id": user["user_id"],
-            "amount": pkg["amount"],
-            "currency": pkg["currency"],
-            "package_id": payload.package_id,
-            "payment_status": "initiated",
-            "status": "open",
-            "metadata": {"user_id": user["user_id"], "package_id": payload.package_id},
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        })
+        sm = request.app.state.db
+        async with sm() as db_session:
+            tx = PaymentTransaction(
+                session_id=session.session_id,
+                user_id=user["user_id"],
+                amount=pkg["amount"],
+                currency=pkg["currency"],
+                package_id=payload.package_id,
+                payment_status="initiated",
+                status="open",
+            )
+            db_session.add(tx)
+            await db_session.commit()
         return {"checkout_url": session.url, "session_id": session.session_id}
 
     @router.get("/billing/status/{session_id}")
     async def checkout_status(session_id: str, request: Request, user: dict = Depends(get_current_user)):
         from emergentintegrations.payments.stripe.checkout import StripeCheckout
-        db = request.app.state.db
-        rec = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
-        if not rec:
-            raise HTTPException(404, "Session not found")
-        # Already processed
-        if rec.get("payment_status") == "paid":
-            return rec
-        host_url = str(request.base_url).rstrip("/")
-        sc = StripeCheckout(api_key=os.environ["STRIPE_API_KEY"], webhook_url=f"{host_url}/api/webhook/stripe")
-        status_obj = await sc.get_checkout_status(session_id)
-        update = {
-            "status": status_obj.status,
-            "payment_status": status_obj.payment_status,
-            "amount_total": status_obj.amount_total,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }
-        await db.payment_transactions.update_one({"session_id": session_id}, {"$set": update})
-        # Upgrade user on successful payment (idempotent)
-        if status_obj.payment_status == "paid" and rec.get("payment_status") != "paid":
-            await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"tier": "premium"}})
-        rec.update(update)
-        return rec
+        sm = request.app.state.db
+        async with sm() as db_session:
+            result = await db_session.execute(
+                select(PaymentTransaction).where(PaymentTransaction.session_id == session_id)
+            )
+            rec = result.scalar_one_or_none()
+            if not rec:
+                raise HTTPException(404, "Session not found")
+            if rec.payment_status == "paid":
+                return {"session_id": rec.session_id, "payment_status": "paid", "status": rec.status, "amount": rec.amount}
+            host_url = str(request.base_url).rstrip("/")
+            sc = StripeCheckout(api_key=os.environ["STRIPE_API_KEY"], webhook_url=f"{host_url}/api/webhook/stripe")
+            status_obj = await sc.get_checkout_status(session_id)
+            rec.status = status_obj.status
+            rec.payment_status = status_obj.payment_status
+            if status_obj.payment_status == "paid" and rec.payment_status != "paid":
+                u_result = await db_session.execute(select(User).where(User.user_id == user["user_id"]))
+                u = u_result.scalar_one_or_none()
+                if u:
+                    u.tier = "premium"
+            await db_session.commit()
+            return {"session_id": rec.session_id, "payment_status": rec.payment_status, "status": rec.status, "amount": rec.amount}
 
     @router.post("/webhook/stripe")
     async def stripe_webhook(request: Request):
@@ -104,16 +107,23 @@ def build_router() -> APIRouter:
         except Exception as e:
             logger.error(f"webhook error: {e}")
             raise HTTPException(400, "Invalid webhook")
-        db = request.app.state.db
-        if evt.payment_status == "paid":
-            await db.payment_transactions.update_one(
-                {"session_id": evt.session_id},
-                {"$set": {"payment_status": "paid", "status": "complete",
-                          "updated_at": datetime.now(timezone.utc).isoformat()}}
+        sm = request.app.state.db
+        async with sm() as db_session:
+            result = await db_session.execute(
+                select(PaymentTransaction).where(PaymentTransaction.session_id == evt.session_id)
             )
-            user_id = (evt.metadata or {}).get("user_id")
-            if user_id:
-                await db.users.update_one({"user_id": user_id}, {"$set": {"tier": "premium"}})
+            rec = result.scalar_one_or_none()
+            if rec:
+                rec.payment_status = "paid" if evt.payment_status == "paid" else rec.payment_status
+                rec.status = "complete"
+            if evt.payment_status == "paid":
+                user_id = (evt.metadata or {}).get("user_id")
+                if user_id:
+                    u_result = await db_session.execute(select(User).where(User.user_id == user_id))
+                    u = u_result.scalar_one_or_none()
+                    if u:
+                        u.tier = "premium"
+            await db_session.commit()
         return {"ok": True}
 
     return router

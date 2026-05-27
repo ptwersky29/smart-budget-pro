@@ -9,7 +9,10 @@ import os
 import logging
 from fastapi import FastAPI, APIRouter
 from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from db import init_engine, dispose_engine, get_session_maker, Base, create_tables
 
 import auth
 import truelayer
@@ -30,12 +33,11 @@ logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("financeai")
 
-mongo_url = os.environ["MONGO_URL"]
-mongo_client = AsyncIOMotorClient(mongo_url)
-db = mongo_client[os.environ["DB_NAME"]]
+database_url = os.environ["DATABASE_URL"]
+init_engine(database_url, echo=False)
 
 app = FastAPI(title="FinanceAI API", version="1.0.0")
-app.state.db = db
+app.state.db = get_session_maker()
 
 api = APIRouter(prefix="/api")
 
@@ -48,8 +50,10 @@ async def root():
 @api.get("/health")
 async def health():
     try:
-        await db.command("ping")
-        return {"status": "ok"}
+        sm = get_session_maker()
+        async with sm() as session:
+            await session.execute(text("SELECT 1"))
+            return {"status": "ok"}
     except Exception as e:
         return {"status": "error", "detail": str(e)}
 
@@ -87,21 +91,14 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup():
-    # Indexes
-    await db.users.create_index("email", unique=True)
-    await db.users.create_index("user_id", unique=True)
-    await db.user_sessions.create_index("session_token", unique=True)
-    await db.password_reset_tokens.create_index("expires_at", expireAfterSeconds=0)
-    await db.bank_connections.create_index([("user_id", 1), ("connection_id", 1)])
-    await db.transactions.create_index([("user_id", 1), ("date", -1)])
-    await db.budgets.create_index([("user_id", 1), ("category", 1)])
-    await db.tzedakah.create_index([("user_id", 1), ("date", -1)])
-    await db.ai_messages.create_index([("user_id", 1), ("session_id", 1), ("created_at", 1)])
-    await db.payment_transactions.create_index("session_id", unique=True)
-    await auth.seed_admin(db)
+    await create_tables()
+    logger.info("Tables created / verified.")
+    sm = get_session_maker()
+    async with sm() as session:
+        await auth.seed_admin(session)
     logger.info("FinanceAI startup complete.")
 
 
 @app.on_event("shutdown")
 async def shutdown():
-    mongo_client.close()
+    await dispose_engine()
