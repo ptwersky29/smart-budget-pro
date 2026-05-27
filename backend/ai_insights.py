@@ -18,8 +18,8 @@ from auth import get_current_user
 
 logger = logging.getLogger("ai_insights")
 
-EMERGENT_PROVIDER = "anthropic"
-EMERGENT_MODEL = "claude-sonnet-4-5-20250929"
+EMERGENT_PROVIDER = "openai"
+EMERGENT_MODEL = "gpt-4o-mini"
 FREE_TIER_DAILY_LIMIT = 5
 
 SYSTEM_PROMPT = (
