@@ -88,7 +88,7 @@ async def _ai_parse_statement(text: str) -> dict:
     chat = LlmChat(
         api_key=api_key, session_id=session_id,
         system_message="You are a precise UK bank statement parser. Always output valid JSON only.",
-    ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+    ).with_model("openai", "google/gemini-2.0-flash-lite-001")
     msg = UserMessage(text=PARSE_PROMPT + text[:MAX_CHARS_TO_AI])
     resp = await chat.send_message(msg)
     raw = str(resp)

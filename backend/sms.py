@@ -46,7 +46,7 @@ async def _ai_parse(text: str) -> dict:
     from emergentintegrations.llm.chat import LlmChat, UserMessage
     api_key = os.environ.get("OPENROUTER_API_KEY", os.environ.get("EMERGENT_LLM_KEY", ""))
     session_id = f"sms_parse_{uuid.uuid4().hex[:8]}"
-    chat = LlmChat(api_key=api_key, session_id=session_id, system_message="You are a precise SMS parser. Always output valid JSON.").with_model("anthropic", "claude-sonnet-4-5-20250929")
+    chat = LlmChat(api_key=api_key, session_id=session_id, system_message="You are a precise SMS parser. Always output valid JSON.").with_model("openai", "google/gemini-2.0-flash-lite-001")
     msg = UserMessage(text=PARSE_PROMPT + text)
     resp = await chat.send_message(msg)
     raw = str(resp)
