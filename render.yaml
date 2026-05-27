@@ -14,8 +14,8 @@ services:
       - key: FRONTEND_URL
         sync: false
       - key: ADMIN_EMAIL
-        value: admin@financeai.app
+        value: ptwersky29@gmail.com
       - key: ADMIN_PASSWORD
-        value: FinanceAI2026!
+        value: 146Osbaldeston!
       - key: EMERGENT_LLM_KEY
         sync: false
