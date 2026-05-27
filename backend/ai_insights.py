@@ -18,8 +18,8 @@ from auth import get_current_user
 
 logger = logging.getLogger("ai_insights")
 
-EMERGENT_PROVIDER = "openai"
-EMERGENT_MODEL = "google/gemini-2.0-flash-lite-preview-02-05:free"
+DEFAULT_PROVIDER = "openai"
+DEFAULT_MODEL = "google/gemini-2.0-flash-lite-preview-02-05:free"
 FREE_TIER_DAILY_LIMIT = 5
 
 SYSTEM_PROMPT = (
@@ -38,10 +38,10 @@ def _pick_provider(user: dict) -> tuple[str, str, str, bool]:
     )
     if active:
         return active["provider"], active["model"], active["api_key"], True
-    api_key = os.environ.get("EMERGENT_LLM_KEY", "")
+    api_key = os.environ.get("OPENROUTER_API_KEY", "")
     if not api_key:
         raise HTTPException(503, "AI is not configured. Add your own API key in Integrations.")
-    return EMERGENT_PROVIDER, EMERGENT_MODEL, api_key, False
+    return DEFAULT_PROVIDER, DEFAULT_MODEL, api_key, False
 
 
 async def _enforce_free_limit_if_needed(session, user: dict, is_user_key: bool) -> None:
