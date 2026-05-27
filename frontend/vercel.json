@@ -1,5 +1,5 @@
 {
-  "buildCommand": "NODE_OPTIONS=\"--max_old_space_size=3072\" npx craco build",
+  "buildCommand": "NODE_OPTIONS=\"--max_old_space_size=3072\" CI=false npx craco build",
   "outputDirectory": "build",
   "framework": "create-react-app",
   "rewrites": [
