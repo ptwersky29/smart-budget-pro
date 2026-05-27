@@ -313,8 +313,15 @@ async def seed_admin(session):
         session.add(user)
         await session.commit()
         logger.info("Seeded admin user.")
-    elif not verify_password(password, existing.hashed_password):
-        existing.hashed_password = hash_password(password)
-        existing.is_admin = True
-        existing.tier = "premium"
-        await session.commit()
+    else:
+        changed = False
+        if not existing.is_admin or existing.tier != "premium":
+            existing.is_admin = True
+            existing.tier = "premium"
+            changed = True
+        if not verify_password(password, existing.hashed_password):
+            existing.hashed_password = hash_password(password)
+            changed = True
+        if changed:
+            await session.commit()
+            logger.info("Upgraded existing user to admin.")
