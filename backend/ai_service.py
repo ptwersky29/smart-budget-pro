@@ -14,8 +14,8 @@ from auth import get_current_user
 
 logger = logging.getLogger("ai")
 
-DEFAULT_PROVIDER = "openai"
-DEFAULT_MODEL = "gpt-4o-mini"
+DEFAULT_PROVIDER = "gemini"
+DEFAULT_MODEL = "gemini-2.0-flash-lite"
 
 SYSTEM_PROMPT = (
     "You are FinanceAI, a premium AI financial assistant specialized in UK personal finance, "
@@ -54,7 +54,7 @@ def build_router() -> APIRouter:
 
             provider = DEFAULT_PROVIDER
             model = DEFAULT_MODEL
-            api_key = os.environ["EMERGENT_LLM_KEY"]
+            api_key = os.environ.get("EMERGENT_LLM_KEY", os.environ.get("GEMINI_API_KEY", ""))
 
             active = next((p for p in user.get("ai_provider_configs", []) if p.get("is_default")), None)
             if active and active.get("api_key"):

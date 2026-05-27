@@ -83,7 +83,7 @@ def _csv_to_text(content: bytes) -> str:
 
 async def _ai_parse_statement(text: str) -> dict:
     from emergentintegrations.llm.chat import LlmChat, UserMessage
-    api_key = os.environ["EMERGENT_LLM_KEY"]
+    api_key = os.environ.get("EMERGENT_LLM_KEY", "")
     session_id = f"stmt_{uuid.uuid4().hex[:8]}"
     chat = LlmChat(
         api_key=api_key, session_id=session_id,
