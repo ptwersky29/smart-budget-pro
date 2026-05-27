@@ -33,7 +33,10 @@ logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("financeai")
 
-database_url = os.environ["DATABASE_URL"]
+database_url = os.environ.get("DATABASE_URL")
+if not database_url:
+    logger.error("DATABASE_URL environment variable is not set!")
+    raise RuntimeError("DATABASE_URL environment variable is required")
 init_engine(database_url, echo=False)
 
 app = FastAPI(title="FinanceAI API", version="1.0.0")
