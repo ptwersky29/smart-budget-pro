@@ -12,7 +12,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: FRONTEND_URL
-        sync: false
+        value: https://smart-budget-pro-ewtm.vercel.app
       - key: ADMIN_EMAIL
         value: ptwersky29@gmail.com
       - key: ADMIN_PASSWORD
