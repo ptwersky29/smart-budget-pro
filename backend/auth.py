@@ -100,6 +100,9 @@ class UserOut(BaseModel):
     picture: Optional[str] = None
     role: str = "user"
     tier: str = "free"
+    onboarded: bool = False
+    preferences: dict = {}
+    disabled: bool = False
     created_at: Optional[str] = None
 
 

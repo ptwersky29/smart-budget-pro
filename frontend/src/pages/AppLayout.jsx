@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { Toaster } from "sonner";
+
 import {
   LayoutDashboard, Receipt, PiggyBank, Building2, TrendingUp, Star,
   Landmark, FileText, Settings, LogOut, Menu, X, MoonStar, Sun, MessageSquare, Upload, Plug, Crown
@@ -41,7 +41,6 @@ export default function AppLayout() {
 
   return (
     <div className="min-h-screen flex bg-background text-foreground">
-      <Toaster richColors position="top-right" />
       {/* Sidebar */}
       <aside className={`${open ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:sticky top-0 left-0 z-40 h-screen w-72 border-r border-border bg-card/50 backdrop-blur-xl transition-transform`}>
         <div className="flex items-center justify-between px-6 h-16 border-b border-border">

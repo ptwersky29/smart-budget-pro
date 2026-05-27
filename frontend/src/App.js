@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import "@/App.css";
 import { AuthProvider } from "./contexts/AuthContext";
+import { Toaster } from "sonner";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./pages/AppLayout";
 import Landing from "./pages/Landing";
@@ -59,6 +60,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <AppRouter />
+        <Toaster richColors position="top-right" />
       </AuthProvider>
     </BrowserRouter>
   );
