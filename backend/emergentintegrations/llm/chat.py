@@ -8,6 +8,7 @@ import httpx
 logger = logging.getLogger("llm")
 
 OPENAI_BASE = "https://api.openai.com/v1"
+OPENROUTER_BASE = "https://openrouter.ai/api/v1"
 ANTHROPIC_BASE = "https://api.anthropic.com/v1"
 GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta"
 OLLAMA_BASE = "http://localhost:11434"
@@ -49,10 +50,14 @@ class LlmChat:
             raise
 
     async def _call_openai(self) -> str:
+        is_openrouter = self.api_key and self.api_key.startswith("sk-or-")
+        base = OPENROUTER_BASE if is_openrouter else OPENAI_BASE
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+        if is_openrouter:
+            headers["HTTP-Referer"] = "https://github.com/ptwersky29/smart-budget-pro"
         body = {
             "model": self.model or "gpt-4o-mini",
             "messages": self._messages,
@@ -60,7 +65,7 @@ class LlmChat:
             "max_tokens": 2048,
         }
         async with httpx.AsyncClient(timeout=60) as client:
-            resp = await client.post(f"{OPENAI_BASE}/chat/completions", headers=headers, json=body)
+            resp = await client.post(f"{base}/chat/completions", headers=headers, json=body)
             if resp.status_code != 200:
                 raise RuntimeError(f"OpenAI error {resp.status_code}: {resp.text[:500]}")
             data = resp.json()
