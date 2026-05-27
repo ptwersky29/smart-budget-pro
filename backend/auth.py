@@ -347,7 +347,7 @@ def build_router() -> APIRouter:
             frontend_url = os.environ.get("FRONTEND_URL", "https://smart-budget-pro-ewtm.vercel.app")
             import urllib.parse
             from starlette.responses import RedirectResponse
-            redirect_url = f"{frontend_url}?access_token={urllib.parse.quote(access)}&refresh_token={urllib.parse.quote(refresh)}"
+            redirect_url = f"{frontend_url}/dashboard?access_token={urllib.parse.quote(access)}&refresh_token={urllib.parse.quote(refresh)}"
             resp = RedirectResponse(url=redirect_url)
             set_auth_cookies(resp, access, refresh)
             return resp
