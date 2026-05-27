@@ -34,9 +34,9 @@ export default function AIInsightPanel({ title = "AI Insights", subtitle, endpoi
     } finally { setBusy(false); }
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   React.useEffect(() => {
     if (autoLoad && !loaded && !busy) generate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoLoad]);
 
   return (
