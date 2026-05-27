@@ -154,19 +154,19 @@ async def get_current_user(request: Request) -> dict:
             candidates.append(("cookie", cookie_session))
         for source, session_token in candidates:
             if session_token:
-            result = await session.execute(
-                select(UserSession).where(UserSession.session_token == session_token)
-            )
-            sess = result.scalar_one_or_none()
-            if sess and sess.expires_at.tzinfo is None:
-                sess.expires_at = sess.expires_at.replace(tzinfo=timezone.utc)
-            if sess and sess.expires_at > datetime.now(timezone.utc):
                 result = await session.execute(
-                    select(User).where(User.user_id == sess.user_id)
+                    select(UserSession).where(UserSession.session_token == session_token)
                 )
-                user = result.scalar_one_or_none()
-                if user:
-                    return _user_to_dict(user)
+                sess = result.scalar_one_or_none()
+                if sess and sess.expires_at.tzinfo is None:
+                    sess.expires_at = sess.expires_at.replace(tzinfo=timezone.utc)
+                if sess and sess.expires_at > datetime.now(timezone.utc):
+                    result = await session.execute(
+                        select(User).where(User.user_id == sess.user_id)
+                    )
+                    user = result.scalar_one_or_none()
+                    if user:
+                        return _user_to_dict(user)
 
     raise HTTPException(status_code=401, detail="Not authenticated")
 
