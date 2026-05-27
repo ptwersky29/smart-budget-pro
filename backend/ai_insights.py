@@ -38,7 +38,7 @@ def _pick_provider(user: dict) -> tuple[str, str, str, bool]:
     )
     if active:
         return active["provider"], active["model"], active["api_key"], True
-    api_key = os.environ.get("OPENROUTER_API_KEY", "")
+    api_key = os.environ.get("OPENROUTER_API_KEY", os.environ.get("EMERGENT_LLM_KEY", ""))
     if not api_key:
         raise HTTPException(503, "AI is not configured. Add your own API key in Integrations.")
     return DEFAULT_PROVIDER, DEFAULT_MODEL, api_key, False

@@ -54,7 +54,7 @@ def build_router() -> APIRouter:
 
             provider = DEFAULT_PROVIDER
             model = DEFAULT_MODEL
-            api_key = os.environ.get("OPENROUTER_API_KEY", "")
+            api_key = os.environ.get("OPENROUTER_API_KEY", os.environ.get("EMERGENT_LLM_KEY", ""))
 
             active = next((p for p in user.get("ai_provider_configs", []) if p.get("is_default")), None)
             if active and active.get("api_key"):
