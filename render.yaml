@@ -17,5 +17,9 @@ services:
         value: ptwersky29@gmail.com
       - key: ADMIN_PASSWORD
         value: 146Osbaldeston!
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
       - key: EMERGENT_LLM_KEY
         sync: false

@@ -108,6 +108,7 @@ def _user_to_dict(u: User) -> dict:
         "user_id": u.user_id,
         "email": u.email,
         "name": u.name or u.email.split("@")[0],
+        "picture": u.picture,
         "role": "admin" if u.is_admin else "user",
         "tier": u.tier,
         "created_at": u.created_at.isoformat() if u.created_at else None,
@@ -249,6 +250,87 @@ def build_router() -> APIRouter:
                 return {"ok": True}
         except jwt.PyJWTError:
             raise HTTPException(401, "Invalid refresh token")
+
+    @router.get("/google")
+    async def google_login(request: Request):
+        client_id = os.environ.get("GOOGLE_CLIENT_ID")
+        if not client_id:
+            raise HTTPException(500, "Google OAuth not configured")
+        redirect_uri = str(request.base_url).rstrip("/") + "/api/auth/google/callback"
+        params = dict(
+            client_id=client_id,
+            redirect_uri=redirect_uri,
+            response_type="code",
+            scope="openid email profile",
+            access_type="offline",
+            prompt="select_account",
+        )
+        import urllib.parse
+        url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
+        from starlette.responses import RedirectResponse
+        return RedirectResponse(url)
+
+    @router.get("/google/callback")
+    async def google_callback(code: str, request: Request, response: Response):
+        client_id = os.environ.get("GOOGLE_CLIENT_ID")
+        client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
+        if not client_id or not client_secret:
+            raise HTTPException(500, "Google OAuth not configured")
+        redirect_uri = str(request.base_url).rstrip("/") + "/api/auth/google/callback"
+        import httpx
+        async with httpx.AsyncClient() as client:
+            token_resp = await client.post(
+                "https://oauth2.googleapis.com/token",
+                data=dict(
+                    code=code,
+                    client_id=client_id,
+                    client_secret=client_secret,
+                    redirect_uri=redirect_uri,
+                    grant_type="authorization_code",
+                ),
+            )
+            if token_resp.status_code != 200:
+                raise HTTPException(400, "Failed to exchange auth code")
+            token_data = token_resp.json()
+            id_token = token_data["id_token"]
+            import jwt as pyjwt
+            info = pyjwt.decode(id_token, options={"verify_signature": False})
+        email = info.get("email", "").lower()
+        name = info.get("name") or email.split("@")[0]
+        picture = info.get("picture")
+        google_sub = info.get("sub")
+        if not email:
+            raise HTTPException(400, "Google account has no email")
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(select(User).where(User.email == email))
+            user = result.scalar_one_or_none()
+            if user is None:
+                user_id = f"user_{uuid.uuid4().hex[:12]}"
+                user = User(
+                    user_id=user_id,
+                    email=email,
+                    name=name,
+                    picture=picture,
+                    google_sub=google_sub,
+                    hashed_password=hash_password(secrets.token_urlsafe(16)),
+                )
+                session.add(user)
+                await session.commit()
+            elif user.disabled:
+                raise HTTPException(403, "Account disabled")
+            else:
+                if picture and (not user.picture or user.picture != picture):
+                    user.picture = picture
+                if google_sub and not user.google_sub:
+                    user.google_sub = google_sub
+                await session.commit()
+            access = create_access_token(user.user_id, email)
+            refresh = create_refresh_token(user.user_id)
+            set_auth_cookies(response, access, refresh)
+            frontend_url = os.environ.get("FRONTEND_URL", "https://smart-budget-pro-ewtm.vercel.app")
+            from starlette.responses import RedirectResponse
+            return RedirectResponse(url=frontend_url)
 
     @router.post("/forgot-password")
     async def forgot_password(payload: ForgotPasswordIn, request: Request):
