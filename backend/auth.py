@@ -259,7 +259,8 @@ def build_router() -> APIRouter:
         client_id = os.environ.get("GOOGLE_CLIENT_ID")
         if not client_id:
             raise HTTPException(500, "Google OAuth not configured")
-        redirect_uri = str(request.base_url).rstrip("/") + "/api/auth/google/callback"
+        scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+        redirect_uri = f"{scheme}://{request.url.hostname}/api/auth/google/callback"
         params = dict(
             client_id=client_id,
             redirect_uri=redirect_uri,
@@ -274,12 +275,13 @@ def build_router() -> APIRouter:
         return RedirectResponse(url)
 
     @router.get("/google/callback")
-    async def google_callback(code: str, request: Request, response: Response):
+    async def google_callback(code: str, request: Request):
         client_id = os.environ.get("GOOGLE_CLIENT_ID")
         client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
         if not client_id or not client_secret:
             raise HTTPException(500, "Google OAuth not configured")
-        redirect_uri = str(request.base_url).rstrip("/") + "/api/auth/google/callback"
+        scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+        redirect_uri = f"{scheme}://{request.url.hostname}/api/auth/google/callback"
         import httpx
         async with httpx.AsyncClient() as client:
             token_resp = await client.post(
@@ -330,10 +332,11 @@ def build_router() -> APIRouter:
                 await session.commit()
             access = create_access_token(user.user_id, email)
             refresh = create_refresh_token(user.user_id)
-            set_auth_cookies(response, access, refresh)
             frontend_url = os.environ.get("FRONTEND_URL", "https://smart-budget-pro-ewtm.vercel.app")
             from starlette.responses import RedirectResponse
-            return RedirectResponse(url=frontend_url)
+            resp = RedirectResponse(url=frontend_url)
+            set_auth_cookies(resp, access, refresh)
+            return resp
 
     @router.post("/forgot-password")
     async def forgot_password(payload: ForgotPasswordIn, request: Request):
