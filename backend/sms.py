@@ -1,6 +1,8 @@
 """Phase 4 — SMS Automation: Twilio webhook, sender-based ID, AI parsing, premium features, dedup."""
 import uuid
 import hashlib
+import hmac
+import base64
 import logging
 from datetime import datetime, timezone, timedelta
 
@@ -113,6 +115,16 @@ def build_router() -> APIRouter:
                              SmsMessageSid: str = Form("")):
         sm = request.app.state.db
         async with sm() as session:
+            twilio_token = await get_config(session, "twilio_auth_token", "TWILIO_AUTH_TOKEN")
+            if not twilio_token:
+                logger.error("sms webhook: TWILIO_AUTH_TOKEN not configured")
+                return {"ok": False, "error": "webhook not configured"}
+            sig = request.headers.get("X-Twilio-Signature", "")
+            url = str(request.url)
+            expected = base64.b64encode(hmac.new(twilio_token.encode(), (url + Body).encode(), hashlib.sha256).digest()).decode()
+            if not hmac.compare_digest(expected, sig):
+                logger.warning("sms webhook: invalid Twilio signature")
+                return {"ok": False, "error": "invalid signature"}
             twilio_number = await get_config(session, "twilio_phone_number", "TWILIO_PHONE_NUMBER")
             if twilio_number and To != twilio_number:
                 logger.info(f"sms webhook skipped: To {To} != configured {twilio_number}")

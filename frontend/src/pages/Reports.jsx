@@ -29,7 +29,7 @@ export default function Reports() {
     if (!isPremium) { toast.error("Premium feature — upgrade to download PDF reports."); return; }
     setBusy(kind);
     try {
-      const token = localStorage.getItem("financeai_token");
+      const token = localStorage.getItem("access_token") || localStorage.getItem("financeai_token");
       const res = await fetch(`${API}/reports/${kind}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });

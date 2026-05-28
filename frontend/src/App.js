@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import "@/App.css";
 import { AuthProvider } from "./contexts/AuthContext";
 import { Toaster } from "sonner";
+import { ThemeProvider } from "next-themes";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./pages/AppLayout";
 import Landing from "./pages/Landing";
@@ -61,10 +62,12 @@ function AppRouter() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppRouter />
-        <Toaster richColors position="top-right" />
-      </AuthProvider>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <AuthProvider>
+          <AppRouter />
+          <Toaster richColors position="top-right" />
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

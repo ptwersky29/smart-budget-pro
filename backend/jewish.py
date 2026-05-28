@@ -47,13 +47,13 @@ HOLIDAY_DEFAULTS = {
     },
 }
 
-CHASUNA_CATEGORIES = [
+CHASUNA_CATEGORIES = {
     "venue", "catering", "photography", "videography", "music", "flowers",
     "decorations", "attire", "rings", "invitations", "transport", "makeup",
     "hair", "sheitels", "shalom-zachor", "vort", "aufruf", "kabbolas-panim",
     "badeken", "chuppah", "seuda", "sheva-brachos", "honeymoon", "gifts",
     "miscellaneous",
-]
+}
 
 INCOME_CATEGORIES = {"salary", "income"}
 
@@ -170,7 +170,7 @@ def build_router() -> APIRouter:
         u = result.scalar_one_or_none()
         if not u:
             return
-        prefs = u.preferences or {}
+        prefs = dict(u.preferences or {})
         prefs[key] = value
         u.preferences = prefs
 
@@ -537,7 +537,7 @@ def build_router() -> APIRouter:
 
     @router.get("/chasuna/categories")
     async def chasuna_categories():
-        return {"categories": CHASUNA_CATEGORIES}
+        return {"categories": sorted(CHASUNA_CATEGORIES)}
 
     @router.get("/chasuna")
     async def list_chasuna(request: Request, user: dict = Depends(get_current_user),
@@ -564,7 +564,7 @@ def build_router() -> APIRouter:
     @router.post("/chasuna")
     async def add_chasuna_item(payload: ChasunaPlanIn, request: Request, user: dict = Depends(get_current_user)):
         if payload.category not in CHASUNA_CATEGORIES:
-            CHASUNA_CATEGORIES.append(payload.category)
+            CHASUNA_CATEGORIES.add(payload.category)
         sm = request.app.state.db
         async with sm() as session:
             cp = ChasunaPlan(

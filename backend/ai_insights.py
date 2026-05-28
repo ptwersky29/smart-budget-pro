@@ -55,12 +55,13 @@ async def _track_usage(session, user_id: str, provider: str, model: str,
 
 
 async def _call_llm_insight(session, user: dict, system: str, user_prompt: str) -> str:
-    key = user.get("_api_key") or os.environ.get("OPENROUTER_API_KEY", "")
-    model = user.get("_model") or "google/gemini-2.0-flash-lite-001"
-    active = next((p for p in user.get("ai_provider_configs", []) if p.get("is_default") and p.get("api_key")), None)
+    key = os.environ.get("OPENROUTER_API_KEY", "")
+    model = "google/gemini-2.0-flash-lite-001"
+    configs = user.get("preferences", {}).get("ai_provider_configs", [])
+    active = next((p for p in configs if p.get("is_default") and p.get("api_key")), None)
     if active:
-        key = active["api_key"]
-        model = active["model"]
+        key = active.get("api_key", key)
+        model = active.get("model", model)
     if not key:
         raise HTTPException(503, "AI is not configured. Add your own API key in Settings.")
     await _enforce_free_limit_if_needed(session, user)

@@ -1,7 +1,6 @@
 """Phase 5 — AI Intelligence Layer: multi-model (Claude, GPT, Gemini), real data context, cost tracking, rate limiting."""
 import os
 import uuid
-import json
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -86,9 +85,10 @@ async def _enforce_rate_limit(session, user: dict) -> None:
 
 
 def _pick_model(user: dict) -> tuple[str, str, str]:
-    active = next((p for p in user.get("ai_provider_configs", []) if p.get("is_default") and p.get("api_key")), None)
+    configs = user.get("preferences", {}).get("ai_provider_configs", [])
+    active = next((p for p in configs if p.get("is_default") and p.get("api_key")), None)
     if active:
-        return active["api_key"], active["model"], active["provider"]
+        return active.get("api_key"), active.get("model", "google/gemini-2.0-flash-lite-001"), active.get("provider", "openrouter")
     key = os.environ.get("OPENROUTER_API_KEY", "")
     if not key:
         raise HTTPException(503, "AI is not configured. Add your own API key in Settings, or set OPENROUTER_API_KEY.")
@@ -123,8 +123,6 @@ def build_router() -> APIRouter:
                                         json_mode=False, max_tokens=4096, temperature=0.7)
                 response_text, used_provider, used_model, pt, ct, cst = result
                 prompt_tokens, completion_tokens, cost = pt, ct, cst
-            except HTTPException:
-                raise
             except Exception as e:
                 logger.error(f"AI chat error: {e}")
                 raise HTTPException(500, f"AI provider error: {str(e)[:200]}")

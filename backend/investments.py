@@ -1,16 +1,14 @@
 """Phase 7 — Investments: holdings, portfolio, forecasting, market data."""
-import math
 import logging
-import os
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request, Depends, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func, delete
+from sqlalchemy import select, func
 
 from db import InvestmentHolding, MarketData
-from auth import get_current_user
+from auth import get_current_user, require_admin
 
 logger = logging.getLogger("investments")
 
@@ -394,7 +392,7 @@ def build_router() -> APIRouter:
             return _m_to_dict(m)
 
     @router.post("/market")
-    async def upsert_market_data(payload: MarketDataIn, request: Request):
+    async def upsert_market_data(payload: MarketDataIn, request: Request, user: dict = Depends(require_admin)):
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(select(MarketData).where(MarketData.ticker == payload.ticker.upper()))
@@ -402,7 +400,8 @@ def build_router() -> APIRouter:
             if existing:
                 existing.price = payload.price
                 existing.previous_close = payload.previous_close or existing.previous_close
-                existing.change_pct = ((payload.price - (payload.previous_close or existing.price)) / (payload.previous_close or existing.price)) * 100 if payload.previous_close else 0
+                prev = payload.previous_close or existing.price
+                existing.change_pct = ((payload.price - prev) / prev * 100) if prev else 0
                 if payload.high_52w: existing.high_52w = payload.high_52w
                 if payload.low_52w: existing.low_52w = payload.low_52w
                 existing.currency = payload.currency
@@ -420,7 +419,7 @@ def build_router() -> APIRouter:
             return {"ok": True}
 
     @router.post("/market/refresh")
-    async def refresh_market_data(request: Request):
+    async def refresh_market_data(request: Request, user: dict = Depends(require_admin)):
         sm = request.app.state.db
         async with sm() as session:
             await _seed_market_data(session)
@@ -428,7 +427,7 @@ def build_router() -> APIRouter:
             updated = 0
             for m in rows:
                 old_price = m.price
-                jitter = 1 + (0.01 * (datetime.now().timestamp() % 1 - 0.5))
+                jitter = 1 + (0.01 * (datetime.now(timezone.utc).timestamp() % 1 - 0.5))
                 m.price = round(m.price * jitter, 2)
                 m.previous_close = old_price
                 m.change_pct = round((m.price - old_price) / old_price * 100, 2)

@@ -7,8 +7,8 @@ logger = logging.getLogger("cache")
 
 
 class TTLCache:
-    def __init__(self, default_ttl: int = 300):
-        self._default_ttl = default_ttl
+    def __init__(self, ttl: int = 300):
+        self._default_ttl = ttl
         self._store: dict[str, tuple[Any, float]] = {}
 
     def get(self, key: str) -> Optional[Any]:

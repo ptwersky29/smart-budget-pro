@@ -3,8 +3,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, List
 from sqlalchemy import (
-    String, Boolean, Integer, Float, DateTime, Text, Enum as SAEnum,
-    ForeignKey, UniqueConstraint, Index, JSON, delete as sa_delete,
+    String, Boolean, Integer, Float, Numeric, DateTime, Date, Text, Enum as SAEnum,
+    ForeignKey, UniqueConstraint, Index, JSON,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
@@ -68,6 +68,46 @@ async def create_tables():
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_privacy BOOLEAN DEFAULT FALSE"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_marketing BOOLEAN DEFAULT FALSE"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN DEFAULT FALSE"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS app_language VARCHAR(8) DEFAULT 'en'"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS app_theme VARCHAR(16) DEFAULT 'system'"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS app_currency VARCHAR(4) DEFAULT 'GBP'"))
+            # Float → Numeric for monetary columns
+            await conn.execute(text("ALTER TABLE transactions ALTER COLUMN amount TYPE NUMERIC(12,2) USING amount::numeric"))
+            await conn.execute(text("ALTER TABLE split_transactions ALTER COLUMN amount TYPE NUMERIC(12,2) USING amount::numeric"))
+            await conn.execute(text("ALTER TABLE budgets ALTER COLUMN amount TYPE NUMERIC(12,2) USING amount::numeric"))
+            await conn.execute(text("ALTER TABLE recurring_transactions ALTER COLUMN amount TYPE NUMERIC(12,2) USING amount::numeric"))
+            await conn.execute(text("ALTER TABLE maaser_ledger ALTER COLUMN income_amount TYPE NUMERIC(12,2) USING income_amount::numeric"))
+            await conn.execute(text("ALTER TABLE maaser_ledger ALTER COLUMN maaser_due TYPE NUMERIC(12,2) USING maaser_due::numeric"))
+            await conn.execute(text("ALTER TABLE maaser_ledger ALTER COLUMN maaser_paid TYPE NUMERIC(12,2) USING maaser_paid::numeric"))
+            await conn.execute(text("ALTER TABLE payment_transactions ALTER COLUMN amount TYPE NUMERIC(12,2) USING amount::numeric"))
+            await conn.execute(text("ALTER TABLE billing_records ALTER COLUMN amount TYPE NUMERIC(12,2) USING amount::numeric"))
+            await conn.execute(text("ALTER TABLE statements ALTER COLUMN total_income TYPE NUMERIC(12,2) USING total_income::numeric"))
+            await conn.execute(text("ALTER TABLE statements ALTER COLUMN total_expenses TYPE NUMERIC(12,2) USING total_expenses::numeric"))
+            await conn.execute(text("ALTER TABLE statements ALTER COLUMN net_savings TYPE NUMERIC(12,2) USING net_savings::numeric"))
+            await conn.execute(text("ALTER TABLE investment_holdings ALTER COLUMN shares TYPE NUMERIC(14,4) USING shares::numeric"))
+            await conn.execute(text("ALTER TABLE investment_holdings ALTER COLUMN cost_basis TYPE NUMERIC(14,4) USING cost_basis::numeric"))
+            await conn.execute(text("ALTER TABLE investment_holdings ALTER COLUMN current_price TYPE NUMERIC(14,4) USING current_price::numeric"))
+            await conn.execute(text("ALTER TABLE investment_holdings ALTER COLUMN target_allocation_pct TYPE NUMERIC(8,4) USING target_allocation_pct::numeric"))
+            await conn.execute(text("ALTER TABLE market_data ALTER COLUMN price TYPE NUMERIC(14,4) USING price::numeric"))
+            await conn.execute(text("ALTER TABLE market_data ALTER COLUMN previous_close TYPE NUMERIC(14,4) USING previous_close::numeric"))
+            await conn.execute(text("ALTER TABLE market_data ALTER COLUMN change_pct TYPE NUMERIC(8,4) USING change_pct::numeric"))
+            await conn.execute(text("ALTER TABLE market_data ALTER COLUMN high_52w TYPE NUMERIC(14,4) USING high_52w::numeric"))
+            await conn.execute(text("ALTER TABLE market_data ALTER COLUMN low_52w TYPE NUMERIC(14,4) USING low_52w::numeric"))
+            await conn.execute(text("ALTER TABLE holiday_budgets ALTER COLUMN budgeted_amount TYPE NUMERIC(12,2) USING budgeted_amount::numeric"))
+            await conn.execute(text("ALTER TABLE holiday_budgets ALTER COLUMN actual_amount TYPE NUMERIC(12,2) USING actual_amount::numeric"))
+            await conn.execute(text("ALTER TABLE chasuna_plans ALTER COLUMN estimated_cost TYPE NUMERIC(12,2) USING estimated_cost::numeric"))
+            await conn.execute(text("ALTER TABLE chasuna_plans ALTER COLUMN actual_cost TYPE NUMERIC(12,2) USING actual_cost::numeric"))
+            await conn.execute(text("ALTER TABLE chasuna_plans ALTER COLUMN deposit_paid TYPE NUMERIC(12,2) USING deposit_paid::numeric"))
+            await conn.execute(text("ALTER TABLE analytics_events ALTER COLUMN value TYPE NUMERIC(12,2) USING value::numeric"))
+            # Currency case fix
+            await conn.execute(text("ALTER TABLE payment_transactions ALTER COLUMN currency SET DEFAULT 'GBP'"))
+            await conn.execute(text("UPDATE payment_transactions SET currency = 'GBP' WHERE currency = 'gbp'"))
+            await conn.execute(text("ALTER TABLE billing_records ALTER COLUMN currency SET DEFAULT 'GBP'"))
+            await conn.execute(text("UPDATE billing_records SET currency = 'GBP' WHERE currency = 'usd'"))
+            # Account lockout columns
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS login_attempts INTEGER DEFAULT 0"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ"))
 
 
 async def get_session() -> AsyncSession:
@@ -117,6 +157,12 @@ class User(Base, TimestampMixin):
     data_exported_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     data_deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     password_changed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    onboarding_completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    app_language: Mapped[str] = mapped_column(String(8), default="en")
+    app_theme: Mapped[str] = mapped_column(String(16), default="system")
+    app_currency: Mapped[str] = mapped_column(String(4), default="GBP")
+    login_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # relationships
     sessions: Mapped[List["UserSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")
@@ -149,12 +195,10 @@ class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     token: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
-
-# ── Config ────────────────────────────────────────────────────────────────
 
 class AppConfig(Base):
     __tablename__ = "app_config"
@@ -171,7 +215,7 @@ class TrueLayerState(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     state: Mapped[str] = mapped_column(String(128), unique=True, nullable=False, index=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False)
     redirect_uri: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
@@ -202,6 +246,7 @@ class BankConnection(Base):
 
     __table_args__ = (
         Index("idx_bank_connections_user_conn", "user_id", "connection_id"),
+        Index("idx_bank_user_status", "user_id", "status"),
     )
 
 
@@ -226,7 +271,7 @@ class SyncLog(Base):
     __tablename__ = "sync_logs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     connection_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     provider: Mapped[str] = mapped_column(String(32), default="truelayer")
     event: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -249,10 +294,10 @@ class Transaction(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     transaction_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     account_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     connection_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
-    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    amount: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), default="GBP")
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     category: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
@@ -281,8 +326,8 @@ class SplitTransaction(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     split_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     parent_transaction_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
-    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
+    amount: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), nullable=False)
     category: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -292,7 +337,7 @@ class AccountNickname(Base, TimestampMixin):
     __tablename__ = "account_nicknames"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     account_id: Mapped[str] = mapped_column(String(128), nullable=False)
     nickname: Mapped[str] = mapped_column(String(255), nullable=False)
     account_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -307,9 +352,9 @@ class Budget(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     budget_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     category: Mapped[str] = mapped_column(String(128), nullable=False)
-    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    amount: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), nullable=False)
     period: Mapped[str] = mapped_column(String(16), default="monthly")  # weekly, monthly, yearly
     start_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     end_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -324,9 +369,9 @@ class RecurringTransaction(Base, TimestampMixin):
     __tablename__ = "recurring_transactions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     description: Mapped[str] = mapped_column(String(255), nullable=False)
-    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    amount: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), nullable=False)
     category: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     frequency: Mapped[str] = mapped_column(String(32), nullable=False)  # weekly, monthly, yearly
     next_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -337,7 +382,7 @@ class PendingUpdate(Base, TimestampMixin):
     __tablename__ = "pending_updates"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     transaction_id: Mapped[str] = mapped_column(String(64), nullable=True)
     field: Mapped[str] = mapped_column(String(64), nullable=False)
     old_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -351,11 +396,11 @@ class MaaserLedger(Base, TimestampMixin):
     __tablename__ = "maaser_ledger"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     transaction_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
-    income_amount: Mapped[float] = mapped_column(Float, default=0)
-    maaser_due: Mapped[float] = mapped_column(Float, default=0)
-    maaser_paid: Mapped[float] = mapped_column(Float, default=0)
+    income_amount: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), default=0)
+    maaser_due: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), default=0)
+    maaser_paid: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), default=0)
     paid_to: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     date: Mapped[datetime] = mapped_column(
@@ -373,7 +418,7 @@ class AiMessage(Base, TimestampMixin):
     __tablename__ = "ai_messages"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     session_id: Mapped[str] = mapped_column(String(64), nullable=False)
     role: Mapped[str] = mapped_column(String(16), nullable=False)  # user, assistant
     content: Mapped[str] = mapped_column(Text, nullable=False)
@@ -388,13 +433,13 @@ class AiUsage(Base):
     __tablename__ = "ai_usage"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     date: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     prompt_tokens: Mapped[int] = mapped_column(Integer, default=0)
     completion_tokens: Mapped[int] = mapped_column(Integer, default=0)
-    cost: Mapped[float] = mapped_column(Float, default=0)
+    cost: Mapped[float] = mapped_column(Numeric(12, 6, asdecimal=False), default=0)
     provider: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     endpoint: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
@@ -403,7 +448,7 @@ class AiProvider(Base, TimestampMixin):
     __tablename__ = "ai_providers"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(32), nullable=False)  # openai, anthropic, etc.
     api_key: Mapped[str] = mapped_column(Text, nullable=False)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -423,15 +468,14 @@ class PaymentTransaction(Base, TimestampMixin):
     session_id: Mapped[str] = mapped_column(String(128), unique=True, nullable=False, index=True)
     oid: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     provider: Mapped[str] = mapped_column(String(16), default="stripe")  # stripe, tyl
-    user_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    user_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=True)
     user_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     user_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     origin: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    amount: Mapped[float] = mapped_column(Float, default=0)
-    currency: Mapped[str] = mapped_column(String(3), default="gbp")
+    amount: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), default=0)
+    currency: Mapped[str] = mapped_column(String(3), default="GBP")
     package_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     payment_status: Mapped[str] = mapped_column(String(32), default="initiated")
-    status: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     approval_code: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     ipg_transaction_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     signature_valid: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
@@ -443,11 +487,11 @@ class BillingRecord(Base, TimestampMixin):
     __tablename__ = "billing_records"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     stripe_session_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    amount: Mapped[float] = mapped_column(Float, default=0)
-    currency: Mapped[str] = mapped_column(String(3), default="usd")
+    amount: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), default=0)
+    currency: Mapped[str] = mapped_column(String(3), default="USD")
     package: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="pending")
 
@@ -458,7 +502,7 @@ class SmsMessage(Base, TimestampMixin):
     __tablename__ = "sms_messages"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     to_number: Mapped[str] = mapped_column(String(32), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="sent")  # sent, delivered, failed
@@ -473,7 +517,7 @@ class SmsSender(Base, TimestampMixin):
     __tablename__ = "sms_senders"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     phone_number: Mapped[str] = mapped_column(String(32), nullable=False)
     verified: Mapped[bool] = mapped_column(Boolean, default=False)
     verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -489,13 +533,13 @@ class Statement(Base, TimestampMixin):
     __tablename__ = "statements"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     account_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     period_start: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     period_end: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    total_income: Mapped[float] = mapped_column(Float, default=0)
-    total_expenses: Mapped[float] = mapped_column(Float, default=0)
-    net_savings: Mapped[float] = mapped_column(Float, default=0)
+    total_income: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), default=0)
+    total_expenses: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), default=0)
+    net_savings: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), default=0)
     currency: Mapped[str] = mapped_column(String(3), default="GBP")
     status: Mapped[str] = mapped_column(String(32), default="draft")  # draft, final
     data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
@@ -526,7 +570,7 @@ class ConsentRecord(Base, TimestampMixin):
     __tablename__ = "consent_records"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     consent_type: Mapped[str] = mapped_column(String(64), nullable=False)
     granted: Mapped[bool] = mapped_column(Boolean, default=True)
     ip_address: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
@@ -544,18 +588,18 @@ class InvestmentHolding(Base, TimestampMixin):
     __tablename__ = "investment_holdings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     ticker: Mapped[str] = mapped_column(String(16), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     type: Mapped[str] = mapped_column(String(16), nullable=False)
-    shares: Mapped[float] = mapped_column(Float, default=0)
-    cost_basis: Mapped[float] = mapped_column(Float, default=0)
-    current_price: Mapped[float] = mapped_column(Float, default=0)
+    shares: Mapped[float] = mapped_column(Numeric(14, 4, asdecimal=False), default=0)
+    cost_basis: Mapped[float] = mapped_column(Numeric(14, 4, asdecimal=False), default=0)
+    current_price: Mapped[float] = mapped_column(Numeric(14, 4, asdecimal=False), default=0)
     currency: Mapped[str] = mapped_column(String(4), default="GBP")
     account_name: Mapped[str] = mapped_column(String(64), default="General")
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     price_updated: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    target_allocation_pct: Mapped[float] = mapped_column(Float, default=0)
+    target_allocation_pct: Mapped[float] = mapped_column(Numeric(8, 4, asdecimal=False), default=0)
 
     __table_args__ = (
         Index("idx_investment_user_ticker", "user_id", "ticker"),
@@ -569,11 +613,11 @@ class MarketData(Base, TimestampMixin):
     ticker: Mapped[str] = mapped_column(String(16), nullable=False, unique=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     type: Mapped[str] = mapped_column(String(16), nullable=False)
-    price: Mapped[float] = mapped_column(Float, default=0)
-    previous_close: Mapped[float] = mapped_column(Float, default=0)
-    change_pct: Mapped[float] = mapped_column(Float, default=0)
-    high_52w: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    low_52w: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    price: Mapped[float] = mapped_column(Numeric(14, 4, asdecimal=False), default=0)
+    previous_close: Mapped[float] = mapped_column(Numeric(14, 4, asdecimal=False), default=0)
+    change_pct: Mapped[float] = mapped_column(Numeric(8, 4, asdecimal=False), default=0)
+    high_52w: Mapped[Optional[float]] = mapped_column(Numeric(14, 4, asdecimal=False), nullable=True)
+    low_52w: Mapped[Optional[float]] = mapped_column(Numeric(14, 4, asdecimal=False), nullable=True)
     currency: Mapped[str] = mapped_column(String(4), default="GBP")
     last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     source: Mapped[str] = mapped_column(String(32), default="manual")
@@ -585,12 +629,12 @@ class HolidayBudget(Base, TimestampMixin):
     __tablename__ = "holiday_budgets"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     holiday_name: Mapped[str] = mapped_column(String(64), nullable=False)
     hebrew_year: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
     category: Mapped[str] = mapped_column(String(64), nullable=False)
-    budgeted_amount: Mapped[float] = mapped_column(Float, default=0)
-    actual_amount: Mapped[float] = mapped_column(Float, default=0)
+    budgeted_amount: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), default=0)
+    actual_amount: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), default=0)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     start_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     end_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -604,23 +648,23 @@ class ChasunaPlan(Base, TimestampMixin):
     __tablename__ = "chasuna_plans"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     category: Mapped[str] = mapped_column(String(64), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    estimated_cost: Mapped[float] = mapped_column(Float, default=0)
-    actual_cost: Mapped[float] = mapped_column(Float, default=0)
+    estimated_cost: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), default=0)
+    actual_cost: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), default=0)
     status: Mapped[str] = mapped_column(String(16), default="planned")
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     vendor: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    deposit_paid: Mapped[float] = mapped_column(Float, default=0)
+    deposit_paid: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), default=0)
 
 
 class Integration(Base, TimestampMixin):
     __tablename__ = "integrations"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     provider: Mapped[str] = mapped_column(String(32), nullable=False)  # truelayer, twilio, etc.
     config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -629,3 +673,69 @@ class Integration(Base, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("user_id", "provider", name="uq_integrations_user_provider"),
     )
+
+
+# ── Phase 9: Onboarding ──────────────────────────────────────────────────
+
+ONBOARDING_STEPS = ["connect_bank", "first_transaction", "set_budget", "ai_intro", "complete"]
+
+
+class OnboardingProgress(Base, TimestampMixin):
+    __tablename__ = "onboarding_progress"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True, unique=True)
+    step: Mapped[str] = mapped_column(String(32), default="connect_bank")
+    completed_steps: Mapped[dict] = mapped_column(JSON, default=dict)
+    skipped: Mapped[bool] = mapped_column(Boolean, default=False)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+# ── Phase 9: Feature Flags ───────────────────────────────────────────────
+
+class FeatureFlag(Base, TimestampMixin):
+    __tablename__ = "feature_flags"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    flag: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    user_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+
+
+# ── Phase 9: Support Tickets ─────────────────────────────────────────────
+
+TICKET_STATUSES = {"open", "in_progress", "resolved", "closed"}
+TICKET_PRIORITIES = {"low", "medium", "high", "critical"}
+
+
+class SupportTicket(Base, TimestampMixin):
+    __tablename__ = "support_tickets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
+    subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default="open")
+    priority: Mapped[str] = mapped_column(String(16), default="medium")
+    category: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    admin_reply: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index("idx_support_user_status", "user_id", "status"),
+    )
+
+
+# ── Phase 9: Analytics ───────────────────────────────────────────────────
+
+class AnalyticsEvent(Base, TimestampMixin):
+    __tablename__ = "analytics_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    event: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    category: Mapped[str] = mapped_column(String(32), default="engagement")
+    value: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), default=0)
+    event_meta: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    ip_address: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)

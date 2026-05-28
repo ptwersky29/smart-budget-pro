@@ -27,32 +27,36 @@ SYNC_PAGE_SIZE = 500
 MAX_RETRIES = 3
 
 
-# ── Encrypted token storage ──────────────────────────────────────────────
+# ── Encrypted token storage (AES-GCM authenticated encryption) ────────────
+
+_ENC_PREFIX = "aesgcm1:"
+
 
 def _derive_key() -> bytes:
-    secret = os.environ.get("JWT_SECRET", "financeai_default_change_me")
+    secret = os.environ.get("JWT_SECRET")
+    if not secret:
+        raise RuntimeError("JWT_SECRET is required for token encryption")
     return hashlib.sha256(secret.encode()).digest()
 
 
 def _encrypt(plaintext: str) -> str:
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     key = _derive_key()
-    iv = secrets.token_bytes(16)
-    cipher = _aes_ctr_bytes(plaintext.encode(), key, iv)
-    return b64encode(iv + cipher).decode()
+    aesgcm = AESGCM(key)
+    nonce = secrets.token_bytes(12)
+    ciphertext = aesgcm.encrypt(nonce, plaintext.encode(), None)
+    return _ENC_PREFIX + b64encode(nonce + ciphertext).decode()
 
 
 def _decrypt(payload: str) -> str:
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    if not payload.startswith(_ENC_PREFIX):
+        raise ValueError("Not an encrypted token")
     key = _derive_key()
-    raw = b64decode(payload)
-    iv, cipher = raw[:16], raw[16:]
-    return _aes_ctr_bytes(cipher, key, iv).decode()
-
-
-def _aes_ctr_bytes(data: bytes, key: bytes, iv: bytes) -> bytes:
-    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-    c = Cipher(algorithms.AES(key), modes.CTR(iv))
-    e = c.encryptor()
-    return e.update(data) + e.finalize()
+    aesgcm = AESGCM(key)
+    raw = b64decode(payload[len(_ENC_PREFIX):])
+    nonce, ciphertext = raw[:12], raw[12:]
+    return aesgcm.decrypt(nonce, ciphertext, None).decode()
 
 
 # ── Config ────────────────────────────────────────────────────────────────
@@ -105,12 +109,13 @@ async def _get_valid_token(session, conn: BankConnection) -> str:
     if conn.expires_at and conn.expires_at.tzinfo is None:
         conn.expires_at = conn.expires_at.replace(tzinfo=timezone.utc)
     if conn.expires_at and conn.expires_at > datetime.now(timezone.utc) + timedelta(minutes=5):
-        return _decrypt(conn.access_token) if conn.access_token.startswith("ey") is False else conn.access_token
+        return _decrypt(conn.access_token)
     if not conn.refresh_token:
         raise HTTPException(401, "Token expired and no refresh token available — reconnect your bank")
-    token_data = await _refresh_access_token(_decrypt(conn.refresh_token) if conn.refresh_token.startswith("ey") is False else conn.refresh_token, session)
+    token_data = await _refresh_access_token(_decrypt(conn.refresh_token), session)
     conn.access_token = _encrypt(token_data["access_token"])
-    conn.refresh_token = _encrypt(token_data.get("refresh_token", conn.refresh_token)) if token_data.get("refresh_token") else conn.refresh_token
+    if token_data.get("refresh_token"):
+        conn.refresh_token = _encrypt(token_data["refresh_token"])
     conn.expires_at = datetime.now(timezone.utc) + timedelta(seconds=token_data.get("expires_in", 3600))
     await session.commit()
     return _decrypt(conn.access_token)

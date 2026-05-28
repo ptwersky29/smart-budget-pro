@@ -1,6 +1,5 @@
 """Smart financial engine: transactions, budgets, analytics, merchant normalization, split, recurring."""
 import uuid
-import math
 import re
 import logging
 from datetime import datetime, timezone, timedelta
@@ -9,7 +8,7 @@ from collections import defaultdict
 
 from fastapi import APIRouter, HTTPException, Request, Depends, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select, update, delete, func, or_, and_
+from sqlalchemy import select, update, delete, func, or_
 
 from db import (
     User, Transaction, Budget, SplitTransaction, AccountNickname,

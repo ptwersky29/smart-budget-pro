@@ -1,7 +1,6 @@
 """Shared LLM helper — direct OpenRouter + provider-specific calls, replaces emergentintegrations.llm.chat."""
 import os
 import json
-import uuid
 import logging
 from typing import Optional
 
@@ -50,7 +49,7 @@ async def call_llm(
     headers = {
         "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",
-        "HTTP-Referer": os.environ.get("FRONTEND_URL", "https://smart-budget-pro-ewtm.vercel.app"),
+        "HTTP-Referer": os.environ.get("FRONTEND_URL", ""),
     }
 
     messages = []

@@ -6,13 +6,14 @@ import hmac
 import base64
 import logging
 from datetime import datetime, timezone
+import html
+import urllib.parse
 from zoneinfo import ZoneInfo
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
-from sqlalchemy import select, update
+from sqlalchemy import select
 
 from db import PaymentTransaction, User
 from auth import get_current_user
@@ -28,7 +29,7 @@ TYL_HASH_ALGORITHM = os.environ.get("TYL_HASH_ALGORITHM", "HMAC_SHA256")
 
 PACKAGES = {
     "premium_monthly": {"amount": "5.00", "label": "Premium Monthly"},
-    "premium_yearly": {"amount": "50.00", "label": "Premium Yearly"},
+    "premium_yearly": {"amount": "48.00", "label": "Premium Yearly"},
 }
 
 
@@ -93,8 +94,8 @@ def build_router() -> APIRouter:
             "currency": TYL_CURRENCY_CODE,
             "checkoutoption": "combinedpage",
             "oid": oid,
-            "responseSuccessURL": f"{public_base}/api/billing/tyl/return?origin={origin}&session_id={session_id}&result=success",
-            "responseFailURL": f"{public_base}/api/billing/tyl/return?origin={origin}&session_id={session_id}&result=failed",
+            "responseSuccessURL": f"{public_base}/api/billing/tyl/return?origin={urllib.parse.quote(origin)}&session_id={session_id}&result=success",
+            "responseFailURL": f"{public_base}/api/billing/tyl/return?origin={urllib.parse.quote(origin)}&session_id={session_id}&result=failed",
             "transactionNotificationURL": f"{public_base}/api/billing/tyl/notify",
             "merchantTransactionId": session_id,
         }
@@ -157,8 +158,8 @@ def build_router() -> APIRouter:
                 "currency": TYL_CURRENCY_CODE,
                 "checkoutoption": "combinedpage",
                 "oid": oid,
-                "responseSuccessURL": f"{public_base}/api/billing/tyl/return?origin={origin}&session_id={session_id}&result=success",
-                "responseFailURL": f"{public_base}/api/billing/tyl/return?origin={origin}&session_id={session_id}&result=failed",
+                "responseSuccessURL": f"{public_base}/api/billing/tyl/return?origin={urllib.parse.quote(origin)}&session_id={session_id}&result=success",
+                "responseFailURL": f"{public_base}/api/billing/tyl/return?origin={urllib.parse.quote(origin)}&session_id={session_id}&result=failed",
                 "transactionNotificationURL": f"{public_base}/api/billing/tyl/notify",
                 "merchantTransactionId": session_id,
             }
@@ -168,7 +169,6 @@ def build_router() -> APIRouter:
                 fields["bname"] = rec.user_name[:96]
             fields["hashExtended"] = _build_extended_hash(fields, TYL_SHARED_SECRET)
 
-        import html
         inputs_html = "\n        ".join(
             f'<input type="hidden" name="{html.escape(str(k))}" value="{html.escape(str(v))}" />'
             for k, v in fields.items()
@@ -231,7 +231,7 @@ def build_router() -> APIRouter:
         sig_ok = _verify_response_hash(data, TYL_SHARED_SECRET) if data.get("extended_response_hash") else False
         approval = (data.get("approval_code") or "")
         status_u = (data.get("status") or "").upper()
-        approved = approval.startswith("Y") or status_u == "APPROVED"
+        approved = approval.startswith("Y") or status_u in {"APPROVED", "WAITING"}
         session_id = data.get("merchantTransactionId")
         result = {"approved": approved, "signature_valid": sig_ok, "status": status_u,
                   "approval_code": approval, "user_id": None}
@@ -271,7 +271,10 @@ def build_router() -> APIRouter:
 
     @router.api_route("/billing/tyl/return", methods=["GET", "POST"])
     async def tyl_return(request: Request):
-        origin = request.query_params.get("origin") or os.environ.get("FRONTEND_URL", "")
+        origin_raw = request.query_params.get("origin") or ""
+        frontend_url = os.environ.get("FRONTEND_URL", "")
+        allowed_domains = {frontend_url, "http://localhost:3000"}
+        origin = origin_raw if any(origin_raw.startswith(d) for d in allowed_domains if d) else frontend_url
         session_id_qs = request.query_params.get("session_id")
         result_hint = request.query_params.get("result", "")
         data: dict = {}
@@ -296,17 +299,17 @@ def build_router() -> APIRouter:
             base = ""
         outcome = "approved" if result["approved"] else (result_hint or "failed")
         params = [
-            f"session_id={data.get('merchantTransactionId') or session_id_qs or ''}",
-            f"outcome={outcome}",
-            f"status={result['status']}",
-            f"approval_code={result.get('approval_code') or ''}",
-            f"signature_valid={'1' if result.get('signature_valid') else '0'}",
+            ("session_id", data.get("merchantTransactionId") or session_id_qs or ""),
+            ("outcome", outcome),
+            ("status", result["status"]),
+            ("approval_code", result.get("approval_code") or ""),
+            ("signature_valid", "1" if result.get("signature_valid") else "0"),
         ]
         if data.get("ipgTransactionId"):
-            params.append(f"txn_id={data['ipgTransactionId']}")
+            params.append(("txn_id", data["ipgTransactionId"]))
         if data.get("fail_reason"):
-            params.append(f"fail_reason={data['fail_reason']}")
-        target = f"{base}/billing/success?{'&'.join(params)}"
+            params.append(("fail_reason", data["fail_reason"]))
+        target = f"{base}/billing/success?" + urllib.parse.urlencode(params)
         return RedirectResponse(url=target, status_code=303)
 
     @router.post("/billing/tyl/verify")

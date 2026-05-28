@@ -1,6 +1,5 @@
 """Audit logging: track important user actions."""
 import logging
-from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import Request

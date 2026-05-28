@@ -1,17 +1,15 @@
 """Real Stripe subscription billing — monthly (£5) and yearly (£48)."""
 import os
-import json
 import logging
-from datetime import datetime, timezone, timedelta
-from typing import Optional
+from datetime import datetime, timezone
 
 import stripe
 from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel
-from sqlalchemy import select, update
+from sqlalchemy import select
 
 from db import PaymentTransaction, User
-from auth import get_current_user, require_admin
+from auth import get_current_user
 
 logger = logging.getLogger("billing")
 
@@ -21,11 +19,11 @@ FREE_TRIAL_DAYS = 14
 
 PACKAGES = {
     "premium_monthly": {
-        "amount": 5.00, "currency": "gbp", "label": "FinanceAI Premium (monthly)",
+        "amount": 5.00, "currency": "GBP", "label": "FinanceAI Premium (monthly)",
         "price_id": MONTHLY_PRICE_ID, "interval": "month",
     },
     "premium_yearly": {
-        "amount": 48.00, "currency": "gbp", "label": "FinanceAI Premium (yearly)",
+        "amount": 48.00, "currency": "GBP", "label": "FinanceAI Premium (yearly)",
         "price_id": YEARLY_PRICE_ID, "interval": "year",
     },
 }
@@ -118,7 +116,10 @@ def build_router() -> APIRouter:
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
-                select(PaymentTransaction).where(PaymentTransaction.session_id == session_id)
+                select(PaymentTransaction).where(
+                    PaymentTransaction.session_id == session_id,
+                    PaymentTransaction.user_id == user["user_id"],
+                )
             )
             rec = result.scalar_one_or_none()
             if not rec:
@@ -129,15 +130,16 @@ def build_router() -> APIRouter:
             rec.status = cs.status
 
             if cs.payment_status == "paid" or (cs.mode == "subscription" and cs.status == "complete"):
-                u_result = await session.execute(select(User).where(User.user_id == user["user_id"]))
-                u = u_result.scalar_one_or_none()
-                if u:
-                    u.tier = "premium"
-                    u.subscription_status = "active"
-                    if cs.subscription:
-                        sub = stripe.Subscription.retrieve(cs.subscription)
-                        u.stripe_subscription_id = cs.subscription
-                        u.subscription_status = sub.status
+                if rec.user_id == user["user_id"]:
+                    u_result = await session.execute(select(User).where(User.user_id == user["user_id"]))
+                    u = u_result.scalar_one_or_none()
+                    if u:
+                        u.tier = "premium"
+                        u.subscription_status = "active"
+                        if cs.subscription:
+                            sub = stripe.Subscription.retrieve(cs.subscription)
+                            u.stripe_subscription_id = cs.subscription
+                            u.subscription_status = sub.status
             await session.commit()
 
             return {
@@ -148,7 +150,7 @@ def build_router() -> APIRouter:
             }
 
     @router.get("/billing/subscription")
-    async def get_subscription(user: dict = Depends(get_current_user)):
+    async def get_subscription(request: Request, user: dict = Depends(get_current_user)):
         stripe.api_key = _get_stripe_key()
         sm = request.app.state.db
         async with sm() as session:
@@ -173,8 +175,8 @@ def build_router() -> APIRouter:
                     sub_info["stripe_status"] = sub.status
                     sub_info["current_period_end"] = datetime.fromtimestamp(sub.current_period_end, tz=timezone.utc).isoformat()
                     sub_info["cancel_at_period_end"] = sub.cancel_at_period_end
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("Failed to retrieve Stripe subscription %s: %s", u.stripe_subscription_id, e)
 
             return sub_info
 
@@ -222,11 +224,11 @@ def build_router() -> APIRouter:
         body = await request.body()
         sig = request.headers.get("Stripe-Signature", "")
         endpoint_secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+        if not endpoint_secret:
+            logger.error("STRIPE_WEBHOOK_SECRET not configured — rejecting webhook")
+            raise HTTPException(500, "Webhook not configured")
         try:
-            if endpoint_secret:
-                evt = stripe.Webhook.construct_event(payload=body, sig_header=sig, secret=endpoint_secret)
-            else:
-                evt = stripe.Event.construct_from(json.loads(body), stripe.api_key)
+            evt = stripe.Webhook.construct_event(payload=body, sig_header=sig, secret=endpoint_secret)
         except (ValueError, stripe.error.StripeError) as e:
             logger.error(f"webhook error: {e}")
             raise HTTPException(400, "Invalid webhook")
