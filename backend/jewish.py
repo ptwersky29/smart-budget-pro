@@ -629,21 +629,23 @@ def build_router() -> APIRouter:
                 select(ChasunaPlan).where(ChasunaPlan.user_id == user["user_id"])
             )
             rows = result.scalars().all()
-            by_status = {"planned": 0, "booked": 0, "paid": 0}
+            by_status = {"planned": 0.0, "booked": 0.0, "paid": 0.0}
             by_category = {}
             for r in rows:
-                by_status[r.status] = by_status.get(r.status, 0) + r.estimated_cost
-                by_category.setdefault(r.category, {"estimated": 0, "actual": 0, "deposit": 0, "status": r.status})
-                by_category[r.category]["estimated"] += r.estimated_cost
-                by_category[r.category]["actual"] += r.actual_cost
-                by_category[r.category]["deposit"] += r.deposit_paid
-                by_category[r.category]["status"] = r.status
+                bs_key = r.status if r.status in by_status else "planned"
+                by_status[bs_key] = by_status[bs_key] + float(r.estimated_cost or 0)
+                cat = r.category or "other"
+                d = by_category.setdefault(cat, {"estimated": 0, "actual": 0, "deposit": 0, "status": bs_key})
+                d["estimated"] += float(r.estimated_cost or 0)
+                d["actual"] += float(r.actual_cost or 0)
+                d["deposit"] += float(r.deposit_paid or 0)
+                d["status"] = bs_key
             return {
-                "total_estimated": round(sum(r.estimated_cost for r in rows), 2),
-                "total_actual": round(sum(r.actual_cost for r in rows), 2),
-                "total_deposit_paid": round(sum(r.deposit_paid for r in rows), 2),
+                "total_estimated": round(sum(float(r.estimated_cost or 0) for r in rows), 2),
+                "total_actual": round(sum(float(r.actual_cost or 0) for r in rows), 2),
+                "total_deposit_paid": round(sum(float(r.deposit_paid or 0) for r in rows), 2),
                 "by_status": {k: round(v, 2) for k, v in by_status.items()},
-                "by_category": {k: {sk: round(sv, 2) for sk, sv in v.items()} for k, v in by_category.items()},
+                "by_category": {k: {sk: round(float(sv), 2) for sk, sv in v.items()} for k, v in by_category.items()},
                 "item_count": len(rows),
             }
 
