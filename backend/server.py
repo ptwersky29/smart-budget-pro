@@ -29,6 +29,8 @@ import statements
 import integrations
 import hebcal
 import jewish
+import investments
+import uk_tools
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -79,6 +81,8 @@ api.include_router(statements.build_router())
 api.include_router(integrations.build_router())
 api.include_router(hebcal.build_router())
 api.include_router(jewish.build_router())
+api.include_router(investments.build_router())
+api.include_router(uk_tools.build_router())
 
 app.include_router(api)
 

@@ -489,7 +489,50 @@ class Statement(Base, TimestampMixin):
     data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
 
-# ── Integrations ──────────────────────────────────────────────────────────
+# ── Investments ──────────────────────────────────────────────────────────
+
+INVESTMENT_TYPES = {"stock", "etf", "crypto", "gold", "bond", "property"}
+
+class InvestmentHolding(Base, TimestampMixin):
+    __tablename__ = "investment_holdings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    ticker: Mapped[str] = mapped_column(String(16), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    type: Mapped[str] = mapped_column(String(16), nullable=False)
+    shares: Mapped[float] = mapped_column(Float, default=0)
+    cost_basis: Mapped[float] = mapped_column(Float, default=0)
+    current_price: Mapped[float] = mapped_column(Float, default=0)
+    currency: Mapped[str] = mapped_column(String(4), default="GBP")
+    account_name: Mapped[str] = mapped_column(String(64), default="General")
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    price_updated: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    target_allocation_pct: Mapped[float] = mapped_column(Float, default=0)
+
+    __table_args__ = (
+        Index("idx_investment_user_ticker", "user_id", "ticker"),
+    )
+
+
+class MarketData(Base, TimestampMixin):
+    __tablename__ = "market_data"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ticker: Mapped[str] = mapped_column(String(16), nullable=False, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    type: Mapped[str] = mapped_column(String(16), nullable=False)
+    price: Mapped[float] = mapped_column(Float, default=0)
+    previous_close: Mapped[float] = mapped_column(Float, default=0)
+    change_pct: Mapped[float] = mapped_column(Float, default=0)
+    high_52w: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    low_52w: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    currency: Mapped[str] = mapped_column(String(4), default="GBP")
+    last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    source: Mapped[str] = mapped_column(String(32), default="manual")
+
+
+# ── Jewish Finance ───────────────────────────────────────────────────────
 
 class HolidayBudget(Base, TimestampMixin):
     __tablename__ = "holiday_budgets"
