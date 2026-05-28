@@ -24,15 +24,26 @@ MAX_BYTES = 5 * 1024 * 1024
 PARSE_LIMIT_FREE = 1
 MAX_CHARS_TO_AI = 40000
 
-CATEGORIES = [
+INCOME_CATEGORIES = {"salary", "income"}
+EXPENSE_CATEGORIES = {
     "groceries", "dining", "transport", "utilities", "subscriptions",
-    "tzedakah", "rent", "salary", "income", "shopping", "health",
-    "entertainment", "insurance", "education", "transfer", "cash",
-    "tax", "fees", "mortgage", "uncategorized",
-]
+    "tzedakah", "rent", "shopping", "health", "entertainment",
+    "insurance", "education", "transfer", "cash", "tax", "fees",
+    "mortgage",
+}
+ALL_CATEGORIES = INCOME_CATEGORIES | EXPENSE_CATEGORIES | {"uncategorized"}
+CATEGORIES = sorted(ALL_CATEGORIES)
 
 PARSE_PROMPT = """You are a UK bank statement parser. Below is text extracted from a bank statement (CSV or PDF).
 Extract every transaction as JSON. Return STRICT JSON only — no markdown, no commentary.
+
+INCOME vs EXPENSE RULES — this is CRITICAL:
+- INCOME = money coming IN (salary, wages, refunds, interest, dividends, cashback, transfers IN, credits)
+  → amount MUST be POSITIVE (e.g. 1500.00)
+  → category = "salary" or "income"
+- EXPENSE = money going OUT (purchases, bills, fees, transfers OUT, debits, withdrawals)
+  → amount MUST be NEGATIVE (e.g. -45.99)
+  → category = one of: groceries, dining, transport, utilities, subscriptions, tzedakah, rent, shopping, health, entertainment, insurance, education, transfer, cash, tax, fees, mortgage
 
 Schema:
 {
@@ -42,8 +53,8 @@ Schema:
       "date": "YYYY-MM-DD",
       "description": string,
       "merchant": string|null,
-      "amount": number (positive for credits/income, negative for debits/spend),
-      "category": "groceries|dining|transport|utilities|subscriptions|tzedakah|rent|salary|income|shopping|health|entertainment|insurance|education|transfer|cash|tax|fees|mortgage|uncategorized",
+      "amount": number,
+      "category": string,
       "is_income": bool,
       "confidence": 0..1
     }
@@ -51,10 +62,9 @@ Schema:
 }
 
 Rules:
-- Use ISO date format YYYY-MM-DD. If only DD/MM/YYYY appears, convert.
-- Amount sign: negative for spend/debits/withdrawals, positive for credits/income/refunds.
-- Use British English categories.
-- Categorise EVERY transaction based on the merchant/description — never leave as "uncategorized" unless truly unrecognisable.
+- Use ISO date format YYYY-MM-DD.
+- Amount sign: POSITIVE for income (salary, interest, refunds, credits), NEGATIVE for expenses (purchases, bills, debits).
+- categorise EVERY transaction — never leave as "uncategorized".
 - Skip header rows, balance lines, and footnotes.
 - Cap to 200 transactions.
 
@@ -108,23 +118,47 @@ async def _ai_parse_statement(text: str) -> dict:
         raise RuntimeError(f"AI JSON parse failed: {e}")
 
 
-CATEGORISE_PROMPT = """You are a bank transaction categoriser. Given the description and merchant of a transaction, choose the best single category from the list below. Return STRICT JSON only — no markdown.
+CATEGORISE_PROMPT = """You are a bank transaction categoriser. Given the description, merchant, and amount of a transaction, choose the best single category.
 
-Categories: groceries, dining, transport, utilities, subscriptions, tzedakah, rent, salary, income, shopping, health, entertainment, insurance, education, transfer, cash, tax, fees, mortgage, uncategorized
+INCOME vs EXPENSE:
+- If amount > 0 (money coming in): category is "salary" or "income" only
+- If amount < 0 (money going out): category is one of the expense categories
+
+Expense categories: groceries, dining, transport, utilities, subscriptions, tzedakah, rent, shopping, health, entertainment, insurance, education, transfer, cash, tax, fees, mortgage
+
+Return STRICT JSON only: {{"category": "..."}}
 
 Examples:
-- "TESCO STORE 1234" -> "groceries"
-- "MCDONALD'S" -> "dining"
-- "SALARY" -> "salary"
-- "AMAZON PRIME" -> "subscriptions"
-- "NATIONAL GRID" -> "utilities"
+- "TESCO STORE 1234" | merchant: tesco | amount: -45.99 -> "groceries"
+- "MCDONALD'S" | merchant: mcdonald | amount: -12.50 -> "dining"
+- "SALARY" | merchant: employer | amount: 2500.00 -> "salary"
+- "INTEREST" | merchant: bank | amount: 12.34 -> "income"
+- "AMAZON PRIME" | merchant: amazon | amount: -7.99 -> "subscriptions"
+- "NATIONAL GRID" | merchant: national grid | amount: -85.00 -> "utilities"
 
 Transaction: {description}
 Merchant: {merchant}
-Amount: {amount} (negative = spend, positive = income)
-
-Respond with JSON: {{"category": "..."}}
+Amount: {amount}
 """
+
+
+def _fix_sign(tx: dict) -> dict:
+    """Ensure amount sign matches the category (income=positive, expense=negative)."""
+    cat = tx.get("category", "uncategorized").lower()
+    amt = tx.get("amount", 0)
+    try:
+        amt = float(amt)
+    except (TypeError, ValueError):
+        amt = 0.0
+    if cat in INCOME_CATEGORIES and amt < 0:
+        tx["amount"] = abs(amt)
+        tx["is_income"] = True
+    elif cat in EXPENSE_CATEGORIES and amt > 0:
+        tx["amount"] = -abs(amt)
+        tx["is_income"] = False
+    else:
+        tx["is_income"] = amt > 0
+    return tx
 
 
 async def _ai_categorise(description: str, merchant: str | None, amount: float) -> str:
@@ -146,7 +180,7 @@ async def _ai_categorise(description: str, merchant: str | None, amount: float) 
         try:
             data = json.loads(m.group(0))
             cat = str(data.get("category", "uncategorized")).lower().strip()
-            return cat if cat in CATEGORIES else "uncategorized"
+            return cat if cat in ALL_CATEGORIES else "uncategorized"
         except Exception:
             pass
     return "uncategorized"
@@ -207,7 +241,7 @@ def build_router() -> APIRouter:
             clean = []
             for t in txs[:200]:
                 try:
-                    clean.append({
+                    tx = _fix_sign({
                         "date": str(t.get("date", ""))[:10],
                         "description": str(t.get("description", ""))[:200],
                         "merchant": (str(t["merchant"])[:120] if t.get("merchant") else None),
@@ -216,6 +250,7 @@ def build_router() -> APIRouter:
                         "is_income": bool(t.get("is_income")),
                         "confidence": float(t.get("confidence", 0.5)),
                     })
+                    clean.append(tx)
                 except Exception:
                     continue
 
@@ -225,6 +260,7 @@ def build_router() -> APIRouter:
                 for t in uncat:
                     new_cat = await _ai_categorise(t["description"], t.get("merchant"), t["amount"])
                     t["category"] = new_cat
+                    _fix_sign(t)
 
             stmt = Statement(
                 user_id=user["user_id"],
