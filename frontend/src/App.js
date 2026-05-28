@@ -29,7 +29,8 @@ import AuthCallback from "./pages/AuthCallback";
 
 function AppRouter() {
   const location = useLocation();
-  if (location.hash?.includes("session_id=")) {
+  const authHash = location.hash || "";
+  if (authHash.includes("access_token=") || authHash.includes("refresh_token=") || authHash.includes("session_id=")) {
     return <AuthCallback />;
   }
   return (

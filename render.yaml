@@ -14,9 +14,9 @@ services:
       - key: FRONTEND_URL
         value: https://smart-budget-pro-ewtm.vercel.app
       - key: ADMIN_EMAIL
-        value: ptwersky29@gmail.com
+        sync: false
       - key: ADMIN_PASSWORD
-        value: 146Osbaldeston!
+        sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET

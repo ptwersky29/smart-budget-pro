@@ -3,7 +3,7 @@ import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
 import {
   Phone, ShieldCheck, ExternalLink, Loader2, CheckCircle2, AlertCircle, Copy, Sparkles, Trash2,
-  CreditCard, Calendar, MessageSquare, TrendingUp, ArrowRight
+  CreditCard, Calendar, MessageSquare, TrendingUp, ArrowRight, Building2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 

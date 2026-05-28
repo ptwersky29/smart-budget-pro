@@ -554,7 +554,7 @@ Return JSON:
             sid = await get_config(session, "twilio_account_sid", "TWILIO_ACCOUNT_SID")
             token_exists = bool(await get_config(session, "twilio_auth_token", "TWILIO_AUTH_TOKEN"))
             number = await get_config(session, "twilio_phone_number", "TWILIO_PHONE_NUMBER")
-            webhook = f"https://budget-pro-4jlg.onrender.com/api/sms/webhook"
+            webhook = f"{str(request.base_url).rstrip('/')}/api/sms/webhook"
             return {"account_sid": sid or "", "has_token": token_exists, "phone_number": number or "", "webhook_url": webhook}
 
     @router.put("/admin/twilio-config")

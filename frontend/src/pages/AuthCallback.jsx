@@ -12,19 +12,40 @@ export default function AuthCallback() {
   useEffect(() => {
     if (hasProcessed.current) return;
     hasProcessed.current = true;
-    const hash = window.location.hash;
-    const match = hash.match(/session_id=([^&]+)/);
-    if (!match) {
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const accessToken = params.get("access_token");
+    const refreshToken = params.get("refresh_token");
+    const sessionId = params.get("session_id");
+
+    if (accessToken) {
+      (async () => {
+        try {
+          const { data } = await api.post("/auth/emergent-session", {
+            access_token: accessToken,
+            refresh_token: refreshToken || undefined,
+          });
+          const { access_token, refresh_token, ...userData } = data || {};
+          setUser(userData);
+          window.history.replaceState(null, "", "/dashboard");
+          navigate("/dashboard", { replace: true, state: { user: userData } });
+        } catch (e) {
+          navigate("/login?error=oauth_failed", { replace: true });
+        }
+      })();
+      return;
+    }
+
+    if (!sessionId) {
       navigate("/login");
       return;
     }
-    const session_id = decodeURIComponent(match[1]);
     (async () => {
       try {
-        const { data } = await api.post("/auth/emergent-session", { session_id });
-        setUser(data);
+        const { data } = await api.post("/auth/emergent-session", { session_id: sessionId });
+        const { access_token, refresh_token, ...userData } = data || {};
+        setUser(userData);
         window.history.replaceState(null, "", "/dashboard");
-        navigate("/dashboard", { replace: true, state: { user: data } });
+        navigate("/dashboard", { replace: true, state: { user: userData } });
       } catch (e) {
         navigate("/login?error=oauth_failed", { replace: true });
       }

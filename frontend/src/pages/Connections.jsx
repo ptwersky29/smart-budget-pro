@@ -13,6 +13,11 @@ export default function Connections() {
   const [totalTx, setTotalTx] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [needsSetup, setNeedsSetup] = useState(false);
+  const [importFromDate, setImportFromDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 90);
+    return d.toISOString().slice(0, 10);
+  });
 
   const load = useCallback(async () => {
     try {
@@ -30,15 +35,30 @@ export default function Connections() {
 
   useEffect(() => {
     const s = params.get("status");
+    const reason = params.get("reason");
     if (s === "success") { setStatus("success"); toast.success(`Bank connected — ${params.get("accounts") || ""} account(s) linked`); }
-    if (s === "failed") { setStatus("failed"); setError(params.get("reason")); toast.error("Connection failed"); }
+    if (s === "failed") {
+      setStatus("failed");
+      setError(reason);
+      if (reason === "no_accounts") {
+        toast.error("No bank accounts were selected");
+      } else if (reason === "invalid_state") {
+        toast.error("Your connect session expired. Please try again.");
+      } else if (reason === "token_exchange") {
+        toast.error("Bank authentication failed. Please reconnect.");
+      } else {
+        toast.error("Connection failed");
+      }
+    }
     load();
   }, [params, load]);
 
   const connect = async () => {
     setStatus("connecting"); setError(null);
     try {
-      const { data } = await api.get("/truelayer/auth-url");
+      const { data } = await api.get("/truelayer/auth-url", {
+        params: importFromDate ? { from_date: importFromDate } : {},
+      });
       setStatus("redirecting");
       setTimeout(() => { window.location.href = data.auth_url; }, 600);
     } catch (e) {
@@ -48,6 +68,8 @@ export default function Connections() {
       if (msg?.includes("not configured") || msg?.includes("administrator")) {
         setNeedsSetup(true);
         toast.error("Banking not configured yet — admin needs to set up TrueLayer");
+      } else if (msg?.toLowerCase().includes("date")) {
+        toast.error("Please choose a valid import start date");
       } else {
         toast.error(msg || "Could not connect");
       }
@@ -95,6 +117,16 @@ export default function Connections() {
         </div>
       )}
 
+      {!needsSetup && conns.some((c) => c.status === "reconnect_required") && (
+        <div className="rounded-2xl border border-ruby/40 bg-ruby/5 p-4 flex items-center gap-3" data-testid="needs-reconnect">
+          <AlertCircle className="h-5 w-5 text-ruby shrink-0" />
+          <div className="flex-1">
+            <p className="font-medium text-sm">One or more bank connections need reconnecting</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Click Connect Bank again to re-authenticate the affected bank and resume automatic sync.</p>
+          </div>
+        </div>
+      )}
+
       {!needsSetup && (
         <div className="rounded-2xl border border-border bg-card p-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
@@ -105,13 +137,25 @@ export default function Connections() {
                 <p className="text-sm text-muted-foreground">Securely link your UK bank account — read-only access</p>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-3 min-w-[260px]">
+              <div>
+                <label className="label-overline">Import start date</label>
+                <input
+                  type="date"
+                  value={importFromDate}
+                  onChange={(e) => setImportFromDate(e.target.value)}
+                  className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none"
+                />
+                <p className="text-xs text-muted-foreground mt-1">FinanceAI will import transactions from this date when you connect.</p>
+              </div>
+              <div className="flex gap-2 justify-end">
               {status === "failed" && (
                 <button onClick={connect} data-testid="retry-connect" className="btn-pill border border-border text-sm">Retry</button>
               )}
               <button onClick={connect} disabled={status === "connecting" || status === "redirecting"} data-testid="connect-bank-button" className="btn-pill gradient-emerald text-white text-sm disabled:opacity-50">
                 {status === "connecting" || status === "redirecting" ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Working…</> : <>Connect Bank <ArrowRight className="h-4 w-4 ml-2" /></>}
               </button>
+              </div>
             </div>
           </div>
           {error && <p className="mt-4 text-sm text-ruby">Failed: {error}</p>}
@@ -146,12 +190,20 @@ export default function Connections() {
                       {c.account_type && <span className="text-xs text-muted-foreground ml-2">{c.account_type}</span>}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {c.status === "active" ? <span className="text-emerald">Active</span> : c.status}
+                      {c.status === "active" ? <span className="text-emerald">Active</span> : c.status === "reconnect_required" ? <span className="text-ruby">Reconnect required</span> : c.status}
+                      {c.import_from_date && <span className="ml-2">importing from {new Date(c.import_from_date).toLocaleDateString()}</span>}
                       {c.expires_at && <span className="ml-2">expires {new Date(c.expires_at).toLocaleDateString()}</span>}
+                      {c.last_sync_at && <span className="ml-2">last sync {new Date(c.last_sync_at).toLocaleDateString()}</span>}
                     </p>
+                    {c.last_error && <p className="text-xs text-ruby mt-1 max-w-[48rem] truncate" title={c.last_error}>{c.last_error}</p>}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {c.status === "reconnect_required" && (
+                    <button onClick={connect} data-testid={`reconnect-${c.connection_id}`} className="btn-pill border border-ruby text-ruby text-sm">
+                      Reconnect
+                    </button>
+                  )}
                   <button onClick={() => removeConn(c.connection_id)} data-testid={`remove-${c.connection_id}`} className="h-9 w-9 rounded-full grid place-items-center hover:bg-secondary text-ruby"><Trash2 className="h-4 w-4" /></button>
                 </div>
               </li>

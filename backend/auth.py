@@ -71,11 +71,21 @@ def create_refresh_token(user_id: str, remember_me: bool = False, jti: str = Non
     return pyjwt.encode(payload, _secret(), algorithm=JWT_ALGORITHM)
 
 
+def _cookie_secure() -> bool:
+    explicit = os.environ.get("COOKIE_SECURE")
+    if explicit is not None:
+        return explicit.lower() in {"1", "true", "yes", "on"}
+    frontend = os.environ.get("FRONTEND_URL", "")
+    return frontend.startswith("https://")
+
+
 def set_auth_cookies(response: Response, access: str, refresh: str, remember_me: bool = False) -> None:
     refresh_max_age = REMEMBER_ME_DAYS * 86400 if remember_me else REFRESH_TOKEN_DAYS * 86400
-    response.set_cookie("access_token", access, httponly=True, secure=True, samesite="none",
+    secure = _cookie_secure()
+    same_site = "none" if secure else "lax"
+    response.set_cookie("access_token", access, httponly=True, secure=secure, samesite=same_site,
                         max_age=ACCESS_TOKEN_MINUTES * 60, path="/")
-    response.set_cookie("refresh_token", refresh, httponly=True, secure=True, samesite="none",
+    response.set_cookie("refresh_token", refresh, httponly=True, secure=secure, samesite=same_site,
                         max_age=refresh_max_age, path="/")
 
 
@@ -106,6 +116,12 @@ class ForgotPasswordIn(BaseModel):
 class ResetPasswordIn(BaseModel):
     token: str
     new_password: str = Field(min_length=8, max_length=128)
+
+
+class EmergentSessionIn(BaseModel):
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
+    session_id: Optional[str] = None
 
 
 class UserOut(BaseModel):
@@ -333,6 +349,36 @@ def build_router() -> APIRouter:
     @router.get("/me", response_model=UserOut)
     async def me(user: dict = Depends(get_current_user)):
         return user
+
+    @router.post("/emergent-session", response_model=UserOut)
+    async def emergent_session(payload: EmergentSessionIn, request: Request, response: Response):
+        if not payload.access_token:
+            raise HTTPException(400, "access_token is required")
+        if payload.session_id and not payload.refresh_token:
+            raise HTTPException(400, "Legacy session_id callbacks are no longer supported")
+
+        try:
+            token_data = pyjwt.decode(payload.access_token, _secret(), algorithms=[JWT_ALGORITHM])
+            if token_data.get("type") != "access":
+                raise HTTPException(401, "Invalid token type")
+        except pyjwt.PyJWTError:
+            raise HTTPException(401, "Invalid access token")
+
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(select(User).where(User.user_id == token_data["sub"]))
+            user = result.scalar_one_or_none()
+            if not user:
+                raise HTTPException(404, "User not found")
+            if user.disabled:
+                raise HTTPException(403, "Account disabled")
+
+            if payload.refresh_token:
+                set_auth_cookies(response, payload.access_token, payload.refresh_token)
+            user_dict = _user_to_dict(user)
+            user_dict["access_token"] = payload.access_token
+            user_dict["refresh_token"] = payload.refresh_token
+            return user_dict
 
     @router.post("/refresh")
     async def refresh_token(request: Request, response: Response):

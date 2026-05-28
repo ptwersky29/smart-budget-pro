@@ -72,6 +72,11 @@ async def create_tables():
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS app_language VARCHAR(8) DEFAULT 'en'"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS app_theme VARCHAR(16) DEFAULT 'system'"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS app_currency VARCHAR(4) DEFAULT 'GBP'"))
+            await conn.execute(text("ALTER TABLE truelayer_states ADD COLUMN IF NOT EXISTS meta JSON"))
+            await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS last_sync_at TIMESTAMPTZ"))
+            await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS last_sync_status VARCHAR(32)"))
+            await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS last_error TEXT"))
+            await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS last_error_at TIMESTAMPTZ"))
             # Float → Numeric for monetary columns
             await conn.execute(text("ALTER TABLE transactions ALTER COLUMN amount TYPE NUMERIC(12,2) USING amount::numeric"))
             await conn.execute(text("ALTER TABLE split_transactions ALTER COLUMN amount TYPE NUMERIC(12,2) USING amount::numeric"))
@@ -217,6 +222,7 @@ class TrueLayerState(Base):
     state: Mapped[str] = mapped_column(String(128), unique=True, nullable=False, index=True)
     user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False)
     redirect_uri: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    meta: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
@@ -237,6 +243,10 @@ class BankConnection(Base):
     refresh_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="active")
+    last_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_sync_status: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    last_error_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

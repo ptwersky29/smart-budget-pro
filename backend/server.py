@@ -72,9 +72,20 @@ async def health():
         sm = get_session_maker()
         async with sm() as session:
             await session.execute(text("SELECT 1"))
-            return {"status": "ok"}
+            return {
+                "status": "ok",
+                "database": "connected",
+                "auth_configured": bool(os.environ.get("JWT_SECRET")),
+                "routers": len(api.routes),
+            }
     except Exception as e:
-        return {"status": "error", "detail": str(e)}
+        return {
+            "status": "error",
+            "detail": str(e),
+            "database": "unavailable",
+            "auth_configured": bool(os.environ.get("JWT_SECRET")),
+            "routers": len(api.routes),
+        }
 
 
 # Mount sub-routers

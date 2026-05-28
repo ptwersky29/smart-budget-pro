@@ -7,54 +7,60 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const stripTokens = useCallback((payload) => {
+    if (!payload) return payload;
+    const { access_token, refresh_token, ...userData } = payload;
+    return userData;
+  }, []);
+
+  const syncTokensFromLocation = useCallback(() => {
+    const params = new URLSearchParams(window.location.search);
+    const accessToken = params.get("access_token");
+    const refreshToken = params.get("refresh_token");
+    if (accessToken) {
+      localStorage.setItem("access_token", accessToken);
+      if (refreshToken) localStorage.setItem("refresh_token", refreshToken);
+      window.history.replaceState(null, "", window.location.pathname);
+      return true;
+    }
+    return false;
+  }, []);
+
   const checkAuth = useCallback(async () => {
     try {
       const { data } = await api.get("/auth/me");
-      setUser(data);
+      setUser(stripTokens(data));
     } catch (err) {
       console.debug("auth/me check failed (expected when not logged in)", err?.response?.status);
       setUser(false);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [stripTokens]);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const accessToken = params.get("access_token");
-    if (accessToken) {
-      localStorage.setItem("access_token", accessToken);
-      const refreshToken = params.get("refresh_token");
-      if (refreshToken) localStorage.setItem("refresh_token", refreshToken);
-      window.history.replaceState(null, "", window.location.pathname);
-    }
+    syncTokensFromLocation();
     checkAuth();
-  }, [checkAuth]);
+  }, [checkAuth, syncTokensFromLocation]);
 
   const login = useCallback(async (email, password, rememberMe = false) => {
     const { data } = await api.post("/auth/login", { email, password, remember_me: rememberMe });
-    if (data.access_token) {
-      localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("refresh_token", data.refresh_token || "");
-    }
-    setUser(data);
+    setUser(stripTokens(data));
     return data;
-  }, []);
+  }, [stripTokens]);
 
   const register = useCallback(async (payload) => {
     const { data } = await api.post("/auth/register", payload);
-    if (data.access_token) {
-      localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("refresh_token", data.refresh_token || "");
-    }
-    setUser(data);
+    setUser(stripTokens(data));
     return data;
-  }, []);
+  }, [stripTokens]);
 
   const logout = useCallback(async () => {
     try { await api.post("/auth/logout"); } catch (err) { console.error("logout error", err); }
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
+    localStorage.removeItem("financeai_token");
+    localStorage.removeItem("session_token");
     setUser(false);
   }, []);
 

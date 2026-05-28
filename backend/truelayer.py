@@ -7,7 +7,7 @@ import hmac
 import json
 import logging
 from base64 import b64encode, b64decode
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 from urllib.parse import urlencode
 from typing import Optional
 
@@ -18,6 +18,12 @@ from sqlalchemy import select, delete, func
 
 from db import TrueLayerState, BankConnection, TrueLayerLog, SyncLog, Transaction
 from auth import get_current_user
+from bank_sync_utils import (
+    parse_import_from_date,
+    is_reauth_error,
+    connection_error_message,
+    transaction_sync_id,
+)
 
 logger = logging.getLogger("truelayer")
 
@@ -25,6 +31,7 @@ SCOPES = "info accounts balance cards transactions direct_debits standing_orders
 PROVIDERS = "uk-cs-mock uk-ob-all uk-oauth-all"
 SYNC_PAGE_SIZE = 500
 MAX_RETRIES = 3
+MAX_ERROR_TEXT = 500
 
 
 # ── Encrypted token storage (AES-GCM authenticated encryption) ────────────
@@ -200,14 +207,20 @@ async def _fetch_accounts(access_token: str, session) -> list:
     return []
 
 
-# ── Deduplication ─────────────────────────────────────────────────────────
-
-def _tx_hash(user_id: str, date: str, description: str, amount: float) -> str:
-    raw = f"{user_id}|{date}|{description}|{amount:.2f}"
-    return hashlib.sha256(raw.encode()).hexdigest()[:40]
-
-
 # ── Logging ───────────────────────────────────────────────────────────────
+
+async def _mark_connection_state(session, conn: BankConnection, *, status: str, error: str = None, synced_at: datetime = None):
+    conn.status = status
+    conn.last_sync_status = status
+    if synced_at:
+        conn.last_sync_at = synced_at
+    if error:
+        conn.last_error = error[:MAX_ERROR_TEXT]
+        conn.last_error_at = datetime.now(timezone.utc)
+    else:
+        conn.last_error = None
+        conn.last_error_at = None
+    await session.commit()
 
 async def _log_sync(session, user_id: str, connection_id: str, event: str, status: str = "info", message: str = None, details: dict = None):
     try:
@@ -231,7 +244,7 @@ def build_router() -> APIRouter:
     router = APIRouter(prefix="/truelayer", tags=["truelayer"])
 
     @router.get("/auth-url")
-    async def get_auth_url(request: Request, user: dict = Depends(get_current_user)):
+    async def get_auth_url(request: Request, from_date: Optional[str] = Query(None), user: dict = Depends(get_current_user)):
         sm = request.app.state.db
         async with sm() as session:
             if not await _is_configured(session):
@@ -239,7 +252,16 @@ def build_router() -> APIRouter:
             state = secrets.token_urlsafe(24)
             nonce = secrets.token_urlsafe(16)
             cfg = await _tl_config_from_db(session)
-            session.add(TrueLayerState(state=state, user_id=user["user_id"], expires_at=datetime.now(timezone.utc) + timedelta(minutes=10)))
+            import_from_date = parse_import_from_date(from_date)
+            session.add(
+                TrueLayerState(
+                    state=state,
+                    user_id=user["user_id"],
+                    redirect_uri=cfg["redirect_uri"],
+                    meta={"from_date": import_from_date} if import_from_date else {},
+                    expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
+                )
+            )
             redirect_uri = cfg["redirect_uri"] or f"{os.environ.get('FRONTEND_URL', '')}/api/truelayer/callback"
             params = {
                 "response_type": "code", "client_id": cfg["client_id"],
@@ -266,12 +288,19 @@ def build_router() -> APIRouter:
             if not state_doc:
                 return RedirectResponse(f"{frontend}/connections?status=failed&reason=invalid_state")
             user_id = state_doc.user_id
+            state_meta = state_doc.meta or {}
+            import_from_date = state_meta.get("from_date") if isinstance(state_meta, dict) else None
             try:
                 token_data = await _exchange_code(code, session)
             except Exception as e:
                 await _log_oauth(session, user_id, "token_exchange_failed", {"error": str(e)})
                 return RedirectResponse(f"{frontend}/connections?status=failed&reason=token_exchange")
             accounts = await _fetch_accounts(token_data["access_token"], session)
+            if not accounts:
+                await _log_oauth(session, user_id, "no_accounts_selected", {"state": state, "meta": state_meta})
+                await session.delete(state_doc)
+                await session.commit()
+                return RedirectResponse(f"{frontend}/connections?status=failed&reason=no_accounts")
             for acc in accounts:
                 provider_info = acc.get("provider", {})
                 connection_id = f"conn_{uuid.uuid4().hex[:12]}"
@@ -283,8 +312,12 @@ def build_router() -> APIRouter:
                     access_token=_encrypt(token_data["access_token"]),
                     refresh_token=_encrypt(token_data.get("refresh_token", "")),
                     expires_at=datetime.now(timezone.utc) + timedelta(seconds=token_data.get("expires_in", 3600)),
-                    config={"account_ids": [acc.get("account_id", "")]} if acc.get("account_id") else None,
+                    config={
+                        **({"account_ids": [acc.get("account_id", "")]} if acc.get("account_id") else {}),
+                        **({"from_date": import_from_date} if import_from_date else {}),
+                    } or None,
                     status="active",
+                    last_sync_status="connected",
                 )
                 session.add(conn)
             await session.delete(state_doc)
@@ -315,7 +348,12 @@ def build_router() -> APIRouter:
                      "provider": c.provider, "status": c.status,
                      "created_at": c.created_at.isoformat() if c.created_at else None,
                      "expires_at": c.expires_at.isoformat() if c.expires_at else None,
-                     "config": c.config or {}}
+                     "last_sync_at": c.last_sync_at.isoformat() if c.last_sync_at else None,
+                     "last_sync_status": c.last_sync_status or c.status,
+                     "last_error": c.last_error,
+                     "last_error_at": c.last_error_at.isoformat() if c.last_error_at else None,
+                     "config": c.config or {},
+                     "import_from_date": (c.config or {}).get("from_date")}
                     for c in rows
                 ],
                 "total_transactions": tx_counts.get(user["user_id"], 0),
@@ -401,82 +439,107 @@ def build_router() -> APIRouter:
 # ── Sync engine ───────────────────────────────────────────────────────────
 
 async def _sync_connection(session, conn: BankConnection, user_id: str) -> tuple:
-    cfg = await _tl_config_from_db(session)
     new_count = 0
     dup_count = 0
     page = 1
     has_more = True
-
-    from_date = None
-    if conn.config and conn.config.get("from_date"):
-        from_date = conn.config["from_date"]
+    from_date = (conn.config or {}).get("from_date")
+    started_at = datetime.now(timezone.utc)
+    existing_hashes = set()
 
     await _log_sync(session, user_id, conn.connection_id, "sync_started", "info", f"Starting sync for {conn.account_name}")
+    result = await session.execute(select(Transaction.transaction_id).where(Transaction.user_id == user_id))
+    for row in result.scalars().all():
+        existing_hashes.add(row)
 
-    while has_more:
-        params = {
-            "page": page,
-            "page_size": SYNC_PAGE_SIZE,
-        }
-        if from_date:
-            params["from"] = from_date
-        try:
-            data = await _tl_get(session, conn, "/data/v1/transactions", params=params)
-        except Exception as e:
-            await _log_sync(session, user_id, conn.connection_id, "sync_page_failed", "error", str(e)[:500])
-            raise
-
-        results = data.get("results", [])
-        if not results:
-            break
-
-        existing_hashes = set()
-        if new_count == 0 and dup_count == 0:
-            result = await session.execute(select(Transaction.transaction_id).where(Transaction.user_id == user_id))
-            for row in result.scalars().all():
-                existing_hashes.add(row)
-
-        for tx in results:
-            tx_id = tx.get("transaction_id", "")
-            amount = float(tx.get("amount", 0))
-            ts = tx.get("timestamp", tx.get("date", ""))
-            desc = (tx.get("description") or tx.get("transaction_category", "") or "")[:200]
-            merchant = (tx.get("merchant_name") or tx.get("meta", {}).get("provider_merchant_name") or "")[:255]
-            cat = (tx.get("transaction_classification") or [""])[0] or "uncategorized"
-
-            dhash = _tx_hash(user_id, ts[:10], desc, amount)
-            if dhash in existing_hashes:
-                dup_count += 1
-                continue
-
+    try:
+        while has_more:
+            params = {
+                "page": page,
+                "page_size": SYNC_PAGE_SIZE,
+            }
+            if from_date:
+                params["from"] = from_date
             try:
-                tx_date = datetime.fromisoformat(ts.replace("Z", "+00:00")) if ts else datetime.now(timezone.utc)
-            except (ValueError, TypeError):
-                tx_date = datetime.now(timezone.utc)
+                data = await _tl_get(session, conn, "/data/v1/transactions", params=params)
+            except Exception as e:
+                await _log_sync(session, user_id, conn.connection_id, "sync_page_failed", "error", str(e)[:500])
+                raise
 
-            tx_obj = Transaction(
-                transaction_id=dhash,
-                user_id=user_id,
-                account_id=conn.account_id,
-                connection_id=conn.connection_id,
-                amount=amount,
-                currency=tx.get("currency", "GBP"),
-                description=desc,
-                category=cat,
-                merchant_name=merchant or None,
-                date=tx_date,
-                source="truelayer",
-            )
-            session.add(tx_obj)
-            existing_hashes.add(dhash)
-            new_count += 1
+            results = data.get("results", [])
+            if not results:
+                break
 
-        total_pages = data.get("total_pages", data.get("totalPages", 1))
-        has_more = page < total_pages
-        page += 1
+            for tx in results:
+                amount = float(tx.get("amount", 0))
+                ts = tx.get("timestamp", tx.get("date", ""))
+                desc = (tx.get("description") or tx.get("transaction_category", "") or "")[:200]
+                merchant = (tx.get("merchant_name") or tx.get("meta", {}).get("provider_merchant_name") or "")[:255]
+                cat = (tx.get("transaction_classification") or [""])[0] or "uncategorized"
 
-    await session.commit()
-    await _log_sync(session, user_id, conn.connection_id, "sync_completed", "success",
-                   f"Imported {new_count} new, skipped {dup_count} duplicates from {conn.account_name}",
-                   {"new": new_count, "duplicates": dup_count})
-    return new_count, dup_count
+                sync_id = transaction_sync_id(conn.connection_id, conn.account_id, tx, ts, desc, amount)
+                if sync_id in existing_hashes:
+                    dup_count += 1
+                    continue
+
+                try:
+                    tx_date = datetime.fromisoformat(ts.replace("Z", "+00:00")) if ts else datetime.now(timezone.utc)
+                except (ValueError, TypeError):
+                    tx_date = datetime.now(timezone.utc)
+
+                tx_obj = Transaction(
+                    transaction_id=sync_id,
+                    user_id=user_id,
+                    account_id=conn.account_id,
+                    connection_id=conn.connection_id,
+                    amount=amount,
+                    currency=tx.get("currency", "GBP"),
+                    description=desc,
+                    category=cat,
+                    merchant_name=merchant or None,
+                    date=tx_date,
+                    source="truelayer",
+                )
+                session.add(tx_obj)
+                existing_hashes.add(sync_id)
+                new_count += 1
+
+            total_pages = data.get("total_pages", data.get("totalPages", 1))
+            has_more = page < total_pages
+            page += 1
+
+        await session.commit()
+        await _mark_connection_state(
+            session,
+            conn,
+            status="active",
+            synced_at=started_at,
+        )
+        await _log_sync(
+            session,
+            user_id,
+            conn.connection_id,
+            "sync_completed",
+            "success",
+            f"Imported {new_count} new, skipped {dup_count} duplicates from {conn.account_name}",
+            {"new": new_count, "duplicates": dup_count},
+        )
+        return new_count, dup_count
+    except Exception as e:
+        status = "reconnect_required" if is_reauth_error(e) else "error"
+        error = connection_error_message(e)
+        conn.last_sync_status = status
+        conn.last_error = error
+        conn.last_error_at = datetime.now(timezone.utc)
+        conn.status = status
+        await session.commit()
+        await _log_sync(
+            session,
+            user_id,
+            conn.connection_id,
+            "sync_failed",
+            "error",
+            error,
+            {"status": status, "reconnect_required": status == "reconnect_required"},
+        )
+        raise

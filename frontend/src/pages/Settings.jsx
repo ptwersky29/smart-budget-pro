@@ -74,8 +74,11 @@ export default function Settings() {
   };
 
   const load = useCallback(async () => {
-    const [p, u] = await Promise.all([api.get("/ai/providers"), api.get("/ai/usage")]);
-    setProviders(p.data.providers); setUsage({ approx_total_tokens: u.data.approx_total_tokens, approx_cost_usd: u.data.approx_cost_usd });
+    try {
+      const [p, u] = await Promise.all([api.get("/ai/providers"), api.get("/ai/usage")]);
+      setProviders(p.data.providers || []);
+      setUsage({ approx_total_tokens: u.data.approx_total_tokens || 0, approx_cost_usd: u.data.approx_cost_usd || 0 });
+    } catch { /* not configured yet */ }
   }, []);
   useEffect(() => { load(); refresh(); loadTl(); loadSubscription(); }, [load, refresh, loadTl, loadSubscription]);
 
