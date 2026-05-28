@@ -1,8 +1,4 @@
-"""AI-generated insights: dashboard, budget, forecast, report.
-
-One-shot prompts (no chat history) — fetches relevant user data, asks the
-user's chosen LLM provider for insights, returns structured JSON.
-"""
+"""Phase 5 — AI insights: dashboard, budget, forecast, report with real user data, cost tracking."""
 import os
 import json
 import logging
@@ -15,12 +11,9 @@ from sqlalchemy import select, func
 
 from db import Transaction, Budget, AiUsage
 from auth import get_current_user
+from llm import call_llm, parse_json, estimate_cost
 
 logger = logging.getLogger("ai_insights")
-
-DEFAULT_PROVIDER = "openai"
-DEFAULT_MODEL = "google/gemini-2.0-flash-lite-001"
-FREE_TIER_DAILY_LIMIT = 5
 
 SYSTEM_PROMPT = (
     "You are FinanceAI's analytics engine. Generate clear, actionable, UK-focused "
@@ -30,50 +23,30 @@ SYSTEM_PROMPT = (
     "general-disclaimer caveat where appropriate."
 )
 
-
-def _pick_provider(user: dict) -> tuple[str, str, str, bool]:
-    active = next(
-        (p for p in user.get("ai_provider_configs", []) if p.get("is_default") and p.get("api_key")),
-        None,
-    )
-    if active:
-        return active["provider"], active["model"], active["api_key"], True
-    api_key = os.environ.get("OPENROUTER_API_KEY", os.environ.get("EMERGENT_LLM_KEY", ""))
-    if not api_key:
-        raise HTTPException(503, "AI is not configured. Add your own API key in Integrations.")
-    return DEFAULT_PROVIDER, DEFAULT_MODEL, api_key, False
+FREE_TIER_DAILY_LIMIT = 5
 
 
-async def _enforce_free_limit_if_needed(session, user: dict, is_user_key: bool) -> None:
-    if is_user_key:
-        return
+async def _enforce_free_limit_if_needed(session, user: dict) -> None:
     if user.get("tier") == "premium" or user.get("role") == "admin":
         return
     start_of_day = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     result = await session.execute(
         select(func.count()).select_from(AiUsage).where(
-            AiUsage.user_id == user["user_id"],
-            AiUsage.date >= start_of_day,
-            AiUsage.endpoint == "insight",
+            AiUsage.user_id == user["user_id"], AiUsage.date >= start_of_day, AiUsage.endpoint == "insight",
         )
     )
     count = result.scalar() or 0
     if count >= FREE_TIER_DAILY_LIMIT:
-        raise HTTPException(
-            429,
-            f"Free tier limit reached ({FREE_TIER_DAILY_LIMIT} AI insights / day). "
-            "Add your own AI API key in Integrations for unlimited, or upgrade to Premium.",
-        )
+        raise HTTPException(429, f"Free tier limit reached ({FREE_TIER_DAILY_LIMIT} AI insights / day). "
+                                 "Upgrade to Premium for unlimited.")
 
 
-async def _track_usage(session, user_id: str, provider: str, model: str, prompt: str, response: str, is_user_key: bool) -> None:
+async def _track_usage(session, user_id: str, provider: str, model: str,
+                       prompt_tokens: int, completion_tokens: int, cost: float) -> None:
     try:
         usage = AiUsage(
-            user_id=user_id,
-            prompt_tokens=len(prompt.split()),
-            completion_tokens=len(response.split()),
-            provider=provider,
-            endpoint="insight",
+            user_id=user_id, prompt_tokens=prompt_tokens, completion_tokens=completion_tokens,
+            cost=cost, provider=provider, endpoint="insight",
         )
         session.add(usage)
         await session.commit()
@@ -81,49 +54,27 @@ async def _track_usage(session, user_id: str, provider: str, model: str, prompt:
         logger.warning(f"usage tracking failed: {e}")
 
 
-async def _call_llm(session, user: dict, system: str, user_prompt: str) -> str:
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
-    provider, model, api_key, is_user_key = _pick_provider(user)
-    await _enforce_free_limit_if_needed(session, user, is_user_key)
-    import uuid as _uuid
-    sess_id = f"insight_{_uuid.uuid4().hex[:10]}"
+async def _call_llm_insight(session, user: dict, system: str, user_prompt: str) -> str:
+    key = user.get("_api_key") or os.environ.get("OPENROUTER_API_KEY", "")
+    model = user.get("_model") or "google/gemini-2.0-flash-lite-001"
+    active = next((p for p in user.get("ai_provider_configs", []) if p.get("is_default") and p.get("api_key")), None)
+    if active:
+        key = active["api_key"]
+        model = active["model"]
+    if not key:
+        raise HTTPException(503, "AI is not configured. Add your own API key in Settings.")
+    await _enforce_free_limit_if_needed(session, user)
     try:
-        client = LlmChat(api_key=api_key, session_id=sess_id, system_message=system).with_model(provider, model)
-        resp = await client.send_message(UserMessage(text=user_prompt))
-        text = str(resp or "")
+        text, provider, used_model, pt, ct, cost = await call_llm(system, user_prompt, model=model, api_key=key)
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"LLM call failed (provider={provider} model={model} user_key={is_user_key}): {e}")
-        if is_user_key:
-            raise HTTPException(502, f"Your provider returned an error: {str(e)[:200]}. Check the API key in Integrations.")
+        logger.error(f"LLM call failed (model={model}): {e}")
         raise HTTPException(502, f"AI provider error: {str(e)[:200]}")
     if not text:
         raise HTTPException(502, "AI returned an empty response")
-    await _track_usage(session, user["user_id"], provider, model, user_prompt, text, is_user_key)
+    await _track_usage(session, user["user_id"], provider, used_model, pt, ct, cost)
     return text
-
-
-def _parse_json(text: str) -> dict:
-    t = text.strip()
-    if t.startswith("```"):
-        lines = t.split("\n")
-        if lines and lines[0].startswith("```"):
-            lines = lines[1:]
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-        t = "\n".join(lines)
-    try:
-        return json.loads(t)
-    except json.JSONDecodeError:
-        start = t.find("{")
-        end = t.rfind("}")
-        if start >= 0 and end > start:
-            try:
-                return json.loads(t[start:end + 1])
-            except json.JSONDecodeError:
-                pass
-        raise HTTPException(502, "AI returned unparseable JSON")
 
 
 class ForecastInsightIn(BaseModel):
@@ -150,8 +101,7 @@ def build_router() -> APIRouter:
             since = datetime.now(timezone.utc) - timedelta(days=60)
             result = await session.execute(
                 select(Transaction).where(
-                    Transaction.user_id == user["user_id"],
-                    Transaction.date >= since,
+                    Transaction.user_id == user["user_id"], Transaction.date >= since,
                 ).order_by(Transaction.date.desc()).limit(500)
             )
             txs = result.scalars().all()
@@ -160,7 +110,7 @@ def build_router() -> APIRouter:
 
             income = sum(t.amount for t in txs if t.amount > 0)
             spend = sum(-t.amount for t in txs if t.amount < 0)
-            by_cat: dict[str, float] = {}
+            by_cat = {}
             for t in txs:
                 if t.amount < 0:
                     c = (t.category or "uncategorized").lower()
@@ -193,8 +143,8 @@ Return JSON in this exact shape:
 }}
 
 Make insights specific (cite actual amounts/categories). Mix positive observations with improvements. Use British English."""
-            text = await _call_llm(session, user, SYSTEM_PROMPT, prompt)
-            return _parse_json(text)
+            text = await _call_llm_insight(session, user, SYSTEM_PROMPT, prompt)
+            return parse_json(text)
 
     @router.post("/budget")
     async def budget_insights(request: Request, user: dict = Depends(get_current_user)):
@@ -203,13 +153,11 @@ Make insights specific (cite actual amounts/categories). Mix positive observatio
             since = datetime.now(timezone.utc) - timedelta(days=90)
             result = await session.execute(
                 select(Transaction).where(
-                    Transaction.user_id == user["user_id"],
-                    Transaction.date >= since,
-                    Transaction.amount < 0,
+                    Transaction.user_id == user["user_id"], Transaction.date >= since, Transaction.amount < 0,
                 )
             )
             txs = result.scalars().all()
-            by_cat: dict[str, list[float]] = {}
+            by_cat = {}
             for t in txs:
                 c = (t.category or "uncategorized").lower()
                 by_cat.setdefault(c, []).append(-t.amount)
@@ -239,8 +187,8 @@ Return JSON:
 }}
 
 Suggest realistic limits (not too aggressive). Use British English."""
-            text = await _call_llm(session, user, SYSTEM_PROMPT, prompt)
-            return _parse_json(text)
+            text = await _call_llm_insight(session, user, SYSTEM_PROMPT, prompt)
+            return parse_json(text)
 
     @router.post("/forecast")
     async def forecast_insights(payload: ForecastInsightIn, request: Request, user: dict = Depends(get_current_user)):
@@ -269,8 +217,8 @@ Return JSON:
 }}
 
 Provide 3-5 ideas, 3 risks, 3 alternative ETFs. British English."""
-            text = await _call_llm(session, user, SYSTEM_PROMPT, prompt)
-            return _parse_json(text)
+            text = await _call_llm_insight(session, user, SYSTEM_PROMPT, prompt)
+            return parse_json(text)
 
     @router.post("/report")
     async def report_insights(payload: ReportInsightIn, request: Request, user: dict = Depends(get_current_user)):
@@ -282,9 +230,7 @@ Provide 3-5 ideas, 3 risks, 3 alternative ETFs. British English."""
             end = datetime(end_year, end_month, 1, tzinfo=timezone.utc)
             result = await session.execute(
                 select(Transaction).where(
-                    Transaction.user_id == user["user_id"],
-                    Transaction.date >= start,
-                    Transaction.date < end,
+                    Transaction.user_id == user["user_id"], Transaction.date >= start, Transaction.date < end,
                 )
             )
             txs = result.scalars().all()
@@ -294,12 +240,12 @@ Provide 3-5 ideas, 3 risks, 3 alternative ETFs. British English."""
 
             income = sum(t.amount for t in txs if t.amount > 0)
             spend = sum(-t.amount for t in txs if t.amount < 0)
-            by_cat: dict[str, float] = {}
+            by_cat = {}
             for t in txs:
                 if t.amount < 0:
                     c = (t.category or "uncategorized").lower()
                     by_cat[c] = by_cat.get(c, 0) + (-t.amount)
-            top_merchants: dict[str, float] = {}
+            top_merchants = {}
             for t in txs:
                 if t.amount < 0:
                     m = (t.description or "Unknown")[:40]
@@ -331,7 +277,7 @@ Return JSON:
 }}
 
 5-7 highlights. British English."""
-            text = await _call_llm(session, user, SYSTEM_PROMPT, prompt)
-            return _parse_json(text)
+            text = await _call_llm_insight(session, user, SYSTEM_PROMPT, prompt)
+            return parse_json(text)
 
     return router

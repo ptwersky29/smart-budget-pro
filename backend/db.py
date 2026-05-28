@@ -60,6 +60,8 @@ async def create_tables():
             await conn.execute(text("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS parent_id VARCHAR(64)"))
             await conn.execute(text("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS recurring_id VARCHAR(64)"))
             await conn.execute(text("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS subscription_name VARCHAR(255)"))
+            await conn.execute(text("ALTER TABLE sms_messages ADD COLUMN IF NOT EXISTS sender_phone VARCHAR(32)"))
+            await conn.execute(text("ALTER TABLE sms_messages ADD COLUMN IF NOT EXISTS dedup_hash VARCHAR(64)"))
 
 
 async def get_session() -> AsyncSession:
@@ -451,6 +453,22 @@ class SmsMessage(Base, TimestampMixin):
     provider: Mapped[str] = mapped_column(String(32), default="twilio")
     external_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     direction: Mapped[str] = mapped_column(String(8), default="outbound")
+    sender_phone: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    dedup_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+
+class SmsSender(Base, TimestampMixin):
+    __tablename__ = "sms_senders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    phone_number: Mapped[str] = mapped_column(String(32), nullable=False)
+    verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "phone_number", name="uq_sms_sender_user_phone"),
+    )
 
 
 # ── Statements ────────────────────────────────────────────────────────────

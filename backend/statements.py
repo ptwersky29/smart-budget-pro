@@ -99,22 +99,15 @@ def _csv_to_text(content: bytes) -> str:
 
 
 async def _ai_parse_statement(text: str) -> dict:
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
-    api_key = os.environ.get("OPENROUTER_API_KEY", os.environ.get("EMERGENT_LLM_KEY", ""))
-    session_id = f"stmt_{uuid.uuid4().hex[:8]}"
-    chat = LlmChat(
-        api_key=api_key, session_id=session_id,
-        system_message="You are a precise UK bank statement parser. Always output valid JSON only.",
-    ).with_model("openai", "google/gemini-2.0-flash-lite-001")
-    msg = UserMessage(text=PARSE_PROMPT + text[:MAX_CHARS_TO_AI])
-    resp = await chat.send_message(msg)
-    raw = str(resp)
-    m = re.search(r"\{.*\}", raw, re.DOTALL)
-    if not m:
-        raise RuntimeError("AI returned no JSON")
+    from llm import call_llm, parse_json as llm_parse
+    raw, *_ = await call_llm(
+        "You are a precise UK bank statement parser. Always output valid JSON only.",
+        PARSE_PROMPT + text[:MAX_CHARS_TO_AI],
+        json_mode=True,
+    )
     try:
-        return json.loads(m.group(0))
-    except json.JSONDecodeError as e:
+        return llm_parse(raw)
+    except ValueError as e:
         raise RuntimeError(f"AI JSON parse failed: {e}")
 
 
@@ -162,28 +155,22 @@ def _fix_sign(tx: dict) -> dict:
 
 
 async def _ai_categorise(description: str, merchant: str | None, amount: float) -> str:
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
-    api_key = os.environ.get("OPENROUTER_API_KEY", os.environ.get("EMERGENT_LLM_KEY", ""))
-    chat = LlmChat(
-        api_key=api_key, session_id=f"cat_{uuid.uuid4().hex[:8]}",
-        system_message="You categorise bank transactions. Output valid JSON only.",
-    ).with_model("openai", "google/gemini-2.0-flash-lite-001")
+    from llm import call_llm, parse_json as llm_parse
     prompt = CATEGORISE_PROMPT.format(
         description=description[:100],
         merchant=merchant or "unknown",
         amount=amount,
     )
-    msg = UserMessage(text=prompt)
-    resp = str(await chat.send_message(msg))
-    m = re.search(r"\{.*\}", resp, re.DOTALL)
-    if m:
-        try:
-            data = json.loads(m.group(0))
-            cat = str(data.get("category", "uncategorized")).lower().strip()
-            return cat if cat in ALL_CATEGORIES else "uncategorized"
-        except Exception:
-            pass
-    return "uncategorized"
+    try:
+        raw, *_ = await call_llm(
+            "You categorise bank transactions. Output valid JSON only.",
+            prompt, json_mode=True,
+        )
+        data = llm_parse(raw)
+        cat = str(data.get("category", "uncategorized")).lower().strip()
+        return cat if cat in ALL_CATEGORIES else "uncategorized"
+    except Exception:
+        return "uncategorized"
 
 
 def build_router() -> APIRouter:
