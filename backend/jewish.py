@@ -623,34 +623,31 @@ def build_router() -> APIRouter:
 
     @router.get("/chasuna/summary")
     async def chasuna_summary(request: Request, user: dict = Depends(get_current_user)):
-        try:
-            sm = request.app.state.db
-            async with sm() as session:
-                result = await session.execute(
-                    select(ChasunaPlan).where(ChasunaPlan.user_id == user["user_id"])
-                )
-                rows = result.scalars().all()
-                by_status = {"planned": 0.0, "booked": 0.0, "paid": 0.0}
-                by_category = {}
-                for r in rows:
-                    bs_key = r.status if r.status in by_status else "planned"
-                    by_status[bs_key] = by_status[bs_key] + float(r.estimated_cost or 0)
-                    cat = r.category or "other"
-                    d = by_category.setdefault(cat, {"estimated": 0, "actual": 0, "deposit": 0, "status": bs_key})
-                    d["estimated"] += float(r.estimated_cost or 0)
-                    d["actual"] += float(r.actual_cost or 0)
-                    d["deposit"] += float(r.deposit_paid or 0)
-                    d["status"] = bs_key
-                return {
-                    "total_estimated": round(sum(float(r.estimated_cost or 0) for r in rows), 2),
-                    "total_actual": round(sum(float(r.actual_cost or 0) for r in rows), 2),
-                    "total_deposit_paid": round(sum(float(r.deposit_paid or 0) for r in rows), 2),
-                    "by_status": {k: round(v, 2) for k, v in by_status.items()},
-                    "by_category": {k: {sk: round(float(sv), 2) if sk != "status" else sv for sk, sv in v.items()} for k, v in by_category.items()},
-                    "item_count": len(rows),
-                }
-        except Exception as e:
-            return {"error": str(e)[:500], "type": type(e).__name__}
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(ChasunaPlan).where(ChasunaPlan.user_id == user["user_id"])
+            )
+            rows = result.scalars().all()
+            by_status = {"planned": 0.0, "booked": 0.0, "paid": 0.0}
+            by_category = {}
+            for r in rows:
+                bs_key = r.status if r.status in by_status else "planned"
+                by_status[bs_key] = by_status[bs_key] + float(r.estimated_cost or 0)
+                cat = r.category or "other"
+                d = by_category.setdefault(cat, {"estimated": 0, "actual": 0, "deposit": 0, "status": bs_key})
+                d["estimated"] += float(r.estimated_cost or 0)
+                d["actual"] += float(r.actual_cost or 0)
+                d["deposit"] += float(r.deposit_paid or 0)
+                d["status"] = bs_key
+            return {
+                "total_estimated": round(sum(float(r.estimated_cost or 0) for r in rows), 2),
+                "total_actual": round(sum(float(r.actual_cost or 0) for r in rows), 2),
+                "total_deposit_paid": round(sum(float(r.deposit_paid or 0) for r in rows), 2),
+                "by_status": {k: round(v, 2) for k, v in by_status.items()},
+                "by_category": {k: {sk: round(float(sv), 2) if sk != "status" else sv for sk, sv in v.items()} for k, v in by_category.items()},
+                "item_count": len(rows),
+            }
 
     # ════════════════════════════════════════════════════════════════════
     # HEALTH CHECK
