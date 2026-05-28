@@ -653,30 +653,19 @@ def build_router() -> APIRouter:
 
     @router.get("/health")
     async def jewish_health(request: Request, user: dict = Depends(get_current_user)):
-        sm = request.app.state.db
-        async with sm() as session:
-            result = await session.execute(
-                select(MaaserLedger).where(MaaserLedger.user_id == user["user_id"])
-            )
-            ledger_rows = result.scalars().all()
-            hb_result = await session.execute(
-                select(HolidayBudget).where(HolidayBudget.user_id == user["user_id"])
-            )
-            hb_rows = hb_result.scalars().all()
-            cp_result = await session.execute(
-                select(ChasunaPlan).where(ChasunaPlan.user_id == user["user_id"])
-            )
-            cp_rows = cp_result.scalars().all()
-            return {
-                "status": "ok",
-                "maaser_entries": len(ledger_rows),
-                "holiday_budgets": len(hb_rows),
-                "chasuna_items": len(cp_rows),
-                "checks": {
-                    "maaser_calculates_correctly": len(ledger_rows) >= 0,
-                    "holiday_dates_accurate": True,
-                    "ledger_totals_accurate": True,
-                },
-            }
+        checks = {"maaser": False, "holiday_budgets": False, "chasuna": False, "tables": False}
+        try:
+            sm = request.app.state.db
+            async with sm() as session:
+                tbl = await session.execute(select(func.count()).select_from(MaaserLedger).where(MaaserLedger.user_id == user["user_id"]))
+                lc = tbl.scalar() or 0
+                hb = await session.execute(select(func.count()).select_from(HolidayBudget).where(HolidayBudget.user_id == user["user_id"]))
+                hc = hb.scalar() or 0
+                cp = await session.execute(select(func.count()).select_from(ChasunaPlan).where(ChasunaPlan.user_id == user["user_id"]))
+                cc = cp.scalar() or 0
+                checks = {"maaser": True, "holiday_budgets": True, "chasuna": True, "tables": True}
+                return {"status": "ok", "maaser_entries": lc, "holiday_budgets": hc, "chasuna_items": cc, "checks": checks}
+        except Exception as e:
+            return {"status": "error", "detail": str(e)[:200], "checks": checks}
 
     return router
