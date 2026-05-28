@@ -114,6 +114,8 @@ class UserOut(BaseModel):
     preferences: dict = {}
     disabled: bool = False
     created_at: Optional[str] = None
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
 
 
 def _user_to_dict(u: User, check_trial: bool = True) -> dict:
