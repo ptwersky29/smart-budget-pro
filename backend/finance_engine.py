@@ -247,36 +247,7 @@ class BudgetUpdate(BaseModel):
     period: Optional[str] = None
 
 
-class InvestmentForecastIn(BaseModel):
-    symbol: str
-    monthly_contribution: float
-    start_date: Optional[str] = None
-    years: int = 10
-    annual_return_pct: Optional[float] = None
-    initial_value: float = 0.0
 
-
-RETURN_MAP = {
-    "VUSA": 0.10, "VWRL": 0.08, "VUKE": 0.06, "VFEM": 0.07, "VHVG": 0.08,
-    "ISF": 0.06, "IUSA": 0.10, "IWDA": 0.08, "EQQQ": 0.13, "VWRP": 0.08,
-    "VUAG": 0.10, "S&P500": 0.10, "FTSE": 0.06, "FTSE100": 0.06,
-    "BRK.B": 0.105, "BERKSHIRE": 0.105, "BTC": 0.30, "ETH": 0.25, "GOLD": 0.05,
-}
-
-
-
-
-class UCEstimateIn(BaseModel):
-    monthly_earnings: float = 0.0
-    children: int = 0
-    housing_cost: float = 0.0
-    couple: bool = False
-    has_disability: bool = False
-
-
-class HMRCEstimateIn(BaseModel):
-    annual_income: float
-    tax_year: str = "2025-2026"
 
 
 # ── Serializers ──────────────────────────────────────────────────────────
@@ -970,66 +941,5 @@ def build_router() -> APIRouter:
             await session.commit()
             await session.refresh(b)
             return _budget_to_dict(b)
-
-    # ── Remainder: investments, maaser, tzedakah, UK tools ───────────
-
-    @router.post("/investments/forecast")
-    async def forecast(payload: InvestmentForecastIn):
-        annual = payload.annual_return_pct
-        if annual is None:
-            annual = RETURN_MAP.get(payload.symbol.upper(), 0.08) * 100
-        r = annual / 100 / 12
-        n = payload.years * 12
-        future = payload.initial_value * ((1 + r) ** n)
-        if r > 0:
-            future += payload.monthly_contribution * (((1 + r) ** n - 1) / r)
-        else:
-            future += payload.monthly_contribution * n
-        total_contributed = payload.initial_value + payload.monthly_contribution * n
-        points = []
-        for year in range(payload.years + 1):
-            yn = year * 12
-            v = payload.initial_value * ((1 + r) ** yn)
-            if r > 0:
-                v += payload.monthly_contribution * (((1 + r) ** yn - 1) / r)
-            else:
-                v += payload.monthly_contribution * yn
-            points.append({"year": year, "value": round(v, 2),
-                           "contributed": round(payload.initial_value + payload.monthly_contribution * yn, 2)})
-        return {
-            "symbol": payload.symbol.upper(),
-            "annual_return_pct": round(annual, 2),
-            "future_value": round(future, 2),
-            "total_contributed": round(total_contributed, 2),
-            "gain": round(future - total_contributed, 2),
-            "points": points,
-        }
-
-    @router.post("/uk/universal-credit")
-    async def uc(payload: UCEstimateIn):
-        standard = 400.14 if not payload.couple else 628.10
-        child = 333.33 * payload.children
-        housing = payload.housing_cost
-        disability = 156.11 if payload.has_disability else 0
-        gross = standard + child + housing + disability
-        work_allowance = 411 if (payload.children > 0 or payload.has_disability) else 0
-        taper = max(0, (payload.monthly_earnings - work_allowance)) * 0.55
-        estimate = max(0, gross - taper)
-        return {"estimated_monthly_uc": round(estimate, 2), "breakdown": {"standard_allowance": round(standard, 2), "child_element": round(child, 2), "housing_element": round(housing, 2), "disability_element": round(disability, 2), "earnings_taper_deduction": round(taper, 2)}}
-
-    @router.post("/uk/hmrc-estimate")
-    async def hmrc(payload: HMRCEstimateIn):
-        i = payload.annual_income
-        personal_allowance = 12570 if i < 100000 else max(0, 12570 - (i - 100000) / 2)
-        taxable = max(0, i - personal_allowance)
-        basic_band = min(taxable, 37700)
-        higher_band = max(0, min(taxable - 37700, 125140 - 37700))
-        addl_band = max(0, taxable - (125140 - personal_allowance))
-        income_tax = basic_band * 0.20 + higher_band * 0.40 + addl_band * 0.45
-        ni_lower = 12570
-        ni_upper = 50270
-        ni = max(0, min(i, ni_upper) - ni_lower) * 0.08 + max(0, i - ni_upper) * 0.02
-        take_home = i - income_tax - ni
-        return {"annual_income": round(i, 2), "personal_allowance": round(personal_allowance, 2), "income_tax": round(income_tax, 2), "national_insurance": round(ni, 2), "take_home": round(take_home, 2), "monthly_take_home": round(take_home / 12, 2), "effective_rate_pct": round((income_tax + ni) / i * 100, 1) if i > 0 else 0}
 
     return router
