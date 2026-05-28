@@ -491,6 +491,41 @@ class Statement(Base, TimestampMixin):
 
 # ── Integrations ──────────────────────────────────────────────────────────
 
+class HolidayBudget(Base, TimestampMixin):
+    __tablename__ = "holiday_budgets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    holiday_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    hebrew_year: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
+    category: Mapped[str] = mapped_column(String(64), nullable=False)
+    budgeted_amount: Mapped[float] = mapped_column(Float, default=0)
+    actual_amount: Mapped[float] = mapped_column(Float, default=0)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    start_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    end_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index("idx_holiday_budget_user_holiday", "user_id", "holiday_name"),
+    )
+
+
+class ChasunaPlan(Base, TimestampMixin):
+    __tablename__ = "chasuna_plans"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    category: Mapped[str] = mapped_column(String(64), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    estimated_cost: Mapped[float] = mapped_column(Float, default=0)
+    actual_cost: Mapped[float] = mapped_column(Float, default=0)
+    status: Mapped[str] = mapped_column(String(16), default="planned")
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    vendor: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    deposit_paid: Mapped[float] = mapped_column(Float, default=0)
+
+
 class Integration(Base, TimestampMixin):
     __tablename__ = "integrations"
 

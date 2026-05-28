@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, update, delete, func, or_, and_
 
 from db import (
-    User, Transaction, Budget, MaaserLedger, SplitTransaction, AccountNickname,
+    User, Transaction, Budget, SplitTransaction, AccountNickname,
     RecurringTransaction, get_session_maker,
 )
 from auth import get_current_user
@@ -264,31 +264,6 @@ RETURN_MAP = {
 }
 
 
-class MaaserIn(BaseModel):
-    income: float
-    percent: float = 10.0
-
-
-class MaaserSettingsIn(BaseModel):
-    enabled: bool
-    percent: float = 10.0
-
-
-class TzedakahEntryIn(BaseModel):
-    amount: float
-    recipient: str
-    note: Optional[str] = None
-    date: Optional[str] = None
-
-
-HOLIDAY_BUDGET_HINTS = [
-    {"holiday": "Pesach", "month": "Nisan", "uplift_pct": 80, "tip": "Stock up on kosher-for-Passover staples 6 weeks early."},
-    {"holiday": "Rosh Hashana / Yom Kippur", "month": "Tishrei", "uplift_pct": 35, "tip": "Account for shul seats, honey, and seasonal produce."},
-    {"holiday": "Sukkos", "month": "Tishrei", "uplift_pct": 50, "tip": "Sukkah materials and the four species can total £200-£400."},
-    {"holiday": "Chanukah", "month": "Kislev", "uplift_pct": 20, "tip": "Gifts, oil, and donuts. Set a per-child cap upfront."},
-    {"holiday": "Purim", "month": "Adar", "uplift_pct": 25, "tip": "Mishloach manos and matanos l'evyonim."},
-    {"holiday": "Shavuos", "month": "Sivan", "uplift_pct": 20, "tip": "Dairy menu and flowers."},
-]
 
 
 class UCEstimateIn(BaseModel):
@@ -354,23 +329,6 @@ def _budget_to_dict(b: Budget) -> dict:
         "end_date": b.end_date.isoformat() if b.end_date else None,
         "notes": b.notes,
         "created_at": b.created_at.isoformat() if b.created_at else None,
-    }
-
-
-def _tz_to_dict(t: MaaserLedger) -> dict:
-    return {
-        "entry_id": f"tz_{t.id}",
-        "user_id": t.user_id,
-        "transaction_id": t.transaction_id,
-        "amount": t.maaser_paid or t.income_amount,
-        "income_amount": t.income_amount,
-        "maaser_due": t.maaser_due,
-        "maaser_paid": t.maaser_paid,
-        "paid_to": t.paid_to,
-        "note": t.note,
-        "date": t.date.isoformat() if t.date else None,
-        "created_at": t.created_at.isoformat() if t.created_at else None,
-        "status": "given" if t.maaser_paid > 0 else "pending",
     }
 
 
@@ -1046,137 +1004,6 @@ def build_router() -> APIRouter:
             "gain": round(future - total_contributed, 2),
             "points": points,
         }
-
-    @router.post("/jewish/maaser")
-    async def maaser_calc(payload: MaaserIn):
-        amount = round(payload.income * (payload.percent / 100), 2)
-        return {"income": payload.income, "percent": payload.percent, "maaser_amount": amount}
-
-    @router.get("/jewish/maaser/settings")
-    async def get_maaser_settings(request: Request, user: dict = Depends(get_current_user)):
-        sm = request.app.state.db
-        async with sm() as session:
-            result = await session.execute(select(User).where(User.user_id == user["user_id"]))
-            u = result.scalar_one_or_none()
-            prefs = u.preferences or {} if u else {}
-            s = prefs.get("maaser") or {}
-            return {"enabled": bool(s.get("enabled")), "percent": float(s.get("percent", 10))}
-
-    @router.put("/jewish/maaser/settings")
-    async def set_maaser_settings(payload: MaaserSettingsIn, request: Request, user: dict = Depends(get_current_user)):
-        if payload.percent < 0 or payload.percent > 100:
-            raise HTTPException(400, "Percent must be between 0 and 100")
-        sm = request.app.state.db
-        async with sm() as session:
-            result = await session.execute(select(User).where(User.user_id == user["user_id"]))
-            u = result.scalar_one_or_none()
-            if not u:
-                raise HTTPException(404, "User not found")
-            prefs = u.preferences or {}
-            prefs["maaser"] = {"enabled": payload.enabled, "percent": payload.percent}
-            u.preferences = prefs
-            await session.commit()
-            backfill = {"created": 0, "skipped": 0, "total_amount": 0}
-            if payload.enabled:
-                backfill = await maaser.backfill_for_user(session, user["user_id"])
-            return {"ok": True, "backfill": backfill}
-
-    @router.post("/jewish/maaser/backfill")
-    async def maaser_backfill(request: Request, user: dict = Depends(get_current_user)):
-        sm = request.app.state.db
-        async with sm() as session:
-            result = await maaser.backfill_for_user(session, user["user_id"])
-            return result
-
-    @router.get("/jewish/maaser/summary")
-    async def maaser_summary(request: Request, user: dict = Depends(get_current_user)):
-        sm = request.app.state.db
-        async with sm() as session:
-            result = await session.execute(select(User).where(User.user_id == user["user_id"]))
-            u = result.scalar_one_or_none()
-            prefs = u.preferences or {} if u else {}
-            s = prefs.get("maaser") or {}
-            percent = float(s.get("percent", 10))
-            tx_result = await session.execute(select(Transaction).where(Transaction.user_id == user["user_id"]))
-            txs = tx_result.scalars().all()
-            total_income = 0.0
-            tx_given = 0.0
-            for t in txs:
-                amt = float(t.amount or 0)
-                cat = (t.category or "").lower()
-                if amt > 0 or cat in maaser.INCOME_CATEGORIES:
-                    total_income += abs(amt)
-                if amt < 0 and cat == "tzedakah":
-                    tx_given += -amt
-            obligation = round(total_income * percent / 100, 2)
-            ledger_result = await session.execute(
-                select(MaaserLedger).where(MaaserLedger.user_id == user["user_id"], MaaserLedger.transaction_id.is_(None))
-            )
-            ledger = ledger_result.scalars().all()
-            manual_given = sum((e.maaser_paid or e.income_amount or 0) for e in ledger)
-            pending_result = await session.execute(
-                select(MaaserLedger).where(MaaserLedger.user_id == user["user_id"], MaaserLedger.maaser_paid == 0)
-            )
-            accrued_pending = sum(r.maaser_due or 0 for r in pending_result.scalars().all())
-            given_total = manual_given + tx_given
-            balance_owed = round(max(0, obligation - given_total), 2)
-            credit = round(max(0, given_total - obligation), 2)
-            return {
-                "percent": percent, "total_income": round(total_income, 2),
-                "obligation": obligation, "given_total": round(given_total, 2),
-                "tx_given": round(tx_given, 2), "ledger_given": round(manual_given, 2),
-                "accrued_pending": round(accrued_pending, 2), "balance_owed": balance_owed, "credit": credit,
-            }
-
-    @router.post("/jewish/maaser/reset")
-    async def maaser_reset(request: Request, user: dict = Depends(get_current_user)):
-        sm = request.app.state.db
-        async with sm() as session:
-            await session.execute(delete(MaaserLedger).where(MaaserLedger.user_id == user["user_id"], MaaserLedger.transaction_id.isnot(None)))
-            await session.commit()
-            return {"ok": True}
-
-    @router.post("/jewish/maaser/pay/{entry_id}")
-    async def pay_pending(entry_id: str, request: Request, user: dict = Depends(get_current_user), recipient: str = "Tzedakah"):
-        sm = request.app.state.db
-        async with sm() as session:
-            entry_id_int = int(entry_id.replace("tz_", "")) if entry_id.startswith("tz_") else int(entry_id)
-            result = await session.execute(
-                select(MaaserLedger).where(MaaserLedger.id == entry_id_int, MaaserLedger.user_id == user["user_id"], MaaserLedger.maaser_paid == 0)
-            )
-            entry = result.scalar_one_or_none()
-            if not entry:
-                raise HTTPException(404, "Pending entry not found")
-            entry.maaser_paid = entry.maaser_due
-            entry.paid_to = recipient
-            await session.commit()
-            return {"ok": True}
-
-    @router.get("/jewish/tzedakah")
-    async def list_tzedakah(request: Request, user: dict = Depends(get_current_user)):
-        sm = request.app.state.db
-        async with sm() as session:
-            result = await session.execute(select(MaaserLedger).where(MaaserLedger.user_id == user["user_id"]).order_by(MaaserLedger.date.desc()).limit(200))
-            rows = result.scalars().all()
-            total = sum(r.maaser_paid or r.income_amount or 0 for r in rows)
-            return {"entries": [_tz_to_dict(r) for r in rows], "total_given": round(total, 2)}
-
-    @router.post("/jewish/tzedakah")
-    async def add_tzedakah(payload: TzedakahEntryIn, request: Request, user: dict = Depends(get_current_user)):
-        sm = request.app.state.db
-        async with sm() as session:
-            entry = MaaserLedger(
-                user_id=user["user_id"], maaser_paid=payload.amount, paid_to=payload.recipient,
-                note=payload.note, date=datetime.fromisoformat(payload.date) if payload.date else datetime.now(timezone.utc),
-            )
-            session.add(entry)
-            await session.commit()
-            await session.refresh(entry)
-            return _tz_to_dict(entry)
-
-    @router.get("/jewish/holiday-budget")
-    async def holiday_budget():
-        return {"holidays": HOLIDAY_BUDGET_HINTS}
 
     @router.post("/uk/universal-credit")
     async def uc(payload: UCEstimateIn):
