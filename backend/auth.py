@@ -13,6 +13,7 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select, update, delete
 
 from db import User, UserSession, PasswordResetToken, TokenBlacklist
+from security import validate_password
 
 logger = logging.getLogger(__name__)
 
@@ -82,8 +83,8 @@ def clear_auth_cookies(response: Response):
 
 class RegisterIn(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=6)
-    name: Optional[str] = None
+    password: str = Field(min_length=8, max_length=128)
+    name: Optional[str] = Field(None, max_length=100)
 
 
 class LoginIn(BaseModel):
@@ -226,6 +227,9 @@ def build_router() -> APIRouter:
 
     @router.post("/register", response_model=UserOut)
     async def register(payload: RegisterIn, request: Request, response: Response):
+        valid, msg = validate_password(payload.password)
+        if not valid:
+            raise HTTPException(400, msg)
         sm = request.app.state.db
         async with sm() as session:
             email = payload.email.lower()
@@ -242,6 +246,7 @@ def build_router() -> APIRouter:
                 hashed_password=hash_password(payload.password),
                 free_trial_end=free_trial_end,
                 trial_started=True,
+                password_changed_at=datetime.now(timezone.utc),
             )
             session.add(user)
             await session.commit()

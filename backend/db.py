@@ -62,6 +62,12 @@ async def create_tables():
             await conn.execute(text("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS subscription_name VARCHAR(255)"))
             await conn.execute(text("ALTER TABLE sms_messages ADD COLUMN IF NOT EXISTS sender_phone VARCHAR(32)"))
             await conn.execute(text("ALTER TABLE sms_messages ADD COLUMN IF NOT EXISTS dedup_hash VARCHAR(64)"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS data_exported_at TIMESTAMPTZ"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS data_deleted_at TIMESTAMPTZ"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_terms BOOLEAN DEFAULT FALSE"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_privacy BOOLEAN DEFAULT FALSE"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_marketing BOOLEAN DEFAULT FALSE"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ"))
 
 
 async def get_session() -> AsyncSession:
@@ -487,6 +493,43 @@ class Statement(Base, TimestampMixin):
     currency: Mapped[str] = mapped_column(String(3), default="GBP")
     status: Mapped[str] = mapped_column(String(32), default="draft")  # draft, final
     data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
+
+# ── Audit ────────────────────────────────────────────────────────────────
+
+class AuditLog(Base, TimestampMixin):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    action: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    resource: Mapped[str] = mapped_column(String(64), nullable=False)
+    resource_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    detail: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    ip_address: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    user_agent: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    success: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        Index("idx_audit_user_action", "user_id", "action"),
+        Index("idx_audit_created", "created_at"),
+    )
+
+
+class ConsentRecord(Base, TimestampMixin):
+    __tablename__ = "consent_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    consent_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    granted: Mapped[bool] = mapped_column(Boolean, default=True)
+    ip_address: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        Index("idx_consent_user_type", "user_id", "consent_type"),
+    )
 
 
 # ── Investments ──────────────────────────────────────────────────────────

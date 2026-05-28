@@ -31,6 +31,9 @@ import hebcal
 import jewish
 import investments
 import uk_tools
+import gdpr
+from rate_limit import RateLimiter, RateLimitMiddleware
+from middleware import ErrorMonitorMiddleware, RequestTimerMiddleware
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -44,6 +47,11 @@ init_engine(database_url, echo=False)
 
 app = FastAPI(title="FinanceAI API", version="1.0.0")
 app.state.db = get_session_maker()
+
+# Middleware stack (order matters: outermost first)
+app.add_middleware(ErrorMonitorMiddleware)
+app.add_middleware(RequestTimerMiddleware)
+app.add_middleware(RateLimitMiddleware, limiter=RateLimiter(limit=120, window=60))
 
 api = APIRouter(prefix="/api")
 
@@ -83,6 +91,7 @@ api.include_router(hebcal.build_router())
 api.include_router(jewish.build_router())
 api.include_router(investments.build_router())
 api.include_router(uk_tools.build_router())
+api.include_router(gdpr.build_router())
 
 app.include_router(api)
 
