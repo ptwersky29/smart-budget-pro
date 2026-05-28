@@ -111,6 +111,12 @@ class User(Base, TimestampMixin):
     onboarding_step: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     preferences: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     disabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    consent_terms: Mapped[bool] = mapped_column(Boolean, default=False)
+    consent_privacy: Mapped[bool] = mapped_column(Boolean, default=False)
+    consent_marketing: Mapped[bool] = mapped_column(Boolean, default=False)
+    data_exported_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    data_deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    password_changed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # relationships
     sessions: Mapped[List["UserSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")
