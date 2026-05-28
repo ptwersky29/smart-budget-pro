@@ -645,7 +645,7 @@ def build_router() -> APIRouter:
                 "total_actual": round(sum(float(r.actual_cost or 0) for r in rows), 2),
                 "total_deposit_paid": round(sum(float(r.deposit_paid or 0) for r in rows), 2),
                 "by_status": {k: round(v, 2) for k, v in by_status.items()},
-                "by_category": {k: {sk: round(float(sv), 2) for sk, sv in v.items()} for k, v in by_category.items()},
+                "by_category": {k: {sk: round(float(sv), 2) if sk != "status" else sv for sk, sv in v.items()} for k, v in by_category.items()},
                 "item_count": len(rows),
             }
 
