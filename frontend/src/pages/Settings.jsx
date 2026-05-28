@@ -3,6 +3,7 @@ import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import { Trash2, Plus, Sparkles, Building2, ShieldCheck, Crown, CreditCard, ExternalLink, XCircle } from "lucide-react";
+import { PageHeader } from "../components/ui/layout";
 
 const PROVIDERS = ["openai","anthropic","gemini","custom"];
 
@@ -91,10 +92,11 @@ export default function Settings() {
 
   return (
     <div className="space-y-8" data-testid="settings-root">
-      <div>
-        <p className="label-overline text-emerald">Settings</p>
-        <h1 className="text-4xl tracking-tight font-medium mt-1">Account & AI.</h1>
-      </div>
+      <PageHeader
+        eyebrow="System"
+        title="Account & AI."
+        description="Manage your profile, subscription, AI providers, and admin-only banking credentials in one place."
+      />
 
       <div className="rounded-2xl border border-border bg-card p-6">
         <p className="label-overline">Profile</p>

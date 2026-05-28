@@ -3,6 +3,7 @@ import { api, formatApiError } from "../lib/api";
 import { useSearchParams } from "react-router-dom";
 import { Building2, Loader2, CheckCircle2, XCircle, RefreshCcw, Trash2, ArrowRight, AlertCircle, Clock } from "lucide-react";
 import { toast } from "sonner";
+import { EmptyState, MetricCard, PageHeader, SectionCard } from "../components/ui/layout";
 
 export default function Connections() {
   const [params] = useSearchParams();
@@ -32,6 +33,8 @@ export default function Connections() {
       console.error("connections load failed", err);
     }
   }, []);
+
+  const reconnectCount = conns.filter((c) => c.status === "reconnect_required").length;
 
   useEffect(() => {
     const s = params.get("status");
@@ -95,19 +98,20 @@ export default function Connections() {
 
   return (
     <div className="space-y-8" data-testid="connections-root">
-      <div className="flex items-end justify-between flex-wrap gap-3">
-        <div>
-          <p className="label-overline text-emerald">Banks</p>
-          <h1 className="text-4xl tracking-tight font-medium mt-1">Bank connections.</h1>
-          <p className="text-sm text-muted-foreground mt-2">Connect your UK bank securely via TrueLayer. Read-only. Revoke any time.</p>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Clock className="h-4 w-4" /> {totalTx.toLocaleString()} transactions synced
-        </div>
+      <PageHeader
+        eyebrow="Accounts"
+        title="Bank connections."
+        description="Connect your UK bank securely via TrueLayer, keep sync status visible, and reconnect when needed."
+      />
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <MetricCard label="Connections" value={conns.length.toString()} icon={Building2} />
+        <MetricCard label="Transactions synced" value={totalTx.toLocaleString()} icon={Clock} />
+        <MetricCard label="Reconnect needed" value={reconnectCount.toString()} tone={reconnectCount ? "ruby" : "emerald"} />
       </div>
 
       {needsSetup && (
-        <div className="rounded-2xl border border-topaz/40 bg-topaz/5 p-4 flex items-center gap-3" data-testid="needs-setup">
+        <div className="rounded-[1.5rem] border border-topaz/40 bg-topaz/5 p-4 flex items-center gap-3" data-testid="needs-setup">
           <AlertCircle className="h-5 w-5 text-topaz shrink-0" />
           <div className="flex-1">
             <p className="font-medium text-sm">Banking not yet available</p>
@@ -118,7 +122,7 @@ export default function Connections() {
       )}
 
       {!needsSetup && conns.some((c) => c.status === "reconnect_required") && (
-        <div className="rounded-2xl border border-ruby/40 bg-ruby/5 p-4 flex items-center gap-3" data-testid="needs-reconnect">
+        <div className="rounded-[1.5rem] border border-ruby/40 bg-ruby/5 p-4 flex items-center gap-3" data-testid="needs-reconnect">
           <AlertCircle className="h-5 w-5 text-ruby shrink-0" />
           <div className="flex-1">
             <p className="font-medium text-sm">One or more bank connections need reconnecting</p>
@@ -128,7 +132,7 @@ export default function Connections() {
       )}
 
       {!needsSetup && (
-        <div className="rounded-2xl border border-border bg-card p-8">
+        <SectionCard eyebrow="Connect" title="Add a new bank" contentClassName="pt-0">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-2xl gradient-emerald grid place-items-center"><Building2 className="h-7 w-7 text-white" /></div>
@@ -159,15 +163,11 @@ export default function Connections() {
             </div>
           </div>
           {error && <p className="mt-4 text-sm text-ruby">Failed: {error}</p>}
-        </div>
+        </SectionCard>
       )}
 
-      <div className="rounded-2xl border border-border bg-card">
-        <div className="p-6 border-b border-border flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <p className="label-overline">Linked accounts</p>
-            <p className="text-xl tracking-tight font-medium mt-1">{conns.length} connection{conns.length !== 1 ? "s" : ""}</p>
-          </div>
+      <SectionCard eyebrow="Linked accounts" title={`${conns.length} connection${conns.length !== 1 ? "s" : ""}`} contentClassName="p-0">
+        <div className="p-6 border-b border-border/70 flex items-center justify-between flex-wrap gap-3">
           {conns.length > 0 && (
             <button onClick={syncNow} disabled={syncing} data-testid="sync-now" className="btn-pill border border-border text-sm disabled:opacity-50">
               {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCcw className="h-4 w-4 mr-2" />}
@@ -176,13 +176,17 @@ export default function Connections() {
           )}
         </div>
         {conns.length === 0 ? (
-          <div className="p-10 text-center text-sm text-muted-foreground">
-            {needsSetup ? "Banking not configured yet." : "No banks connected yet. Click Connect Bank above to get started."}
+          <div className="p-6">
+            <EmptyState
+              title={needsSetup ? "Banking not configured yet" : "No banks connected yet"}
+              description={needsSetup ? "The administrator needs to configure TrueLayer in Settings before you can connect a bank." : "Click Connect Bank above to get started."}
+              className="border-0 bg-transparent shadow-none"
+            />
           </div>
         ) : (
           <ul>
             {conns.map((c) => (
-              <li key={c.connection_id} className="px-6 py-4 flex items-center justify-between border-b border-border last:border-0">
+              <li key={c.connection_id} className="px-6 py-4 flex items-center justify-between border-b border-border/70 last:border-0">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-secondary grid place-items-center"><Building2 className="h-4 w-4" /></div>
                   <div>
@@ -210,14 +214,10 @@ export default function Connections() {
             ))}
           </ul>
         )}
-      </div>
+      </SectionCard>
 
       {syncLogs.length > 0 && (
-        <div className="rounded-2xl border border-border bg-card">
-          <div className="p-6 border-b border-border">
-            <p className="label-overline">Sync history</p>
-            <p className="text-sm text-muted-foreground mt-1">Recent transaction sync activity</p>
-          </div>
+        <SectionCard eyebrow="Sync history" title="Recent transaction sync activity" contentClassName="p-0">
           <div className="divide-y divide-border text-sm max-h-64 overflow-auto">
             {syncLogs.map((l, i) => (
               <div key={i} className="px-6 py-3 flex items-center gap-3">
@@ -231,7 +231,7 @@ export default function Connections() {
               </div>
             ))}
           </div>
-        </div>
+        </SectionCard>
       )}
     </div>
   );

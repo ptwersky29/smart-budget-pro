@@ -3,6 +3,7 @@ import { api, formatApiError } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import { Upload, FileText, Loader2, Sparkles, CheckCircle2, Trash2, ArrowDownRight, ArrowUpRight, Save } from "lucide-react";
+import { PageHeader, SectionCard } from "../components/ui/layout";
 
 export default function Statements() {
   const { user } = useAuth();
@@ -65,16 +66,12 @@ export default function Statements() {
 
   return (
     <div className="space-y-8" data-testid="statements-root">
-      <div className="flex items-end justify-between flex-wrap gap-3">
-        <div>
-          <p className="label-overline text-emerald">Statements</p>
-          <h1 className="text-4xl tracking-tight font-medium mt-1">Drop a statement. AI reads it.</h1>
-          <p className="text-sm text-muted-foreground mt-2">Upload a CSV or PDF bank statement — Claude Sonnet 4.5 extracts every transaction, auto-categorises, and you save them in one click.</p>
-        </div>
-        {user?.tier !== "premium" && user?.role !== "admin" && (
-          <span className="text-xs px-3 py-1 rounded-full bg-secondary text-muted-foreground">Free tier · 1 upload/day</span>
-        )}
-      </div>
+      <PageHeader
+        eyebrow="Money"
+        title="Drop a statement. AI reads it."
+        description="Upload a CSV or PDF bank statement — the system extracts each transaction so you can review and save it in one click."
+        meta={user?.tier !== "premium" && user?.role !== "admin" ? [<span key="limit" className="toolbar-chip">Free tier · 1 upload/day</span>] : null}
+      />
 
       <div
         data-testid="statement-dropzone"
@@ -138,11 +135,7 @@ export default function Statements() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-border bg-card">
-        <div className="p-6 pb-3">
-          <p className="label-overline">History</p>
-          <p className="text-xl tracking-tight font-medium mt-1">{history.length} previous upload{history.length !== 1 ? "s" : ""}</p>
-        </div>
+      <SectionCard eyebrow="History" title={`${history.length} previous upload${history.length !== 1 ? "s" : ""}`} contentClassName="p-0">
         {history.length === 0 ? (
           <div className="px-6 pb-6 text-sm text-muted-foreground">No statements uploaded yet.</div>
         ) : (
@@ -162,7 +155,7 @@ export default function Statements() {
             ))}
           </ul>
         )}
-      </div>
+      </SectionCard>
     </div>
   );
 }

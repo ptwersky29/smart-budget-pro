@@ -6,6 +6,7 @@ import {
   CreditCard, Calendar, MessageSquare, TrendingUp, ArrowRight, Building2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { PageHeader } from "../components/ui/layout";
 
 const PROVIDERS = [
   { value: "anthropic", label: "Anthropic Claude", models: ["claude-sonnet-4-5-20250929", "claude-opus-4-1-20250805", "claude-3-7-sonnet-20250219"], url: "https://console.anthropic.com/settings/keys" },
@@ -113,11 +114,11 @@ export default function Integrations() {
 
   return (
     <div className="space-y-8" data-testid="integrations-root">
-      <div>
-        <p className="label-overline text-emerald">Integrations</p>
-        <h1 className="text-4xl tracking-tight font-medium mt-1">Connect everything in one place.</h1>
-        <p className="text-sm text-muted-foreground mt-2">Wire up TrueLayer and Twilio in 30 seconds. Test connections before going live.</p>
-      </div>
+      <PageHeader
+        eyebrow="System"
+        title="Connect everything in one place."
+        description="Wire up TrueLayer, Twilio, and AI providers in a layout that matches the rest of FinanceAI."
+      />
 
       {/* AI Provider — bring your own key (works for free tier too) */}
       <Card icon={Sparkles} title="AI Provider"

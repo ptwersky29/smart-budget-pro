@@ -120,10 +120,11 @@ app.include_router(api)
 # CORS: allow frontend origin with credentials
 frontend = os.environ.get("FRONTEND_URL", "")
 vercel_url = "https://smart-budget-pro-ewtm.vercel.app"
-origins = list({o for o in [frontend, vercel_url, "http://localhost:3000"] if o})
+origins = list({o for o in [frontend, vercel_url, "http://localhost:3000", "http://127.0.0.1:3000"] if o})
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins or ["http://localhost:3000"],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

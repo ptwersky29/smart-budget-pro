@@ -1,8 +1,10 @@
 {
-  "buildCommand": "NODE_OPTIONS=\"--max_old_space_size=3072\" CI=false npx craco build",
+  "buildCommand": "npm run build",
   "outputDirectory": "build",
-  "framework": "create-react-app",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ]
 }

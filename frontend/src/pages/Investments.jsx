@@ -4,6 +4,7 @@ import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, Area, Area
 import { TrendingUp, Loader2, ArrowUpRight, ArrowDownRight, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import AIInsightPanel from "../components/AIInsightPanel";
+import { PageHeader } from "../components/ui/layout";
 
 const SYMBOLS = ["VUSA","VWRL","VUKE","VFEM","IWDA","EQQQ","ISF","IUSA","VHVG","SP500","FTSE","NASDAQ","BRK.B","BTC","ETH"];
 const CRYPTO_TICKERS = "BTC,ETH,SOL,ADA,XRP,DOGE";
@@ -61,10 +62,11 @@ export default function Investments() {
 
   return (
     <div className="space-y-6" data-testid="investments-root">
-      <div>
-        <p className="label-overline text-emerald">Forecast</p>
-        <h1 className="text-4xl tracking-tight font-medium mt-1">See your future net worth.</h1>
-      </div>
+      <PageHeader
+        eyebrow="Tools"
+        title="See your future net worth."
+        description="Simple investment projections and live market context in a cleaner, easier-to-scan layout."
+      />
 
       <div className="rounded-2xl border border-border bg-card p-6" data-testid="live-prices">
         <div className="flex items-center justify-between mb-4">

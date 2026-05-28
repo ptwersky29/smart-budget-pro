@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { Star, Plus, Calendar, Sunrise, MapPin, Sparkles, CheckCircle2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { PageHeader } from "../components/ui/layout";
 
 const CITIES = ["london","manchester","gateshead","leeds","jerusalem","tel-aviv","new-york","monsey","lakewood","stamford-hill"];
 
@@ -139,10 +140,11 @@ export default function Jewish() {
 
   return (
     <div className="space-y-8" data-testid="jewish-root">
-      <div>
-        <p className="label-overline text-topaz">Jewish lifestyle</p>
-        <h1 className="text-4xl tracking-tight font-medium mt-1">Maaser, Tzedakah, Yom Tov.</h1>
-      </div>
+      <PageHeader
+        eyebrow="Tools"
+        title="Maaser, Tzedakah, Yom Tov."
+        description="A dedicated space for Jewish finance planning, giving, and holiday budgeting."
+      />
 
       {/* Hebrew calendar + Zmanim widget */}
       <div className="grid lg:grid-cols-3 gap-4">

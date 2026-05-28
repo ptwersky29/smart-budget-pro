@@ -3,6 +3,7 @@ import { api, formatApiError } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import { MessageSquare, Sparkles, Loader2, Trash2, CheckCircle2, AlertTriangle, Phone } from "lucide-react";
+import { PageHeader, SectionCard } from "../components/ui/layout";
 
 const SAMPLE = "Tesco: You spent £42.50 at TESCO EXPRESS on 03/05/26. Available balance £812.40.";
 
@@ -61,17 +62,14 @@ export default function SMS() {
 
   return (
     <div className="space-y-8" data-testid="sms-root">
-      <div className="flex items-end justify-between flex-wrap gap-3">
-        <div>
-          <p className="label-overline text-emerald">SMS Finance</p>
-          <h1 className="text-4xl tracking-tight font-medium mt-1">Paste any bank SMS. AI does the rest.</h1>
-        </div>
-        {user?.tier !== "premium" && user?.role !== "admin" && (
-          <span className="text-xs px-3 py-1 rounded-full bg-secondary text-muted-foreground">Free tier · 3 parses/day</span>
-        )}
-      </div>
+      <PageHeader
+        eyebrow="Accounts"
+        title="Paste any bank SMS. AI does the rest."
+        description="Drop in a bank SMS and FinanceAI will extract the transaction, category, and useful metadata."
+        meta={user?.tier !== "premium" && user?.role !== "admin" ? [<span key="limit" className="toolbar-chip">Free tier · 3 parses/day</span>] : null}
+      />
 
-      <div className="rounded-2xl border border-border bg-card p-6">
+      <SectionCard eyebrow="Parse" title="Paste a transaction SMS" contentClassName="pt-0">
         <div className="flex items-center gap-2 mb-3"><MessageSquare className="h-4 w-4 text-emerald" /><p className="label-overline">Paste a transaction SMS</p></div>
         <textarea data-testid="sms-text" rows={4} value={text} onChange={(e)=>setText(e.target.value)} placeholder={SAMPLE} className="w-full p-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none text-sm leading-relaxed" />
         <div className="flex flex-wrap gap-2 mt-3">
@@ -106,10 +104,9 @@ export default function SMS() {
             )}
           </div>
         )}
-      </div>
+      </SectionCard>
 
-      <div className="rounded-2xl border border-border bg-card overflow-hidden">
-        <div className="p-6 pb-3"><p className="label-overline">Recent SMS</p><p className="text-xl tracking-tight font-medium mt-1">{inbox.length} message{inbox.length !== 1 ? "s" : ""}</p></div>
+      <SectionCard eyebrow="Inbox" title={`${inbox.length} message${inbox.length !== 1 ? "s" : ""}`} contentClassName="p-0">
         {inbox.length === 0 ? <div className="p-8 text-center text-sm text-muted-foreground">No SMS parsed yet.</div> :
           <ul className="divide-y divide-border">
             {inbox.map((m) => (
@@ -134,10 +131,10 @@ export default function SMS() {
             ))}
           </ul>
         }
-      </div>
+      </SectionCard>
 
       {user?.role === "admin" && (
-        <div className="rounded-2xl border border-border bg-card p-6" data-testid="twilio-admin-card">
+        <SectionCard eyebrow="Admin" title="Twilio — automatic SMS" data-testid="twilio-admin-card">
           <div className="flex items-center gap-2 mb-1"><Phone className="h-4 w-4 text-emerald" /><p className="label-overline">Twilio (admin) — automatic SMS</p></div>
           <p className="text-xs text-muted-foreground mb-4">Wire up automatic SMS parsing. Add the webhook URL below to your Twilio number's <em>A MESSAGE COMES IN</em> setting (HTTP POST).</p>
           <form onSubmit={saveTw} className="grid sm:grid-cols-2 gap-3">
@@ -159,7 +156,7 @@ export default function SMS() {
             </div>
             <button data-testid="tw-save" className="btn-pill gradient-emerald text-white text-sm">Save Twilio settings</button>
           </form>
-        </div>
+        </SectionCard>
       )}
     </div>
   );

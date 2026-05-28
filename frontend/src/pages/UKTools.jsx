@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { api } from "../lib/api";
 import { Landmark, Calculator } from "lucide-react";
+import { PageHeader } from "../components/ui/layout";
 
 export default function UKTools() {
   const [uc, setUc] = useState({ monthly_earnings: 0, children: 0, housing_cost: 0, couple: false, has_disability: false, result: null });
@@ -17,10 +18,11 @@ export default function UKTools() {
 
   return (
     <div className="space-y-8" data-testid="uk-tools-root">
-      <div>
-        <p className="label-overline text-emerald">UK tools</p>
-        <h1 className="text-4xl tracking-tight font-medium mt-1">Benefits & tax, demystified.</h1>
-      </div>
+      <PageHeader
+        eyebrow="Tools"
+        title="Benefits & tax, demystified."
+        description="Simple UK calculators with a cleaner layout and clear outputs."
+      />
 
       <div className="grid lg:grid-cols-2 gap-4">
         <div className="rounded-2xl border border-border bg-card p-6">

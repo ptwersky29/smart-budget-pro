@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { api } from "../lib/api";
 import { Sparkles, Loader2, TrendingUp, TrendingDown, AlertCircle, Wallet, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { SectionCard } from "./ui/layout";
 
 const ICONS = {
   "trending-up": TrendingUp,
@@ -40,24 +41,18 @@ export default function AIInsightPanel({ title = "AI Insights", subtitle, endpoi
   }, [autoLoad]);
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-6" data-testid="ai-insight-panel">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg gradient-emerald grid place-items-center">
-              <Sparkles className="h-3.5 w-3.5 text-white" />
-            </div>
-            <p className="label-overline text-emerald">{title}</p>
-          </div>
-          {subtitle && <h3 className="text-2xl tracking-tight font-medium mt-2">{subtitle}</h3>}
-        </div>
+    <SectionCard
+      eyebrow={title}
+      title={subtitle}
+      actions={
         <button onClick={generate} disabled={busy} data-testid="ai-generate"
-                className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full border border-border hover:border-emerald hover:text-emerald disabled:opacity-50">
+                className="inline-flex items-center gap-2 h-10 px-4 rounded-full border border-border bg-background/70 hover:bg-secondary/70 disabled:opacity-50 text-xs font-medium">
           {busy ? <Loader2 className="h-3 w-3 animate-spin"/> : <RefreshCw className="h-3 w-3"/>}
           {data ? "Regenerate" : "Generate"}
         </button>
-      </div>
-
+      }
+      data-testid="ai-insight-panel"
+    >
       {!data && !busy && (
         <p className="mt-4 text-sm text-muted-foreground">
           Click <span className="font-medium text-foreground">Generate</span> for AI-powered insights based on your latest data.
@@ -70,7 +65,7 @@ export default function AIInsightPanel({ title = "AI Insights", subtitle, endpoi
         </div>
       )}
       {data && (render ? render(data) : <DefaultInsights data={data} />)}
-    </div>
+    </SectionCard>
   );
 }
 

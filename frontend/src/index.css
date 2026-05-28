@@ -14,6 +14,11 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  background:
+    radial-gradient(circle at top left, rgba(16, 185, 129, 0.08), transparent 24%),
+    radial-gradient(circle at top right, rgba(245, 158, 11, 0.06), transparent 22%),
+    hsl(var(--background));
+  background-attachment: fixed;
 }
 
 @layer base {
@@ -111,6 +116,33 @@ body {
 
 .btn-pill {
   @apply inline-flex items-center justify-center rounded-full px-6 py-3 font-semibold transition-all duration-300 ease-out;
+}
+
+.app-shell {
+  background:
+    radial-gradient(circle at top left, rgba(16, 185, 129, 0.08), transparent 26%),
+    radial-gradient(circle at top right, rgba(245, 158, 11, 0.06), transparent 20%),
+    linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 100%);
+}
+
+.page-title {
+  @apply text-4xl lg:text-5xl tracking-tight font-semibold leading-[1.05];
+}
+
+.page-shell {
+  @apply rounded-[2rem] border border-border bg-card/90 backdrop-blur-xl shadow-[0_20px_60px_rgba(15,23,42,0.08)];
+}
+
+.section-shell {
+  @apply rounded-[1.75rem] border border-border bg-card/90 backdrop-blur-xl shadow-[0_16px_45px_rgba(15,23,42,0.06)];
+}
+
+.control-shell {
+  @apply h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none transition-colors;
+}
+
+.toolbar-chip {
+  @apply inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-3 py-1.5 text-xs font-medium text-muted-foreground;
 }
 
 @keyframes fadeUp {

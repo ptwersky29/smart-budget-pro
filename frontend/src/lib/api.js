@@ -1,6 +1,11 @@
 import axios from "axios";
 
-export const BACKEND_URL = (process.env.REACT_APP_BACKEND_URL || "http://localhost:8000").replace(/\/+$/, "");
+const fallbackBackend =
+  typeof window !== "undefined" && window.location.hostname.endsWith(".vercel.app")
+    ? "https://financeai-api.onrender.com"
+    : "http://localhost:8000";
+
+export const BACKEND_URL = (process.env.REACT_APP_BACKEND_URL || fallbackBackend).replace(/\/+$/, "");
 export const API = `${BACKEND_URL}/api`;
 
 export const api = axios.create({

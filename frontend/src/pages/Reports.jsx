@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { FileText, TrendingDown, TrendingUp, ShieldCheck, Download, Loader2, Lock, AlertCircle, Sparkles, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import AIInsightPanel from "../components/AIInsightPanel";
+import { PageHeader, SectionCard } from "../components/ui/layout";
 
 const ICONS = {
   "trending-up": TrendingUp, "trending-down": TrendingDown,
@@ -56,25 +57,26 @@ export default function Reports() {
 
   return (
     <div className="space-y-8" data-testid="reports-root">
-      <div className="flex items-end justify-between flex-wrap gap-3">
-        <div>
-          <p className="label-overline text-emerald">Reports</p>
-          <h1 className="text-4xl tracking-tight font-medium mt-1">Your financial health, explained.</h1>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {[
-            {kind: "monthly", label: "This month"},
-            {kind: "yearly", label: "This year"},
-            {kind: "full", label: "Full snapshot"},
-          ].map(({kind, label}) => (
-            <button key={kind} onClick={() => download(kind)} disabled={busy === kind} data-testid={`download-${kind}`}
-              className={`btn-pill text-sm ${isPremium ? "gradient-emerald text-white" : "border border-border text-muted-foreground"} disabled:opacity-50`}>
-              {busy === kind ? <Loader2 className="h-4 w-4 animate-spin" /> : isPremium ? <Download className="h-4 w-4 mr-2"/> : <Lock className="h-4 w-4 mr-2"/>}
-              {label} PDF
-            </button>
-          ))}
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Overview"
+        title="Your financial health, explained."
+        description="A cleaner monthly readout with health score, insights, and premium PDF reports."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            {[
+              {kind: "monthly", label: "This month"},
+              {kind: "yearly", label: "This year"},
+              {kind: "full", label: "Full snapshot"},
+            ].map(({kind, label}) => (
+              <button key={kind} onClick={() => download(kind)} disabled={busy === kind} data-testid={`download-${kind}`}
+                className={`btn-pill h-11 px-4 text-sm ${isPremium ? "gradient-emerald text-white" : "border border-border bg-card/80 text-muted-foreground"} disabled:opacity-50`}>
+                {busy === kind ? <Loader2 className="h-4 w-4 animate-spin" /> : isPremium ? <Download className="h-4 w-4 mr-2"/> : <Lock className="h-4 w-4 mr-2"/>}
+                {label} PDF
+              </button>
+            ))}
+          </div>
+        }
+      />
 
       {!isPremium && (
         <div className="rounded-2xl border border-dashed border-emerald/40 bg-emerald/5 p-4 flex items-center gap-3" data-testid="reports-paywall">
@@ -84,7 +86,7 @@ export default function Reports() {
       )}
 
       <div className="grid lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 rounded-2xl border border-border bg-card p-8">
+        <SectionCard className="lg:col-span-2" contentClassName="pt-0">
           <div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald" /><p className="label-overline">Health score</p></div>
           <div className="flex items-end gap-4 mt-4">
             <p className="text-7xl tracking-tight font-light leading-none">{data.health_score}</p>
@@ -96,24 +98,23 @@ export default function Reports() {
           <p className="text-sm text-muted-foreground mt-4 leading-relaxed">
             Your savings rate is <span className="text-emerald font-medium">{data.savings_rate}%</span>. {data.savings_rate >= 20 ? "Excellent discipline." : data.savings_rate >= 10 ? "Solid — push for 20%." : "Tighten discretionary spend this month."}
           </p>
-        </div>
+        </SectionCard>
 
-        <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
+        <SectionCard contentClassName="space-y-4">
           <ReportRow icon={TrendingDown} title="Top spend" value={topSpend ? `${topSpend.name} · £${topSpend.value.toFixed(0)}` : "—"} />
           <ReportRow icon={FileText} title="Subscriptions" value={subs ? `£${subs.value.toFixed(2)} / mo` : "None detected"} />
           <ReportRow icon={TrendingUp} title="Cash flow" value={`£${data.balance.toLocaleString()}`} />
-        </div>
+        </SectionCard>
       </div>
 
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <p className="label-overline">AI savings suggestions</p>
+      <SectionCard eyebrow="Savings" title="AI savings suggestions">
         <ul className="mt-4 space-y-3 text-sm">
           <li className="flex gap-3"><span className="text-emerald">→</span> Cancel unused subscriptions could save <span className="text-emerald font-medium">£{(subs?.value || 0).toFixed(2)}</span> / mo.</li>
           <li className="flex gap-3"><span className="text-emerald">→</span> Aim to keep {topSpend?.name || "your top category"} below 30% of monthly spend.</li>
           <li className="flex gap-3"><span className="text-emerald">→</span> Set aside 10% of net income for Maaser before discretionary spend.</li>
           <li className="flex gap-3"><span className="text-emerald">→</span> Build an emergency fund of 3-6 months expenses before increasing investments.</li>
         </ul>
-      </div>
+      </SectionCard>
 
       <AIInsightPanel
         title="AI Monthly Report"
