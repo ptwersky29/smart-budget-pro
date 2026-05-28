@@ -515,7 +515,6 @@ class AuditLog(Base, TimestampMixin):
     ip_address: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     user_agent: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     success: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index("idx_audit_user_action", "user_id", "action"),
@@ -531,7 +530,6 @@ class ConsentRecord(Base, TimestampMixin):
     consent_type: Mapped[str] = mapped_column(String(64), nullable=False)
     granted: Mapped[bool] = mapped_column(Boolean, default=True)
     ip_address: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index("idx_consent_user_type", "user_id", "consent_type"),
