@@ -8,6 +8,8 @@ import AppLayout from "./pages/AppLayout";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
 import Budgets from "./pages/Budgets";
@@ -26,7 +28,6 @@ import AuthCallback from "./pages/AuthCallback";
 
 function AppRouter() {
   const location = useLocation();
-  // Handle Emergent OAuth callback synchronously
   if (location.hash?.includes("session_id=")) {
     return <AuthCallback />;
   }
@@ -35,6 +36,8 @@ function AppRouter() {
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/billing/success" element={<PaymentSuccess />} />
       <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>

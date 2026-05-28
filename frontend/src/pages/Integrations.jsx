@@ -1,9 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "../lib/api";
-import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import {
-  Building2, Phone, ShieldCheck, ExternalLink, Loader2, CheckCircle2, AlertCircle, Copy, Sparkles, Trash2,
+  Phone, ShieldCheck, ExternalLink, Loader2, CheckCircle2, AlertCircle, Copy, Sparkles, Trash2,
   CreditCard, Calendar, MessageSquare, TrendingUp, ArrowRight
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -15,14 +14,7 @@ const PROVIDERS = [
 ];
 
 export default function Integrations() {
-  const { user } = useAuth();
   const navigate = useNavigate();
-
-  // TrueLayer (admin only)
-  const [tl, setTl] = useState(null);
-  const [tlForm, setTlForm] = useState({ client_id: "", client_secret: "", redirect_uri: "", environment: "sandbox" });
-  const [tlBusy, setTlBusy] = useState(false);
-  const [tlTest, setTlTest] = useState(null);
 
   // Twilio (per-user)
   const [tw, setTw] = useState(null);
@@ -46,19 +38,6 @@ export default function Integrations() {
     catch (err) { console.error(err); }
   }, []);
 
-  const loadTl = useCallback(async () => {
-    try {
-      const { data } = await api.get("/integrations/truelayer");
-      setTl(data);
-      setTlForm({
-        client_id: data.client_id || "",
-        client_secret: "",
-        redirect_uri: data.redirect_uri || "",
-        environment: data.environment || "sandbox",
-      });
-    } catch (err) { console.error(err); }
-  }, []);
-
   const loadTw = useCallback(async () => {
     try {
       const { data } = await api.get("/integrations/twilio");
@@ -79,31 +58,7 @@ export default function Integrations() {
     } catch { setHebcalStatus({ ok: false }); }
   }, []);
 
-  useEffect(() => { loadTl(); loadTw(); loadAi(); loadTyl(); loadHebcal(); }, [loadTl, loadTw, loadAi, loadTyl, loadHebcal]);
-
-  const saveTl = async (e) => {
-    e.preventDefault(); setTlBusy(true); setTlTest(null);
-    try {
-      const p = { ...tlForm }; if (!p.client_secret) delete p.client_secret;
-      await api.put("/integrations/truelayer", p);
-      toast.success("TrueLayer saved");
-      await loadTl();
-    } catch (err) { toast.error(formatApiError(err.response?.data?.detail) || "Save failed"); }
-    finally { setTlBusy(false); }
-  };
-
-  const testTl = async () => {
-    setTlBusy(true); setTlTest(null);
-    try {
-      const { data } = await api.post("/integrations/truelayer/test");
-      setTlTest(data);
-      toast.success(data.ok ? `TrueLayer reachable (${data.source})` : "Auth host unreachable");
-    } catch (err) {
-      const msg = formatApiError(err.response?.data?.detail);
-      setTlTest({ ok: false, error: msg });
-      toast.error(msg || "Test failed");
-    } finally { setTlBusy(false); }
-  };
+  useEffect(() => { loadTw(); loadAi(); loadTyl(); loadHebcal(); }, [loadTw, loadAi, loadTyl, loadHebcal]);
 
   const saveTw = async (e) => {
     e.preventDefault(); setTwBusy(true); setTwTest(null);
@@ -223,41 +178,15 @@ export default function Integrations() {
         </div>
       </Card>
 
-      {/* TrueLayer — available for every user (per-user override, with admin fallback) */}
-      <Card icon={Building2} title="TrueLayer"
-            subtitle={tl?.source === "admin" ? "UK Open Banking · using admin defaults · override with your own below" : "UK Open Banking · your personal credentials"}
-            status={tl?.has_secret ? "configured" : "missing"} testid="card-truelayer">
-        <form onSubmit={saveTl} className="grid sm:grid-cols-2 gap-3">
-          <Field testid="tl-client-id" label="Client ID" placeholder="sandbox-yourapp-12ab34"
-                 value={tlForm.client_id} onChange={(v)=>setTlForm({...tlForm, client_id:v})} mono />
-          <Field testid="tl-client-secret" type="password" label={`Client Secret ${tl?.has_secret ? "(set)" : ""}`}
-                 placeholder={tl?.has_secret ? "•••••••••• (leave blank to keep)" : "Paste secret"}
-                 value={tlForm.client_secret} onChange={(v)=>setTlForm({...tlForm, client_secret:v})} mono />
-          <div className="sm:col-span-2 space-y-1">
-            <label className="label-overline">Redirect URI</label>
-            <div className="flex gap-2">
-              <input data-testid="tl-redirect" value={tlForm.redirect_uri} onChange={(e)=>setTlForm({...tlForm, redirect_uri:e.target.value})} className="flex-1 h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none font-mono text-xs" />
-              <button type="button" onClick={()=>copy(tlForm.redirect_uri)} data-testid="tl-copy-redirect" className="h-11 w-11 rounded-xl border border-border hover:bg-secondary grid place-items-center"><Copy className="h-4 w-4"/></button>
-            </div>
-            <p className="text-xs text-muted-foreground">Paste this in TrueLayer Console → App → Redirect URIs.</p>
-          </div>
-          <div>
-            <label className="label-overline">Environment</label>
-            <select data-testid="tl-env" value={tlForm.environment} onChange={(e)=>setTlForm({...tlForm, environment:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none">
-              <option value="sandbox">Sandbox</option>
-              <option value="live">Live</option>
-            </select>
-          </div>
-          <div className="sm:col-span-2 flex flex-wrap gap-2 items-center">
-            <button data-testid="tl-save" disabled={tlBusy} className="btn-pill gradient-emerald text-white text-sm disabled:opacity-50">{tlBusy ? <Loader2 className="h-4 w-4 animate-spin"/> : "Save"}</button>
-            <button type="button" onClick={testTl} disabled={tlBusy} data-testid="tl-test" className="btn-pill border border-border text-sm disabled:opacity-50">Test connection</button>
-            <a href="https://console.truelayer.com" target="_blank" rel="noreferrer" className="text-sm text-emerald hover:underline inline-flex items-center gap-1">Open TrueLayer Console <ExternalLink className="h-3 w-3"/></a>
-            {tl?.source === "user" && <span className="text-xs text-emerald ml-auto">Using your credentials</span>}
-            {tl?.source === "admin" && <span className="text-xs text-muted-foreground ml-auto">Using admin defaults</span>}
-          </div>
-        </form>
-        {tlTest && <TestResult ok={tlTest.ok} text={tlTest.ok ? `Auth host reachable · env=${tlTest.environment} · source=${tlTest.source}` : (tlTest.error || "Test failed")} />}
-      </Card>
+      {/* TrueLayer — moved to /connections page for a clean end-user flow */}
+      <LinkCard icon={Building2} title="TrueLayer (UK Open Banking)"
+                subtitle="Connect your bank to auto-sync transactions"
+                status={navigate ? "configured" : "info"}
+                statusLabel="Open"
+                href="/connections"
+                navigate={navigate}>
+        <p className="text-sm text-muted-foreground">One-click bank connection. No client IDs or secrets needed — just authenticate with your bank. Transactions sync automatically.</p>
+      </LinkCard>
 
       {/* Twilio (per user) */}
       <Card icon={Phone} title="Twilio (SMS)" subtitle="Your own SMS pipeline · per-user"

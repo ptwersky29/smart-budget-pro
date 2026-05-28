@@ -31,8 +31,8 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, [checkAuth]);
 
-  const login = useCallback(async (email, password) => {
-    const { data } = await api.post("/auth/login", { email, password });
+  const login = useCallback(async (email, password, rememberMe = false) => {
+    const { data } = await api.post("/auth/login", { email, password, remember_me: rememberMe });
     if (data.access_token) {
       localStorage.setItem("access_token", data.access_token);
       localStorage.setItem("refresh_token", data.refresh_token || "");

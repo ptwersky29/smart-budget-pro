@@ -12,13 +12,14 @@ export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const onSubmit = async (e) => {
     e.preventDefault();
     setBusy(true);
     try {
-      await login(email, password);
+      await login(email, password, rememberMe);
       toast.success("Welcome back");
       navigate("/dashboard");
     } catch (err) {
@@ -33,7 +34,7 @@ export default function Login() {
       <div className="flex items-center justify-center p-8">
         <div className="w-full max-w-sm">
           <Link to="/" className="flex items-center gap-2 mb-10">
-            <div className="w-9 h-9 rounded-xl gradient-emerald grid place-items-center text-white font-bold">£</div>
+            <div className="w-9 h-9 rounded-xl gradient-emerald grid place-items-center text-white font-bold">&pound;</div>
             <span className="font-semibold tracking-tight text-lg">FinanceAI</span>
           </Link>
           <h1 className="text-3xl tracking-tight font-medium">Welcome back.</h1>
@@ -47,6 +48,14 @@ export default function Login() {
             <div>
               <label className="label-overline">Password</label>
               <input data-testid="login-password" type="password" required value={password} onChange={(e)=>setPassword(e.target.value)} className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
+            </div>
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)}
+                       className="rounded border-border" />
+                Remember me
+              </label>
+              <Link to="/forgot-password" className="text-sm text-emerald hover:underline">Forgot password?</Link>
             </div>
             <button data-testid="login-submit" disabled={busy} className="btn-pill w-full gradient-emerald text-white disabled:opacity-50">
               {busy ? <Loader2 className="h-4 w-4 animate-spin"/> : "Sign in"}

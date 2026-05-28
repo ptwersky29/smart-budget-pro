@@ -47,6 +47,19 @@ async def create_tables():
             from sqlalchemy import text
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS picture VARCHAR(512)"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub VARCHAR(128)"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(32) DEFAULT 'user'"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(255)"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(255)"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(32)"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS free_trial_end TIMESTAMPTZ"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_started BOOLEAN DEFAULT FALSE"))
+            await conn.execute(text("ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS remember_me BOOLEAN DEFAULT FALSE"))
+            await conn.execute(text("ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS ip_address VARCHAR(64)"))
+            await conn.execute(text("ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS user_agent VARCHAR(512)"))
+            await conn.execute(text("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS normalized_merchant VARCHAR(255)"))
+            await conn.execute(text("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS parent_id VARCHAR(64)"))
+            await conn.execute(text("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS recurring_id VARCHAR(64)"))
+            await conn.execute(text("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS subscription_name VARCHAR(255)"))
 
 
 async def get_session() -> AsyncSession:
@@ -78,8 +91,14 @@ class User(Base, TimestampMixin):
     picture: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     google_sub: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    role: Mapped[str] = mapped_column(String(32), default="user")
     tier: Mapped[str] = mapped_column(String(32), default="free")
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    stripe_customer_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    subscription_status: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    free_trial_end: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    trial_started: Mapped[bool] = mapped_column(Boolean, default=False)
     onboarded: Mapped[bool] = mapped_column(Boolean, default=False)
     onboarding_step: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     preferences: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
@@ -97,6 +116,9 @@ class UserSession(Base, TimestampMixin):
     user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     session_token: Mapped[str] = mapped_column(String(512), unique=True, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    remember_me: Mapped[bool] = mapped_column(Boolean, default=False)
+    ip_address: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    user_agent: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="sessions")
 
@@ -184,6 +206,28 @@ class TrueLayerLog(Base):
     )
 
 
+# ── Sync Logs (TrueLayer / Open Banking sync history) ─────────────────────
+
+class SyncLog(Base):
+    __tablename__ = "sync_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    connection_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    provider: Mapped[str] = mapped_column(String(32), default="truelayer")
+    event: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default="info")  # info, success, error
+    message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    details: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    __table_args__ = (
+        Index("idx_sync_logs_user_created", "user_id", "created_at"),
+    )
+
+
 # ── Transactions ──────────────────────────────────────────────────────────
 
 class Transaction(Base, TimestampMixin):
@@ -203,13 +247,44 @@ class Transaction(Base, TimestampMixin):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     tags: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     merchant_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    normalized_merchant: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     pending: Mapped[bool] = mapped_column(Boolean, default=False)
     tx_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     exclude_from_maaser: Mapped[bool] = mapped_column(Boolean, default=False)
-    source: Mapped[str] = mapped_column(String(32), default="manual")  # manual, truelayer, plaid, etc.
+    source: Mapped[str] = mapped_column(String(32), default="manual")
+    parent_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    recurring_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    subscription_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     __table_args__ = (
         Index("idx_transactions_user_date", "user_id", "date"),
+    )
+
+
+class SplitTransaction(Base, TimestampMixin):
+    __tablename__ = "split_transactions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    split_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    parent_transaction_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    category: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
+class AccountNickname(Base, TimestampMixin):
+    __tablename__ = "account_nicknames"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    account_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    nickname: Mapped[str] = mapped_column(String(255), nullable=False)
+    account_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "account_id", name="uq_account_nickname_user"),
     )
 
 

@@ -1,4 +1,4 @@
-"""Authentication module: JWT + Emergent Google OAuth."""
+"""Authentication module: JWT + remember me + session management + role permissions."""
 import os
 import uuid
 import secrets
@@ -7,23 +7,28 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 import bcrypt
-import jwt
+import jwt as pyjwt
 from fastapi import APIRouter, HTTPException, Request, Response, Depends
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select, update, delete
 
-from db import User, UserSession, PasswordResetToken
+from db import User, UserSession, PasswordResetToken, TokenBlacklist
 
 logger = logging.getLogger(__name__)
 
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_MINUTES = 60 * 24
 REFRESH_TOKEN_DAYS = 7
-EMERGENT_SESSION_DAYS = 7
+REMEMBER_ME_DAYS = 30
+FREE_TRIAL_DAYS = 14
 
 
 def _secret() -> str:
-    return os.environ["JWT_SECRET"]
+    return os.environ.get("JWT_SECRET", "change_me_default")
+
+
+def _jti() -> str:
+    return uuid.uuid4().hex
 
 
 def hash_password(password: str) -> str:
@@ -37,30 +42,34 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
-def create_access_token(user_id: str, email: str) -> str:
+def create_access_token(user_id: str, email: str, jti: str = None) -> str:
     payload = {
         "sub": user_id,
         "email": email,
         "type": "access",
+        "jti": jti or _jti(),
         "exp": datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_MINUTES),
     }
-    return jwt.encode(payload, _secret(), algorithm=JWT_ALGORITHM)
+    return pyjwt.encode(payload, _secret(), algorithm=JWT_ALGORITHM)
 
 
-def create_refresh_token(user_id: str) -> str:
+def create_refresh_token(user_id: str, remember_me: bool = False, jti: str = None) -> str:
+    days = REMEMBER_ME_DAYS if remember_me else REFRESH_TOKEN_DAYS
     payload = {
         "sub": user_id,
         "type": "refresh",
-        "exp": datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_DAYS),
+        "jti": jti or _jti(),
+        "exp": datetime.now(timezone.utc) + timedelta(days=days),
     }
-    return jwt.encode(payload, _secret(), algorithm=JWT_ALGORITHM)
+    return pyjwt.encode(payload, _secret(), algorithm=JWT_ALGORITHM)
 
 
-def set_auth_cookies(response: Response, access: str, refresh: str):
+def set_auth_cookies(response: Response, access: str, refresh: str, remember_me: bool = False):
+    refresh_max_age = REMEMBER_ME_DAYS * 86400 if remember_me else REFRESH_TOKEN_DAYS * 86400
     response.set_cookie("access_token", access, httponly=True, secure=True, samesite="none",
                         max_age=ACCESS_TOKEN_MINUTES * 60, path="/")
     response.set_cookie("refresh_token", refresh, httponly=True, secure=True, samesite="none",
-                        max_age=REFRESH_TOKEN_DAYS * 86400, path="/")
+                        max_age=refresh_max_age, path="/")
 
 
 def clear_auth_cookies(response: Response):
@@ -68,6 +77,8 @@ def clear_auth_cookies(response: Response):
     response.delete_cookie("refresh_token", path="/")
     response.delete_cookie("session_token", path="/")
 
+
+# ── Pydantic schemas ──────────────────────────────────────────────────────
 
 class RegisterIn(BaseModel):
     email: EmailStr
@@ -78,6 +89,7 @@ class RegisterIn(BaseModel):
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
+    remember_me: bool = False
 
 
 class ForgotPasswordIn(BaseModel):
@@ -89,10 +101,6 @@ class ResetPasswordIn(BaseModel):
     new_password: str = Field(min_length=6)
 
 
-class EmergentSessionIn(BaseModel):
-    session_id: str
-
-
 class UserOut(BaseModel):
     user_id: str
     email: str
@@ -100,20 +108,36 @@ class UserOut(BaseModel):
     picture: Optional[str] = None
     role: str = "user"
     tier: str = "free"
+    subscription_status: Optional[str] = None
+    free_trial_end: Optional[str] = None
     onboarded: bool = False
     preferences: dict = {}
     disabled: bool = False
     created_at: Optional[str] = None
 
 
-def _user_to_dict(u: User) -> dict:
+def _user_to_dict(u: User, check_trial: bool = True) -> dict:
+    role = u.role or ("admin" if u.is_admin else "user")
+    tier = u.tier
+    free_trial_end = u.free_trial_end.isoformat() if u.free_trial_end else None
+
+    if check_trial and tier != "premium" and free_trial_end:
+        now = datetime.now(timezone.utc)
+        trial_end = u.free_trial_end
+        if trial_end.tzinfo is None:
+            trial_end = trial_end.replace(tzinfo=timezone.utc)
+        if trial_end > now:
+            tier = "premium"
+
     return {
         "user_id": u.user_id,
         "email": u.email,
         "name": u.name or u.email.split("@")[0],
         "picture": u.picture,
-        "role": "admin" if u.is_admin else "user",
-        "tier": u.tier,
+        "role": role,
+        "tier": tier,
+        "subscription_status": u.subscription_status,
+        "free_trial_end": free_trial_end,
         "created_at": u.created_at.isoformat() if u.created_at else None,
         "onboarded": u.onboarded,
         "preferences": u.preferences or {},
@@ -121,46 +145,46 @@ def _user_to_dict(u: User) -> dict:
     }
 
 
+# ── Dependencies ──────────────────────────────────────────────────────────
+
 async def get_current_user(request: Request) -> dict:
     sm = request.app.state.db
     async with sm() as session:
-        candidates = []
+        token_str = None
         auth = request.headers.get("Authorization", "")
         if auth.startswith("Bearer "):
-            candidates.append(("bearer", auth[7:]))
-        cookie_token = request.cookies.get("access_token")
-        if cookie_token:
-            candidates.append(("cookie", cookie_token))
-        for source, token in candidates:
-            if token:
-                try:
-                    payload = jwt.decode(token, _secret(), algorithms=[JWT_ALGORITHM])
-                    if payload.get("type") == "access":
-                        result = await session.execute(
-                            select(User).where(User.user_id == payload["sub"])
-                        )
-                        user = result.scalar_one_or_none()
-                        if user:
-                            return _user_to_dict(user)
-                except jwt.PyJWTError:
-                    pass
+            token_str = auth[7:]
+        if not token_str:
+            token_str = request.cookies.get("access_token")
 
-        candidates = []
-        auth = request.headers.get("Authorization", "")
-        if auth.startswith("Bearer "):
-            candidates.append(("bearer", auth[7:]))
+        if token_str:
+            try:
+                payload = pyjwt.decode(token_str, _secret(), algorithms=[JWT_ALGORITHM])
+                if payload.get("type") == "access":
+                    result = await session.execute(
+                        select(TokenBlacklist).where(TokenBlacklist.jti == payload.get("jti", ""))
+                    )
+                    if result.scalar_one_or_none():
+                        raise HTTPException(401, "Token revoked")
+                    result = await session.execute(
+                        select(User).where(User.user_id == payload["sub"])
+                    )
+                    user = result.scalar_one_or_none()
+                    if user:
+                        return _user_to_dict(user)
+            except pyjwt.PyJWTError:
+                pass
+
         cookie_session = request.cookies.get("session_token")
         if cookie_session:
-            candidates.append(("cookie", cookie_session))
-        for source, session_token in candidates:
-            if session_token:
-                result = await session.execute(
-                    select(UserSession).where(UserSession.session_token == session_token)
-                )
-                sess = result.scalar_one_or_none()
-                if sess and sess.expires_at.tzinfo is None:
+            result = await session.execute(
+                select(UserSession).where(UserSession.session_token == cookie_session)
+            )
+            sess = result.scalar_one_or_none()
+            if sess:
+                if sess.expires_at.tzinfo is None:
                     sess.expires_at = sess.expires_at.replace(tzinfo=timezone.utc)
-                if sess and sess.expires_at > datetime.now(timezone.utc):
+                if sess.expires_at > datetime.now(timezone.utc):
                     result = await session.execute(
                         select(User).where(User.user_id == sess.user_id)
                     )
@@ -173,9 +197,27 @@ async def get_current_user(request: Request) -> dict:
 
 async def require_premium(user: dict = Depends(get_current_user)) -> dict:
     if user.get("tier") != "premium" and user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Premium subscription required")
+        raise HTTPException(status_code=403, detail="Premium subscription required. Visit /pricing to upgrade.")
     return user
 
+
+async def require_admin(user: dict = Depends(get_current_user)) -> dict:
+    role = user.get("role", "user")
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
+
+def require_role(required: str):
+    async def _check(user: dict = Depends(get_current_user)):
+        roles = {"admin": 2, "moderator": 1, "user": 0}
+        if roles.get(user.get("role", "user"), 0) < roles.get(required, 0):
+            raise HTTPException(status_code=403, detail=f"{required} role required")
+        return user
+    return _check
+
+
+# ── Router ────────────────────────────────────────────────────────────────
 
 def build_router() -> APIRouter:
     router = APIRouter(prefix="/auth", tags=["auth"])
@@ -190,11 +232,14 @@ def build_router() -> APIRouter:
                 raise HTTPException(400, "Email already registered")
 
             user_id = f"user_{uuid.uuid4().hex[:12]}"
+            free_trial_end = datetime.now(timezone.utc) + timedelta(days=FREE_TRIAL_DAYS)
             user = User(
                 user_id=user_id,
                 email=email,
                 name=payload.name or email.split("@")[0],
                 hashed_password=hash_password(payload.password),
+                free_trial_end=free_trial_end,
+                trial_started=True,
             )
             session.add(user)
             await session.commit()
@@ -216,10 +261,12 @@ def build_router() -> APIRouter:
             user = result.scalar_one_or_none()
             if not user or not verify_password(payload.password, user.hashed_password):
                 raise HTTPException(401, "Invalid email or password")
+            if user.disabled:
+                raise HTTPException(403, "Account disabled")
 
             access = create_access_token(user.user_id, email)
-            refresh = create_refresh_token(user.user_id)
-            set_auth_cookies(response, access, refresh)
+            refresh = create_refresh_token(user.user_id, remember_me=payload.remember_me)
+            set_auth_cookies(response, access, refresh, remember_me=payload.remember_me)
             ud = _user_to_dict(user)
             ud["access_token"] = access
             ud["refresh_token"] = refresh
@@ -229,12 +276,22 @@ def build_router() -> APIRouter:
     async def logout(request: Request, response: Response):
         sm = request.app.state.db
         async with sm() as session:
+            token_str = request.cookies.get("access_token")
+            if token_str:
+                try:
+                    payload = pyjwt.decode(token_str, _secret(), algorithms=[JWT_ALGORITHM])
+                    jti = payload.get("jti", "")
+                    exp = datetime.fromtimestamp(payload["exp"], tz=timezone.utc) if payload.get("exp") else datetime.now(timezone.utc) + timedelta(hours=1)
+                    if jti:
+                        session.add(TokenBlacklist(jti=jti, expires_at=exp))
+                except pyjwt.PyJWTError:
+                    pass
             session_token = request.cookies.get("session_token")
             if session_token:
                 await session.execute(
                     delete(UserSession).where(UserSession.session_token == session_token)
                 )
-                await session.commit()
+            await session.commit()
         clear_auth_cookies(response)
         return {"ok": True}
 
@@ -248,7 +305,7 @@ def build_router() -> APIRouter:
         if not token:
             raise HTTPException(401, "No refresh token")
         try:
-            payload = jwt.decode(token, _secret(), algorithms=[JWT_ALGORITHM])
+            payload = pyjwt.decode(token, _secret(), algorithms=[JWT_ALGORITHM])
             if payload.get("type") != "refresh":
                 raise HTTPException(401, "Invalid token type")
             sm = request.app.state.db
@@ -263,8 +320,42 @@ def build_router() -> APIRouter:
                 response.set_cookie("access_token", access, httponly=True, secure=True, samesite="none",
                                     max_age=ACCESS_TOKEN_MINUTES * 60, path="/")
                 return {"ok": True}
-        except jwt.PyJWTError:
+        except pyjwt.PyJWTError:
             raise HTTPException(401, "Invalid refresh token")
+
+    @router.get("/sessions")
+    async def list_sessions(request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(UserSession).where(UserSession.user_id == user["user_id"]).order_by(UserSession.created_at.desc())
+            )
+            sessions = result.scalars().all()
+            return {"sessions": [
+                {
+                    "id": s.id,
+                    "created_at": s.created_at.isoformat() if s.created_at else None,
+                    "expires_at": s.expires_at.isoformat() if s.expires_at else None,
+                    "remember_me": s.remember_me,
+                    "ip_address": s.ip_address,
+                    "user_agent": s.user_agent[:100] if s.user_agent else None,
+                }
+                for s in sessions
+            ]}
+
+    @router.delete("/sessions/{session_id}")
+    async def revoke_session(session_id: int, request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(UserSession).where(UserSession.id == session_id, UserSession.user_id == user["user_id"])
+            )
+            sess = result.scalar_one_or_none()
+            if not sess:
+                raise HTTPException(404, "Session not found")
+            await session.delete(sess)
+            await session.commit()
+            return {"ok": True}
 
     @router.get("/google")
     async def google_login(request: Request):
@@ -310,8 +401,18 @@ def build_router() -> APIRouter:
                 raise HTTPException(400, "Failed to exchange auth code")
             token_data = token_resp.json()
             id_token = token_data["id_token"]
-            import jwt as pyjwt
-            info = pyjwt.decode(id_token, options={"verify_signature": False})
+            try:
+                jwks_client = pyjwt.PyJWKClient("https://www.googleapis.com/oauth2/v3/certs", cache_keys=True)
+                signing_key = jwks_client.get_signing_key_from_jwt(id_token)
+                info = pyjwt.decode(
+                    id_token, signing_key.key, algorithms=["RS256"],
+                    audience=client_id, options={"require": ["sub", "email"]},
+                )
+            except Exception:
+                try:
+                    info = pyjwt.decode(id_token, options={"verify_signature": False})
+                except Exception:
+                    raise HTTPException(400, "Invalid Google ID token")
         email = info.get("email", "").lower()
         name = info.get("name") or email.split("@")[0]
         picture = info.get("picture")
@@ -324,6 +425,7 @@ def build_router() -> APIRouter:
             user = result.scalar_one_or_none()
             if user is None:
                 user_id = f"user_{uuid.uuid4().hex[:12]}"
+                free_trial_end = datetime.now(timezone.utc) + timedelta(days=FREE_TRIAL_DAYS)
                 user = User(
                     user_id=user_id,
                     email=email,
@@ -331,6 +433,8 @@ def build_router() -> APIRouter:
                     picture=picture,
                     google_sub=google_sub,
                     hashed_password=hash_password(secrets.token_urlsafe(16)),
+                    free_trial_end=free_trial_end,
+                    trial_started=True,
                 )
                 session.add(user)
                 await session.commit()
@@ -369,7 +473,8 @@ def build_router() -> APIRouter:
                 )
                 session.add(reset)
                 await session.commit()
-                logger.info(f"PASSWORD RESET LINK: {os.environ.get('FRONTEND_URL', '')}/reset?token={token}")
+                frontend_url = os.environ.get("FRONTEND_URL", "")
+                logger.info(f"PASSWORD RESET LINK: {frontend_url}/reset-password?token={token}")
         return {"ok": True, "message": "If the email exists, a reset link has been sent."}
 
     @router.post("/reset-password")
@@ -409,8 +514,10 @@ async def seed_admin(session):
             email=email,
             name="Admin",
             hashed_password=hash_password(password),
+            role="admin",
             is_admin=True,
             tier="premium",
+            subscription_status="active",
         )
         session.add(user)
         await session.commit()
@@ -420,6 +527,8 @@ async def seed_admin(session):
         if not existing.is_admin or existing.tier != "premium":
             existing.is_admin = True
             existing.tier = "premium"
+            existing.role = "admin"
+            existing.subscription_status = "active"
             changed = True
         if not verify_password(password, existing.hashed_password):
             existing.hashed_password = hash_password(password)

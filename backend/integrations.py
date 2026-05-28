@@ -1,4 +1,4 @@
-"""Per-user integrations: Twilio + TrueLayer test/connect endpoints."""
+"""Per-user integrations: Twilio."""
 import os
 import logging
 from datetime import datetime, timezone
@@ -12,7 +12,6 @@ from sqlalchemy import select
 
 from db import User, get_session_maker
 from auth import get_current_user
-from app_config import get_truelayer_config
 
 logger = logging.getLogger("integrations")
 
@@ -21,13 +20,6 @@ class TwilioIn(BaseModel):
     account_sid: Optional[str] = None
     auth_token: Optional[str] = None
     phone_number: Optional[str] = None
-
-
-class TrueLayerIn(BaseModel):
-    client_id: Optional[str] = None
-    client_secret: Optional[str] = None
-    redirect_uri: Optional[str] = None
-    environment: Optional[str] = None
 
 
 def build_router() -> APIRouter:
@@ -103,78 +95,5 @@ def build_router() -> APIRouter:
             except Exception as e:
                 logger.error(f"twilio test failed: {e}")
                 raise HTTPException(502, f"Twilio request failed: {str(e)[:150]}")
-
-    @router.get("/truelayer")
-    async def get_truelayer(request: Request, user: dict = Depends(get_current_user)):
-        sm = request.app.state.db
-        async with sm() as session:
-            result = await session.execute(select(User).where(User.user_id == user["user_id"]))
-            u = result.scalar_one_or_none()
-            prefs = u.preferences or {} if u else {}
-            per_user = prefs.get("truelayer") or {}
-            admin_cfg = await get_truelayer_config(session)
-            client_id = per_user.get("client_id") or admin_cfg["client_id"]
-            has_secret = bool(per_user.get("client_secret") or admin_cfg["client_secret"])
-            env = per_user.get("environment") or admin_cfg["environment"]
-            redirect = per_user.get("redirect_uri") or admin_cfg["redirect_uri"]
-            return {
-                "client_id": client_id or "",
-                "has_secret": has_secret,
-                "environment": env,
-                "redirect_uri": redirect,
-                "source": "user" if per_user.get("client_id") else ("admin" if admin_cfg["client_id"] else "none"),
-            }
-
-    @router.put("/truelayer")
-    async def put_truelayer(payload: TrueLayerIn, request: Request, user: dict = Depends(get_current_user)):
-        sm = request.app.state.db
-        async with sm() as session:
-            result = await session.execute(select(User).where(User.user_id == user["user_id"]))
-            u = result.scalar_one_or_none()
-            if not u:
-                raise HTTPException(404, "User not found")
-            prefs = u.preferences or {}
-            tl = prefs.get("truelayer") or {}
-            if payload.client_id is not None:
-                tl["client_id"] = payload.client_id
-            if payload.client_secret:
-                tl["client_secret"] = payload.client_secret
-            if payload.redirect_uri is not None:
-                tl["redirect_uri"] = payload.redirect_uri
-            if payload.environment in ("sandbox", "live"):
-                tl["environment"] = payload.environment
-            prefs["truelayer"] = tl
-            u.preferences = prefs
-            await session.commit()
-            return {"ok": True}
-
-    @router.post("/truelayer/test")
-    async def test_truelayer(request: Request, user: dict = Depends(get_current_user)):
-        sm = request.app.state.db
-        async with sm() as session:
-            result = await session.execute(select(User).where(User.user_id == user["user_id"]))
-            u = result.scalar_one_or_none()
-            prefs = u.preferences or {} if u else {}
-            per_user = prefs.get("truelayer") or {}
-            admin_cfg = await get_truelayer_config(session)
-            client_id = per_user.get("client_id") or admin_cfg["client_id"]
-            client_secret = per_user.get("client_secret") or admin_cfg["client_secret"]
-            env = per_user.get("environment") or admin_cfg["environment"] or "sandbox"
-            auth_url = "https://auth.truelayer.com" if env == "live" else "https://auth.truelayer-sandbox.com"
-            if not client_id or not client_secret:
-                raise HTTPException(400, "TrueLayer not configured. Add Client ID and Client Secret.")
-            try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
-                    r = await client.get(f"{auth_url}/.well-known/openid-configuration")
-                ok = r.status_code in (200, 301, 302)
-            except Exception:
-                ok = False
-            return {
-                "ok": ok,
-                "environment": env,
-                "auth_host_reachable": ok,
-                "client_id": (client_id[:8] + "…") if client_id else "",
-                "source": "user" if per_user.get("client_id") else "admin",
-            }
 
     return router
