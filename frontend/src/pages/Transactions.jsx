@@ -3,7 +3,7 @@ import { api } from "../lib/api";
 import { Plus, Trash2, Loader2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
-const CATS = ["groceries","dining","transport","utilities","subscriptions","tzedakah","rent","salary","income","uncategorized"];
+const CATS = ["groceries","dining","transport","utilities","subscriptions","tzedakah","rent","salary","income","shopping","health","entertainment","insurance","education","transfer","cash","tax","fees","mortgage","uncategorized"];
 
 const emptyForm = { description: "", amount: "", category: "", is_income: false };
 

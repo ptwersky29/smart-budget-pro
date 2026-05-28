@@ -39,15 +39,24 @@ class TransactionUpdate(BaseModel):
 
 
 CATEGORY_RULES = {
-    "groceries": ["tesco", "sainsbury", "asda", "aldi", "lidl", "morrison", "waitrose", "kosher"],
-    "transport": ["tfl", "uber", "bolt", "trainline", "shell", "bp", "petrol"],
-    "dining": ["restaurant", "pizza", "deliveroo", "ubereats", "just eat", "mcdonald", "kfc"],
-    "subscriptions": ["netflix", "spotify", "amazon prime", "apple", "disney", "youtube"],
-    "utilities": ["british gas", "edf", "octopus", "thames water", "council tax", "ee", "vodafone"],
-    "tzedakah": ["chesed", "tzedakah", "shul", "yeshiva", "kollel", "donation"],
-    "rent": ["rent", "mortgage", "letting"],
-    "salary": ["salary", "wages", "payroll"],
-    "income": ["refund", "interest", "dividend"],
+    "groceries": ["tesco", "sainsbury", "asda", "aldi", "lidl", "morrison", "waitrose", "kosher", "m&s food", "marks & spencer food", "co-op"],
+    "transport": ["tfl", "uber", "bolt", "trainline", "shell", "bp", "petrol", "national express", "southern railway", "thameslink", "oyster"],
+    "dining": ["restaurant", "pizza", "deliveroo", "ubereats", "just eat", "mcdonald", "kfc", "subway", "greggs", "costa", "starbucks", "pret"],
+    "subscriptions": ["netflix", "spotify", "amazon prime", "apple", "disney", "youtube", "chatgpt", "openai", "github", "adobe", "microsoft 365"],
+    "utilities": ["british gas", "edf", "octopus", "thames water", "council tax", "ee", "vodafone", "sky", "virgin media", "severn trent", "yorkshire water"],
+    "tzedakah": ["chesed", "tzedakah", "shul", "yeshiva", "kollel", "donation", "charity", "maaser"],
+    "rent": ["rent", "mortgage", "letting", "landlord", "tenancy"],
+    "salary": ["salary", "wages", "payroll", "hmrc"],
+    "income": ["refund", "interest", "dividend", "tax refund", "cashback"],
+    "shopping": ["amazon", "argos", "ikea", "b&q", "screwfix", "primark", "zara", "h&m", "next", "john lewis", "eBay", "etsy"],
+    "health": ["nhs", "boots", "superdrug", "pharmacy", "doctor", "dentist", "optician", "hospital", "gym", "puregym"],
+    "entertainment": ["cinema", "odeon", "vue", "showcase", "national trust", "english heritage", "spotify", "eventim", "ticketmaster"],
+    "insurance": ["aviva", "direct line", "admiral", "churchill", "axa", "legal & general", "life insurance", "car insurance", "home insurance"],
+    "education": ["coursera", "udemy", "open university", "school", "nursery", "childcare", "tutor"],
+    "transfer": ["bank transfer", "transfer", "faster payment", "bacs", "chaps", "paypal", "monzo me", "starling"],
+    "cash": ["cash", "atm", "withdrawal"],
+    "tax": ["self assessment", "tax", "hmrc", "stamp duty"],
+    "fees": ["fee", "charge", "penalty", "interest charge", "o/d fee", "overdraft"],
 }
 
 

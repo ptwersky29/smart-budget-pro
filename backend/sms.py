@@ -20,7 +20,7 @@ logger = logging.getLogger("sms")
 
 
 PARSE_PROMPT = """You are a UK bank-SMS parser. Extract a transaction from this SMS. Return STRICT JSON only:
-{"is_transaction": bool, "amount": number, "currency": "GBP|USD|EUR", "merchant": string|null, "description": string, "is_income": bool, "category": "groceries|dining|transport|utilities|subscriptions|tzedakah|rent|salary|income|uncategorized", "confidence": 0..1, "reason_if_not_transaction": string|null}
+{"is_transaction": bool, "amount": number, "currency": "GBP|USD|EUR", "merchant": string|null, "description": string, "is_income": bool, "category": "groceries|dining|transport|utilities|subscriptions|tzedakah|rent|salary|income|shopping|health|entertainment|insurance|education|transfer|cash|tax|fees|mortgage|uncategorized", "confidence": 0..1, "reason_if_not_transaction": string|null}
 
 Rules:
 - amount = absolute positive number
@@ -28,6 +28,7 @@ Rules:
 - For declined/failed/balance-only messages: is_transaction=false
 - confidence = your certainty 0..1
 - Use British English categories.
+- Categorise EVERY transaction — never leave as "uncategorized".
 SMS: """
 
 

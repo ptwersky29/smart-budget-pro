@@ -4,7 +4,7 @@ import { Plus, Trash2, Pencil, X, Check } from "lucide-react";
 import { toast } from "sonner";
 import AIInsightPanel from "../components/AIInsightPanel";
 
-const CATS = ["groceries","dining","transport","utilities","subscriptions","tzedakah","rent","other"];
+const CATS = ["groceries","dining","transport","utilities","subscriptions","tzedakah","rent","salary","income","shopping","health","entertainment","insurance","education","transfer","cash","tax","fees","mortgage","uncategorized"];
 
 export default function Budgets() {
   const [budgets, setBudgets] = useState([]);

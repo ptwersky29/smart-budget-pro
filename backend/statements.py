@@ -24,6 +24,13 @@ MAX_BYTES = 5 * 1024 * 1024
 PARSE_LIMIT_FREE = 1
 MAX_CHARS_TO_AI = 40000
 
+CATEGORIES = [
+    "groceries", "dining", "transport", "utilities", "subscriptions",
+    "tzedakah", "rent", "salary", "income", "shopping", "health",
+    "entertainment", "insurance", "education", "transfer", "cash",
+    "tax", "fees", "mortgage", "uncategorized",
+]
+
 PARSE_PROMPT = """You are a UK bank statement parser. Below is text extracted from a bank statement (CSV or PDF).
 Extract every transaction as JSON. Return STRICT JSON only — no markdown, no commentary.
 
@@ -36,7 +43,7 @@ Schema:
       "description": string,
       "merchant": string|null,
       "amount": number (positive for credits/income, negative for debits/spend),
-      "category": "groceries|dining|transport|utilities|subscriptions|tzedakah|rent|salary|income|uncategorized",
+      "category": "groceries|dining|transport|utilities|subscriptions|tzedakah|rent|salary|income|shopping|health|entertainment|insurance|education|transfer|cash|tax|fees|mortgage|uncategorized",
       "is_income": bool,
       "confidence": 0..1
     }
@@ -47,8 +54,8 @@ Rules:
 - Use ISO date format YYYY-MM-DD. If only DD/MM/YYYY appears, convert.
 - Amount sign: negative for spend/debits/withdrawals, positive for credits/income/refunds.
 - Use British English categories.
+- Categorise EVERY transaction based on the merchant/description — never leave as "uncategorized" unless truly unrecognisable.
 - Skip header rows, balance lines, and footnotes.
-- Skip transactions with confidence < 0.4.
 - Cap to 200 transactions.
 
 STATEMENT TEXT:
@@ -99,6 +106,50 @@ async def _ai_parse_statement(text: str) -> dict:
         return json.loads(m.group(0))
     except json.JSONDecodeError as e:
         raise RuntimeError(f"AI JSON parse failed: {e}")
+
+
+CATEGORISE_PROMPT = """You are a bank transaction categoriser. Given the description and merchant of a transaction, choose the best single category from the list below. Return STRICT JSON only — no markdown.
+
+Categories: groceries, dining, transport, utilities, subscriptions, tzedakah, rent, salary, income, shopping, health, entertainment, insurance, education, transfer, cash, tax, fees, mortgage, uncategorized
+
+Examples:
+- "TESCO STORE 1234" -> "groceries"
+- "MCDONALD'S" -> "dining"
+- "SALARY" -> "salary"
+- "AMAZON PRIME" -> "subscriptions"
+- "NATIONAL GRID" -> "utilities"
+
+Transaction: {description}
+Merchant: {merchant}
+Amount: {amount} (negative = spend, positive = income)
+
+Respond with JSON: {{"category": "..."}}
+"""
+
+
+async def _ai_categorise(description: str, merchant: str | None, amount: float) -> str:
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    api_key = os.environ.get("OPENROUTER_API_KEY", os.environ.get("EMERGENT_LLM_KEY", ""))
+    chat = LlmChat(
+        api_key=api_key, session_id=f"cat_{uuid.uuid4().hex[:8]}",
+        system_message="You categorise bank transactions. Output valid JSON only.",
+    ).with_model("openai", "google/gemini-2.0-flash-lite-001")
+    prompt = CATEGORISE_PROMPT.format(
+        description=description[:100],
+        merchant=merchant or "unknown",
+        amount=amount,
+    )
+    msg = UserMessage(text=prompt)
+    resp = str(await chat.send_message(msg))
+    m = re.search(r"\{.*\}", resp, re.DOTALL)
+    if m:
+        try:
+            data = json.loads(m.group(0))
+            cat = str(data.get("category", "uncategorized")).lower().strip()
+            return cat if cat in CATEGORIES else "uncategorized"
+        except Exception:
+            pass
+    return "uncategorized"
 
 
 def build_router() -> APIRouter:
@@ -167,6 +218,13 @@ def build_router() -> APIRouter:
                     })
                 except Exception:
                     continue
+
+            uncat = [t for t in clean if t["category"] == "uncategorized"]
+            if uncat:
+                logger.info(f"Re-categorising {len(uncat)} uncategorised transactions")
+                for t in uncat:
+                    new_cat = await _ai_categorise(t["description"], t.get("merchant"), t["amount"])
+                    t["category"] = new_cat
 
             stmt = Statement(
                 user_id=user["user_id"],
