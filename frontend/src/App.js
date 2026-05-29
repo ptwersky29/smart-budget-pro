@@ -1,6 +1,6 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
-import "@/App.css";
+import "App.css";
 import { AuthProvider } from "./contexts/AuthContext";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "next-themes";
