@@ -89,7 +89,7 @@ logger.info("JWT_SECRET validated")
 
 init_engine(database_url, echo=False)
 
-app = FastAPI(title="FinanceAI API", version="1.0.0")
+app = FastAPI(title="FinanceAI API", version="1.0.1")
 app.state.db = get_session_maker()
 
 # Middleware stack (order matters: outermost first)
