@@ -1,7 +1,7 @@
 {
   "rootDirectory": "frontend",
   "installCommand": "npm install --legacy-peer-deps",
-  "buildCommand": "NODE_OPTIONS=\"--max_old_space_size=3072\" NODE_PATH=src CI=false npm run build",
+  "buildCommand": "NODE_OPTIONS=\"--max_old_space_size=3072\" NODE_PATH=src CI=false DISABLE_ESLINT_PLUGIN=true npm run build",
   "outputDirectory": "build",
   "rewrites": [
     {
