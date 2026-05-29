@@ -1,12 +1,24 @@
 """Admin-managed app configuration (TrueLayer credentials) stored in PostgreSQL.
 Falls back to env vars when DB value is missing.
 """
+import os
 from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel
+from sqlalchemy import select
 from typing import Optional
 
 from db import AppConfig
 from auth import get_current_user
+
+
+async def get_config(session, key: str, env_var: str) -> str:
+    val = os.environ.get(env_var)
+    if not val:
+        r = await session.execute(select(AppConfig).where(AppConfig.key == key))
+        c = r.scalar_one_or_none()
+        if c and c.value:
+            val = c.value
+    return val or ""
 
 
 class TrueLayerConfigIn(BaseModel):
