@@ -46,6 +46,8 @@ module.exports = {
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
   			ring: 'hsl(var(--ring))',
+  			ruby: 'hsl(var(--ruby))',
+  			topaz: 'hsl(var(--topaz))',
   			chart: {
   				'1': 'hsl(var(--chart-1))',
   				'2': 'hsl(var(--chart-2))',
