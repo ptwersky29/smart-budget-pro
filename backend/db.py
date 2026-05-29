@@ -117,6 +117,13 @@ async def create_tables():
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_token VARCHAR(128)"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_sent_at TIMESTAMPTZ"))
+            # Missing columns from User model
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS tier VARCHAR(32) DEFAULT 'free'"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarded BOOLEAN DEFAULT FALSE"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_step VARCHAR(64)"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS preferences JSON"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled BOOLEAN DEFAULT FALSE"))
             # Phase 2 — Bank connection improvements
             await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS import_start_date DATE"))
             await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS update_count INTEGER DEFAULT 0"))
