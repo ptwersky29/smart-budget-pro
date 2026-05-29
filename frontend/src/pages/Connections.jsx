@@ -79,6 +79,23 @@ export default function Connections() {
     }
   };
 
+  const reconnectConn = async (connectionId) => {
+    setStatus("connecting"); setError(null);
+    try {
+      const { data } = await api.post(`/truelayer/reconnect/${connectionId}`);
+      setStatus("redirecting");
+      setTimeout(() => { window.location.href = data.auth_url; }, 600);
+    } catch (e) {
+      setStatus("failed");
+      const msg = formatApiError(e.response?.data?.detail);
+      setError(msg);
+      if (msg?.includes("not configured")) {
+        setNeedsSetup(true);
+      }
+      toast.error(msg || "Reconnect failed");
+    }
+  };
+
   const syncNow = async () => {
     setSyncing(true);
     try {
@@ -204,7 +221,7 @@ export default function Connections() {
                 </div>
                 <div className="flex items-center gap-2">
                   {c.status === "reconnect_required" && (
-                    <button onClick={connect} data-testid={`reconnect-${c.connection_id}`} className="btn-pill border border-ruby text-ruby text-sm">
+                    <button onClick={() => reconnectConn(c.connection_id)} data-testid={`reconnect-${c.connection_id}`} className="btn-pill border border-ruby text-ruby text-sm">
                       Reconnect
                     </button>
                   )}

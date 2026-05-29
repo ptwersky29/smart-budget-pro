@@ -53,7 +53,7 @@ export default function Investments() {
         symbol: form.symbol,
         monthly_contribution: Number(form.monthly_contribution),
         years: Number(form.years),
-        initial_value: Number(form.initial_value),
+        current_value: Number(form.initial_value),
       });
       setResult(data);
     } catch { toast.error("Could not run forecast"); }

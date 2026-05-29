@@ -154,6 +154,11 @@ export default function Landing() {
 
       <footer className="border-t border-border py-12 text-center text-sm text-muted-foreground">
         <p>© 2026 FinanceAI. Built for the UK & the heimishe community.</p>
+        <div className="flex items-center justify-center gap-4 mt-2">
+          <a href="/privacy" className="hover:text-foreground">Privacy Policy</a>
+          <a href="/login" className="hover:text-foreground">Sign In</a>
+          <a href="/pricing" className="hover:text-foreground">Pricing</a>
+        </div>
       </footer>
     </div>
   );

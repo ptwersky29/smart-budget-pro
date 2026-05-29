@@ -30,8 +30,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const { data } = await api.get("/auth/me");
       setUser(stripTokens(data));
-    } catch (err) {
-      console.debug("auth/me check failed (expected when not logged in)", err?.response?.status);
+    } catch {
       setUser(false);
     } finally {
       setLoading(false);
@@ -56,7 +55,7 @@ export const AuthProvider = ({ children }) => {
   }, [stripTokens]);
 
   const logout = useCallback(async () => {
-    try { await api.post("/auth/logout"); } catch (err) { console.error("logout error", err); }
+    try { await api.post("/auth/logout"); } catch { /* server logout best-effort */ }
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("financeai_token");

@@ -1,4 +1,4 @@
-"""In-memory rate limiter using a sliding window per user/IP."""
+"""In-memory rate limiter using a sliding window per user/IP + CSRF middleware."""
 import time
 import logging
 from collections import defaultdict
@@ -7,8 +7,9 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger("rate_limit")
 
-DEFAULT_LIMIT = 60
+DEFAULT_LIMIT = 120
 DEFAULT_WINDOW = 60
+CSRF_SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 
 
 class RateLimiter:
@@ -48,4 +49,30 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if not self.limiter.check(request):
             logger.warning("Rate limit exceeded for %s", self.limiter._key(request))
             raise HTTPException(429, "Too many requests. Please slow down.")
+        return await call_next(request)
+
+
+class CsrfProtectionMiddleware(BaseHTTPMiddleware):
+    """CSRF protection for cookie-authenticated state-changing requests.
+    
+    Requires GET /api/auth/csrf-token to return a CSRF token that is then
+    sent as X-CSRF-Token header on POST/PUT/PATCH/DELETE requests.
+    Skips CSRF for API-key or Bearer-token authenticated requests.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        if request.method in CSRF_SAFE_METHODS:
+            return await call_next(request)
+        # Check if request uses Bearer token (API clients skip CSRF)
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            return await call_next(request)
+        # CSRF check for cookie-authenticated requests
+        csrf_header = request.headers.get("X-CSRF-Token", "")
+        csrf_cookie = request.cookies.get("csrf_token", "")
+        if not csrf_header or not csrf_cookie:
+            raise HTTPException(403, "CSRF token missing")
+        from security import verify_csrf_token as _verify
+        if not _verify(csrf_header, csrf_cookie):
+            raise HTTPException(403, "CSRF token mismatch")
         return await call_next(request)

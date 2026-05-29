@@ -650,6 +650,112 @@ def build_router() -> APIRouter:
             }
 
     # ════════════════════════════════════════════════════════════════════
+    # ANNUAL MAASER SUMMARY
+    # ════════════════════════════════════════════════════════════════════
+
+    @router.get("/maaser/annual-summary")
+    async def annual_maaser_summary(request: Request, user: dict = Depends(get_current_user),
+                                    year: int = Query(None)):
+        sm = request.app.state.db
+        async with sm() as session:
+            target_year = year or datetime.now(timezone.utc).year
+            start = datetime(target_year, 1, 1, tzinfo=timezone.utc)
+            end = datetime(target_year + 1, 1, 1, tzinfo=timezone.utc)
+
+            s = await _get_pref(session, user["user_id"], "maaser", {})
+            percent = float(s.get("percent", 10))
+
+            tx_result = await session.execute(
+                select(Transaction).where(
+                    Transaction.user_id == user["user_id"],
+                    Transaction.date >= start, Transaction.date < end,
+                )
+            )
+            txs = tx_result.scalars().all()
+            total_income = 0.0
+            tx_given = 0.0
+            income_by_month = {}
+            for t in txs:
+                amt = float(t.amount or 0)
+                cat = (t.category or "").lower()
+                if amt > 0 or cat in INCOME_CATEGORIES:
+                    total_income += abs(amt)
+                    month_key = t.date.strftime("%Y-%m") if t.date else "unknown"
+                    income_by_month[month_key] = income_by_month.get(month_key, 0) + abs(amt)
+                if amt < 0 and cat == "tzedakah":
+                    tx_given += -amt
+
+            obligation = round(total_income * percent / 100, 2)
+
+            ledger_result = await session.execute(
+                select(MaaserLedger).where(
+                    MaaserLedger.user_id == user["user_id"],
+                    MaaserLedger.date >= start, MaaserLedger.date < end,
+                )
+            )
+            ledger_entries = ledger_result.scalars().all()
+            manual_given = sum((e.maaser_paid or e.income_amount or 0) for e in ledger_entries)
+            pending_entries = [e for e in ledger_entries if e.maaser_paid == 0]
+            accrued_pending = sum(r.maaser_due or 0 for r in pending_entries)
+
+            given_total = manual_given + tx_given
+            balance_owed = round(max(0, obligation - given_total), 2)
+
+            return {
+                "year": target_year, "percent": percent,
+                "total_income": round(total_income, 2),
+                "obligation": obligation,
+                "given_total": round(given_total, 2),
+                "tx_given": round(tx_given, 2),
+                "ledger_given": round(manual_given, 2),
+                "accrued_pending": round(accrued_pending, 2),
+                "balance_owed": balance_owed,
+                "income_by_month": income_by_month,
+                "month_count": len(income_by_month),
+                "transaction_count": len(txs),
+            }
+
+    # ════════════════════════════════════════════════════════════════════
+    # HOLIDAY UPLIFT PROJECTION
+    # ════════════════════════════════════════════════════════════════════
+
+    @router.get("/holiday-uplift")
+    async def holiday_uplift(request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(Transaction).where(
+                    Transaction.user_id == user["user_id"], Transaction.amount < 0,
+                ).order_by(Transaction.date.desc()).limit(200)
+            )
+            txs = result.scalars().all()
+            monthly_spend = {}
+            for t in txs:
+                if t.date:
+                    m = t.date.strftime("%Y-%m")
+                    monthly_spend[m] = monthly_spend.get(m, 0) + abs(float(t.amount))
+            avg_monthly = round(sum(monthly_spend.values()) / max(len(monthly_spend), 1), 2)
+
+            projections = []
+            for name, info in HOLIDAY_DEFAULTS.items():
+                uplifted = round(avg_monthly * (info["uplift_pct"] / 100), 2)
+                total_projected = round(avg_monthly + uplifted, 2)
+                projections.append({
+                    "holiday": name, "month": info["month"],
+                    "uplift_pct": info["uplift_pct"],
+                    "base_monthly_spend": avg_monthly,
+                    "uplift_amount": uplifted,
+                    "projected_total": total_projected,
+                    "categories": info["categories"],
+                })
+
+            return {
+                "average_monthly_spend": avg_monthly,
+                "months_analysed": len(monthly_spend),
+                "projections": projections,
+            }
+
+    # ════════════════════════════════════════════════════════════════════
     # HEALTH CHECK
     # ════════════════════════════════════════════════════════════════════
 

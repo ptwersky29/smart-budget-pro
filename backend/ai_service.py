@@ -11,7 +11,8 @@ from sqlalchemy import select, func, text
 
 from db import AiMessage, AiUsage, User, Transaction, Budget
 from auth import get_current_user
-from llm import call_llm, parse_json, estimate_cost
+from llm import call_llm, parse_json, estimate_cost, track_ai_usage
+from security import sanitize_input
 
 logger = logging.getLogger("ai")
 
@@ -114,12 +115,14 @@ def build_router() -> APIRouter:
             if context:
                 sys += f"\n\nUser's financial data (use this to give personalised answers):\n{context}"
 
+            clean_message = sanitize_input(payload.message, max_len=4000)
+
             response_text = ""
             prompt_tokens = 0
             completion_tokens = 0
             cost = 0.0
             try:
-                result = await call_llm(sys, payload.message, model=model, api_key=api_key,
+                result = await call_llm(sys, clean_message, model=model, api_key=api_key,
                                         json_mode=False, max_tokens=4096, temperature=0.7)
                 response_text, used_provider, used_model, pt, ct, cst = result
                 prompt_tokens, completion_tokens, cost = pt, ct, cst

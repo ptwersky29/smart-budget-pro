@@ -19,8 +19,8 @@ export default function ResetPassword() {
       toast.error("Passwords don't match");
       return;
     }
-    if (password.length < 6) {
-      toast.error("Password must be at least 6 characters");
+    if (password.length < 8) {
+      toast.error("Password must be at least 8 characters");
       return;
     }
     setBusy(true);
@@ -64,13 +64,13 @@ export default function ResetPassword() {
             <form onSubmit={onSubmit} className="space-y-4 mt-8">
               <div>
                 <label className="label-overline">New password</label>
-                <input type="password" required minLength={6} value={password}
+                <input type="password" required minLength={8} value={password}
                        onChange={(e) => setPassword(e.target.value)}
-                       placeholder="At least 6 characters" className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
+                       placeholder="At least 8 characters" className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
               </div>
               <div>
                 <label className="label-overline">Confirm password</label>
-                <input type="password" required minLength={6} value={confirm}
+                <input type="password" required minLength={8} value={confirm}
                        onChange={(e) => setConfirm(e.target.value)}
                        placeholder="Repeat password" className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
               </div>

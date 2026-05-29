@@ -45,7 +45,7 @@ export default function Register() {
             </div>
             <div>
               <label className="label-overline">Password</label>
-              <input data-testid="register-password" type="password" required minLength={6} value={form.password} onChange={(e)=>setForm({...form, password:e.target.value})} className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
+              <input data-testid="register-password" type="password" required minLength={8} value={form.password} onChange={(e)=>setForm({...form, password:e.target.value})} className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
             </div>
             <button data-testid="register-submit" disabled={busy} className="btn-pill w-full gradient-emerald text-white disabled:opacity-50">
               {busy ? <Loader2 className="h-4 w-4 animate-spin"/> : "Create account"}

@@ -13,9 +13,17 @@ from auth import get_current_user
 
 logger = logging.getLogger("billing")
 
+REQUIRED_STRIPE_ENV_VARS = ["STRIPE_API_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_MONTHLY_PRICE_ID", "STRIPE_YEARLY_PRICE_ID"]
+
 MONTHLY_PRICE_ID = os.environ.get("STRIPE_MONTHLY_PRICE_ID", "")
 YEARLY_PRICE_ID = os.environ.get("STRIPE_YEARLY_PRICE_ID", "")
 FREE_TRIAL_DAYS = 14
+
+
+def require_stripe_configured():
+    missing = [v for v in REQUIRED_STRIPE_ENV_VARS if not os.environ.get(v)]
+    if missing:
+        raise RuntimeError(f"Stripe not fully configured. Missing: {', '.join(missing)}")
 
 PACKAGES = {
     "premium_monthly": {
@@ -30,10 +38,8 @@ PACKAGES = {
 
 
 def _get_stripe_key() -> str:
-    key = os.environ.get("STRIPE_API_KEY", "")
-    if not key:
-        raise RuntimeError("Stripe not configured. Add STRIPE_API_KEY to backend .env")
-    return key
+    require_stripe_configured()
+    return os.environ["STRIPE_API_KEY"]
 
 
 class CheckoutIn(BaseModel):
@@ -215,6 +221,42 @@ def build_router() -> APIRouter:
                 u.subscription_status = "canceled"
                 await session.commit()
                 return {"ok": True, "message": "Subscription will cancel at period end"}
+            except Exception as e:
+                raise HTTPException(400, str(e))
+
+    @router.post("/billing/resume")
+    async def resume_subscription(request: Request, user: dict = Depends(get_current_user)):
+        stripe.api_key = _get_stripe_key()
+        sm = request.app.state.db
+        async with sm() as session:
+            u = (await session.execute(select(User).where(User.user_id == user["user_id"]))).scalar_one_or_none()
+            if not u:
+                raise HTTPException(404, "User not found")
+            if not u.stripe_subscription_id:
+                raise HTTPException(400, "No subscription to resume")
+            try:
+                sub = stripe.Subscription.retrieve(u.stripe_subscription_id)
+                if sub.status == "canceled":
+                    new_sub = stripe.Subscription.create(
+                        customer=u.stripe_customer_id,
+                        items=[{"price": sub["items"]["data"][0].price.id}],
+                        metadata={"user_id": user["user_id"]},
+                    )
+                    u.stripe_subscription_id = new_sub.id
+                    u.subscription_status = new_sub.status
+                    u.tier = "premium" if new_sub.status == "active" else "free"
+                elif sub.cancel_at_period_end:
+                    stripe.Subscription.modify(u.stripe_subscription_id, cancel_at_period_end=False)
+                    u.subscription_status = "active"
+                    u.tier = "premium"
+                elif sub.status == "past_due":
+                    invoice = stripe.Invoice.retrieve(sub.latest_invoice)
+                    if invoice and invoice.status == "open":
+                        stripe.Invoice.pay(invoice.id)
+                        u.tier = "premium"
+                        u.subscription_status = "active"
+                await session.commit()
+                return {"ok": True, "status": u.subscription_status, "tier": u.tier}
             except Exception as e:
                 raise HTTPException(400, str(e))
 

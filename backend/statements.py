@@ -98,13 +98,15 @@ def _csv_to_text(content: bytes) -> str:
     return "\n".join(lines)
 
 
-async def _ai_parse_statement(text: str) -> dict:
-    from llm import call_llm, parse_json as llm_parse
-    raw, *_ = await call_llm(
+async def _ai_parse_statement(text: str, session=None, user_id: str = None) -> dict:
+    from llm import call_llm, parse_json as llm_parse, track_ai_usage
+    raw, provider, model, pt, ct, cost = await call_llm(
         "You are a precise UK bank statement parser. Always output valid JSON only.",
         PARSE_PROMPT + text[:MAX_CHARS_TO_AI],
         json_mode=True,
     )
+    if session and user_id:
+        await track_ai_usage(session, user_id, provider, model, pt, ct, cost, endpoint="statement_parse")
     try:
         return llm_parse(raw)
     except ValueError as e:
@@ -154,18 +156,20 @@ def _fix_sign(tx: dict) -> dict:
     return tx
 
 
-async def _ai_categorise(description: str, merchant: str | None, amount: float) -> str:
-    from llm import call_llm, parse_json as llm_parse
+async def _ai_categorise(description: str, merchant: str | None, amount: float, session=None, user_id: str = None) -> str:
+    from llm import call_llm, parse_json as llm_parse, track_ai_usage
     prompt = CATEGORISE_PROMPT.format(
         description=description[:100],
         merchant=merchant or "unknown",
         amount=amount,
     )
     try:
-        raw, *_ = await call_llm(
+        raw, provider, model, pt, ct, cost = await call_llm(
             "You categorise bank transactions. Output valid JSON only.",
             prompt, json_mode=True,
         )
+        if session and user_id:
+            await track_ai_usage(session, user_id, provider, model, pt, ct, cost, endpoint="statement_categorize")
         data = llm_parse(raw)
         cat = str(data.get("category", "uncategorized")).lower().strip()
         return cat if cat in ALL_CATEGORIES else "uncategorized"
@@ -219,7 +223,7 @@ def build_router() -> APIRouter:
 
             parsed = {}
             try:
-                parsed = await _ai_parse_statement(text)
+                parsed = await _ai_parse_statement(text, session, user["user_id"])
             except Exception as e:
                 logger.error(f"ai parse failed: {e}")
                 raise HTTPException(500, f"AI parsing failed: {str(e)[:200]}")
@@ -245,7 +249,7 @@ def build_router() -> APIRouter:
             if uncat:
                 logger.info(f"Re-categorising {len(uncat)} uncategorised transactions")
                 for t in uncat:
-                    new_cat = await _ai_categorise(t["description"], t.get("merchant"), t["amount"])
+                    new_cat = await _ai_categorise(t["description"], t.get("merchant"), t["amount"], session, user["user_id"])
                     t["category"] = new_cat
                     _fix_sign(t)
 

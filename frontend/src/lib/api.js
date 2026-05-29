@@ -14,10 +14,29 @@ export const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-api.interceptors.request.use((config) => {
+let _csrfToken = null;
+
+async function _ensureCsrf() {
+  if (_csrfToken) return _csrfToken;
+  try {
+    const { data } = await axios.get(`${API}/csrf-token`, { withCredentials: true });
+    _csrfToken = data.csrf_token;
+  } catch { /* CSRF best-effort */ }
+  return _csrfToken;
+}
+
+const SAFE_METHODS = new Set(["get", "head", "options"]);
+
+api.interceptors.request.use(async (config) => {
   const token = localStorage.getItem("access_token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  if (!SAFE_METHODS.has(config.method?.toLowerCase())) {
+    const csrf = await _ensureCsrf();
+    if (csrf) {
+      config.headers["X-CSRF-Token"] = csrf;
+    }
   }
   return config;
 });

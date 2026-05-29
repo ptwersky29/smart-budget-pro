@@ -119,7 +119,7 @@ class TestRateLimiter:
 
     def test_defaults(self):
         rl = RateLimiter()
-        assert rl.limit == 60
+        assert rl.limit == 120
         assert rl.window == 60
 
 

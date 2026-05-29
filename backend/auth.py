@@ -1,4 +1,7 @@
-"""Authentication module: JWT + remember me + session management + role permissions."""
+"""Authentication module: JWT + remember me + session management + role permissions.
+
+Roles hierarchy: guest < free_user < premium_user < admin.
+"""
 import os
 import uuid
 import secrets
@@ -15,8 +18,8 @@ import httpx
 import urllib.parse
 from starlette.responses import RedirectResponse
 
-from db import User, UserSession, PasswordResetToken, TokenBlacklist
-from security import validate_password
+from db import User, UserSession, PasswordResetToken, TokenBlacklist, TrueLayerState
+from security import validate_password, _require_jwt_secret, generate_csrf_token, verify_csrf_token
 
 logger = logging.getLogger(__name__)
 
@@ -26,12 +29,7 @@ REFRESH_TOKEN_DAYS = 7
 REMEMBER_ME_DAYS = 30
 FREE_TRIAL_DAYS = 14
 
-
-def _secret() -> str:
-    val = os.environ.get("JWT_SECRET")
-    if not val:
-        raise RuntimeError("JWT_SECRET environment variable is required")
-    return val
+ROLE_HIERARCHY = {"guest": 0, "free_user": 1, "premium_user": 2, "admin": 3}
 
 
 def _jti() -> str:
@@ -57,7 +55,7 @@ def create_access_token(user_id: str, email: str, jti: str = None) -> str:
         "jti": jti or _jti(),
         "exp": datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_MINUTES),
     }
-    return pyjwt.encode(payload, _secret(), algorithm=JWT_ALGORITHM)
+    return pyjwt.encode(payload, _require_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
 def create_refresh_token(user_id: str, remember_me: bool = False, jti: str = None) -> str:
@@ -68,7 +66,7 @@ def create_refresh_token(user_id: str, remember_me: bool = False, jti: str = Non
         "jti": jti or _jti(),
         "exp": datetime.now(timezone.utc) + timedelta(days=days),
     }
-    return pyjwt.encode(payload, _secret(), algorithm=JWT_ALGORITHM)
+    return pyjwt.encode(payload, _require_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
 def _cookie_secure() -> bool:
@@ -93,6 +91,34 @@ def clear_auth_cookies(response: Response) -> None:
     response.delete_cookie("access_token", path="/")
     response.delete_cookie("refresh_token", path="/")
     response.delete_cookie("session_token", path="/")
+    response.delete_cookie("csrf_token", path="/")
+
+
+# ── Role helpers ────────────────────────────────────────────────────────────
+
+def _resolve_role(user_obj: User) -> str:
+    """Map DB user to role hierarchy: admin > premium_user > free_user > guest."""
+    if user_obj.is_admin or user_obj.role == "admin":
+        return "admin"
+    if user_obj.tier == "premium":
+        return "premium_user"
+    return "free_user"
+
+
+def _effective_tier(user_obj: User) -> str:
+    """Return effective tier considering trial period."""
+    if user_obj.is_admin or user_obj.role == "admin":
+        return "premium"
+    if user_obj.tier == "premium":
+        return "premium"
+    if user_obj.free_trial_end:
+        now = datetime.now(timezone.utc)
+        trial_end = user_obj.free_trial_end
+        if trial_end.tzinfo is None:
+            trial_end = trial_end.replace(tzinfo=timezone.utc)
+        if trial_end > now:
+            return "premium"
+    return "free"
 
 
 # ── Pydantic schemas ──────────────────────────────────────────────────────
@@ -118,6 +144,11 @@ class ResetPasswordIn(BaseModel):
     new_password: str = Field(min_length=8, max_length=128)
 
 
+class ChangePasswordIn(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=128)
+
+
 class EmergentSessionIn(BaseModel):
     access_token: Optional[str] = None
     refresh_token: Optional[str] = None
@@ -129,31 +160,29 @@ class UserOut(BaseModel):
     email: str
     name: Optional[str] = None
     picture: Optional[str] = None
-    role: str = "user"
+    role: str = "free_user"
     tier: str = "free"
     subscription_status: Optional[str] = None
     free_trial_end: Optional[str] = None
     onboarded: bool = False
     preferences: dict = Field(default_factory=dict)
     disabled: bool = False
+    email_verified: bool = False
     created_at: Optional[str] = None
     access_token: Optional[str] = None
     refresh_token: Optional[str] = None
 
 
-def _user_to_dict(u: User, check_trial: bool = True) -> dict:
-    role = u.role or ("admin" if u.is_admin else "user")
-    tier = u.tier
+class EmailVerifyIn(BaseModel):
+    email: EmailStr
+
+
+# ── User data helpers ─────────────────────────────────────────────────────
+
+def _user_to_dict(u: User) -> dict:
+    role = _resolve_role(u)
+    tier = _effective_tier(u)
     free_trial_end = u.free_trial_end.isoformat() if u.free_trial_end else None
-
-    if check_trial and tier != "premium" and free_trial_end:
-        now = datetime.now(timezone.utc)
-        trial_end = u.free_trial_end
-        if trial_end.tzinfo is None:
-            trial_end = trial_end.replace(tzinfo=timezone.utc)
-        if trial_end > now:
-            tier = "premium"
-
     return {
         "user_id": u.user_id,
         "email": u.email,
@@ -167,6 +196,7 @@ def _user_to_dict(u: User, check_trial: bool = True) -> dict:
         "onboarded": u.onboarded,
         "preferences": u.preferences or {},
         "disabled": u.disabled,
+        "email_verified": u.email_verified or False,
     }
 
 
@@ -184,7 +214,7 @@ async def get_current_user(request: Request) -> dict:
 
         if token_str:
             try:
-                payload = pyjwt.decode(token_str, _secret(), algorithms=[JWT_ALGORITHM])
+                payload = pyjwt.decode(token_str, _require_jwt_secret(), algorithms=[JWT_ALGORITHM])
                 if payload.get("type") == "access":
                     result = await session.execute(
                         select(TokenBlacklist).where(TokenBlacklist.jti == payload.get("jti", ""))
@@ -198,9 +228,12 @@ async def get_current_user(request: Request) -> dict:
                     if user:
                         if user.disabled:
                             raise HTTPException(403, "Account disabled")
+                        request.state.user_id = user.user_id
                         return _user_to_dict(user)
-            except pyjwt.PyJWTError:
+            except pyjwt.ExpiredSignatureError:
                 pass
+            except pyjwt.InvalidTokenError as e:
+                logger.debug("JWT validation failed: %s", e)
 
         cookie_session = request.cookies.get("session_token")
         if cookie_session:
@@ -211,36 +244,38 @@ async def get_current_user(request: Request) -> dict:
             if sess:
                 if sess.expires_at.tzinfo is None:
                     sess.expires_at = sess.expires_at.replace(tzinfo=timezone.utc)
-                    if sess.expires_at > datetime.now(timezone.utc):
-                        result = await session.execute(
-                            select(User).where(User.user_id == sess.user_id)
-                        )
-                        user = result.scalar_one_or_none()
-                        if user:
-                            if user.disabled:
-                                raise HTTPException(403, "Account disabled")
-                            return _user_to_dict(user)
+                if sess.expires_at > datetime.now(timezone.utc):
+                    result = await session.execute(
+                        select(User).where(User.user_id == sess.user_id)
+                    )
+                    user = result.scalar_one_or_none()
+                    if user:
+                        if user.disabled:
+                            raise HTTPException(403, "Account disabled")
+                        request.state.user_id = user.user_id
+                        return _user_to_dict(user)
 
     raise HTTPException(status_code=401, detail="Not authenticated")
 
 
 async def require_premium(user: dict = Depends(get_current_user)) -> dict:
-    if user.get("tier") != "premium" and user.get("role") != "admin":
+    role = user.get("role", "free_user")
+    if ROLE_HIERARCHY.get(role, 0) < ROLE_HIERARCHY["premium_user"]:
         raise HTTPException(status_code=403, detail="Premium subscription required. Visit /pricing to upgrade.")
     return user
 
 
 async def require_admin(user: dict = Depends(get_current_user)) -> dict:
-    role = user.get("role", "user")
-    if role != "admin":
+    role = user.get("role", "free_user")
+    if ROLE_HIERARCHY.get(role, 0) < ROLE_HIERARCHY["admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     return user
 
 
 def require_role(required: str):
     async def _check(user: dict = Depends(get_current_user)):
-        roles = {"admin": 2, "moderator": 1, "user": 0}
-        if roles.get(user.get("role", "user"), 0) < roles.get(required, 0):
+        role = user.get("role", "free_user")
+        if ROLE_HIERARCHY.get(role, 0) < ROLE_HIERARCHY.get(required, 0):
             raise HTTPException(status_code=403, detail=f"{required} role required")
         return user
     return _check
@@ -265,6 +300,7 @@ def build_router() -> APIRouter:
 
             user_id = f"user_{uuid.uuid4().hex[:12]}"
             free_trial_end = datetime.now(timezone.utc) + timedelta(days=FREE_TRIAL_DAYS)
+            verify_token = secrets.token_urlsafe(32)
             user = User(
                 user_id=user_id,
                 email=email,
@@ -273,9 +309,13 @@ def build_router() -> APIRouter:
                 free_trial_end=free_trial_end,
                 trial_started=True,
                 password_changed_at=datetime.now(timezone.utc),
+                email_verification_token=verify_token,
+                email_verification_sent_at=datetime.now(timezone.utc),
             )
             session.add(user)
             await session.commit()
+
+            logger.info("User %s registered. Verification token: %s", user_id[:16], verify_token[:16])
 
             access = create_access_token(user_id, email)
             refresh = create_refresh_token(user_id)
@@ -313,8 +353,12 @@ def build_router() -> APIRouter:
             if user.disabled:
                 raise HTTPException(403, "Account disabled")
 
+            # Reset lockout counters
             user.login_attempts = 0
             user.locked_until = None
+            await session.commit()
+
+            request.state.user_id = user.user_id
             access = create_access_token(user.user_id, email)
             refresh = create_refresh_token(user.user_id, remember_me=payload.remember_me)
             set_auth_cookies(response, access, refresh, remember_me=payload.remember_me)
@@ -330,13 +374,24 @@ def build_router() -> APIRouter:
             token_str = request.cookies.get("access_token")
             if token_str:
                 try:
-                    payload = pyjwt.decode(token_str, _secret(), algorithms=[JWT_ALGORITHM])
+                    payload = pyjwt.decode(token_str, _require_jwt_secret(), algorithms=[JWT_ALGORITHM])
                     jti = payload.get("jti", "")
                     exp = datetime.fromtimestamp(payload["exp"], tz=timezone.utc) if payload.get("exp") else datetime.now(timezone.utc) + timedelta(hours=1)
                     if jti:
                         session.add(TokenBlacklist(jti=jti, expires_at=exp))
-                except pyjwt.PyJWTError:
-                    pass
+                except pyjwt.PyJWTError as e:
+                    logger.debug("Logout token decode skipped: %s", e)
+            # Also blacklist refresh token
+            refresh_str = request.cookies.get("refresh_token")
+            if refresh_str:
+                try:
+                    payload = pyjwt.decode(refresh_str, _require_jwt_secret(), algorithms=[JWT_ALGORITHM])
+                    jti = payload.get("jti", "")
+                    exp = datetime.fromtimestamp(payload["exp"], tz=timezone.utc) if payload.get("exp") else datetime.now(timezone.utc) + timedelta(days=7)
+                    if jti:
+                        session.add(TokenBlacklist(jti=jti, expires_at=exp))
+                except pyjwt.PyJWTError as e:
+                    logger.debug("Logout refresh token decode skipped: %s", e)
             session_token = request.cookies.get("session_token")
             if session_token:
                 await session.execute(
@@ -358,7 +413,7 @@ def build_router() -> APIRouter:
             raise HTTPException(400, "Legacy session_id callbacks are no longer supported")
 
         try:
-            token_data = pyjwt.decode(payload.access_token, _secret(), algorithms=[JWT_ALGORITHM])
+            token_data = pyjwt.decode(payload.access_token, _require_jwt_secret(), algorithms=[JWT_ALGORITHM])
             if token_data.get("type") != "access":
                 raise HTTPException(401, "Invalid token type")
         except pyjwt.PyJWTError:
@@ -386,7 +441,7 @@ def build_router() -> APIRouter:
         if not token:
             raise HTTPException(401, "No refresh token")
         try:
-            payload = pyjwt.decode(token, _secret(), algorithms=[JWT_ALGORITHM])
+            payload = pyjwt.decode(token, _require_jwt_secret(), algorithms=[JWT_ALGORITHM])
             if payload.get("type") != "refresh":
                 raise HTTPException(401, "Invalid token type")
             sm = request.app.state.db
@@ -448,6 +503,49 @@ def build_router() -> APIRouter:
             await session.commit()
             return {"ok": True}
 
+    # ── Email verification ──────────────────────────────────────────────
+
+    @router.post("/verify-email/send")
+    async def send_verification_email(request: Request, user: dict = Depends(get_current_user)):
+        """Generate and store a verification token, log it (in production would email it)."""
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(User).where(User.user_id == user["user_id"])
+            )
+            db_user = result.scalar_one_or_none()
+            if not db_user:
+                raise HTTPException(404, "User not found")
+            if db_user.email_verified:
+                return {"ok": True, "message": "Email already verified"}
+            token = secrets.token_urlsafe(32)
+            db_user.email_verification_token = token
+            db_user.email_verification_sent_at = datetime.now(timezone.utc)
+            await session.commit()
+            frontend = os.environ.get("FRONTEND_URL", "")
+            verify_link = f"{frontend}/verify-email?token={token}"
+            logger.info("Verification link for %s: %s", user["user_id"][:16], verify_link)
+            return {"ok": True, "message": "Verification email sent", "verify_url": verify_link}
+
+    @router.post("/verify-email")
+    async def verify_email(token: str, request: Request):
+        """Verify email with a token."""
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(User).where(User.email_verification_token == token)
+            )
+            db_user = result.scalar_one_or_none()
+            if not db_user:
+                raise HTTPException(400, "Invalid verification token")
+            db_user.email_verified = True
+            db_user.email_verification_token = None
+            db_user.email_verification_sent_at = None
+            await session.commit()
+            return {"ok": True, "message": "Email verified"}
+
+    # ── Google OAuth ────────────────────────────────────────────────────
+
     @router.get("/google")
     async def google_login(request: Request):
         client_id = os.environ.get("GOOGLE_CLIENT_ID")
@@ -455,6 +553,19 @@ def build_router() -> APIRouter:
             raise HTTPException(500, "Google OAuth not configured")
         scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
         redirect_uri = f"{scheme}://{request.url.hostname}/api/auth/google/callback"
+        state = generate_csrf_token()
+        # Store state in TrueLayerState table for verification
+        sm = request.app.state.db
+        async with sm() as session:
+            state_record = TrueLayerState(
+                state=state,
+                user_id=f"oauth_{uuid.uuid4().hex[:8]}",
+                redirect_uri=redirect_uri,
+                meta={"purpose": "google_oauth"},
+                expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
+            )
+            session.add(state_record)
+            await session.commit()
         params = dict(
             client_id=client_id,
             redirect_uri=redirect_uri,
@@ -462,16 +573,38 @@ def build_router() -> APIRouter:
             scope="openid email profile",
             access_type="offline",
             prompt="select_account",
+            state=state,
         )
         url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
         return RedirectResponse(url)
 
     @router.get("/google/callback")
-    async def google_callback(code: str, request: Request):
+    async def google_callback(code: str, state: str = None, request: Request = None):
         client_id = os.environ.get("GOOGLE_CLIENT_ID")
         client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
         if not client_id or not client_secret:
             raise HTTPException(500, "Google OAuth not configured")
+
+        # Validate state parameter (CSRF protection)
+        if not state:
+            logger.warning("Google OAuth callback missing state parameter")
+            raise HTTPException(400, "Missing state parameter")
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(TrueLayerState).where(
+                    TrueLayerState.state == state,
+                    TrueLayerState.meta["purpose"].as_string() == "google_oauth",
+                )
+            )
+            state_record = result.scalar_one_or_none()
+            if not state_record:
+                logger.warning("Google OAuth callback with invalid/expired state")
+                raise HTTPException(400, "Invalid state parameter")
+            # Clean up used state
+            await session.delete(state_record)
+            await session.commit()
+
         scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
         redirect_uri = f"{scheme}://{request.url.hostname}/api/auth/google/callback"
         async with httpx.AsyncClient() as client:
@@ -504,7 +637,6 @@ def build_router() -> APIRouter:
         google_sub = info.get("sub")
         if not email:
             raise HTTPException(400, "Google account has no email")
-        sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(select(User).where(User.email == email))
             user = result.scalar_one_or_none()
@@ -520,6 +652,7 @@ def build_router() -> APIRouter:
                     hashed_password=hash_password(secrets.token_urlsafe(16)),
                     free_trial_end=free_trial_end,
                     trial_started=True,
+                    email_verified=True,
                 )
                 session.add(user)
                 await session.commit()
@@ -541,6 +674,8 @@ def build_router() -> APIRouter:
             set_auth_cookies(resp, access, refresh)
             return resp
 
+    # ── Password reset ──────────────────────────────────────────────────
+
     @router.post("/forgot-password")
     async def forgot_password(payload: ForgotPasswordIn, request: Request):
         sm = request.app.state.db
@@ -559,8 +694,37 @@ def build_router() -> APIRouter:
                 session.add(reset)
                 await session.commit()
                 frontend_url = os.environ.get("FRONTEND_URL", "")
-                logger.info(f"password reset link generated for user {user.user_id[:16]}")
+                reset_link = f"{frontend_url}/reset-password?token={token}"
+                logger.info("Password reset link for %s: %s", user.user_id[:16], reset_link)
         return {"ok": True, "message": "If the email exists, a reset link has been sent."}
+
+    @router.post("/change-password")
+    async def change_password(payload: ChangePasswordIn, request: Request, user: dict = Depends(get_current_user)):
+        valid, msg = validate_password(payload.new_password)
+        if not valid:
+            raise HTTPException(400, msg)
+        if payload.current_password == payload.new_password:
+            raise HTTPException(400, "New password must be different from current password")
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(select(User).where(User.user_id == user["user_id"]))
+            db_user = result.scalar_one_or_none()
+            if not db_user:
+                raise HTTPException(404, "User not found")
+            if not verify_password(payload.current_password, db_user.hashed_password):
+                raise HTTPException(400, "Current password is incorrect")
+            db_user.hashed_password = hash_password(payload.new_password)
+            db_user.password_changed_at = datetime.now(timezone.utc)
+            session_token = request.cookies.get("session_token", "")
+            await session.execute(
+                delete(UserSession).where(
+                    UserSession.user_id == db_user.user_id,
+                    UserSession.session_token != session_token,
+                )
+            )
+            await session.commit()
+            logger.info("Password changed for user %s", user["user_id"][:16])
+            return {"ok": True}
 
     @router.post("/reset-password")
     async def reset_password(payload: ResetPasswordIn, request: Request):
@@ -589,6 +753,10 @@ def build_router() -> APIRouter:
             await session.execute(
                 delete(UserSession).where(UserSession.user_id == rec.user_id)
             )
+            # Invalidate all tokens
+            await session.execute(
+                delete(TokenBlacklist).where(TokenBlacklist.jti.isnot(None))
+            )
             await session.delete(rec)
             await session.commit()
             logger.info("Password reset completed for user %s", rec.user_id[:16])
@@ -601,7 +769,7 @@ async def seed_admin(session):
     email = os.environ.get("ADMIN_EMAIL")
     password = os.environ.get("ADMIN_PASSWORD")
     if not email or not password:
-        logger.warning("ADMIN_EMAIL or ADMIN_PASSWORD not set — skipping admin seed")
+        logger.info("ADMIN_EMAIL or ADMIN_PASSWORD not set — skipping admin seed")
         return
     result = await session.execute(select(User).where(User.email == email))
     existing = result.scalar_one_or_none()
@@ -615,6 +783,7 @@ async def seed_admin(session):
             is_admin=True,
             tier="premium",
             subscription_status="active",
+            email_verified=True,
         )
         session.add(user)
         await session.commit()

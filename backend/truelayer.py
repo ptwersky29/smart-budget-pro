@@ -69,7 +69,7 @@ def _decrypt(payload: str) -> str:
 # ── Config ────────────────────────────────────────────────────────────────
 
 async def _tl_config_from_db(session=None) -> dict:
-    """Read config from env vars first, then fall back to DB AppConfig."""
+    """Read TrueLayer config from env vars, falling back to DB AppConfig."""
     async def _get(key: str, env_var: str) -> str:
         val = os.environ.get(env_var)
         if not val and session:
@@ -80,28 +80,27 @@ async def _tl_config_from_db(session=None) -> dict:
                 val = c.value
         return val or ""
 
-    env = os.environ.get("TRUELAYER_ENVIRONMENT") or (await _get("environment", "") if session else "") or "sandbox"
+    env = os.environ.get("TRUELAYER_ENVIRONMENT", "sandbox")
+    client_id = await _get("client_id", "TRUELAYER_CLIENT_ID")
+    client_secret = await _get("client_secret", "TRUELAYER_CLIENT_SECRET")
+    redirect_uri = await _get("redirect_uri", "TRUELAYER_REDIRECT_URI")
+
     if env == "live":
         return {
-            "client_id": await _get("client_id", "TRUELAYER_CLIENT_ID"),
-            "client_secret": await _get("client_secret", "TRUELAYER_CLIENT_SECRET"),
-            "redirect_uri": await _get("redirect_uri", "TRUELAYER_REDIRECT_URI"),
+            "client_id": client_id, "client_secret": client_secret,
+            "redirect_uri": redirect_uri,
             "auth_url": "https://auth.truelayer.com",
             "token_url": "https://auth.truelayer.com/connect/token",
             "api_url": "https://api.truelayer.com",
             "environment": "live",
         }
-    sandbox_auth = os.environ.get("TRUELAYER_AUTH_URL") or (await _get("auth_url", "") if session else "") or "https://auth.truelayer-sandbox.com"
-    sandbox_token = os.environ.get("TRUELAYER_TOKEN_URL") or (await _get("token_url", "") if session else "") or "https://auth.truelayer-sandbox.com/connect/token"
-    sandbox_api = os.environ.get("TRUELAYER_API_URL") or (await _get("api_url", "") if session else "") or "https://api.truelayer-sandbox.com"
     return {
-        "client_id": await _get("client_id", "TRUELAYER_CLIENT_ID"),
-        "client_secret": await _get("client_secret", "TRUELAYER_CLIENT_SECRET"),
-        "redirect_uri": await _get("redirect_uri", "TRUELAYER_REDIRECT_URI"),
-        "auth_url": sandbox_auth,
-        "token_url": sandbox_token,
-        "api_url": sandbox_api,
-        "environment": env,
+        "client_id": client_id, "client_secret": client_secret,
+        "redirect_uri": redirect_uri,
+        "auth_url": os.environ.get("TRUELAYER_AUTH_URL", "https://auth.truelayer-sandbox.com"),
+        "token_url": os.environ.get("TRUELAYER_TOKEN_URL", "https://auth.truelayer-sandbox.com/connect/token"),
+        "api_url": os.environ.get("TRUELAYER_API_URL", "https://api.truelayer-sandbox.com"),
+        "environment": "sandbox",
     }
 
 
@@ -255,12 +254,15 @@ def build_router() -> APIRouter:
             import_from_date = parse_import_from_date(from_date)
             session.add(
                 TrueLayerState(
-                    state=state,
-                    user_id=user["user_id"],
+                    state=state, user_id=user["user_id"],
                     redirect_uri=cfg["redirect_uri"],
                     meta={"from_date": import_from_date} if import_from_date else {},
                     expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
                 )
+            )
+            # Clean up expired states
+            await session.execute(
+                delete(TrueLayerState).where(TrueLayerState.expires_at < datetime.now(timezone.utc))
             )
             redirect_uri = cfg["redirect_uri"] or f"{os.environ.get('FRONTEND_URL', '')}/api/truelayer/callback"
             params = {
@@ -290,11 +292,36 @@ def build_router() -> APIRouter:
             user_id = state_doc.user_id
             state_meta = state_doc.meta or {}
             import_from_date = state_meta.get("from_date") if isinstance(state_meta, dict) else None
+            connection_id_to_update = state_meta.get("connection_id") if isinstance(state_meta, dict) else None
             try:
                 token_data = await _exchange_code(code, session)
             except Exception as e:
                 await _log_oauth(session, user_id, "token_exchange_failed", {"error": str(e)})
                 return RedirectResponse(f"{frontend}/connections?status=failed&reason=token_exchange")
+
+            # Reconnect flow — update existing connection tokens
+            if connection_id_to_update:
+                result = await session.execute(
+                    select(BankConnection).where(
+                        BankConnection.connection_id == connection_id_to_update,
+                        BankConnection.user_id == user_id,
+                    )
+                )
+                existing = result.scalar_one_or_none()
+                if existing:
+                    existing.access_token = _encrypt(token_data["access_token"])
+                    existing.refresh_token = _encrypt(token_data.get("refresh_token", ""))
+                    existing.expires_at = datetime.now(timezone.utc) + timedelta(seconds=token_data.get("expires_in", 3600))
+                    existing.status = "active"
+                    existing.last_error = None
+                    existing.last_error_at = None
+                    existing.last_sync_status = "connected"
+                    existing.update_count = (existing.update_count or 0) + 1
+                    await session.delete(state_doc)
+                    await session.commit()
+                    return RedirectResponse(f"{frontend}/connections?status=success&accounts=1")
+
+            # New connection flow
             accounts = await _fetch_accounts(token_data["access_token"], session)
             if not accounts:
                 await _log_oauth(session, user_id, "no_accounts_selected", {"state": state, "meta": state_meta})
@@ -312,10 +339,8 @@ def build_router() -> APIRouter:
                     access_token=_encrypt(token_data["access_token"]),
                     refresh_token=_encrypt(token_data.get("refresh_token", "")),
                     expires_at=datetime.now(timezone.utc) + timedelta(seconds=token_data.get("expires_in", 3600)),
-                    config={
-                        **({"account_ids": [acc.get("account_id", "")]} if acc.get("account_id") else {}),
-                        **({"from_date": import_from_date} if import_from_date else {}),
-                    } or None,
+                    import_start_date=import_from_date,
+                    config={"account_ids": [acc.get("account_id", "")]} if acc.get("account_id") else None,
                     status="active",
                     last_sync_status="connected",
                 )
@@ -353,7 +378,7 @@ def build_router() -> APIRouter:
                      "last_error": c.last_error,
                      "last_error_at": c.last_error_at.isoformat() if c.last_error_at else None,
                      "config": c.config or {},
-                     "import_from_date": (c.config or {}).get("from_date")}
+                     "import_from_date": c.import_start_date.isoformat() if c.import_start_date else None}
                     for c in rows
                 ],
                 "total_transactions": tx_counts.get(user["user_id"], 0),
@@ -363,6 +388,46 @@ def build_router() -> APIRouter:
                     for s in recent_syncs
                 ],
             }
+
+    @router.post("/reconnect/{connection_id}")
+    async def reconnect_connection(connection_id: str, request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(BankConnection).where(
+                    BankConnection.connection_id == connection_id,
+                    BankConnection.user_id == user["user_id"],
+                )
+            )
+            conn = result.scalar_one_or_none()
+            if not conn:
+                raise HTTPException(404, "Connection not found")
+            if not await _is_configured(session):
+                raise HTTPException(400, "TrueLayer not configured by the administrator.")
+            state = secrets.token_urlsafe(24)
+            nonce = secrets.token_urlsafe(16)
+            cfg = await _tl_config_from_db(session)
+            session.add(
+                TrueLayerState(
+                    state=state, user_id=user["user_id"],
+                    redirect_uri=cfg["redirect_uri"],
+                    meta={"connection_id": connection_id,
+                          "from_date": conn.import_start_date.isoformat() if conn.import_start_date else None},
+                    expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
+                )
+            )
+            await session.execute(
+                delete(TrueLayerState).where(TrueLayerState.expires_at < datetime.now(timezone.utc))
+            )
+            redirect_uri = cfg["redirect_uri"] or f"{os.environ.get('FRONTEND_URL', '')}/api/truelayer/callback"
+            params = {
+                "response_type": "code", "client_id": cfg["client_id"],
+                "scope": SCOPES, "redirect_uri": redirect_uri,
+                "providers": PROVIDERS, "state": state, "nonce": nonce,
+            }
+            auth_url = f"{cfg['auth_url']}/?{urlencode(params)}"
+            await session.commit()
+            return {"auth_url": auth_url, "state": state, "redirect_uri": redirect_uri}
 
     @router.post("/sync")
     async def sync_transactions(request: Request, user: dict = Depends(get_current_user)):
@@ -443,7 +508,7 @@ async def _sync_connection(session, conn: BankConnection, user_id: str) -> tuple
     dup_count = 0
     page = 1
     has_more = True
-    from_date = (conn.config or {}).get("from_date")
+    from_date = conn.import_start_date.isoformat() if conn.import_start_date else None
     started_at = datetime.now(timezone.utc)
     existing_hashes = set()
 
@@ -508,6 +573,7 @@ async def _sync_connection(session, conn: BankConnection, user_id: str) -> tuple
             has_more = page < total_pages
             page += 1
 
+        conn.update_count = (conn.update_count or 0) + 1
         await session.commit()
         await _mark_connection_state(
             session,

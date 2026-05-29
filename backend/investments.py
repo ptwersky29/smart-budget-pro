@@ -58,6 +58,7 @@ class HoldingUpdateIn(BaseModel):
 
 
 class ForecastIn(BaseModel):
+    symbol: str = ""
     current_value: float = 0
     monthly_contribution: float = 0
     annual_return_pct: float = 7.0
@@ -291,7 +292,8 @@ def build_router() -> APIRouter:
             n = y * 12
             fv_nominal = principal * (1 + r) ** y + monthly * (((1 + r) ** y - 1) / r) if r > 0 else principal + monthly * n
             fv_real = fv_nominal / ((1 + i) ** y)
-            nominal_proj.append({"year": y, "value": round(fv_nominal, 2)})
+            contributed_so_far = principal + monthly * n
+            nominal_proj.append({"year": y, "value": round(fv_nominal, 2), "contributed": round(contributed_so_far, 2)})
             real_proj.append({"year": y, "value": round(fv_real, 2)})
         final_nominal = nominal_proj[-1]["value"]
         final_real = real_proj[-1]["value"]
@@ -300,6 +302,7 @@ def build_router() -> APIRouter:
         optimistic = final_nominal * 1.3
         pessimistic = min(final_nominal * 0.6, total_contributions * 0.9)
         return {
+            "symbol": payload.symbol,
             "current_value": principal,
             "monthly_contribution": monthly,
             "annual_return_pct": payload.annual_return_pct,
@@ -313,6 +316,10 @@ def build_router() -> APIRouter:
             "pessimistic_scenario": round(pessimistic, 2),
             "projection_nominal": nominal_proj,
             "projection_real": real_proj,
+            "points": nominal_proj,
+            "future_value": final_nominal,
+            "total_contributed": round(total_contributions, 2),
+            "gain": round(gain_nominal, 2),
         }
 
     # ── User portfolio forecast ──────────────────────────────────────

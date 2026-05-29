@@ -1,6 +1,6 @@
 """SQLAlchemy 2.0 async models for PostgreSQL (Supabase)."""
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional, List
 from sqlalchemy import (
     String, Boolean, Integer, Float, Numeric, DateTime, Date, Text, Enum as SAEnum,
@@ -113,6 +113,14 @@ async def create_tables():
             # Account lockout columns
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS login_attempts INTEGER DEFAULT 0"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ"))
+            # Email verification columns
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_token VARCHAR(128)"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_sent_at TIMESTAMPTZ"))
+            # Phase 2 — Bank connection improvements
+            await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS import_start_date DATE"))
+            await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS update_count INTEGER DEFAULT 0"))
+            await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ"))
 
 
 async def get_session() -> AsyncSession:
@@ -168,10 +176,14 @@ class User(Base, TimestampMixin):
     app_currency: Mapped[str] = mapped_column(String(4), default="GBP")
     login_attempts: Mapped[int] = mapped_column(Integer, default=0)
     locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    email_verification_token: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
+    email_verification_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # relationships
     sessions: Mapped[List["UserSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     bank_connections: Mapped[List["BankConnection"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    support_tickets: Mapped[List["SupportTicket"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class UserSession(Base, TimestampMixin):
@@ -247,9 +259,14 @@ class BankConnection(Base):
     last_sync_status: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     last_error_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    import_start_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    update_count: Mapped[int] = mapped_column(Integer, default=0)
     config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), default=None, onupdate=lambda: datetime.now(timezone.utc)
     )
 
     user: Mapped["User"] = relationship(back_populates="bank_connections")
@@ -386,6 +403,41 @@ class RecurringTransaction(Base, TimestampMixin):
     frequency: Mapped[str] = mapped_column(String(32), nullable=False)  # weekly, monthly, yearly
     next_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class Category(Base, TimestampMixin):
+    __tablename__ = "categories"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    category_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    icon: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    color: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)
+    is_income: Mapped[bool] = mapped_column(Boolean, default=False)
+    budget: Mapped[Optional[float]] = mapped_column(Numeric(12, 2, asdecimal=False), nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_category_user_name"),
+    )
+
+
+class Subscription(Base, TimestampMixin):
+    __tablename__ = "subscriptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    subscription_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    amount: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), default="GBP")
+    category: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    merchant: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    frequency: Mapped[str] = mapped_column(String(16), default="monthly")
+    next_billing: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
 class PendingUpdate(Base, TimestampMixin):
@@ -731,6 +783,8 @@ class SupportTicket(Base, TimestampMixin):
     category: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     admin_reply: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user: Mapped["User"] = relationship(back_populates="support_tickets")
 
     __table_args__ = (
         Index("idx_support_user_status", "user_id", "status"),

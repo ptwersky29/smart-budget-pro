@@ -46,8 +46,13 @@ export default function SMS() {
   };
 
   const saveExisting = async (id) => {
-    try { const { data } = await api.post(`/sms/${id}/save`); toast.success("Saved to transactions"); await loadInbox(); }
-    catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    try {
+      const { data } = await api.post(`/sms/${id}/save`);
+      toast.success("Transaction saved");
+      await loadInbox();
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Could not save");
+    }
   };
   const del = async (id) => { await api.delete(`/sms/${id}`); await loadInbox(); };
 
@@ -111,21 +116,18 @@ export default function SMS() {
           <ul className="divide-y divide-border">
             {inbox.map((m) => (
               <li key={m.sms_id} className="px-6 py-4 flex items-start gap-4">
-                <div className={`mt-1 h-2 w-2 rounded-full ${m.parsed?.is_transaction ? "bg-emerald" : "bg-topaz"}`} />
+                <div className={`mt-1 h-2 w-2 rounded-full shrink-0 ${m.direction === "inbound" ? "bg-emerald" : "bg-muted"}`} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm truncate">{m.text}</p>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
                     <span>{m.created_at?.slice(0,16).replace("T"," ")}</span>
-                    <span>· {m.source}</span>
-                    {m.parsed?.is_transaction && <span>· {m.parsed.is_income ? "+" : "−"}£{Math.abs(m.parsed.amount).toFixed(2)} ({m.parsed.category})</span>}
-                    {m.transaction_id && <span className="text-emerald">· saved</span>}
+                    <span>· {m.source || m.direction}</span>
+                    {m.sender_phone && <span>· {m.sender_phone}</span>}
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  {m.parsed?.is_transaction && !m.transaction_id && (
-                    <button onClick={()=>saveExisting(m.sms_id)} data-testid={`save-${m.sms_id}`} className="text-xs px-3 py-1.5 rounded-full bg-emerald text-white">Save</button>
-                  )}
-                  <button onClick={()=>del(m.sms_id)} data-testid={`del-${m.sms_id}`} className="h-8 w-8 grid place-items-center rounded-full hover:bg-secondary text-muted-foreground"><Trash2 className="h-4 w-4"/></button>
+                  <button onClick={() => saveExisting(m.sms_id)} data-testid={`save-${m.sms_id}`} className="text-xs px-3 py-1.5 rounded-full bg-emerald text-white">Save</button>
+                  <button onClick={() => del(m.sms_id)} data-testid={`del-${m.sms_id}`} className="text-muted-foreground hover:text-ruby" title="Delete"><Trash2 className="h-4 w-4" /></button>
                 </div>
               </li>
             ))}

@@ -281,4 +281,69 @@ Return JSON:
             text = await _call_llm_insight(session, user, SYSTEM_PROMPT, prompt)
             return parse_json(text)
 
+    @router.post("/unusual-spending")
+    async def unusual_spending(request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            since = datetime.now(timezone.utc) - timedelta(days=60)
+            result = await session.execute(
+                select(Transaction).where(
+                    Transaction.user_id == user["user_id"], Transaction.date >= since, Transaction.amount < 0,
+                )
+            )
+            txs = result.scalars().all()
+            if not txs:
+                return {"unusual": [], "note": "Not enough data to detect unusual spending."}
+
+            by_cat = {}
+            for t in txs:
+                c = (t.category or "uncategorized").lower()
+                by_cat.setdefault(c, []).append(-t.amount)
+
+            cat_stats = {}
+            for cat, amounts in by_cat.items():
+                avg = sum(amounts) / len(amounts)
+                cat_stats[cat] = {"total": round(sum(amounts), 2), "count": len(amounts), "average": round(avg, 2)}
+
+            mid = since + timedelta(days=30)
+            recent_by_cat = {}
+            older_by_cat = {}
+            for t in txs:
+                c = (t.category or "uncategorized").lower()
+                if t.date >= mid:
+                    recent_by_cat[c] = recent_by_cat.get(c, 0) + (-t.amount)
+                else:
+                    older_by_cat[c] = older_by_cat.get(c, 0) + (-t.amount)
+
+            prompt = f"""Analyse this UK user's 60-day spending data and identify unusual patterns.
+
+Category stats (all 60 days):
+{json.dumps(cat_stats, indent=2)}
+
+Last 30 days spending by category:
+{json.dumps(recent_by_cat, indent=2)}
+
+Previous 30 days spending by category:
+{json.dumps(older_by_cat, indent=2)}
+
+Return JSON:
+{{
+  "unusual": [
+    {{
+      "category": "category_name",
+      "current_spend": 123.45,
+      "previous_spend": 67.89,
+      "change_pct": 81.6,
+      "severity": "low|medium|high",
+      "insight": "One-sentence explanation of what's unusual.",
+      "suggestion": "Actionable suggestion for the user."
+    }}
+  ],
+  "summary": "One-line overall assessment."
+}}
+
+Focus on categories with significant changes (>20% increase) or unusually high spend. British English."""
+            text = await _call_llm_insight(session, user, SYSTEM_PROMPT, prompt)
+            return parse_json(text)
+
     return router

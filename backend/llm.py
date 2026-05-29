@@ -2,6 +2,7 @@
 import os
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
@@ -92,6 +93,23 @@ async def call_llm(
         provider = "google"
 
     return content, provider, used_model, prompt_tokens, completion_tokens, cost
+
+
+async def track_ai_usage(session, user_id: str, provider: str, model: str,
+                         prompt_tokens: int, completion_tokens: int, cost: float,
+                         endpoint: str = "general") -> None:
+    from db import AiUsage
+    try:
+        usage = AiUsage(
+            user_id=user_id, date=datetime.now(timezone.utc),
+            prompt_tokens=prompt_tokens, completion_tokens=completion_tokens,
+            cost=cost, provider=provider, endpoint=endpoint,
+        )
+        session.add(usage)
+        await session.commit()
+    except Exception as e:
+        logger.warning(f"AI usage tracking failed: {e}")
+    session.close()
 
 
 def parse_json(text: str) -> dict:

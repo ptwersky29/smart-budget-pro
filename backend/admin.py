@@ -104,6 +104,60 @@ def build_router() -> APIRouter:
                          detail={"disabled": u.disabled}, request=request)
         return {"status": "ok", "user_id": user_id, "disabled": u.disabled}
 
+    # ── Subscription Management ──────────────────────────────────────
+
+    @router.put("/users/{user_id}/tier")
+    async def set_user_tier(user_id: str, request: Request, user: dict = Depends(require_admin),
+                            tier: str = Query(...)):
+        if tier not in ("free", "premium"):
+            raise HTTPException(400, "Tier must be 'free' or 'premium'")
+        sm = request.app.state.db
+        async with sm() as session:
+            u = (await session.execute(select(User).where(User.user_id == user_id))).scalar_one_or_none()
+            if not u:
+                raise HTTPException(404, "User not found")
+            u.tier = tier
+            if tier == "premium":
+                u.subscription_status = "active"
+            else:
+                u.subscription_status = "canceled"
+                u.stripe_subscription_id = None
+            await session.commit()
+        await log_action(user["user_id"], "user_tier_update", "user", user_id,
+                         detail={"new_tier": tier}, request=request)
+        return {"status": "ok", "user_id": user_id, "tier": tier}
+
+    @router.post("/users/{user_id}/grant-premium")
+    async def grant_premium(user_id: str, request: Request, user: dict = Depends(require_admin)):
+        sm = request.app.state.db
+        async with sm() as session:
+            u = (await session.execute(select(User).where(User.user_id == user_id))).scalar_one_or_none()
+            if not u:
+                raise HTTPException(404, "User not found")
+            u.tier = "premium"
+            u.subscription_status = "active"
+            if not u.stripe_customer_id:
+                u.stripe_customer_id = f"manual_{user_id}"
+            await session.commit()
+        await log_action(user["user_id"], "user_grant_premium", "user", user_id, request=request)
+        return {"status": "ok", "user_id": user_id, "tier": "premium"}
+
+    @router.post("/users/{user_id}/revoke-premium")
+    async def revoke_premium(user_id: str, request: Request, user: dict = Depends(require_admin)):
+        sm = request.app.state.db
+        async with sm() as session:
+            u = (await session.execute(select(User).where(User.user_id == user_id))).scalar_one_or_none()
+            if not u:
+                raise HTTPException(404, "User not found")
+            if u.role == "admin":
+                raise HTTPException(400, "Cannot revoke premium from admin users")
+            u.tier = "free"
+            u.subscription_status = "canceled"
+            u.stripe_subscription_id = None
+            await session.commit()
+        await log_action(user["user_id"], "user_revoke_premium", "user", user_id, request=request)
+        return {"status": "ok", "user_id": user_id, "tier": "free"}
+
     # ── Feature Flags ──────────────────────────────────────────────────
 
     @router.get("/feature-flags")

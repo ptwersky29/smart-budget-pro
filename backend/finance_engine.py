@@ -12,12 +12,17 @@ from sqlalchemy import select, update, delete, func, or_
 
 from db import (
     User, Transaction, Budget, SplitTransaction, AccountNickname,
-    RecurringTransaction, get_session_maker,
+    RecurringTransaction, Category, Subscription, get_session_maker,
 )
 from auth import get_current_user
+from llm import call_llm, track_ai_usage
+from security import sanitize_input
+from cache import TTLCache
 import maaser
 
 logger = logging.getLogger("finance")
+
+_query_cache = TTLCache(ttl=60)  # 60-second cache for frequent queries
 
 # ── Merchant normalization ───────────────────────────────────────────────
 
@@ -181,12 +186,31 @@ CATEGORY_RULES = {
 }
 
 
+ALL_CATEGORIES = set(CATEGORY_RULES.keys()) | {"salary", "income", "uncategorized"}
+
+
 def smart_categorize(text: str) -> str:
     t = (text or "").lower()
     for cat, keywords in CATEGORY_RULES.items():
         if any(k in t for k in keywords):
             return cat
     return "uncategorized"
+
+
+CATEGORISE_PROMPT_FE = """You are a bank transaction categoriser. Given the description, merchant, and amount of a transaction, choose the best single category.
+
+INCOME vs EXPENSE:
+- If amount > 0 (money coming in): category is "salary" or "income" only
+- If amount < 0 (money going out): category is one of the expense categories
+
+Expense categories: groceries, dining, transport, utilities, subscriptions, tzedakah, rent, shopping, health, entertainment, insurance, education, transfer, cash, tax, fees, mortgage
+
+Return STRICT JSON only: {{"category": "..."}}
+
+Transaction: {description}
+Merchant: {merchant}
+Amount: {amount}
+"""
 
 
 # ── Pydantic models ──────────────────────────────────────────────────────
@@ -364,6 +388,26 @@ def build_router() -> APIRouter:
             rows = result.scalars().all()
 
             count_stmt = select(func.count()).select_from(Transaction).where(Transaction.user_id == user["user_id"])
+            if category:
+                count_stmt = count_stmt.where(Transaction.category == category)
+            if source:
+                count_stmt = count_stmt.where(Transaction.source == source)
+            if pending == "true":
+                count_stmt = count_stmt.where(Transaction.pending == True)
+            elif pending == "false":
+                count_stmt = count_stmt.where(Transaction.pending == False)
+            if tx_type == "income":
+                count_stmt = count_stmt.where(Transaction.amount > 0)
+            elif tx_type == "expense":
+                count_stmt = count_stmt.where(Transaction.amount < 0)
+            if date_from:
+                count_stmt = count_stmt.where(Transaction.date >= datetime.fromisoformat(date_from))
+            if date_to:
+                count_stmt = count_stmt.where(Transaction.date <= datetime.fromisoformat(date_to) + timedelta(days=1))
+            if amount_min is not None:
+                count_stmt = count_stmt.where(abs(Transaction.amount) >= amount_min)
+            if amount_max is not None:
+                count_stmt = count_stmt.where(abs(Transaction.amount) <= amount_max)
             count_result = await session.execute(count_stmt)
             total = count_result.scalar() or 0
 
@@ -374,6 +418,31 @@ def build_router() -> APIRouter:
                 "limit": limit,
             }
 
+    @router.post("/transactions/ai-search")
+    async def ai_search(request: Request, user: dict = Depends(get_current_user), q: str = Query("")):
+        clean_q = sanitize_input(q.strip(), max_len=200)
+        if not clean_q:
+            return {"query": q, "transactions": [], "total": 0}
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(Transaction).where(Transaction.user_id == user["user_id"])
+                .order_by(Transaction.date.desc()).limit(50)
+            )
+            recent = [_tx_to_dict(t) for t in result.scalars().all()]
+            descs = "\n".join(f"- {t['date'][:10] if t['date'] else '?'} | {t['description']} | {t['merchant'] or ''} | £{abs(t['amount']):.2f} | {t['category']}" for t in recent)
+            system = "You are a financial search assistant. Given a user's question and their recent transactions, return a JSON object with \"matches\": an array of line numbers (0-indexed) that are relevant to the query."
+            try:
+                resp, provider, model, pt, ct, cost = await call_llm(system, f"User query: {clean_q}\n\nRecent transactions:\n{descs}", max_tokens=512)
+                await track_ai_usage(session, user["user_id"], provider, model, pt, ct, cost, endpoint="ai_search")
+                import json
+                data = json.loads(resp) if isinstance(resp, str) else resp
+                indices = data.get("matches", [])
+            except Exception:
+                indices = []
+            matches = [recent[i] for i in indices if isinstance(i, int) and 0 <= i < len(recent)]
+            return {"query": q, "transactions": matches, "total": len(matches)}
+
     @router.post("/transactions")
     async def create_transaction(payload: TransactionIn, request: Request, user: dict = Depends(get_current_user)):
         sm = request.app.state.db
@@ -382,6 +451,20 @@ def build_router() -> APIRouter:
             desc = payload.description or ""
             merch = payload.merchant or ""
             category = payload.category or smart_categorize(f"{desc} {merch}")
+            if category == "uncategorized":
+                from llm import call_llm, parse_json as llm_parse, track_ai_usage as track_usage
+                try:
+                    raw, provider, model, pt, ct, cost = await call_llm(
+                        "You categorise transactions. Output valid JSON only.",
+                        CATEGORISE_PROMPT_FE.format(description=desc[:100], merchant=merch or "unknown", amount=payload.amount),
+                        json_mode=True,
+                    )
+                    await track_usage(session, user["user_id"], provider, model, pt, ct, cost, endpoint="manual_categorize")
+                    ai_cat = str(llm_parse(raw).get("category", "uncategorized")).lower().strip()
+                    if ai_cat in ALL_CATEGORIES and ai_cat != "uncategorized":
+                        category = ai_cat
+                except Exception:
+                    pass
             normalized = normalize_merchant(merch or desc)
             signed_amount = abs(payload.amount) if payload.is_income else -abs(payload.amount)
             tx = Transaction(
@@ -406,6 +489,7 @@ def build_router() -> APIRouter:
             accrued = await maaser.maybe_accrue(session, user["user_id"], doc)
             if accrued:
                 doc["maaser_accrued"] = accrued
+            _query_cache.delete(f"dash:{user['user_id']}")
             return doc
 
     @router.patch("/transactions/{tx_id}")
@@ -444,6 +528,7 @@ def build_router() -> APIRouter:
             await session.refresh(tx)
             doc = _tx_to_dict(tx)
             await maaser.maybe_accrue(session, user["user_id"], doc)
+            _query_cache.delete(f"dash:{user['user_id']}")
             return doc
 
     @router.delete("/transactions/{tx_id}")
@@ -464,6 +549,7 @@ def build_router() -> APIRouter:
             )
             await session.delete(tx)
             await session.commit()
+            _query_cache.delete(f"dash:{user['user_id']}")
             return {"ok": True}
 
     @router.post("/transactions/bulk-update")
@@ -485,6 +571,7 @@ def build_router() -> APIRouter:
                     ).values(**values)
                 )
                 await session.commit()
+            _query_cache.delete(f"dash:{user['user_id']}")
             return {"ok": True, "updated": len(payload.transaction_ids)}
 
     @router.post("/transactions/seed-demo")
@@ -531,6 +618,7 @@ def build_router() -> APIRouter:
                 session.add(tx)
             await session.commit()
             await maaser.backfill_for_user(session, user["user_id"])
+            _query_cache.delete(f"dash:{user['user_id']}")
             return {"ok": True, "inserted": len(sample)}
 
     # ── Split transactions ───────────────────────────────────────────
@@ -651,6 +739,81 @@ def build_router() -> APIRouter:
             await session.commit()
             return {"ok": True, "normalized": count}
 
+    # ── Subscriptions ───────────────────────────────────────────────
+
+    @router.get("/subscriptions")
+    async def list_subscriptions(request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(Subscription).where(Subscription.user_id == user["user_id"]).order_by(Subscription.active.desc(), Subscription.name)
+            )
+            subs = result.scalars().all()
+            return {"subscriptions": [
+                {"subscription_id": s.subscription_id, "name": s.name,
+                 "amount": float(s.amount), "currency": s.currency,
+                 "category": s.category, "merchant": s.merchant,
+                 "frequency": s.frequency,
+                 "next_billing": s.next_billing.isoformat() if s.next_billing else None,
+                 "active": s.active, "notes": s.notes}
+                for s in subs
+            ]}
+
+    @router.post("/subscriptions")
+    async def create_subscription(payload: dict, request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            sub = Subscription(
+                subscription_id=f"sub_{uuid.uuid4().hex[:12]}",
+                user_id=user["user_id"],
+                name=payload["name"],
+                amount=abs(payload["amount"]),
+                currency=payload.get("currency", "GBP"),
+                category=payload.get("category"),
+                merchant=payload.get("merchant"),
+                frequency=payload.get("frequency", "monthly"),
+                next_billing=payload.get("next_billing"),
+                notes=payload.get("notes"),
+            )
+            session.add(sub)
+            await session.commit()
+            await session.refresh(sub)
+            return {"subscription_id": sub.subscription_id, "name": sub.name}
+
+    @router.patch("/subscriptions/{subscription_id}")
+    async def update_subscription(subscription_id: str, payload: dict, request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(Subscription).where(Subscription.subscription_id == subscription_id, Subscription.user_id == user["user_id"])
+            )
+            sub = result.scalar_one_or_none()
+            if not sub:
+                raise HTTPException(404, "Subscription not found")
+            for field in ("name", "amount", "currency", "category", "merchant", "frequency", "notes"):
+                if field in payload:
+                    setattr(sub, field, payload[field])
+            if "next_billing" in payload:
+                sub.next_billing = payload["next_billing"]
+            if "active" in payload:
+                sub.active = payload["active"]
+            await session.commit()
+            return {"ok": True}
+
+    @router.delete("/subscriptions/{subscription_id}")
+    async def delete_subscription(subscription_id: str, request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(Subscription).where(Subscription.subscription_id == subscription_id, Subscription.user_id == user["user_id"])
+            )
+            sub = result.scalar_one_or_none()
+            if not sub:
+                raise HTTPException(404, "Subscription not found")
+            await session.delete(sub)
+            await session.commit()
+            return {"ok": True}
+
     # ── Account nicknames ────────────────────────────────────────────
 
     @router.get("/accounts")
@@ -703,6 +866,80 @@ def build_router() -> APIRouter:
                 session.add(nick)
             await session.commit()
             return {"ok": True, "account_id": account_id, "nickname": payload.nickname}
+
+    # ── Categories ──────────────────────────────────────────────────
+
+    @router.get("/categories")
+    async def list_categories(request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(Category).where(Category.user_id == user["user_id"]).order_by(Category.sort_order, Category.name)
+            )
+            cats = result.scalars().all()
+            return {"categories": [
+                {"category_id": c.category_id, "name": c.name, "icon": c.icon,
+                 "color": c.color, "is_income": c.is_income,
+                 "budget": float(c.budget) if c.budget else None,
+                 "sort_order": c.sort_order}
+                for c in cats
+            ]}
+
+    @router.post("/categories")
+    async def create_category(payload: dict, request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            existing = await session.execute(
+                select(Category).where(Category.user_id == user["user_id"], Category.name == payload["name"])
+            )
+            if existing.scalar_one_or_none():
+                raise HTTPException(409, "Category already exists")
+            cat = Category(
+                category_id=f"cat_{uuid.uuid4().hex[:12]}",
+                user_id=user["user_id"],
+                name=payload["name"],
+                icon=payload.get("icon"),
+                color=payload.get("color"),
+                is_income=payload.get("is_income", False),
+                budget=payload.get("budget"),
+                sort_order=payload.get("sort_order", 0),
+            )
+            session.add(cat)
+            await session.commit()
+            await session.refresh(cat)
+            return {"category_id": cat.category_id, "name": cat.name}
+
+    @router.patch("/categories/{category_id}")
+    async def update_category(category_id: str, payload: dict, request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(Category).where(Category.category_id == category_id, Category.user_id == user["user_id"])
+            )
+            cat = result.scalar_one_or_none()
+            if not cat:
+                raise HTTPException(404, "Category not found")
+            for field in ("name", "icon", "color", "is_income", "sort_order"):
+                if field in payload:
+                    setattr(cat, field, payload[field])
+            if "budget" in payload:
+                cat.budget = payload["budget"]
+            await session.commit()
+            return {"ok": True}
+
+    @router.delete("/categories/{category_id}")
+    async def delete_category(category_id: str, request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(Category).where(Category.category_id == category_id, Category.user_id == user["user_id"])
+            )
+            cat = result.scalar_one_or_none()
+            if not cat:
+                raise HTTPException(404, "Category not found")
+            await session.delete(cat)
+            await session.commit()
+            return {"ok": True}
 
     # ── Analytics ────────────────────────────────────────────────────
 
@@ -817,10 +1054,14 @@ def build_router() -> APIRouter:
 
     @router.get("/dashboard/overview")
     async def dashboard_overview(request: Request, user: dict = Depends(get_current_user)):
+        uid = user["user_id"]
+        cached = _query_cache.get(f"dash:{uid}")
+        if cached:
+            return cached
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
-                select(Transaction).where(Transaction.user_id == user["user_id"])
+                select(Transaction).where(Transaction.user_id == uid)
                 .order_by(Transaction.date.desc()).limit(1000)
             )
             txs = result.scalars().all()
@@ -847,7 +1088,7 @@ def build_router() -> APIRouter:
             for t in txs:
                 sources[t.source or "manual"] += 1
 
-            return {
+            payload = {
                 "balance": round(balance, 2),
                 "income": round(income, 2),
                 "spend": round(spend, 2),
@@ -858,6 +1099,8 @@ def build_router() -> APIRouter:
                 "recent": [_tx_to_dict(t) for t in txs[:8]],
                 "source_breakdown": [{"source": k, "count": v} for k, v in sorted(sources.items(), key=lambda x: -x[1])],
             }
+            _query_cache.set(f"dash:{uid}", payload)
+            return payload
 
     # ── Budgets ──────────────────────────────────────────────────────
 
@@ -940,5 +1183,43 @@ def build_router() -> APIRouter:
             await session.commit()
             await session.refresh(b)
             return _budget_to_dict(b)
+
+    # ── Transaction system health check ─────────────────────────────
+
+    @router.get("/transactions/health")
+    async def transactions_health(request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(func.count()).select_from(Transaction).where(Transaction.user_id == user["user_id"])
+            )
+            total = result.scalar() or 0
+            dup = await session.execute(
+                select(Transaction.transaction_id, func.count().label("cnt"))
+                .where(Transaction.user_id == user["user_id"])
+                .group_by(Transaction.transaction_id)
+                .having(func.count() > 1)
+            )
+            duplicates = dup.rowcount
+            null_cat = await session.execute(
+                select(func.count()).select_from(Transaction).where(
+                    Transaction.user_id == user["user_id"],
+                    Transaction.category.is_(None),
+                )
+            )
+            return {
+                "ok": True,
+                "total_transactions": total,
+                "duplicate_ids": duplicates,
+                "uncategorized": null_cat.scalar() or 0,
+                "sources": {
+                    src: count for src, count in
+                    (await session.execute(
+                        select(Transaction.source, func.count())
+                        .where(Transaction.user_id == user["user_id"])
+                        .group_by(Transaction.source)
+                    )).all()
+                },
+            }
 
     return router

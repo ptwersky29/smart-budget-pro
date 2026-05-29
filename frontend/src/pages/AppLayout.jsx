@@ -4,7 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 
 import {
   LayoutDashboard, Receipt, PiggyBank, Building2, TrendingUp, Star,
-  Landmark, FileText, Settings, LogOut, Menu, X, MoonStar, Sun, MessageSquare, Upload, Plug, Crown, ArrowRight
+  Landmark, FileText, Settings, LogOut, Menu, X, MoonStar, Sun, MessageSquare, Upload, Plug, Crown, ArrowRight, RefreshCcw
 } from "lucide-react";
 
 const NAV_SECTIONS = [
@@ -20,6 +20,7 @@ const NAV_SECTIONS = [
     items: [
       { to: "/transactions", label: "Transactions", icon: Receipt },
       { to: "/budgets", label: "Budgets", icon: PiggyBank },
+      { to: "/subscriptions", label: "Subscriptions", icon: RefreshCcw },
       { to: "/statements", label: "Statements", icon: Upload },
     ],
   },
@@ -86,6 +87,14 @@ const ROUTE_META = [
     title: "SMS Finance",
     description: "Turn bank SMS messages into clean, readable transaction entries.",
     primary: { label: "Open integrations", to: "/integrations" },
+    secondary: { label: "Transactions", to: "/transactions" },
+  },
+  {
+    paths: ["/subscriptions"],
+    eyebrow: "Money",
+    title: "Subscriptions",
+    description: "Track recurring payments, detect subscriptions from your transactions, and manage them in one place.",
+    primary: { label: "Add subscription", to: "/subscriptions" },
     secondary: { label: "Transactions", to: "/transactions" },
   },
   {

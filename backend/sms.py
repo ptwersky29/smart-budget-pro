@@ -13,7 +13,8 @@ from sqlalchemy import select, func
 from db import User, Transaction, SmsMessage, SmsSender, AppConfig, Budget
 from auth import get_current_user
 from app_config import get_config
-from llm import call_llm, parse_json
+from llm import call_llm, parse_json, track_ai_usage
+from security import sanitize_input
 import maaser as maaser_mod
 
 logger = logging.getLogger("sms")
@@ -148,7 +149,8 @@ def build_router() -> APIRouter:
 
             parsed = {}
             try:
-                text, *_ = await call_llm("You are a precise SMS parser. Always output valid JSON.", PARSE_PROMPT + Body, json_mode=True)
+                text, provider, model, pt, ct, cost = await call_llm("You are a precise SMS parser. Always output valid JSON.", PARSE_PROMPT + Body, json_mode=True)
+                await track_ai_usage(session, user.user_id, provider, model, pt, ct, cost, endpoint="sms_webhook")
                 parsed = parse_json(text)
             except Exception as e:
                 logger.error(f"sms webhook AI parse failed: {e}")
@@ -160,6 +162,72 @@ def build_router() -> APIRouter:
             sms = SmsMessage(
                 user_id=user.user_id, to_number=To, body=Body[:2000], direction="inbound",
                 provider="twilio", external_id=SmsMessageSid[:128], sender_phone=phone, dedup_hash=dedup,
+            )
+            session.add(sms)
+
+            transaction_id = None
+            if parsed.get("is_transaction") and parsed.get("confidence", 0) >= 0.7:
+                tx_id = f"tx_{uuid.uuid4().hex[:12]}"
+                amt = abs(float(parsed.get("amount", 0)))
+                tx = Transaction(
+                    transaction_id=tx_id, user_id=user.user_id,
+                    amount=amt if parsed.get("is_income") else -amt,
+                    currency=parsed.get("currency", "GBP"),
+                    description=parsed.get("description", ""),
+                    merchant_name=parsed.get("merchant"),
+                    category=parsed.get("category", "uncategorized"),
+                    date=now, source="sms",
+                )
+                session.add(tx)
+                transaction_id = tx_id
+                tx_doc = {
+                    "transaction_id": tx_id, "user_id": user.user_id,
+                    "amount": amt if parsed.get("is_income") else -amt,
+                    "category": parsed.get("category", "uncategorized"),
+                    "description": parsed.get("description", ""),
+                    "is_income": bool(parsed.get("is_income")),
+                }
+                await maaser_mod.maybe_accrue(session, user.user_id, tx_doc)
+
+            await session.commit()
+            return {"ok": True, "parsed": parsed.get("is_transaction"), "confidence": parsed.get("confidence", 0),
+                    "transaction_id": transaction_id, "user_id": user.user_id}
+
+    @router.post("/sms/make-webhook")
+    async def make_webhook(request: Request):
+        """Generic JSON webhook for Make.com / n8n / Zapier. Accepts JSON body with {text, phone_number}."""
+        body = await request.json()
+        text = (body or {}).get("text", "")
+        phone = (body or {}).get("phone_number", "")
+        if not text:
+            return {"ok": False, "error": "Missing 'text' field"}
+        sm = request.app.state.db
+        async with sm() as session:
+            user = None
+            if phone:
+                user = await _lookup_user_by_phone(session, phone.strip())
+            if not user:
+                return {"ok": False, "error": "unidentified_sender", "phone": phone}
+
+            if await _dedup_check(session, user.user_id, text):
+                return {"ok": True, "status": "duplicate"}
+
+            parsed = {}
+            try:
+                text_resp, provider, model, pt, ct, cost = await call_llm("You are a precise SMS parser. Always output valid JSON.",
+                                               PARSE_PROMPT + text, json_mode=True)
+                await track_ai_usage(session, user.user_id, provider, model, pt, ct, cost, endpoint="sms_make_webhook")
+                parsed = parse_json(text_resp)
+            except Exception as e:
+                logger.error(f"make webhook AI parse failed: {e}")
+                parsed = {"is_transaction": False, "confidence": 0, "reason_if_not_transaction": str(e)[:120]}
+
+            raw = f"{user.user_id}|{text.strip().lower()}"
+            dedup = hashlib.sha256(raw.encode()).hexdigest()
+            now = datetime.now(timezone.utc)
+            sms = SmsMessage(
+                user_id=user.user_id, to_number="make_webhook", body=text[:2000],
+                direction="inbound", provider="twilio", sender_phone=phone, dedup_hash=dedup,
             )
             session.add(sms)
 
@@ -250,9 +318,11 @@ def build_router() -> APIRouter:
                 if count_today >= 3:
                     raise HTTPException(429, "Free tier: 3 SMS parses/day. Upgrade for unlimited.")
 
+            clean_text = sanitize_input(payload.text, max_len=2000)
             try:
-                text, *_ = await call_llm("You are a precise SMS parser. Always output valid JSON.",
-                                          PARSE_PROMPT + payload.text, json_mode=True)
+                text, provider, model, pt, ct, cost = await call_llm("You are a precise SMS parser. Always output valid JSON.",
+                                          PARSE_PROMPT + clean_text, json_mode=True)
+                await track_ai_usage(session, user["user_id"], provider, model, pt, ct, cost, endpoint="sms_parse")
                 parsed = parse_json(text)
             except Exception as e:
                 logger.error(f"sms parse failed: {e}")
@@ -306,7 +376,8 @@ def build_router() -> APIRouter:
             )
             return {"messages": [
                 {"sms_id": f"sms_{r.id}", "text": r.body, "direction": r.direction,
-                 "sender_phone": r.sender_phone, "created_at": r.created_at.isoformat() if r.created_at else None}
+                 "sender_phone": r.sender_phone, "source": r.provider,
+                 "created_at": r.created_at.isoformat() if r.created_at else None}
                 for r in result.scalars().all()
             ]}
 
@@ -327,7 +398,48 @@ def build_router() -> APIRouter:
 
     @router.post("/sms/{sms_id}/save")
     async def save_to_tx(sms_id: str, request: Request, user: dict = Depends(get_current_user)):
-        raise HTTPException(400, "Re-parse the SMS with auto_save=true")
+        sm = request.app.state.db
+        async with sm() as session:
+            sid = int(sms_id.replace("sms_", "")) if sms_id.startswith("sms_") else int(sms_id)
+            result = await session.execute(
+                select(SmsMessage).where(SmsMessage.id == sid, SmsMessage.user_id == user["user_id"])
+            )
+            rec = result.scalar_one_or_none()
+            if not rec:
+                raise HTTPException(404, "SMS not found")
+            if not rec.body.strip():
+                raise HTTPException(400, "SMS body is empty")
+            try:
+                text, provider, model, pt, ct, cost = await call_llm("You are a precise SMS parser. Always output valid JSON.",
+                                          PARSE_PROMPT + rec.body, json_mode=True)
+                await track_ai_usage(session, user["user_id"], provider, model, pt, ct, cost, endpoint="sms_save")
+                parsed = parse_json(text)
+            except Exception as e:
+                raise HTTPException(500, f"AI parse failed: {str(e)[:200]}")
+            if not parsed.get("is_transaction") or parsed.get("confidence", 0) < 0.7:
+                raise HTTPException(400, f"Not a transaction (confidence {parsed.get('confidence', 0):.1f}): {parsed.get('reason_if_not_transaction', 'unknown')}")
+            tx_id = f"tx_{uuid.uuid4().hex[:12]}"
+            amt = abs(float(parsed.get("amount", 0)))
+            tx = Transaction(
+                transaction_id=tx_id, user_id=user["user_id"],
+                amount=amt if parsed.get("is_income") else -amt,
+                currency=parsed.get("currency", "GBP"),
+                description=parsed.get("description", ""),
+                merchant_name=parsed.get("merchant"),
+                category=parsed.get("category", "uncategorized"),
+                date=datetime.now(timezone.utc), source="sms",
+            )
+            session.add(tx)
+            tx_doc = {
+                "transaction_id": tx_id, "user_id": user["user_id"],
+                "amount": amt if parsed.get("is_income") else -amt,
+                "category": parsed.get("category", "uncategorized"),
+                "description": parsed.get("description", ""),
+                "is_income": bool(parsed.get("is_income")),
+            }
+            await maaser_mod.maybe_accrue(session, user["user_id"], tx_doc)
+            await session.commit()
+            return {"ok": True, "transaction_id": tx_id, "parsed": parsed}
 
     @router.post("/sms/send-report")
     async def send_report(request: Request, user: dict = Depends(get_current_user)):
@@ -367,7 +479,8 @@ def build_router() -> APIRouter:
             prompt = REPORT_PROMPT.format(income=round(income, 2), spend=round(spend, 2),
                                           categories=top_cats, savings_rate=savings_rate, budget_count=budget_count)
             try:
-                text, *_ = await call_llm("You are FinanceAI SMS report generator.", prompt, json_mode=True)
+                text, provider, model, pt, ct, cost = await call_llm("You are FinanceAI SMS report generator.", prompt, json_mode=True)
+                await track_ai_usage(session, user["user_id"], provider, model, pt, ct, cost, endpoint="sms_report")
                 report = parse_json(text)
             except Exception as e:
                 raise HTTPException(500, f"AI report generation failed: {str(e)[:200]}")
@@ -425,7 +538,8 @@ Tier: {user.get('tier', 'free')}
 Return JSON:
 {{"insights": ["Insight 1 (one sentence with specific number)", "Insight 2", "Insight 3"], "tip": "One actionable tip"}}"""
             try:
-                text, *_ = await call_llm("You are FinanceAI insights generator.", insight_prompt, json_mode=True)
+                text, provider, model, pt, ct, cost = await call_llm("You are FinanceAI insights generator.", insight_prompt, json_mode=True)
+                await track_ai_usage(session, user["user_id"], provider, model, pt, ct, cost, endpoint="sms_insights")
                 data = parse_json(text)
             except Exception as e:
                 raise HTTPException(500, f"AI insights failed: {str(e)[:200]}")

@@ -5,6 +5,8 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "next-themes";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ErrorBoundary from "./components/ErrorBoundary";
+import ConsentBanner from "./components/ConsentBanner";
 import AppLayout from "./pages/AppLayout";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -22,10 +24,13 @@ import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import SMS from "./pages/SMS";
 import Statements from "./pages/Statements";
+import Subscriptions from "./pages/Subscriptions";
 import Integrations from "./pages/Integrations";
 import Pricing from "./pages/Pricing";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import AuthCallback from "./pages/AuthCallback";
+import OnboardingWizard from "./pages/OnboardingWizard";
+import Privacy from "./pages/Privacy";
 
 function AppRouter() {
   const location = useLocation();
@@ -41,12 +46,15 @@ function AppRouter() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/pricing" element={<Pricing />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/onboarding" element={<ProtectedRoute><OnboardingWizard /></ProtectedRoute>} />
       <Route path="/billing/success" element={<PaymentSuccess />} />
       <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/transactions" element={<Transactions />} />
         <Route path="/budgets" element={<Budgets />} />
         <Route path="/connections" element={<Connections />} />
+        <Route path="/subscriptions" element={<Subscriptions />} />
         <Route path="/sms" element={<SMS />} />
         <Route path="/statements" element={<Statements />} />
         <Route path="/integrations" element={<Integrations />} />
@@ -65,7 +73,10 @@ export default function App() {
     <BrowserRouter>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <AuthProvider>
-          <AppRouter />
+          <ErrorBoundary>
+            <AppRouter />
+            <ConsentBanner />
+          </ErrorBoundary>
           <Toaster richColors position="top-right" />
         </AuthProvider>
       </ThemeProvider>

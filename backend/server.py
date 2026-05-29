@@ -6,7 +6,11 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
 import os
+import sys
+import json
 import logging
+import logging.config
+from datetime import datetime, timezone
 from fastapi import FastAPI, APIRouter
 from starlette.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -37,17 +41,52 @@ import support
 import app_settings
 import analytics
 import empty_states
-from rate_limit import RateLimiter, RateLimitMiddleware
-from middleware import ErrorMonitorMiddleware, RequestTimerMiddleware
+from rate_limit import RateLimiter, RateLimitMiddleware, CsrfProtectionMiddleware
+from middleware import ErrorMonitorMiddleware, RequestTimerMiddleware, RequestIdMiddleware, SecurityHeadersMiddleware
+from security import generate_csrf_token, _require_jwt_secret
 
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+# Optional Sentry integration
+SENTRY_DSN = os.environ.get("SENTRY_DSN")
+if SENTRY_DSN:
+    try:
+        import sentry_sdk
+        sentry_sdk.init(dsn=SENTRY_DSN, traces_sample_rate=0.1)
+        logger.info("Sentry error monitoring enabled")
+    except ImportError:
+        logger.warning("SENTRY_DSN set but sentry-sdk not installed — skipping")
+
+
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        log = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        if record.exc_info and record.exc_info[0]:
+            log["exc"] = self.formatException(record.exc_info)
+        return json.dumps(log)
+
+
+_handler = logging.StreamHandler(sys.stdout)
+_handler.setFormatter(JsonFormatter() if os.environ.get("JSON_LOG") else logging.Formatter(
+    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+))
+logging.basicConfig(level=logging.INFO, handlers=[_handler])
 logger = logging.getLogger("financeai")
+
+# ── Startup validation ──────────────────────────────────────────────────
 
 database_url = os.environ.get("DATABASE_URL")
 if not database_url:
     logger.error("DATABASE_URL environment variable is not set!")
     raise RuntimeError("DATABASE_URL environment variable is required")
+
+# Validate JWT_SECRET early — will raise if missing/weak
+_require_jwt_secret()
+logger.info("JWT_SECRET validated")
+
 init_engine(database_url, echo=False)
 
 app = FastAPI(title="FinanceAI API", version="1.0.0")
@@ -55,7 +94,10 @@ app.state.db = get_session_maker()
 
 # Middleware stack (order matters: outermost first)
 app.add_middleware(ErrorMonitorMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(CsrfProtectionMiddleware)
 app.add_middleware(RequestTimerMiddleware)
+app.add_middleware(RequestIdMiddleware)
 app.add_middleware(RateLimitMiddleware, limiter=RateLimiter(limit=120, window=60))
 
 api = APIRouter(prefix="/api")
@@ -68,6 +110,7 @@ async def root():
 
 @api.get("/health")
 async def health():
+    stripe_vars = ["STRIPE_API_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_MONTHLY_PRICE_ID", "STRIPE_YEARLY_PRICE_ID"]
     try:
         sm = get_session_maker()
         async with sm() as session:
@@ -76,6 +119,7 @@ async def health():
                 "status": "ok",
                 "database": "connected",
                 "auth_configured": bool(os.environ.get("JWT_SECRET")),
+                "stripe_configured": all(os.environ.get(v) for v in stripe_vars),
                 "routers": len(api.routes),
             }
     except Exception as e:
@@ -84,8 +128,15 @@ async def health():
             "detail": str(e),
             "database": "unavailable",
             "auth_configured": bool(os.environ.get("JWT_SECRET")),
+            "stripe_configured": all(os.environ.get(v) for v in stripe_vars),
             "routers": len(api.routes),
         }
+
+
+@api.get("/csrf-token")
+async def csrf_token():
+    token = generate_csrf_token()
+    return {"csrf_token": token}
 
 
 # Mount sub-routers
