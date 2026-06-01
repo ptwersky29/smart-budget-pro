@@ -117,17 +117,21 @@ async def health():
             await session.execute(text("SELECT 1"))
             return {
                 "status": "ok",
+                "version": app.version,
                 "database": "connected",
                 "auth_configured": bool(os.environ.get("JWT_SECRET")),
+                "frontend_url_set": bool(os.environ.get("FRONTEND_URL")),
                 "stripe_configured": all(os.environ.get(v) for v in stripe_vars),
                 "routers": len(api.routes),
             }
     except Exception as e:
         return {
             "status": "error",
+            "version": app.version,
             "detail": str(e),
             "database": "unavailable",
             "auth_configured": bool(os.environ.get("JWT_SECRET")),
+            "frontend_url_set": bool(os.environ.get("FRONTEND_URL")),
             "stripe_configured": all(os.environ.get(v) for v in stripe_vars),
             "routers": len(api.routes),
         }
