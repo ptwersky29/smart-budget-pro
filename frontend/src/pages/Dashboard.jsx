@@ -39,8 +39,10 @@ export default function Dashboard() {
       const { data } = await api.get("/dashboard/overview");
       setData(data);
     } catch (err) {
+      const status = err?.response?.status;
+      const detail = err?.response?.data?.detail || err?.message || "Unknown error";
       console.error("dashboard load failed", err);
-      toast.error("Failed to load dashboard");
+      toast.error(`Dashboard failed (${status || "?"}): ${detail}`);
     } finally { setLoading(false); }
   }, []);
 
