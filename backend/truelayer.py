@@ -104,6 +104,36 @@ async def _tl_config_from_db(session=None) -> dict:
     }
 
 
+def _build_auth_link_params(
+    cfg: dict,
+    *,
+    env: str,
+    redirect_uri: str,
+    state: str,
+    nonce: str,
+    user_email: str,
+) -> dict:
+    """Build a TrueLayer auth-link parameter set.
+
+    Sandbox uses a UK country hint to keep users on the normal UK provider
+    selection path. Production stays untouched.
+    """
+    params = {
+        "response_type": "code",
+        "client_id": cfg["client_id"],
+        "scope": SCOPES,
+        "redirect_uri": redirect_uri,
+        "providers": "uk-ob-all uk-oauth-all",
+        "state": state,
+        "nonce": nonce,
+    }
+    if env == "sandbox":
+        params["country_id"] = "GB"
+        if user_email:
+            params["user_email"] = user_email
+    return params
+
+
 async def _is_configured(session=None) -> bool:
     cfg = await _tl_config_from_db(session)
     return bool(cfg["client_id"] and cfg["client_secret"])
@@ -305,8 +335,6 @@ def build_router() -> APIRouter:
                 raise HTTPException(400, "TrueLayer not configured by the administrator.")
             cfg = await _tl_config_from_db(session)
             env = cfg.get("environment", "sandbox")
-            # Use correct providers per environment
-            providers = "uk-cs-mock uk-ob-all uk-oauth-all" if env == "sandbox" else "uk-ob-all uk-oauth-all"
             state = secrets.token_urlsafe(24)
             nonce = secrets.token_urlsafe(16)
             import_from_date = parse_import_from_date(from_date)
@@ -326,14 +354,14 @@ def build_router() -> APIRouter:
             await session.execute(
                 delete(TrueLayerState).where(TrueLayerState.expires_at < datetime.now(timezone.utc))
             )
-            params = {
-                "response_type": "code", "client_id": cfg["client_id"],
-                "scope": SCOPES, "redirect_uri": redirect_uri,
-                "providers": providers, "state": state, "nonce": nonce,
-            }
-            if env == "sandbox":
-                params["provider_id"] = "uk-cs-mock"
-                params["user_email"] = user.get("email", "")
+            params = _build_auth_link_params(
+                cfg,
+                env=env,
+                redirect_uri=redirect_uri,
+                state=state,
+                nonce=nonce,
+                user_email=user.get("email", ""),
+            )
             auth_url = f"{cfg['auth_url']}/?{urlencode(params)}"
             await _log_oauth(session, user["user_id"], "auth_url_generated", {"state": state, "redirect_uri": redirect_uri})
             await session.commit()
@@ -487,7 +515,6 @@ def build_router() -> APIRouter:
                 raise HTTPException(400, "TrueLayer not configured by the administrator.")
             cfg = await _tl_config_from_db(session)
             env = cfg.get("environment", "sandbox")
-            providers = "uk-cs-mock uk-ob-all uk-oauth-all" if env == "sandbox" else "uk-ob-all uk-oauth-all"
             state = secrets.token_urlsafe(24)
             nonce = secrets.token_urlsafe(16)
             redirect_uri = _backend_callback_url(request, cfg)
@@ -503,14 +530,14 @@ def build_router() -> APIRouter:
             await session.execute(
                 delete(TrueLayerState).where(TrueLayerState.expires_at < datetime.now(timezone.utc))
             )
-            params = {
-                "response_type": "code", "client_id": cfg["client_id"],
-                "scope": SCOPES, "redirect_uri": redirect_uri,
-                "providers": providers, "state": state, "nonce": nonce,
-            }
-            if env == "sandbox":
-                params["provider_id"] = "uk-cs-mock"
-                params["user_email"] = user.get("email", "")
+            params = _build_auth_link_params(
+                cfg,
+                env=env,
+                redirect_uri=redirect_uri,
+                state=state,
+                nonce=nonce,
+                user_email=user.get("email", ""),
+            )
             auth_url = f"{cfg['auth_url']}/?{urlencode(params)}"
             await session.commit()
             return {"auth_url": auth_url, "state": state, "redirect_uri": redirect_uri}

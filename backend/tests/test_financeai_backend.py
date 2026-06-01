@@ -93,6 +93,14 @@ def test_truelayer_auth_url(admin):
     for k in ("client_id", "redirect_uri", "response_type", "scope", "providers", "state", "nonce"):
         assert k in qs, f"missing param {k} in auth URL"
     assert qs["response_type"] == ["code"]
+    providers = qs["providers"][0]
+    assert "uk-cs-mock" not in providers
+    assert "provider_id" not in qs
+    if "sandbox" in url:
+        assert qs.get("country_id") == ["GB"]
+        assert qs.get("user_email"), "sandbox auth URL should include user_email"
+    else:
+        assert "country_id" not in qs
 
 
 def test_truelayer_callback_invalid_state(admin):
