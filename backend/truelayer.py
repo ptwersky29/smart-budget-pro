@@ -127,7 +127,7 @@ def _build_auth_link_params(
         "nonce": nonce,
     }
     if env == "sandbox":
-        params["country_id"] = "GB"
+        params["providers"] = "uk-cs-mock"
         if user_email:
             params["user_email"] = user_email
     return params

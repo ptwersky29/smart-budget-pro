@@ -96,9 +96,10 @@ def test_truelayer_auth_url(admin):
     assert "providers" not in qs
     assert "provider_id" not in qs
     if "sandbox" in url:
-        assert qs.get("country_id") == ["GB"]
+        assert qs.get("providers") == ["uk-cs-mock"]
         assert qs.get("user_email"), "sandbox auth URL should include user_email"
     else:
+        assert "providers" not in qs
         assert "country_id" not in qs
         assert "user_email" not in qs
 
