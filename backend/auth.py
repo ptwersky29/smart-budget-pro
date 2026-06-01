@@ -476,11 +476,16 @@ def build_router() -> APIRouter:
             auth = request.headers.get("Authorization", "")
             if auth.startswith("Bearer "):
                 token = auth[7:]
+        logger.info("refresh attempt: cookie=%s header=%s",
+                    "yes" if request.cookies.get("refresh_token") else "no",
+                    "yes" if request.headers.get("Authorization", "").startswith("Bearer ") else "no")
         if not token:
+            logger.warning("refresh rejected: no refresh token in cookie or header")
             raise HTTPException(401, "No refresh token")
         try:
             payload = pyjwt.decode(token, _require_jwt_secret(), algorithms=[JWT_ALGORITHM])
             if payload.get("type") != "refresh":
+                logger.warning("refresh rejected: wrong token type for sub=%s", payload.get("sub"))
                 raise HTTPException(401, "Invalid token type")
             sm = request.app.state.db
             async with sm() as session:

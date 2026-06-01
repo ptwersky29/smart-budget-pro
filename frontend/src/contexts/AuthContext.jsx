@@ -50,12 +50,16 @@ export const AuthProvider = ({ children }) => {
 
   const login = useCallback(async (email, password, rememberMe = false) => {
     const { data } = await api.post("/auth/login", { email, password, remember_me: rememberMe });
+    if (data?.access_token) localStorage.setItem("access_token", data.access_token);
+    if (data?.refresh_token) localStorage.setItem("refresh_token", data.refresh_token);
     setUser(stripTokens(data));
     return data;
   }, [stripTokens]);
 
   const register = useCallback(async (payload) => {
     const { data } = await api.post("/auth/register", payload);
+    if (data?.access_token) localStorage.setItem("access_token", data.access_token);
+    if (data?.refresh_token) localStorage.setItem("refresh_token", data.refresh_token);
     setUser(stripTokens(data));
     return data;
   }, [stripTokens]);

@@ -1,19 +1,26 @@
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { BACKEND_URL, formatApiError } from "../lib/api";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
-const AUTH_BG = "https://images.unsplash.com/photo-1618556450991-2f1af64e8191?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzR8MHwxfHNlYXJjaHwzfHxhYnN0cmFjdCUyMHByZW1pdW0lMjBmaW5hbmNlJTIwdGVjaCUyMGJhY2tncm91bmR8ZW58MHx8fHwxNzc5MTk5MTE5fDA&ixlib=rb-4.1.0&q=85";
+const AUTH_BG = "https://images.unsplash.com/photo-1618556450991-2f1af64e8191?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzR8MHwxfHNlYXJjaHwzfHxhYnN0cmF0dW0lMjBwcmVtaXVtJTIwZmluYW5jZSUyMHRlY2glMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc3OTE5OTExOXww&ixlib=rb-4.1.0&q=85";
 
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("expired") === "1") {
+      toast.info("Your session expired. Please sign in again.");
+    }
+  }, [searchParams]);
 
   const onSubmit = async (e) => {
     e.preventDefault();

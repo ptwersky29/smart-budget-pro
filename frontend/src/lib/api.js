@@ -74,8 +74,14 @@ api.interceptors.response.use(
         }
         return api(originalRequest);
       } catch (refreshError) {
+        const status = refreshError?.response?.status;
+        console.warn("[auth] refresh failed", status, refreshError?.response?.data);
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
+        // Redirect to login so the user isn't stuck in a zombie authenticated state
+        if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+          window.location.assign("/login?expired=1");
+        }
       }
     }
     return Promise.reject(error);
