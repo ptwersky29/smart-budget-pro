@@ -413,11 +413,17 @@ def build_router() -> APIRouter:
             raise HTTPException(400, "Legacy session_id callbacks are no longer supported")
 
         try:
-            token_data = pyjwt.decode(payload.access_token, _require_jwt_secret(), algorithms=[JWT_ALGORITHM])
+            secret = _require_jwt_secret()
+        except RuntimeError as e:
+            raise HTTPException(500, f"JWT secret error: {e}")
+
+        try:
+            token_data = pyjwt.decode(payload.access_token, secret, algorithms=[JWT_ALGORITHM])
             if token_data.get("type") != "access":
                 raise HTTPException(401, "Invalid token type")
-        except pyjwt.PyJWTError:
-            raise HTTPException(401, "Invalid access token")
+        except pyjwt.PyJWTError as e:
+            logger.warning("emergent_session JWT decode failed: %s %s", type(e).__name__, e)
+            raise HTTPException(401, f"Invalid access token: {type(e).__name__}")
 
         try:
             sm = request.app.state.db
@@ -438,9 +444,9 @@ def build_router() -> APIRouter:
         except HTTPException:
             raise
         except Exception as e:
-            logger.error("emergent_session failed for user %s: %s: %s",
+            logger.error("emergent_session DB failed for user %s: %s: %s",
                          token_data.get("sub", "unknown"), type(e).__name__, e)
-            raise HTTPException(500, f"Session validation failed: {type(e).__name__}")
+            raise HTTPException(500, f"Session validation failed: {type(e).__name__}: {e}")
 
     @router.post("/refresh")
     async def refresh_token(request: Request, response: Response):
