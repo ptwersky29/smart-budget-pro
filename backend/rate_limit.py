@@ -10,6 +10,7 @@ logger = logging.getLogger("rate_limit")
 DEFAULT_LIMIT = 120
 DEFAULT_WINDOW = 60
 CSRF_SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
+CSRF_SAFE_PATH_PREFIXES = ("/api/auth/",)
 
 
 class RateLimiter:
@@ -62,6 +63,9 @@ class CsrfProtectionMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         if request.method in CSRF_SAFE_METHODS:
+            return await call_next(request)
+        # Auth-flow endpoints skip CSRF (no cookie session yet)
+        if any(request.url.path.startswith(p) for p in CSRF_SAFE_PATH_PREFIXES):
             return await call_next(request)
         # Check if request uses Bearer token (API clients skip CSRF)
         auth = request.headers.get("Authorization", "")

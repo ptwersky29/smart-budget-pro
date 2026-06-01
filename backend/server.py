@@ -20,7 +20,6 @@ from sqlalchemy import text
 from db import init_engine, dispose_engine, get_session_maker, Base, create_tables
 
 import auth
-import security
 import truelayer
 import ai_service
 import ai_insights
@@ -92,9 +91,9 @@ logger.info("JWT_SECRET validated")
 
 init_engine(database_url, echo=False)
 
-app = FastAPI(title="FinanceAI API", version="1.1.0")
+app = FastAPI(title="FinanceAI API", version="1.1.1")
 
-GIT_COMMIT = "c0ff566"
+GIT_COMMIT = "17a2c91"
 app.state.db = get_session_maker()
 
 # Middleware stack (order matters: outermost first)
@@ -106,30 +105,6 @@ app.add_middleware(RequestIdMiddleware)
 app.add_middleware(RateLimitMiddleware, limiter=RateLimiter(limit=120, window=60))
 
 api = APIRouter(prefix="/api")
-
-
-@api.get("/debug/jwt-test")
-async def debug_jwt():
-    import traceback
-    import jwt as pyjwt
-    info = {"pyjwt_version": getattr(pyjwt, "__version__", "unknown")}
-    try:
-        secret = security._require_jwt_secret()
-        info["jwt_secret_status"] = "ok"
-        info["jwt_secret_preview"] = secret[:4] + "..." if len(secret) > 4 else "short"
-    except Exception as e:
-        info["jwt_secret_status"] = f"error: {e}"
-
-    try:
-        bad_token = "eyJhbGciOiJIUzI1NiJ9.ZmFrZQ.abc123"
-        pyjwt.decode(bad_token, "test-secret", algorithms=["HS256"])
-        info["decode_test"] = "unexpected_success"
-    except pyjwt.PyJWTError as e:
-        info["decode_test"] = f"Caught_by_PyJWTError: {type(e).__name__}"
-    except Exception as e:
-        info["decode_test"] = f"NOT_caught_by_PyJWTError: {type(e).__name__}: {e}"
-
-    return info
 
 
 @api.get("/")
@@ -207,9 +182,20 @@ app.include_router(api)
 @app.exception_handler(Exception)
 async def global_exception_handler(request: StarletteRequest, exc: Exception):
     logger.exception("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
+    origin = request.headers.get("origin", "")
+    cors_headers = {}
+    if origin and (
+        origin in origins
+        or origin.startswith("https://")
+        and origin.endswith(".vercel.app")
+    ):
+        cors_headers["Access-Control-Allow-Origin"] = origin
+        cors_headers["Access-Control-Allow-Credentials"] = "true"
+        cors_headers["Vary"] = "Origin"
     return JSONResponse(
         status_code=500,
         content={"detail": f"Server error: {type(exc).__name__}: {exc}"},
+        headers=cors_headers,
     )
 
 # CORS: allow frontend origin with credentials
