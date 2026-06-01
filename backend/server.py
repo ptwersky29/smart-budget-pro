@@ -89,7 +89,7 @@ logger.info("JWT_SECRET validated")
 
 init_engine(database_url, echo=False)
 
-app = FastAPI(title="FinanceAI API", version="1.0.1")
+app = FastAPI(title="FinanceAI API", version="1.1.0")
 app.state.db = get_session_maker()
 
 # Middleware stack (order matters: outermost first)
@@ -184,8 +184,9 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup():
+    logger.info("Running DB migrations (v1.1.0) ...")
     await create_tables()
-    logger.info("Tables created / verified.")
+    logger.info("DB tables created / verified.")
     sm = get_session_maker()
     async with sm() as session:
         await auth.seed_admin(session)

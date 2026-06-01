@@ -419,21 +419,28 @@ def build_router() -> APIRouter:
         except pyjwt.PyJWTError:
             raise HTTPException(401, "Invalid access token")
 
-        sm = request.app.state.db
-        async with sm() as session:
-            result = await session.execute(select(User).where(User.user_id == token_data["sub"]))
-            user = result.scalar_one_or_none()
-            if not user:
-                raise HTTPException(404, "User not found")
-            if user.disabled:
-                raise HTTPException(403, "Account disabled")
+        try:
+            sm = request.app.state.db
+            async with sm() as session:
+                result = await session.execute(select(User).where(User.user_id == token_data["sub"]))
+                user = result.scalar_one_or_none()
+                if not user:
+                    raise HTTPException(404, "User not found")
+                if user.disabled:
+                    raise HTTPException(403, "Account disabled")
 
-            if payload.refresh_token:
-                set_auth_cookies(response, payload.access_token, payload.refresh_token)
-            user_dict = _user_to_dict(user)
-            user_dict["access_token"] = payload.access_token
-            user_dict["refresh_token"] = payload.refresh_token
-            return user_dict
+                if payload.refresh_token:
+                    set_auth_cookies(response, payload.access_token, payload.refresh_token)
+                user_dict = _user_to_dict(user)
+                user_dict["access_token"] = payload.access_token
+                user_dict["refresh_token"] = payload.refresh_token
+                return user_dict
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("emergent_session failed for user %s: %s: %s",
+                         token_data.get("sub", "unknown"), type(e).__name__, e)
+            raise HTTPException(500, f"Session validation failed: {type(e).__name__}")
 
     @router.post("/refresh")
     async def refresh_token(request: Request, response: Response):
