@@ -6,6 +6,7 @@ os.environ.setdefault("JWT_SECRET", "test-jwt-secret-for-truelayer-auth-params")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from truelayer import _build_auth_link_params
+from truelayer import _token_value
 
 
 def test_build_auth_link_params_sandbox():
@@ -40,3 +41,9 @@ def test_build_auth_link_params_live():
     assert "user_email" not in params
     assert "provider_id" not in params
     assert "country_id" not in params
+
+
+def test_token_value_normalizes_none():
+    assert _token_value(None) == ""
+    assert _token_value("") == ""
+    assert _token_value("abc") == "abc"

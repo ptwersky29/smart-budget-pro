@@ -133,6 +133,10 @@ def _build_auth_link_params(
     return params
 
 
+def _token_value(value: Optional[str]) -> str:
+    return value or ""
+
+
 async def _is_configured(session=None) -> bool:
     cfg = await _tl_config_from_db(session)
     return bool(cfg["client_id"] and cfg["client_secret"])
@@ -149,8 +153,9 @@ async def _get_valid_token(session, conn: BankConnection) -> str:
         raise HTTPException(401, "Token expired and no refresh token available — reconnect your bank")
     token_data = await _refresh_access_token(_decrypt(conn.refresh_token), session)
     conn.access_token = _encrypt(token_data["access_token"])
-    if token_data.get("refresh_token"):
-        conn.refresh_token = _encrypt(token_data["refresh_token"])
+    refresh_token = _token_value(token_data.get("refresh_token"))
+    if refresh_token:
+        conn.refresh_token = _encrypt(refresh_token)
     conn.expires_at = datetime.now(timezone.utc) + timedelta(seconds=token_data.get("expires_in", 3600))
     await session.commit()
     return _decrypt(conn.access_token)
@@ -401,7 +406,7 @@ def build_router() -> APIRouter:
                 existing = result.scalar_one_or_none()
                 if existing:
                     existing.access_token = _encrypt(token_data["access_token"])
-                    existing.refresh_token = _encrypt(token_data.get("refresh_token", ""))
+                    existing.refresh_token = _encrypt(_token_value(token_data.get("refresh_token")))
                     existing.expires_at = datetime.now(timezone.utc) + timedelta(seconds=token_data.get("expires_in", 3600))
                     existing.status = "active"
                     existing.last_error = None
@@ -434,7 +439,7 @@ def build_router() -> APIRouter:
                     account_name=acc.get("display_name") or provider_info.get("display_name", "UK Bank"),
                     account_type=acc.get("account_type", ""),
                     access_token=_encrypt(token_data["access_token"]),
-                    refresh_token=_encrypt(token_data.get("refresh_token", "")),
+                    refresh_token=_encrypt(_token_value(token_data.get("refresh_token"))),
                     expires_at=datetime.now(timezone.utc) + timedelta(seconds=token_data.get("expires_in", 3600)),
                     import_start_date=import_from_date,
                     config={"account_ids": [acc.get("account_id", "")]} if acc.get("account_id") else None,
