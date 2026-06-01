@@ -163,13 +163,13 @@ async def _tl_get(session, conn: BankConnection, path: str, params: dict = None)
 
 # ── Auth helpers ──────────────────────────────────────────────────────────
 
-async def _exchange_code(code: str, session) -> dict:
+async def _exchange_code(code: str, redirect_uri: str, session) -> dict:
     cfg = await _tl_config_from_db(session)
     data = {
         "grant_type": "authorization_code",
         "client_id": cfg["client_id"],
         "client_secret": cfg["client_secret"],
-        "redirect_uri": cfg["redirect_uri"],
+        "redirect_uri": redirect_uri,
         "code": code,
     }
     async with httpx.AsyncClient(timeout=30.0) as client:
@@ -344,7 +344,7 @@ def build_router() -> APIRouter:
             import_from_date = state_meta.get("from_date") if isinstance(state_meta, dict) else None
             connection_id_to_update = state_meta.get("connection_id") if isinstance(state_meta, dict) else None
             try:
-                token_data = await _exchange_code(code, session)
+                token_data = await _exchange_code(code, state_doc.redirect_uri, session)
             except Exception as e:
                 await _log_oauth(session, user_id, "token_exchange_failed", {"error": str(e)})
                 return RedirectResponse(f"{frontend}/connections?status=failed&reason=token_exchange")
@@ -606,7 +606,7 @@ async def _sync_connection(session, conn: BankConnection, user_id: str) -> tuple
     dup_count = 0
     page = 1
     has_more = True
-    from_date = conn.import_start_date.isoformat() if conn.import_start_date else None
+    from_date = conn.import_start_date.isoformat() + "T00:00:00Z" if conn.import_start_date else None
     started_at = datetime.now(timezone.utc)
     existing_hashes = set()
 
@@ -624,10 +624,13 @@ async def _sync_connection(session, conn: BankConnection, user_id: str) -> tuple
             if from_date:
                 params["from"] = from_date
             try:
-                data = await _tl_get(session, conn, "/data/v1/transactions", params=params)
+                data = await _tl_get(session, conn, f"/data/v1/accounts/{conn.account_id}/transactions", params=params)
             except Exception as e:
-                await _log_sync(session, user_id, conn.connection_id, "sync_page_failed", "error", str(e)[:500])
-                raise
+                try:
+                    data = await _tl_get(session, conn, f"/data/v1/cards/{conn.account_id}/transactions", params=params)
+                except Exception as e2:
+                    await _log_sync(session, user_id, conn.connection_id, "sync_page_failed", "error", str(e)[:500])
+                    raise
 
             results = data.get("results", [])
             if not results:

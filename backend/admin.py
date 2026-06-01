@@ -161,7 +161,7 @@ def build_router() -> APIRouter:
     # ── Feature Flags ──────────────────────────────────────────────────
 
     @router.get("/feature-flags")
-    async def list_flags(user: dict = Depends(require_admin)):
+    async def list_flags(request: Request, user: dict = Depends(require_admin)):
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(select(FeatureFlag).order_by(FeatureFlag.flag))
@@ -169,7 +169,7 @@ def build_router() -> APIRouter:
                                "description": f.description, "user_id": f.user_id} for f in result.scalars().all()]}
 
     @router.post("/feature-flags")
-    async def create_flag(payload: FeatureFlagIn, user: dict = Depends(require_admin)):
+    async def create_flag(payload: FeatureFlagIn, request: Request, user: dict = Depends(require_admin)):
         sm = request.app.state.db
         async with sm() as session:
             existing = await session.execute(select(FeatureFlag).where(FeatureFlag.flag == payload.flag))
@@ -182,7 +182,7 @@ def build_router() -> APIRouter:
             return {"status": "created", "flag": payload.flag}
 
     @router.put("/feature-flags/{flag_id}")
-    async def update_flag(flag_id: int, payload: FeatureFlagIn, user: dict = Depends(require_admin)):
+    async def update_flag(flag_id: int, payload: FeatureFlagIn, request: Request, user: dict = Depends(require_admin)):
         sm = request.app.state.db
         async with sm() as session:
             ff = (await session.execute(select(FeatureFlag).where(FeatureFlag.id == flag_id))).scalar_one_or_none()
@@ -195,7 +195,7 @@ def build_router() -> APIRouter:
             return {"status": "updated", "flag": ff.flag, "enabled": ff.enabled}
 
     @router.delete("/feature-flags/{flag_id}")
-    async def delete_flag(flag_id: int, user: dict = Depends(require_admin)):
+    async def delete_flag(flag_id: int, request: Request, user: dict = Depends(require_admin)):
         sm = request.app.state.db
         async with sm() as session:
             ff = (await session.execute(select(FeatureFlag).where(FeatureFlag.id == flag_id))).scalar_one_or_none()
