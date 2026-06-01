@@ -137,6 +137,18 @@ def _token_value(value: Optional[str]) -> str:
     return value or ""
 
 
+def _normalize_accounts_payload(payload) -> list[dict]:
+    if isinstance(payload, list):
+        return [item for item in payload if isinstance(item, dict)]
+    if isinstance(payload, dict):
+        results = payload.get("results")
+        if isinstance(results, list):
+            return [item for item in results if isinstance(item, dict)]
+        if isinstance(results, dict):
+            return [results]
+    return []
+
+
 async def _is_configured(session=None) -> bool:
     cfg = await _tl_config_from_db(session)
     return bool(cfg["client_id"] and cfg["client_secret"])
@@ -234,7 +246,7 @@ async def _fetch_accounts(access_token: str, session) -> list:
         async with httpx.AsyncClient(timeout=20.0) as client:
             r = await client.get(f"{cfg['api_url']}/data/v1/accounts", headers={"Authorization": f"Bearer {access_token}"})
         if r.status_code == 200:
-            return r.json().get("results", [])
+            return _normalize_accounts_payload(r.json())
     except Exception as e:
         logger.warning(f"/data/v1/accounts failed: {e}")
     # Fallback to /me for backwards compatibility
@@ -242,7 +254,7 @@ async def _fetch_accounts(access_token: str, session) -> list:
         async with httpx.AsyncClient(timeout=20.0) as client:
             r = await client.get(f"{cfg['api_url']}/data/v1/me", headers={"Authorization": f"Bearer {access_token}"})
         if r.status_code == 200:
-            return r.json().get("results", [])
+            return _normalize_accounts_payload(r.json())
     except Exception as e:
         logger.warning(f"/data/v1/me fallback also failed: {e}")
     return []
@@ -431,7 +443,7 @@ def build_router() -> APIRouter:
                 return RedirectResponse(f"{frontend}/connections?status=failed&reason=no_accounts")
             created_connections = []
             for acc in accounts:
-                provider_info = acc.get("provider", {})
+                provider_info = acc.get("provider") or {}
                 connection_id = f"conn_{uuid.uuid4().hex[:12]}"
                 conn = BankConnection(
                     connection_id=connection_id, user_id=user_id, provider="truelayer",

@@ -6,6 +6,7 @@ os.environ.setdefault("JWT_SECRET", "test-jwt-secret-for-truelayer-auth-params")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from truelayer import _build_auth_link_params
+from truelayer import _normalize_accounts_payload
 from truelayer import _token_value
 
 
@@ -47,3 +48,12 @@ def test_token_value_normalizes_none():
     assert _token_value(None) == ""
     assert _token_value("") == ""
     assert _token_value("abc") == "abc"
+
+
+def test_normalize_accounts_payload():
+    assert _normalize_accounts_payload([]) == []
+    assert _normalize_accounts_payload({"results": []}) == []
+    payload = {"results": [{"account_id": "acc_1", "provider": None}, "ignore-me", 123]}
+    normalized = _normalize_accounts_payload(payload)
+    assert normalized == [{"account_id": "acc_1", "provider": None}]
+    assert _normalize_accounts_payload({"results": {"account_id": "acc_2"}}) == [{"account_id": "acc_2"}]
