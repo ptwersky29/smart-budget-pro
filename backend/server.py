@@ -20,6 +20,7 @@ from sqlalchemy import text
 from db import init_engine, dispose_engine, get_session_maker, Base, create_tables
 
 import auth
+import security
 import truelayer
 import ai_service
 import ai_insights
@@ -105,6 +106,30 @@ app.add_middleware(RequestIdMiddleware)
 app.add_middleware(RateLimitMiddleware, limiter=RateLimiter(limit=120, window=60))
 
 api = APIRouter(prefix="/api")
+
+
+@api.get("/debug/jwt-test")
+async def debug_jwt():
+    import traceback
+    import jwt as pyjwt
+    info = {"pyjwt_version": getattr(pyjwt, "__version__", "unknown")}
+    try:
+        secret = security._require_jwt_secret()
+        info["jwt_secret_status"] = "ok"
+        info["jwt_secret_preview"] = secret[:4] + "..." if len(secret) > 4 else "short"
+    except Exception as e:
+        info["jwt_secret_status"] = f"error: {e}"
+
+    try:
+        bad_token = "eyJhbGciOiJIUzI1NiJ9.ZmFrZQ.abc123"
+        pyjwt.decode(bad_token, "test-secret", algorithms=["HS256"])
+        info["decode_test"] = "unexpected_success"
+    except pyjwt.PyJWTError as e:
+        info["decode_test"] = f"Caught_by_PyJWTError: {type(e).__name__}"
+    except Exception as e:
+        info["decode_test"] = f"NOT_caught_by_PyJWTError: {type(e).__name__}: {e}"
+
+    return info
 
 
 @api.get("/")
