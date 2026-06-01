@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import { api, formatApiError } from "../lib/api";
 import { useSearchParams } from "react-router-dom";
-import { Building2, Loader2, CheckCircle2, XCircle, RefreshCcw, Trash2, ArrowRight, AlertCircle, Clock } from "lucide-react";
+import { Building2, Loader2, CheckCircle2, XCircle, RefreshCcw, Trash2, ArrowRight, AlertCircle, Clock, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, MetricCard, PageHeader, SectionCard } from "../components/ui/layout";
 
@@ -13,12 +13,17 @@ export default function Connections() {
   const [syncLogs, setSyncLogs] = useState([]);
   const [totalTx, setTotalTx] = useState(0);
   const [syncing, setSyncing] = useState(false);
+  const [initialSync, setInitialSync] = useState(false);
+  const [initialSyncPhase, setInitialSyncPhase] = useState("");
   const [needsSetup, setNeedsSetup] = useState(false);
   const [importFromDate, setImportFromDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 90);
     return d.toISOString().slice(0, 10);
   });
+  const [editingNickname, setEditingNickname] = useState(null);
+  const [nicknameValue, setNicknameValue] = useState("");
+  const pollingRef = useRef(null);
 
   const load = useCallback(async () => {
     try {
@@ -34,12 +39,38 @@ export default function Connections() {
     }
   }, []);
 
+  const doSync = useCallback(async () => {
+    setSyncing(true);
+    try {
+      const { data } = await api.post("/truelayer/sync");
+      toast.success(`Synced: ${data.new_transactions} new, ${data.duplicates_skipped} duplicates`);
+      setTotalTx(prev => prev + data.new_transactions);
+      await load();
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Sync failed");
+    } finally { setSyncing(false); }
+  }, [load]);
+
   const reconnectCount = conns.filter((c) => c.status === "reconnect_required").length;
+  const totalBalance = conns.reduce((sum, c) => sum + (c.balance || 0), 0);
 
   useEffect(() => {
     const s = params.get("status");
     const reason = params.get("reason");
-    if (s === "success") { setStatus("success"); toast.success(`Bank connected — ${params.get("accounts") || ""} account(s) linked`); }
+    const accts = parseInt(params.get("accounts") || "0", 10);
+    if (s === "success") {
+      setStatus("success");
+      toast.success(`Bank connected — ${params.get("accounts") || ""} account(s) linked`);
+      // Auto-start initial sync
+      if (accts > 0) {
+        setInitialSync(true);
+        setInitialSyncPhase("Importing transactions...");
+        doSync().finally(() => {
+          setInitialSync(false);
+          setInitialSyncPhase("");
+        });
+      }
+    }
     if (s === "failed") {
       setStatus("failed");
       setError(reason);
@@ -54,7 +85,38 @@ export default function Connections() {
       }
     }
     load();
-  }, [params, load]);
+    // Start polling for live updates
+    if (!pollingRef.current) {
+      pollingRef.current = setInterval(load, 15000); // every 15s
+    }
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [params, load, doSync]);
+
+  const saveNickname = async (connectionId) => {
+    try {
+      await api.put(`/truelayer/connections/${connectionId}`, { nickname: nicknameValue });
+      toast.success("Nickname saved");
+      setEditingNickname(null);
+      await load();
+    } catch (e) {
+      toast.error("Failed to save nickname");
+    }
+  };
+
+  const editDate = async (connectionId, date) => {
+    try {
+      await api.put(`/truelayer/connections/${connectionId}`, { import_start_date: date });
+      toast.success("Import date updated");
+      await load();
+    } catch (e) {
+      toast.error("Failed to update import date");
+    }
+  };
 
   const connect = async () => {
     setStatus("connecting"); setError(null);
@@ -96,18 +158,6 @@ export default function Connections() {
     }
   };
 
-  const syncNow = async () => {
-    setSyncing(true);
-    try {
-      const { data } = await api.post("/truelayer/sync");
-      toast.success(`Synced: ${data.new_transactions} new, ${data.duplicates_skipped} duplicates`);
-      setTotalTx(prev => prev + data.new_transactions);
-      await load();
-    } catch (e) {
-      toast.error(formatApiError(e.response?.data?.detail) || "Sync failed");
-    } finally { setSyncing(false); }
-  };
-
   const removeConn = async (id) => {
     try { await api.delete(`/truelayer/connections/${id}`); toast.success("Connection removed"); await load(); }
     catch (err) { console.error(err); toast.error("Could not remove"); }
@@ -121,9 +171,10 @@ export default function Connections() {
         description="Connect your UK bank securely via TrueLayer, keep sync status visible, and reconnect when needed."
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <MetricCard label="Connections" value={conns.length.toString()} icon={Building2} />
         <MetricCard label="Transactions synced" value={totalTx.toLocaleString()} icon={Clock} />
+        <MetricCard label="Total Balance" value={totalBalance !== 0 ? `£${totalBalance.toLocaleString()}` : "—"} icon={Wallet} tone="emerald" />
         <MetricCard label="Reconnect needed" value={reconnectCount.toString()} tone={reconnectCount ? "ruby" : "emerald"} />
       </div>
 
@@ -144,6 +195,16 @@ export default function Connections() {
           <div className="flex-1">
             <p className="font-medium text-sm">One or more bank connections need reconnecting</p>
             <p className="text-xs text-muted-foreground mt-0.5">Click Connect Bank again to re-authenticate the affected bank and resume automatic sync.</p>
+          </div>
+        </div>
+      )}
+
+      {initialSync && (
+        <div className="rounded-2xl border border-emerald/40 bg-emerald/5 p-5 flex items-center gap-4">
+          <Loader2 className="h-5 w-5 animate-spin text-emerald shrink-0" />
+          <div>
+            <p className="font-medium text-sm text-emerald">{initialSyncPhase}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Your bank transactions are being imported in the background. This may take a minute.</p>
           </div>
         </div>
       )}
@@ -173,7 +234,7 @@ export default function Connections() {
               {status === "failed" && (
                 <button onClick={connect} data-testid="retry-connect" className="btn-pill border border-border text-sm">Retry</button>
               )}
-              <button onClick={connect} disabled={status === "connecting" || status === "redirecting"} data-testid="connect-bank-button" className="btn-pill gradient-emerald text-white text-sm disabled:opacity-50">
+              <button onClick={connect} disabled={status === "connecting" || status === "redirecting" || initialSync} data-testid="connect-bank-button" className="btn-pill gradient-emerald text-white text-sm disabled:opacity-50">
                 {status === "connecting" || status === "redirecting" ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Working…</> : <>Connect Bank <ArrowRight className="h-4 w-4 ml-2" /></>}
               </button>
               </div>
@@ -186,9 +247,9 @@ export default function Connections() {
       <SectionCard eyebrow="Linked accounts" title={`${conns.length} connection${conns.length !== 1 ? "s" : ""}`} contentClassName="p-0">
         <div className="p-6 border-b border-border/70 flex items-center justify-between flex-wrap gap-3">
           {conns.length > 0 && (
-            <button onClick={syncNow} disabled={syncing} data-testid="sync-now" className="btn-pill border border-border text-sm disabled:opacity-50">
-              {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCcw className="h-4 w-4 mr-2" />}
-              {syncing ? "Syncing…" : "Sync now"}
+            <button onClick={doSync} disabled={syncing || initialSync} data-testid="sync-now" className="btn-pill border border-border text-sm disabled:opacity-50">
+              {syncing || initialSync ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCcw className="h-4 w-4 mr-2" />}
+              {syncing || initialSync ? "Syncing…" : "Sync now"}
             </button>
           )}
         </div>
@@ -203,29 +264,52 @@ export default function Connections() {
         ) : (
           <ul>
             {conns.map((c) => (
-              <li key={c.connection_id} className="px-6 py-4 flex items-center justify-between border-b border-border/70 last:border-0">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-secondary grid place-items-center"><Building2 className="h-4 w-4" /></div>
-                  <div>
-                    <p className="font-medium">{c.account_name}
-                      {c.account_type && <span className="text-xs text-muted-foreground ml-2">{c.account_type}</span>}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {c.status === "active" ? <span className="text-emerald">Active</span> : c.status === "reconnect_required" ? <span className="text-ruby">Reconnect required</span> : c.status}
-                      {c.import_from_date && <span className="ml-2">importing from {new Date(c.import_from_date).toLocaleDateString()}</span>}
-                      {c.expires_at && <span className="ml-2">expires {new Date(c.expires_at).toLocaleDateString()}</span>}
-                      {c.last_sync_at && <span className="ml-2">last sync {new Date(c.last_sync_at).toLocaleDateString()}</span>}
+              <li key={c.connection_id} className="px-6 py-4 flex items-center justify-between border-b border-border/70 last:border-0 gap-4">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-10 h-10 rounded-xl bg-secondary grid place-items-center shrink-0"><Building2 className="h-4 w-4" /></div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {editingNickname === c.connection_id ? (
+                        <form onSubmit={(e) => { e.preventDefault(); saveNickname(c.connection_id); }} className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={nicknameValue}
+                            onChange={(e) => setNicknameValue(e.target.value)}
+                            className="h-8 px-3 rounded-xl bg-secondary/50 border border-border focus:border-emerald focus:outline-none text-sm font-medium w-48"
+                            autoFocus
+                          />
+                          <button type="submit" className="text-xs text-emerald font-medium">Save</button>
+                          <button type="button" onClick={() => setEditingNickname(null)} className="text-xs text-muted-foreground">Cancel</button>
+                        </form>
+                      ) : (
+                        <>
+                          <p className="font-medium truncate">{c.account_name}</p>
+                          <button onClick={() => { setEditingNickname(c.connection_id); setNicknameValue(c.nickname || c.account_name); }} className="text-xs text-muted-foreground hover:text-emerald shrink-0">✎</button>
+                        </>
+                      )}
+                      {c.account_type && <span className="text-xs text-muted-foreground shrink-0">{c.account_type}</span>}
+                      {c.balance !== null && c.balance !== undefined && (
+                        <span className="text-sm font-semibold text-foreground ml-auto shrink-0">
+                          £{c.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          <span className="text-xs text-muted-foreground font-normal ml-1">{c.balance_currency}</span>
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {c.status === "active" ? <span className="text-emerald">● Active</span> : c.status === "reconnect_required" ? <span className="text-ruby">● Reconnect required</span> : <span className="text-topaz">● {c.status}</span>}
+                      {c.import_from_date && <span className="ml-2">from {new Date(c.import_from_date).toLocaleDateString()}</span>}
+                      {c.last_sync_at && <span className="ml-2">synced {new Date(c.last_sync_at).toLocaleString()}</span>}
                     </p>
                     {c.last_error && <p className="text-xs text-ruby mt-1 max-w-[48rem] truncate" title={c.last_error}>{c.last_error}</p>}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   {c.status === "reconnect_required" && (
-                    <button onClick={() => reconnectConn(c.connection_id)} data-testid={`reconnect-${c.connection_id}`} className="btn-pill border border-ruby text-ruby text-sm">
+                    <button onClick={() => reconnectConn(c.connection_id)} data-testid={`reconnect-${c.connection_id}`} className="btn-pill border border-ruby text-ruby text-xs whitespace-nowrap">
                       Reconnect
                     </button>
                   )}
-                  <button onClick={() => removeConn(c.connection_id)} data-testid={`remove-${c.connection_id}`} className="h-9 w-9 rounded-full grid place-items-center hover:bg-secondary text-ruby"><Trash2 className="h-4 w-4" /></button>
+                  <button onClick={() => removeConn(c.connection_id)} data-testid={`remove-${c.connection_id}`} className="h-9 w-9 rounded-full grid place-items-center hover:bg-secondary text-ruby" title="Remove connection"><Trash2 className="h-4 w-4" /></button>
                 </div>
               </li>
             ))}

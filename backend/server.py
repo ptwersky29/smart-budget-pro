@@ -17,7 +17,9 @@ from starlette.responses import JSONResponse
 from starlette.requests import Request as StarletteRequest
 from sqlalchemy import text
 
-from db import init_engine, dispose_engine, get_session_maker, Base, create_tables
+import asyncio
+from db import init_engine, dispose_engine, get_session_maker, Base, create_tables, BankConnection
+from sqlalchemy import select
 
 import auth
 import truelayer
@@ -236,6 +238,26 @@ async def startup():
         await auth.seed_admin(session)
     if not os.environ.get("FRONTEND_URL"):
         logger.warning("FRONTEND_URL not set — Google OAuth redirects will fail")
+
+    # Start background sync loop for TrueLayer
+    try:
+        from truelayer import run_background_sync, SYNC_INTERVAL_SECONDS
+
+        async def _background_sync_loop():
+            logger.info("Background TrueLayer sync loop started (interval=%ss)", SYNC_INTERVAL_SECONDS)
+            while True:
+                await asyncio.sleep(SYNC_INTERVAL_SECONDS)
+                try:
+                    db_maker = get_session_maker()
+                    await run_background_sync(db_maker)
+                except Exception as e:
+                    logger.error("Background sync loop error: %s", e)
+
+        asyncio.create_task(_background_sync_loop())
+        logger.info("Background sync task created")
+    except Exception as e:
+        logger.warning("Could not start background sync: %s", e)
+
     logger.info("FinanceAI startup complete.")
 
 

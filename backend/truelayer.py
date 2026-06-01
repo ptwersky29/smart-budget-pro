@@ -28,10 +28,10 @@ from bank_sync_utils import (
 logger = logging.getLogger("truelayer")
 
 SCOPES = "info accounts balance cards transactions direct_debits standing_orders offline_access"
-PROVIDERS = "uk-cs-mock uk-ob-all uk-oauth-all"
 SYNC_PAGE_SIZE = 500
 MAX_RETRIES = 3
 MAX_ERROR_TEXT = 500
+SYNC_INTERVAL_SECONDS = 300  # 5 minutes
 
 
 # ── Encrypted token storage (AES-GCM authenticated encryption) ────────────
@@ -198,12 +198,42 @@ async def _fetch_accounts(access_token: str, session) -> list:
     cfg = await _tl_config_from_db(session)
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
+            r = await client.get(f"{cfg['api_url']}/data/v1/accounts", headers={"Authorization": f"Bearer {access_token}"})
+        if r.status_code == 200:
+            return r.json().get("results", [])
+    except Exception as e:
+        logger.warning(f"/data/v1/accounts failed: {e}")
+    # Fallback to /me for backwards compatibility
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
             r = await client.get(f"{cfg['api_url']}/data/v1/me", headers={"Authorization": f"Bearer {access_token}"})
         if r.status_code == 200:
             return r.json().get("results", [])
     except Exception as e:
-        logger.warning(f"/me failed: {e}")
+        logger.warning(f"/data/v1/me fallback also failed: {e}")
     return []
+
+async def _fetch_and_store_balances(session, token: str, conn: BankConnection, cfg: dict):
+    """Fetch balance for a single account and store it."""
+    account_id = conn.account_id
+    if not account_id:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.get(
+                f"{cfg['api_url']}/data/v1/accounts/{account_id}/balance",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+        if r.status_code == 200:
+            results = r.json().get("results", [])
+            if results:
+                bal = results[0]
+                conn.balance = float(bal.get("balance", 0))
+                conn.balance_currency = bal.get("currency", "GBP")
+                conn.balance_updated_at = datetime.now(timezone.utc)
+                await session.commit()
+    except Exception as e:
+        logger.warning(f"balance fetch failed for {account_id}: {e}")
 
 
 # ── Logging ───────────────────────────────────────────────────────────────
@@ -242,20 +272,32 @@ async def _log_oauth(session, user_id, event, payload):
 def build_router() -> APIRouter:
     router = APIRouter(prefix="/truelayer", tags=["truelayer"])
 
+    def _backend_callback_url(request: Request, cfg: dict) -> str:
+        """Derive the TrueLayer callback URL from the request or config."""
+        if cfg.get("redirect_uri"):
+            return cfg["redirect_uri"]
+        scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+        backend_url = f"{scheme}://{request.url.hostname}"
+        return f"{backend_url}/api/truelayer/callback"
+
     @router.get("/auth-url")
     async def get_auth_url(request: Request, from_date: Optional[str] = Query(None), user: dict = Depends(get_current_user)):
         sm = request.app.state.db
         async with sm() as session:
             if not await _is_configured(session):
                 raise HTTPException(400, "TrueLayer not configured by the administrator.")
+            cfg = await _tl_config_from_db(session)
+            env = cfg.get("environment", "sandbox")
+            # Use correct providers per environment
+            providers = "uk-cs-mock uk-ob-all uk-oauth-all" if env == "sandbox" else "uk-ob-all uk-oauth-all"
             state = secrets.token_urlsafe(24)
             nonce = secrets.token_urlsafe(16)
-            cfg = await _tl_config_from_db(session)
             import_from_date = parse_import_from_date(from_date)
+            redirect_uri = _backend_callback_url(request, cfg)
             session.add(
                 TrueLayerState(
                     state=state, user_id=user["user_id"],
-                    redirect_uri=cfg["redirect_uri"],
+                    redirect_uri=redirect_uri,
                     meta={"from_date": import_from_date} if import_from_date else {},
                     expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
                 )
@@ -264,14 +306,13 @@ def build_router() -> APIRouter:
             await session.execute(
                 delete(TrueLayerState).where(TrueLayerState.expires_at < datetime.now(timezone.utc))
             )
-            redirect_uri = cfg["redirect_uri"] or f"{os.environ.get('FRONTEND_URL', '')}/api/truelayer/callback"
             params = {
                 "response_type": "code", "client_id": cfg["client_id"],
                 "scope": SCOPES, "redirect_uri": redirect_uri,
-                "providers": PROVIDERS, "state": state, "nonce": nonce,
+                "providers": providers, "state": state, "nonce": nonce,
             }
             auth_url = f"{cfg['auth_url']}/?{urlencode(params)}"
-            await _log_oauth(session, user["user_id"], "auth_url_generated", {"state": state})
+            await _log_oauth(session, user["user_id"], "auth_url_generated", {"state": state, "redirect_uri": redirect_uri})
             await session.commit()
             return {"auth_url": auth_url, "state": state, "redirect_uri": redirect_uri}
 
@@ -319,6 +360,11 @@ def build_router() -> APIRouter:
                     existing.update_count = (existing.update_count or 0) + 1
                     await session.delete(state_doc)
                     await session.commit()
+                    # Trigger initial sync for reconnected connection
+                    try:
+                        _, _ = await _sync_connection(session, existing, user_id)
+                    except Exception as e:
+                        logger.error(f"reconnect sync failed for {existing.connection_id}: {e}")
                     return RedirectResponse(f"{frontend}/connections?status=success&accounts=1")
 
             # New connection flow
@@ -328,6 +374,7 @@ def build_router() -> APIRouter:
                 await session.delete(state_doc)
                 await session.commit()
                 return RedirectResponse(f"{frontend}/connections?status=failed&reason=no_accounts")
+            created_connections = []
             for acc in accounts:
                 provider_info = acc.get("provider", {})
                 connection_id = f"conn_{uuid.uuid4().hex[:12]}"
@@ -345,9 +392,16 @@ def build_router() -> APIRouter:
                     last_sync_status="connected",
                 )
                 session.add(conn)
+                created_connections.append(conn)
             await session.delete(state_doc)
             await _log_oauth(session, user_id, "connection_success", {"accounts_count": len(accounts)})
             await session.commit()
+            # Trigger initial sync for all new connections
+            for conn in created_connections:
+                try:
+                    _, _ = await _sync_connection(session, conn, user_id)
+                except Exception as e:
+                    logger.error(f"initial sync failed for {conn.connection_id}: {e}")
             return RedirectResponse(f"{frontend}/connections?status=success&accounts={len(accounts)}")
 
     @router.get("/connections")
@@ -369,7 +423,7 @@ def build_router() -> APIRouter:
             return {
                 "connections": [
                     {"connection_id": c.connection_id, "account_id": c.account_id,
-                     "account_name": c.account_name, "account_type": c.account_type,
+                     "account_name": c.nickname or c.account_name, "account_type": c.account_type,
                      "provider": c.provider, "status": c.status,
                      "created_at": c.created_at.isoformat() if c.created_at else None,
                      "expires_at": c.expires_at.isoformat() if c.expires_at else None,
@@ -378,7 +432,11 @@ def build_router() -> APIRouter:
                      "last_error": c.last_error,
                      "last_error_at": c.last_error_at.isoformat() if c.last_error_at else None,
                      "config": c.config or {},
-                     "import_from_date": c.import_start_date.isoformat() if c.import_start_date else None}
+                     "import_from_date": c.import_start_date.isoformat() if c.import_start_date else None,
+                     "nickname": c.nickname or c.account_name,
+                     "balance": float(c.balance) if c.balance is not None else None,
+                     "balance_currency": c.balance_currency,
+                     "balance_updated_at": c.balance_updated_at.isoformat() if c.balance_updated_at else None}
                     for c in rows
                 ],
                 "total_transactions": tx_counts.get(user["user_id"], 0),
@@ -404,13 +462,16 @@ def build_router() -> APIRouter:
                 raise HTTPException(404, "Connection not found")
             if not await _is_configured(session):
                 raise HTTPException(400, "TrueLayer not configured by the administrator.")
+            cfg = await _tl_config_from_db(session)
+            env = cfg.get("environment", "sandbox")
+            providers = "uk-cs-mock uk-ob-all uk-oauth-all" if env == "sandbox" else "uk-ob-all uk-oauth-all"
             state = secrets.token_urlsafe(24)
             nonce = secrets.token_urlsafe(16)
-            cfg = await _tl_config_from_db(session)
+            redirect_uri = _backend_callback_url(request, cfg)
             session.add(
                 TrueLayerState(
                     state=state, user_id=user["user_id"],
-                    redirect_uri=cfg["redirect_uri"],
+                    redirect_uri=redirect_uri,
                     meta={"connection_id": connection_id,
                           "from_date": conn.import_start_date.isoformat() if conn.import_start_date else None},
                     expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
@@ -419,11 +480,10 @@ def build_router() -> APIRouter:
             await session.execute(
                 delete(TrueLayerState).where(TrueLayerState.expires_at < datetime.now(timezone.utc))
             )
-            redirect_uri = cfg["redirect_uri"] or f"{os.environ.get('FRONTEND_URL', '')}/api/truelayer/callback"
             params = {
                 "response_type": "code", "client_id": cfg["client_id"],
                 "scope": SCOPES, "redirect_uri": redirect_uri,
-                "providers": PROVIDERS, "state": state, "nonce": nonce,
+                "providers": providers, "state": state, "nonce": nonce,
             }
             auth_url = f"{cfg['auth_url']}/?{urlencode(params)}"
             await session.commit()
@@ -455,27 +515,56 @@ def build_router() -> APIRouter:
 
     @router.post("/sync/all")
     async def sync_all_users(request: Request):
-        """Background sync — called by cron. Accepts a secret token for auth."""
+        """Background sync — called by cron or scheduler. Accepts a secret token for auth."""
         token = request.headers.get("X-Sync-Secret")
         expected = os.environ.get("SYNC_SECRET", "")
         if expected and token != expected:
             raise HTTPException(403, "Invalid sync secret")
+        result = await run_background_sync(request.app.state.db)
+        return result
+
+
+# Exported for background scheduler
+async def run_background_sync(db_maker) -> dict:
+    """Sync all active connections. Can be called from scheduler or endpoint."""
+    sm = db_maker
+    async with sm() as session:
+        result = await session.execute(select(BankConnection).where(BankConnection.status == "active"))
+        conns = result.scalars().all()
+        total_new = 0
+        total_dup = 0
+        for conn in conns:
+            try:
+                new, dup = await _sync_connection(session, conn, conn.user_id)
+                total_new += new
+                total_dup += dup
+            except Exception as e:
+                logger.error(f"background sync failed for {conn.connection_id}: {e}")
+                await _log_sync(session, conn.user_id, conn.connection_id, "background_sync_failed", "error", str(e)[:500])
+        logger.info(f"Background sync: {total_new} new, {total_dup} duplicates, {len(conns)} connections")
+        return {"ok": True, "connections_synced": len(conns), "new_transactions": total_new, "duplicates_skipped": total_dup}
+
+    @router.put("/connections/{connection_id}")
+    async def update_connection(connection_id: str, request: Request, user: dict = Depends(get_current_user)):
         sm = request.app.state.db
         async with sm() as session:
-            result = await session.execute(select(BankConnection).where(BankConnection.status == "active"))
-            conns = result.scalars().all()
-            total_new = 0
-            total_dup = 0
-            for conn in conns:
+            result = await session.execute(
+                select(BankConnection).where(BankConnection.connection_id == connection_id, BankConnection.user_id == user["user_id"])
+            )
+            conn = result.scalar_one_or_none()
+            if not conn:
+                raise HTTPException(404, "Connection not found")
+            body = await request.json()
+            if "nickname" in body:
+                conn.nickname = body["nickname"]
+            if "import_start_date" in body:
                 try:
-                    new, dup = await _sync_connection(session, conn, conn.user_id)
-                    total_new += new
-                    total_dup += dup
-                except Exception as e:
-                    logger.error(f"background sync failed for {conn.connection_id}: {e}")
-                    await _log_sync(session, conn.user_id, conn.connection_id, "background_sync_failed", "error", str(e)[:500])
-            logger.info(f"Background sync: {total_new} new, {total_dup} duplicates, {len(conns)} connections")
-            return {"ok": True, "connections_synced": len(conns), "new_transactions": total_new, "duplicates_skipped": total_dup}
+                    conn.import_start_date = date.fromisoformat(body["import_start_date"])
+                except (ValueError, TypeError):
+                    raise HTTPException(400, "Invalid date format. Use YYYY-MM-DD")
+            await session.commit()
+            await _log_sync(session, user["user_id"], connection_id, "connection_updated", "info", "Nickname or settings updated")
+            return {"ok": True}
 
     @router.delete("/connections/{connection_id}")
     async def remove_connection(connection_id: str, request: Request, user: dict = Depends(get_current_user)):
@@ -572,6 +661,14 @@ async def _sync_connection(session, conn: BankConnection, user_id: str) -> tuple
             total_pages = data.get("total_pages", data.get("totalPages", 1))
             has_more = page < total_pages
             page += 1
+
+        # Also fetch and store current balance
+        try:
+            cfg = await _tl_config_from_db(session)
+            token = await _get_valid_token(session, conn)
+            await _fetch_and_store_balances(session, token, conn, cfg)
+        except Exception as e:
+            logger.warning(f"balance sync failed for {conn.connection_id}: {e}")
 
         conn.update_count = (conn.update_count or 0) + 1
         await session.commit()

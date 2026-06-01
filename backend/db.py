@@ -129,6 +129,11 @@ async def create_tables():
             await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS update_count INTEGER DEFAULT 0"))
             await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ"))
             await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS config JSON"))
+            # Phase 3 — Nicknames, balances
+            await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS nickname VARCHAR(255)"))
+            await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS balance NUMERIC(14,2)"))
+            await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS balance_currency VARCHAR(3) DEFAULT 'GBP'"))
+            await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS balance_updated_at TIMESTAMPTZ"))
 
 
 async def get_session() -> AsyncSession:
@@ -270,6 +275,10 @@ class BankConnection(Base):
     import_start_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     update_count: Mapped[int] = mapped_column(Integer, default=0)
     config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    nickname: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    balance: Mapped[Optional[float]] = mapped_column(Numeric(14, 2, asdecimal=False), nullable=True)
+    balance_currency: Mapped[str] = mapped_column(String(3), default="GBP")
+    balance_updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
