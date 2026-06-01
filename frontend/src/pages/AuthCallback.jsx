@@ -25,6 +25,8 @@ export default function AuthCallback() {
             refresh_token: refreshToken || undefined,
           });
           const { access_token, refresh_token, ...userData } = data || {};
+          if (access_token) localStorage.setItem("access_token", access_token);
+          if (refresh_token) localStorage.setItem("refresh_token", refresh_token);
           setUser(userData);
           window.history.replaceState(null, "", "/dashboard");
           navigate("/dashboard", { replace: true, state: { user: userData } });
@@ -43,6 +45,8 @@ export default function AuthCallback() {
       try {
         const { data } = await api.post("/auth/emergent-session", { session_id: sessionId });
         const { access_token, refresh_token, ...userData } = data || {};
+        if (access_token) localStorage.setItem("access_token", access_token);
+        if (refresh_token) localStorage.setItem("refresh_token", refresh_token);
         setUser(userData);
         window.history.replaceState(null, "", "/dashboard");
         navigate("/dashboard", { replace: true, state: { user: userData } });
