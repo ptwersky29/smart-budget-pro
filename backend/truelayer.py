@@ -273,12 +273,18 @@ def build_router() -> APIRouter:
     router = APIRouter(prefix="/truelayer", tags=["truelayer"])
 
     def _backend_callback_url(request: Request, cfg: dict) -> str:
-        """Derive the TrueLayer callback URL from the request or config."""
-        if cfg.get("redirect_uri"):
-            return cfg["redirect_uri"]
-        scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
-        backend_url = f"{scheme}://{request.url.hostname}"
-        return f"{backend_url}/api/truelayer/callback"
+        """Derive the TrueLayer callback URL from the request.
+
+        Always derive from the live request so the redirect_uri exactly matches
+        the host the browser used to reach us (and what's registered in the
+        TrueLayer Console). Ignore any stale value in cfg/env to avoid
+        "Invalid redirect_uri" errors from mismatched dev/prod URLs.
+        """
+        scheme = request.headers.get("x-forwarded-proto") or request.url.scheme or "https"
+        if scheme not in ("http", "https"):
+            scheme = "https"
+        host = request.url.hostname or "budget-pro-4jlg.onrender.com"
+        return f"{scheme}://{host}/api/truelayer/callback"
 
     @router.get("/auth-url")
     async def get_auth_url(request: Request, from_date: Optional[str] = Query(None), user: dict = Depends(get_current_user)):
@@ -294,6 +300,9 @@ def build_router() -> APIRouter:
             nonce = secrets.token_urlsafe(16)
             import_from_date = parse_import_from_date(from_date)
             redirect_uri = _backend_callback_url(request, cfg)
+            logger.info("truelayer auth-url: env=%s redirect_uri=%r scheme=%s host=%s xfp=%s",
+                        env, redirect_uri, request.url.scheme, request.url.hostname,
+                        request.headers.get("x-forwarded-proto", ""))
             session.add(
                 TrueLayerState(
                     state=state, user_id=user["user_id"],
