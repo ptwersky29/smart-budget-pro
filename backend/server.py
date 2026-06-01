@@ -189,6 +189,8 @@ async def startup():
     sm = get_session_maker()
     async with sm() as session:
         await auth.seed_admin(session)
+    if not os.environ.get("FRONTEND_URL"):
+        logger.warning("FRONTEND_URL not set — Google OAuth redirects will fail")
     logger.info("FinanceAI startup complete.")
 
 

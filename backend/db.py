@@ -128,6 +128,7 @@ async def create_tables():
             await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS import_start_date DATE"))
             await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS update_count INTEGER DEFAULT 0"))
             await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ"))
+            await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS config JSON"))
 
 
 async def get_session() -> AsyncSession:
