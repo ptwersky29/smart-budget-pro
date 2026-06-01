@@ -13,6 +13,8 @@ import logging.config
 from datetime import datetime, timezone
 from fastapi import FastAPI, APIRouter
 from starlette.middleware.cors import CORSMiddleware
+from starlette.responses import JSONResponse
+from starlette.requests import Request as StarletteRequest
 from sqlalchemy import text
 
 from db import init_engine, dispose_engine, get_session_maker, Base, create_tables
@@ -171,6 +173,15 @@ api.include_router(analytics.build_router())
 api.include_router(empty_states.build_router())
 
 app.include_router(api)
+
+# Global exception handler — catches every unhandled error and logs it
+@app.exception_handler(Exception)
+async def global_exception_handler(request: StarletteRequest, exc: Exception):
+    logger.exception("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Server error: {type(exc).__name__}: {exc}"},
+    )
 
 # CORS: allow frontend origin with credentials
 frontend = os.environ.get("FRONTEND_URL", "")
