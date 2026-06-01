@@ -273,13 +273,16 @@ def build_router() -> APIRouter:
     router = APIRouter(prefix="/truelayer", tags=["truelayer"])
 
     def _backend_callback_url(request: Request, cfg: dict) -> str:
-        """Derive the TrueLayer callback URL from the request.
+        """Resolve the exact TrueLayer callback URL.
 
-        Always derive from the live request so the redirect_uri exactly matches
-        the host the browser used to reach us (and what's registered in the
-        TrueLayer Console). Ignore any stale value in cfg/env to avoid
-        "Invalid redirect_uri" errors from mismatched dev/prod URLs.
+        Prefer the admin/env configured redirect URI because TrueLayer requires
+        an exact string match with the URL registered in the console.
+        Fall back to the live request only when no configured redirect exists.
         """
+        configured = (cfg.get("redirect_uri") or "").strip()
+        if configured:
+            return configured
+
         scheme = request.headers.get("x-forwarded-proto") or request.url.scheme or "https"
         if scheme not in ("http", "https"):
             scheme = "https"
@@ -290,7 +293,9 @@ def build_router() -> APIRouter:
             or urlparse(os.environ.get("RENDER_EXTERNAL_URL", "")).hostname
             or "financeai-api.onrender.com"
         )
-        return f"{scheme}://{host}/api/truelayer/callback"
+        derived = f"{scheme}://{host}/api/truelayer/callback"
+        logger.warning("TrueLayer redirect_uri not configured; derived %s. Register this exact URL in TrueLayer Console.", derived)
+        return derived
 
     @router.get("/auth-url")
     async def get_auth_url(request: Request, from_date: Optional[str] = Query(None), user: dict = Depends(get_current_user)):
