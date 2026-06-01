@@ -11,7 +11,7 @@ import json
 import logging
 import logging.config
 from datetime import datetime, timezone
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 from starlette.requests import Request as StarletteRequest
@@ -178,52 +178,44 @@ api.include_router(empty_states.build_router())
 
 app.include_router(api)
 
-# Global exception handler — catches every unhandled error and logs it
-@app.exception_handler(Exception)
-async def global_exception_handler(request: StarletteRequest, exc: Exception):
-    # Re-raise HTTPException so FastAPI's default handler processes it (preserves status code + CORS)
-    if isinstance(exc, HTTPException):
-        raise exc
-    logger.exception("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
-    origin = request.headers.get("origin", "")
-    cors_headers = {}
-    if origin and (
-        origin in origins
-        or origin.startswith("https://")
-        and origin.endswith(".vercel.app")
-    ):
-        cors_headers["Access-Control-Allow-Origin"] = origin
-        cors_headers["Access-Control-Allow-Credentials"] = "true"
-        cors_headers["Vary"] = "Origin"
-    return JSONResponse(
-        status_code=500,
-        content={"detail": f"Server error: {type(exc).__name__}: {exc}"},
-        headers=cors_headers,
-    )
+# CORS config (defined before exception handlers that reference it)
+frontend_url = os.environ.get("FRONTEND_URL", "")
+vercel_url = "https://smart-budget-pro-ewtm.vercel.app"
+origins = list({o for o in [frontend_url, vercel_url, "http://localhost:3000", "http://127.0.0.1:3000"] if o})
 
-# Also add a handler for HTTPException that adds CORS headers
+def _cors_headers(request: StarletteRequest):
+    """Build CORS headers for the given origin."""
+    origin = request.headers.get("origin", "")
+    if not origin:
+        return {}
+    if origin in origins or (origin.startswith("https://") and origin.endswith(".vercel.app")):
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Vary": "Origin",
+        }
+    return {}
+
+# HTTPException handler adds CORS headers (preserves status code)
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: StarletteRequest, exc: HTTPException):
-    origin = request.headers.get("origin", "")
-    cors_headers = {}
-    if origin and (
-        origin in origins
-        or origin.startswith("https://")
-        and origin.endswith(".vercel.app")
-    ):
-        cors_headers["Access-Control-Allow-Origin"] = origin
-        cors_headers["Access-Control-Allow-Credentials"] = "true"
-        cors_headers["Vary"] = "Origin"
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
-        headers=cors_headers,
+        headers=_cors_headers(request),
+    )
+
+# Global exception handler — catches every unhandled error and logs it
+@app.exception_handler(Exception)
+async def global_exception_handler(request: StarletteRequest, exc: Exception):
+    logger.exception("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Server error: {type(exc).__name__}: {exc}"},
+        headers=_cors_headers(request),
     )
 
 # CORS: allow frontend origin with credentials
-frontend = os.environ.get("FRONTEND_URL", "")
-vercel_url = "https://smart-budget-pro-ewtm.vercel.app"
-origins = list({o for o in [frontend, vercel_url, "http://localhost:3000", "http://127.0.0.1:3000"] if o})
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins or ["http://localhost:3000"],

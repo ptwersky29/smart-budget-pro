@@ -470,7 +470,12 @@ def build_router() -> APIRouter:
 
     @router.post("/refresh")
     async def refresh_token(request: Request, response: Response):
+        # Accept token from cookie (browser) or Authorization header (localStorage)
         token = request.cookies.get("refresh_token")
+        if not token:
+            auth = request.headers.get("Authorization", "")
+            if auth.startswith("Bearer "):
+                token = auth[7:]
         if not token:
             raise HTTPException(401, "No refresh token")
         try:

@@ -59,7 +59,13 @@ api.interceptors.response.use(
     ) {
       originalRequest._retry = true;
       try {
-        const refreshResponse = await axios.post(`${API}/auth/refresh`, {}, { withCredentials: true });
+        // Send refresh token from either cookie (browser) or localStorage (cross-site fallback)
+        const storedRt = localStorage.getItem("refresh_token");
+        const refreshHeaders = storedRt ? { Authorization: `Bearer ${storedRt}` } : {};
+        const refreshResponse = await axios.post(`${API}/auth/refresh`, {}, {
+          withCredentials: true,
+          headers: refreshHeaders,
+        });
         if (refreshResponse?.data?.access_token) {
           localStorage.setItem("access_token", refreshResponse.data.access_token);
         }

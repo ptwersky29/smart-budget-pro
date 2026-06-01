@@ -39,6 +39,12 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     syncTokensFromLocation();
+    // If URL hash has OAuth tokens, AuthCallback will handle auth — skip
+    // checkAuth to avoid race where it sets user=false before AuthCallback finishes
+    if (window.location.hash.includes("access_token=")) {
+      setLoading(false);
+      return;
+    }
     checkAuth();
   }, [checkAuth, syncTokensFromLocation]);
 
