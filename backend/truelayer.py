@@ -8,7 +8,7 @@ import json
 import logging
 from base64 import b64encode, b64decode
 from datetime import datetime, timezone, timedelta, date
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from typing import Optional
 
 import httpx
@@ -283,7 +283,13 @@ def build_router() -> APIRouter:
         scheme = request.headers.get("x-forwarded-proto") or request.url.scheme or "https"
         if scheme not in ("http", "https"):
             scheme = "https"
-        host = request.url.hostname or "budget-pro-4jlg.onrender.com"
+        host = (
+            request.headers.get("x-forwarded-host")
+            or request.headers.get("host")
+            or request.url.hostname
+            or urlparse(os.environ.get("RENDER_EXTERNAL_URL", "")).hostname
+            or "financeai-api.onrender.com"
+        )
         return f"{scheme}://{host}/api/truelayer/callback"
 
     @router.get("/auth-url")
