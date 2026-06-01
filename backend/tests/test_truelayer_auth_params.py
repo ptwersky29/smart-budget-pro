@@ -20,9 +20,9 @@ def test_build_auth_link_params_sandbox():
 
     assert params["client_id"] == "client_123"
     assert params["redirect_uri"] == "https://example.com/api/truelayer/callback"
-    assert params["providers"] == "uk-ob-all uk-oauth-all"
     assert params["country_id"] == "GB"
     assert params["user_email"] == "user@example.com"
+    assert "providers" not in params
     assert "provider_id" not in params
 
 
@@ -36,7 +36,7 @@ def test_build_auth_link_params_live():
         user_email="user@example.com",
     )
 
-    assert params["providers"] == "uk-ob-all uk-oauth-all"
+    assert "providers" not in params
     assert "country_id" not in params
     assert "user_email" not in params
     assert "provider_id" not in params

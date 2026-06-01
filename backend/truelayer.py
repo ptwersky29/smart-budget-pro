@@ -123,7 +123,6 @@ def _build_auth_link_params(
         "client_id": cfg["client_id"],
         "scope": SCOPES,
         "redirect_uri": redirect_uri,
-        "providers": "uk-ob-all uk-oauth-all",
         "state": state,
         "nonce": nonce,
     }
