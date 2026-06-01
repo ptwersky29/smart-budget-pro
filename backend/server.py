@@ -181,6 +181,9 @@ app.include_router(api)
 # Global exception handler — catches every unhandled error and logs it
 @app.exception_handler(Exception)
 async def global_exception_handler(request: StarletteRequest, exc: Exception):
+    # Re-raise HTTPException so FastAPI's default handler processes it (preserves status code + CORS)
+    if isinstance(exc, HTTPException):
+        raise exc
     logger.exception("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
     origin = request.headers.get("origin", "")
     cors_headers = {}
@@ -195,6 +198,25 @@ async def global_exception_handler(request: StarletteRequest, exc: Exception):
     return JSONResponse(
         status_code=500,
         content={"detail": f"Server error: {type(exc).__name__}: {exc}"},
+        headers=cors_headers,
+    )
+
+# Also add a handler for HTTPException that adds CORS headers
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: StarletteRequest, exc: HTTPException):
+    origin = request.headers.get("origin", "")
+    cors_headers = {}
+    if origin and (
+        origin in origins
+        or origin.startswith("https://")
+        and origin.endswith(".vercel.app")
+    ):
+        cors_headers["Access-Control-Allow-Origin"] = origin
+        cors_headers["Access-Control-Allow-Credentials"] = "true"
+        cors_headers["Vary"] = "Origin"
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
         headers=cors_headers,
     )
 
