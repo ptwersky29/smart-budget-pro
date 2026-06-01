@@ -2,7 +2,7 @@ import axios from "axios";
 
 const fallbackBackend =
   typeof window !== "undefined" && window.location.hostname.endsWith(".vercel.app")
-    ? (process.env.REACT_APP_BACKEND_URL || "https://financeai-api.onrender.com")
+    ? (process.env.REACT_APP_BACKEND_URL || "https://budget-pro-4jlg.onrender.com")
     : "http://localhost:8000";
 
 export const BACKEND_URL = (process.env.REACT_APP_BACKEND_URL || fallbackBackend).replace(/\/+$/, "");

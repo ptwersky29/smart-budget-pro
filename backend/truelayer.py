@@ -291,7 +291,7 @@ def build_router() -> APIRouter:
             or request.headers.get("host")
             or request.url.hostname
             or urlparse(os.environ.get("RENDER_EXTERNAL_URL", "")).hostname
-            or "financeai-api.onrender.com"
+            or "budget-pro-4jlg.onrender.com"
         )
         derived = f"{scheme}://{host}/api/truelayer/callback"
         logger.warning("TrueLayer redirect_uri not configured; derived %s. Register this exact URL in TrueLayer Console.", derived)

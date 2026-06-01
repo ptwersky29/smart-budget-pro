@@ -14,7 +14,7 @@ services:
       - key: FRONTEND_URL
         value: https://smart-budget-pro-ewtm.vercel.app
       - key: TRUELAYER_REDIRECT_URI
-        value: https://financeai-api.onrender.com/api/truelayer/callback
+        value: https://budget-pro-4jlg.onrender.com/api/truelayer/callback
       - key: ADMIN_EMAIL
         sync: false
       - key: ADMIN_PASSWORD
