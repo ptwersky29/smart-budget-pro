@@ -92,6 +92,8 @@ logger.info("JWT_SECRET validated")
 init_engine(database_url, echo=False)
 
 app = FastAPI(title="FinanceAI API", version="1.1.0")
+
+GIT_COMMIT = "c0ff566"
 app.state.db = get_session_maker()
 
 # Middleware stack (order matters: outermost first)
@@ -120,6 +122,7 @@ async def health():
             return {
                 "status": "ok",
                 "version": app.version,
+                "commit": GIT_COMMIT,
                 "database": "connected",
                 "auth_configured": bool(os.environ.get("JWT_SECRET")),
                 "frontend_url_set": bool(os.environ.get("FRONTEND_URL")),
@@ -130,6 +133,7 @@ async def health():
         return {
             "status": "error",
             "version": app.version,
+            "commit": GIT_COMMIT,
             "detail": str(e),
             "database": "unavailable",
             "auth_configured": bool(os.environ.get("JWT_SECRET")),
