@@ -331,6 +331,9 @@ def build_router() -> APIRouter:
                 "scope": SCOPES, "redirect_uri": redirect_uri,
                 "providers": providers, "state": state, "nonce": nonce,
             }
+            if env == "sandbox":
+                params["provider_id"] = "uk-cs-mock"
+                params["user_email"] = user.get("email", "")
             auth_url = f"{cfg['auth_url']}/?{urlencode(params)}"
             await _log_oauth(session, user["user_id"], "auth_url_generated", {"state": state, "redirect_uri": redirect_uri})
             await session.commit()
@@ -505,6 +508,9 @@ def build_router() -> APIRouter:
                 "scope": SCOPES, "redirect_uri": redirect_uri,
                 "providers": providers, "state": state, "nonce": nonce,
             }
+            if env == "sandbox":
+                params["provider_id"] = "uk-cs-mock"
+                params["user_email"] = user.get("email", "")
             auth_url = f"{cfg['auth_url']}/?{urlencode(params)}"
             await session.commit()
             return {"auth_url": auth_url, "state": state, "redirect_uri": redirect_uri}
