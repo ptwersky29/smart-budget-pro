@@ -117,8 +117,8 @@ CATEGORISE_KEYWORDS = {
     "subscriptions": ["netflix", "spotify", "disney+", "disney plus", "apple.com/bill", "apple.com", "icloud", "google one", "microsoft 365", "office 365", "dropbox", "adobe", "notion", "slack", "zoom", "github", "patreon", "onlyfans", "paramount", "now tv", "hbo", "apple tv", "youtube premium", "tidal", "deezer", "audible", "kindle unlimited", "puregym", "david lloyd", "nuffield", "anytime fitness", "the gym", "gym membership"],
     "utilities": ["british gas", "edf energy", "edf ", "eon ", "octopus energy", "octopus ", "scottish power", "npower", "bulb ", "ovo energy", "ovo ", "thames water", "anglian water", "welsh water", "bt ", " sky ", "sky tv", "sky broadband", "virgin media", "vodafone", " ee ", " three ", " o2 ", "talk talk", "plusnet", "council tax", "gas bill", "electricity", "broadband", "phone bill", "internet bill", "water bill"],
     "groceries": ["tesco", "sainsbury", "asda", "waitrose", "lidl", "aldi", "morrisons", "co-op", "coop", "m&s food", "marks & spencer", "iceland", "farmfoods", "budgens", "spar ", "nisa", "londis", "supermarket", "tesco metro", "sainsbury's", "ocado"],
-    "dining": ["mcdonald", "nando", "kfc", "subway ", "pret a manger", "pret ", "starbucks", "costa ", "cafe nero", "wagamama", "pizza hut", "dominos", "deliveroo", "uber eats", "just eat", "restaurant", "cafe ", "café", "bistro", " pub ", "bar ", "grill", "kitchen", "diner", "brasserie", "eatery", "bagel", "sushi", "noodle", " thai", " indian", " chinese", "chippy", "fish & chips", "greek", "burger"],
-    "transport": ["uber trip", "uber ", "bolt ", "lyft", "free now", "viavan", "addison lee", "tfl ", "oyster", "tube ", "trainline", "national rail", "stagecoach", "arriva", "first bus", "shell ", " bp ", "esso", "texaco", "petrol", "parking", "ncp", "apcoa", "zipcar", "enterprise rent", "hertz", "avis ", "budget rent", "autoglass", "kwik fit", "halfords", "dvla", "car tax", "vehicle tax"],
+    "dining": ["mcdonald", "nando", "kfc", "subway ", "pret a manger", "pret ", "starbucks", "costa ", "cafe nero", "wagamama", "pizza hut", "dominos", "papa johns", "deliveroo", "uber eats", "uber_eats", "just eat", "justeat", "restaurant", "cafe ", "café", "bistro", " pub ", "bar ", "grill", "kitchen", "diner", "brasserie", "eatery", "bagel", "sushi", "noodle", " thai", " indian", " chinese", "chippy", "fish & chips", "greek", "burger", "kebab", "pizza", "taco", "burrito", "greggs", "leon ", "wasabi", "itsu", "dishoom", "yo! sushi", "pizzaexpress", "zizzi", "ask italian", "prezzo", "frankie & benny", "toby carvery", "harvester", "beefeater", "brewers fayre", "wethers", "spoons", "weatherspoon", "jamie oliver", "gordon ramsay", "m&s food to go", "meal deal", "breakfast", "lunch"],
+    "transport": ["uber trip", "uber ", "bolt ", "lyft", "free now", "viavan", "addison lee", "tfl ", "oyster", "tube ", "trainline", "national rail", "stagecoach", "arriva", "first bus", "shell ", " bp ", "esso", "texaco", "petrol", "diesel", "unleaded", "ev charge", "parking", "ncp", "apcoa", "ringgo", "paybyphone", "zipcar", "enterprise rent", "hertz", "avis ", "budget rent", "autoglass", "kwik fit", "halfords", "dvla", "car tax", "vehicle tax", "mot test", "barclays cycle", "santander cycle", "lime ", "bike rental"],
     "health": ["boots", "lloyds pharmacy", "superdrug", "pharmacy", "nhs ", "bupa", "dental", "dentist", "optician", "specsavers", "vision express", "hospital", " clinic", "physio", "chiropractor", "counselling", "therapy", "prescription"],
     "entertainment": ["odeon", "vue cinema", "vue ", "cineworld", " cinema", "theatre", "concert", "stubhub", "viagogo", "steam ", "playstation", "xbox", "nintendo", "epic games", "gog.com"],
     "shopping": ["amazon", "ebay", "argos", "john lewis", "next ", "zara", "h&m", "primark", "tk maxx", "matalan", "asos", "boohoo", "river island", "new look", "debenhams", "selfridges", "harrods", "apple store", "currys", "pc world", "game ", "decathlon", "ikea", "dunelm", "wilko", "homebase", "b&q", "wickes", "screwfix", "toolstation", "amazon.co.uk"],
@@ -137,62 +137,56 @@ CATEGORISE_KEYWORDS = {
 
 def _keyword_categorise(description: str, merchant: str | None, amount: float) -> str | None:
     """Fast keyword-based categorisation. Returns category if confident, else None.
-    Categories are checked in priority order (most specific first) so e.g. 'amazon prime' → subscriptions, not shopping."""
+    Amount-aware: small supermarket tx (< £10) → dining (meal deal/snack), not groceries."""
     text = f" {(description or '').lower()} {(merchant or '').lower()} "
     if not text.strip():
         return None
+    abs_amt = abs(amount)
     for category, keywords in CATEGORISE_KEYWORDS.items():
         for kw in keywords:
             if kw in text:
                 if category in ("income", "salary") and amount <= 0:
                     continue
+                # Amount-aware: small supermarket tx is likely a meal deal → dining
+                if category == "groceries" and abs_amt < 10:
+                    return "dining"
                 return category
     return None
 
 
-CATEGORISE_PROMPT = """You are a UK bank transaction categoriser. Given the description, merchant, and amount of a transaction, choose the best single category.
+CATEGORISE_PROMPT = """You are a UK bank transaction categoriser. Think step by step: consider the merchant name, the description text, AND the amount together — the same merchant can mean different categories depending on what was bought and how much was spent.
 
-SIGN: amount > 0 means money coming IN (income), amount < 0 means money going OUT (expense).
+SIGN: amount > 0 = money IN (income). amount < 0 = money OUT (expense).
 
 CATEGORIES:
 - income: salary, wages, pension, refunds, interest, dividends (amount > 0)
-- groceries: supermarkets, food shops (Tesco, Sainsbury's, Asda, Waitrose, Lidl, Aldi, M&S, Co-op, Morrisons)
-- dining: restaurants, cafes, takeaways, pubs, bars, fast food (McDonald's, Nando's, Pret, Starbucks, Deliveroo, Uber Eats, Just Eat)
-- transport: fuel, parking, tube, train, bus, taxi, Uber, Bolt, TfL, Oyster, rail tickets, car maintenance
+- groceries: supermarket food shopping. AMOUNT-AWARE: small supermarket tx (< £10 at Tesco/Co-op/Sainsbury) is likely a meal deal/snack → dining, not groceries. Over £10 = groceries.
+- dining: restaurants, cafes, takeaways, fast food, coffee shops, meal deals. "Uber" + food keywords = dining. "Uber" + trip/ride keywords = transport.
+- transport: fuel, parking, tube, train, bus, taxi, Uber/Bolt rides, TfL, Oyster, rail tickets, car maintenance, EV charging
 - utilities: gas, electric, water, broadband, phone, council tax (British Gas, EDF, Eon, Octopus, BT, Sky, Virgin, Vodafone, EE, Three, O2)
-- subscriptions: streaming, software, memberships (Netflix, Spotify, Disney+, Amazon Prime, Apple, iCloud, gym)
-- tzedakah: charitable donations, Jewish charitable giving (Jewish charities, tzedakah, Gift Aid to charity)
-- rent: monthly rent payments to landlord or letting agent
-- shopping: general retail, online shopping, clothes, electronics (Amazon non-Prime, eBay, Argos, John Lewis, Next, H&M, Zara, Primark)
-- health: pharmacies, GP, dentist, opticians, hospital (Boots, Lloyds Pharmacy, NHS, Bupa)
-- entertainment: cinema, theatre, concerts, books, games (Odeon, Vue, Cineworld, Steam, PlayStation, Xbox)
-- insurance: home, car, life, pet, travel insurance (Aviva, Direct Line, Admiral, LV=, Churchill)
-- education: tuition, books, courses, training (UCAS, university, Udemy, Coursera)
-- transfer: bank transfers between own accounts, peer-to-peer (Faster Payment, BACS, standing order to own account, Monzo to Monzo, Revolut)
-- cash: ATM withdrawals, cashback
-- tax: HMRC, VAT, self-assessment, council tax
-- fees: bank fees, overdraft, FX, interest charges
-- mortgage: monthly mortgage payments
-- uncategorized: only if nothing above fits
+- subscriptions: streaming, software, memberships, recurring small payments (Netflix, Spotify, Disney+, Amazon Prime, Apple, iCloud, gym, Google)
+- tzedakah: charitable donations, Jewish charitable giving (Jewish charities, tzedakah, Gift Aid, direct debit to charity)
+- rent: monthly rent payments to landlord or letting agent (usually >500 and monthly pattern)
+- shopping: general retail, online shopping, clothes, electronics (Amazon non-Prime, eBay, Argos, John Lewis, Next, H&M, Zara, Primark, M&S clothes)
+- health: pharmacies, GP, dentist, opticians, hospital, gym, fitness (Boots, Lloyds Pharmacy, Superdrug, NHS, Bupa, PureGym, The Gym Group)
+- entertainment: cinema, theatre, concerts, books, games, hobbies (Odeon, Vue, Cineworld, Steam, PlayStation, Xbox, Waterstones)
+- insurance: home, car, life, pet, travel insurance (Aviva, Direct Line, Admiral, LV=, Churchill, comparethemarket)
+- education: tuition, books, courses, training (UCAS, university, Udemy, Coursera, Skillshare)
+- transfer: bank transfers between own accounts, peer-to-peer, savings pots (Faster Payment, BACS, standing order to savings, Monzo to Monzo, Revolut)
+- cash: ATM withdrawals, cashback, "CASH"
+- tax: HMRC, VAT, self-assessment, council tax, tax credits
+- fees: bank fees, overdraft, FX fees, interest charges, credit card fees
+- mortgage: monthly mortgage payments, home loan payments
+- uncategorized: only if truly nothing above fits
+
+AMOUNT-AWARE LOGIC (use this to disambiguate):
+- Tesco/Co-op/Sainsbury < £10 → dining (meal deal/snack), >= £10 → groceries
+- Amazon < £15 → possibly shopping (small item), >= £15 → shopping; if "PRIME" or "MUSIC" or "VIDEO" → subscriptions regardless of amount
+- Uber: check description for "EATS" → dining, "TRIP"/"RIDE" → transport
+- PayPal: check description — if "PAYPAL *TRANSFER" → transfer, if "PAYPAL *EBAY" → shopping, if "PAYPAL *UBER" → depends on Uber context
+- Any recurring small amount (3.99-14.99) with digital service name likely → subscriptions
 
 Output STRICT JSON only: {{"category": "<one of the above>"}}
-
-Examples:
-- "TESCO STORE 1234" | merchant: tesco | amount: -45.99 -> "groceries"
-- "MCDONALD'S" | merchant: mcdonald | amount: -12.50 -> "dining"
-- "BACS SALARY ACME LTD" | merchant: acme | amount: 2500.00 -> "salary"
-- "INTEREST" | merchant: bank | amount: 12.34 -> "income"
-- "AMAZON PRIME" | merchant: amazon | amount: -7.99 -> "subscriptions"
-- "AMAZON.CO.UK*XYZ" | merchant: amazon | amount: -34.99 -> "shopping"
-- "NATIONAL GRID" | merchant: national grid | amount: -85.00 -> "utilities"
-- "SHELL FORECOURT" | merchant: shell | amount: -52.30 -> "transport"
-- "UBER TRIP" | merchant: uber | amount: -15.40 -> "transport"
-- "NETFLIX.COM" | merchant: netflix | amount: -15.99 -> "subscriptions"
-- "BOOTS PHARMACY" | merchant: boots | amount: -8.75 -> "health"
-- "GIFT AID DONATION" | merchant: charity | amount: -50.00 -> "tzedakah"
-- "HMRC TAX" | merchant: hmrc | amount: -1200.00 -> "tax"
-- "ATM CASH" | merchant: link | amount: -100.00 -> "cash"
-- "MONZO TO MONZO" | merchant: monzo | amount: -25.00 -> "transfer"
 
 Transaction: {description}
 Merchant: {merchant}

@@ -258,25 +258,38 @@ def smart_categorize(text: str) -> str:
     return "uncategorized"
 
 
-CATEGORISE_PROMPT_FE = """You are a UK bank transaction categoriser. Given the description, merchant, and amount of a transaction, choose the best single category.
+CATEGORISE_PROMPT_FE = """You are a UK bank transaction categoriser. Think step by step about what this transaction is, then output the category.
 
 CATEGORIES (pick exactly one):
 income, salary, groceries, dining, transport, utilities, subscriptions, tzedakah, rent, shopping, health, entertainment, insurance, education, transfer, cash, tax, fees, mortgage, uncategorized
 
-SIGN: amount > 0 means money coming IN (use 'salary' or 'income'), amount < 0 means money going OUT (use an expense category).
+RULES:
+- amount > 0 = money IN (income/salary). amount < 0 = money OUT (expense category).
+- AMOUNT CONTEXT: small amounts at supermarkets (< £10) are often meal deals/lunch → dining. Large amounts at supermarkets (> £30) are weekly shops → groceries.
+- If merchant is vague but description suggests a pattern, use the category that best fits the merchant + amount combination.
+- If truly uncertain, use "uncategorized" rather than guessing wildly.
 
-UK MERCHANT HINTS:
-- Tesco/Sainsbury/Asda/Waitrose/Lidl/Aldi/M&S/Co-op/Morrisons → groceries
-- McDonald/Nando/KFC/Pret/Starbucks/Deliveroo/Uber Eats → dining
-- Uber/Bolt/TfL/Oyster/Shell/BP/Trainline → transport
-- British Gas/EDF/Eon/Octopus/BT/Sky/Vodafone/EE → utilities
-- Netflix/Spotify/Disney+/Apple.com/Amazon Prime → subscriptions
-- Boots/Lloyds Pharmacy/Specsavers → health
-- Amazon non-Prime/eBay/Argos/John Lewis/Next/H&M/Primark → shopping
-- HMRC/tax/VAT → tax
-- ATM/cash withdrawal → cash
-- Faster payment/standing order/Monzo-to-Monzo/PayPal → transfer
-- Charity/tzedakah → tzedakah
+MERCHANT → CATEGORY (with amount-aware logic):
+- Tesco/Sainsbury/Asda/Waitrose/Lidl/Aldi/Co-op/Morrisons: if abs(amount) < 10 → dining (meal deal/snack), if abs(amount) >= 10 → groceries (weekly shop)
+- McDonald/Nando/KFC/Pret/Starbucks/Costa → dining (always)
+- Deliveroo/Uber Eats/JustEat: if merchant says "uber" but description says "Uber Eats" → dining; if "Uber trip" → transport
+- Uber/Bolt: check description — "uber eats" → dining, "trip/ride" → transport
+- TfL/Oyster/Shell/BP/Esso/SSE/texaco/Applegreen → transport
+- Trainline/raileasy → transport
+- British Gas/EDF/Eon/Octopus/BT/Sky/Virgin/Vodafone/EE → utilities
+- Netflix/Spotify/Disney+/Apple Music/Apple.com/Google/YouTube Premium → subscriptions
+- Amazon: if "prime" in description → subscriptions, otherwise → shopping
+- Boots/Lloyds/Superdrug/Specsavers → health
+- eBay/Argos/John Lewis/Next/H&M/Primark/M&S/clothing/fashion → shopping
+- HMRC/tax/VAT/VAT payment → tax
+- ATM/WITHDRAWAL → cash
+- Faster payment/standing order/PayPal/Monzo-to-Monzo — check description; if "salary/wages/payroll" → salary; if "transfer"/"payment to"/"savings" → transfer
+- Charity/Donation/Tzedakah/JGive/Keren → tzedakah
+- Rent/mortgage payment → rent or mortgage (abs(amount) > 500 likely)
+- Dentist/Doctor/Prescription → health
+- Gym/Fitness/ClassPass → health
+- Cinema/Theatre/Event/Ticket → entertainment
+- Coursera/Udemy/Skillshare → education
 
 Output STRICT JSON only: {{"category": "<one of the above>"}}
 
@@ -670,36 +683,50 @@ def build_router() -> APIRouter:
             filters: dict = {}
             llm_used = False
             try:
+                today_str = datetime.now(timezone.utc).strftime('%Y-%m-%d')
                 filter_resp, provider, model, pt, ct, cost = await call_llm(
-                    "You extract structured filters from a UK personal-finance search query. "
-                    "Output STRICT JSON only, no markdown. Infer relative dates from today "
-                    f"({datetime.now(timezone.utc).strftime('%Y-%m-%d')}). Use ISO date format. "
-                    "Categories are limited to: groceries, dining, transport, utilities, subscriptions, "
-                    "tzedakah, rent, shopping, health, entertainment, insurance, education, transfer, cash, tax, fees, mortgage, salary, income.",
-                    f"""Query: "{clean_q}"
+                    "You are a UK personal finance search assistant. Understand what the user wants, think step by step, "
+                    "then output structured JSON filters. Today is " + today_str + ".",
+                    f"""User query: "{clean_q}"
 
-Examples:
-- "groceries last month" -> {{"category": "groceries", "date_from": "<first of last month>", "date_to": "<last of last month>"}}
-- "biggest expenses in March" -> {{"type": "expense", "date_from": "<1 Mar>", "date_to": "<31 Mar>", "sort": "amount_desc"}}
-- "subscriptions over £10" -> {{"category": "subscriptions", "amount_min": 10, "type": "expense"}}
-- "Uber trips last week" -> {{"merchant_keywords": ["uber"], "date_from": "<7 days ago>", "date_to": "<today>"}}
-- "salary payments" -> {{"type": "income", "category": "salary"}}
-- "Tesco" -> {{"merchant_keywords": ["tesco"]}}
+First, understand what they're looking for:
+- Are they asking about a specific category? (groceries, dining, transport, utilities, subscriptions, tzedakah, rent, shopping, health, entertainment, insurance, education, transfer, cash, tax, fees, mortgage, salary, income)
+- Are they asking about income or expenses?
+- Is there a time frame mentioned? (today, yesterday, this week, last week, this month, last month, this year, last year, March, January 2025, last 3 months, etc.) Be precise with dates — today is {today_str}.
+- Is there a specific merchant or shop mentioned? (tesco, uber, amazon, netflix, etc.) Expand partial names — "sains" = "sainsbury", "McD" = "mcdonald"
+- Is there an amount hint? (over/under £X, cheap=low amount, expensive=high amount, large=high, small=low)
+- Do they want sorting? (biggest/largest=amount descending, smallest/cheapest=amount ascending, newest/recent=date descending, oldest=date ascending)
+- Are they asking for a comparison? ("compare dining this month vs last month", "difference between" → return comparative=true with two date sets)
+- Are they asking for a total/summary? ("how much did I spend on X", "total" → return aggregate=true)
 
-Return JSON:
+Common merchant synonyms:
+- uber/uber eats/uber trip → "uber" — if food order use dining, if trip use transport
+- sains/sainsburys → "sainsbury"
+- mcDs/mcdonalds → "mcdonald"
+- amzn/amazon → "amazon" — amazon prime → subscriptions, amazon non-prime → shopping
+- pret → "pret a manger"
+- starbucks/costa → coffee shops (dining)
+- tfl/oyster → transport
+- hmrc/taxman → "hmrc"
+- netflix/spotify/disney/apple music → streaming subscriptions
+
+Output ONLY valid JSON, no markdown, no explanation:
 {{
-  "category": "category name or null",
+  "category": "category or null",
   "type": "expense|income|null",
   "date_from": "YYYY-MM-DD or null",
   "date_to": "YYYY-MM-DD or null",
-  "amount_min": "number or null",
-  "amount_max": "number or null",
+  "amount_min": number or null,
+  "amount_max": number or null,
+  "amount_comparator": "over|under|null — use 'over' if user said 'expensive'/'big'/'large' or 'over £X', use 'under' if 'cheap'/'small'/'under £X'",
   "merchant_keywords": ["keyword1", "keyword2"] or [],
-  "search_text": "free text to match in description/merchant or null",
+  "search_text": "free text to search descriptions for, or null",
   "sort": "amount_desc|amount_asc|date_desc|date_asc|null",
+  "aggregate": "how_much|count|null — 'how_much' if they want total spend, 'count' if they want number of transactions",
+  "comparative": "true|false — true if comparing two periods",
   "limit": 50
 }}""",
-                    temperature=0.0, max_tokens=400, json_mode=False,
+                    temperature=0.1, max_tokens=600, json_mode=False,
                 )
                 try:
                     await track_ai_usage(session, user["user_id"], provider, model, pt, ct, cost, endpoint="ai_search")
@@ -742,11 +769,18 @@ Return JSON:
                 except Exception: pass
             amin = filters.get("amount_min")
             if amin is not None and amin != "null":
-                try: stmt = stmt.where(Transaction.amount <= -abs(float(amin)))
+                try:
+                    v = abs(float(amin))
+                    amt_comp = filters.get("amount_comparator")
+                    if amt_comp == "under":
+                        stmt = stmt.where(func.abs(Transaction.amount) <= v)
+                    else:
+                        stmt = stmt.where(func.abs(Transaction.amount) >= v)
                 except Exception: pass
             amax = filters.get("amount_max")
             if amax is not None and amax != "null":
-                try: stmt = stmt.where(Transaction.amount >= -abs(float(amax)))
+                try:
+                    stmt = stmt.where(func.abs(Transaction.amount) <= abs(float(amax)))
                 except Exception: pass
             keywords = filters.get("merchant_keywords") or []
             if isinstance(keywords, list) and keywords:
@@ -789,13 +823,65 @@ Return JSON:
             stmt = stmt.limit(limit_n)
             result = await session.execute(stmt)
             txs = [_tx_to_dict(t) for t in result.scalars().all()]
-            return {
+
+            # Build response
+            resp = {
                 "query": q,
                 "filters": filters,
                 "transactions": txs,
                 "total": len(txs),
                 "llm_used": llm_used,
             }
+
+            # Aggregate: compute summary if user asked for totals
+            agg_type = filters.get("aggregate")
+            if agg_type in ("how_much", "count", "total"):
+                total_income = sum(t["amount"] for t in txs if t["amount"] > 0)
+                total_spend = sum(abs(t["amount"]) for t in txs if t["amount"] < 0)
+                net = total_income - total_spend
+                resp["aggregate"] = {
+                    "total_income": round(total_income, 2),
+                    "total_spend": round(total_spend, 2),
+                    "net": round(net, 2),
+                    "count": len(txs),
+                }
+
+            # Comparative: return two result sets if comparing periods
+            if str(filters.get("comparative", "")).lower() == "true" and df and dto:
+                resp["comparative"] = True
+                # Build a second query for the period before
+                df_dt = datetime.fromisoformat(df)
+                dto_dt = datetime.fromisoformat(dto)
+                period_days = (dto_dt - df_dt).days
+                prev_to = df_dt - timedelta(days=1)
+                prev_from = prev_to - timedelta(days=period_days)
+                prev_stmt = select(Transaction).where(Transaction.user_id == user["user_id"])
+                if cat and cat != "null":
+                    prev_stmt = prev_stmt.where(Transaction.category == cat)
+                if t == "expense":
+                    prev_stmt = prev_stmt.where(Transaction.amount < 0)
+                elif t == "income":
+                    prev_stmt = prev_stmt.where(Transaction.amount > 0)
+                try:
+                    prev_stmt = prev_stmt.where(
+                        Transaction.date >= prev_from,
+                        Transaction.date <= prev_to + timedelta(days=1),
+                    )
+                except Exception: pass
+                prev_result = await session.execute(prev_stmt)
+                prev_txs = [_tx_to_dict(t) for t in prev_result.scalars().all()]
+                prev_income = sum(t["amount"] for t in prev_txs if t["amount"] > 0)
+                prev_spend = sum(abs(t["amount"]) for t in prev_txs if t["amount"] < 0)
+                resp["previous_period"] = {
+                    "date_from": prev_from.strftime("%Y-%m-%d"),
+                    "date_to": prev_to.strftime("%Y-%m-%d"),
+                    "total_income": round(prev_income, 2),
+                    "total_spend": round(prev_spend, 2),
+                    "net": round(prev_income - prev_spend, 2),
+                    "count": len(prev_txs),
+                }
+
+            return resp
 
     @router.post("/transactions")
     async def create_transaction(payload: TransactionIn, request: Request, user: dict = Depends(get_current_user)):
