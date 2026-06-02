@@ -56,7 +56,8 @@ api.interceptors.response.use(
       !requestUrl.includes("/auth/forgot-password") &&
       !requestUrl.includes("/auth/reset-password") &&
       !requestUrl.includes("/auth/google") &&
-      !requestUrl.includes("/auth/emergent-session")
+      !requestUrl.includes("/auth/emergent-session") &&
+      !requestUrl.includes("/gdpr/")
     ) {
       originalRequest._retry = true;
       try {
