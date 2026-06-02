@@ -3,6 +3,7 @@ import { api, formatApiError } from "../lib/api";
 import { Plus, Trash2, Loader2, Pencil, Search, ArrowUpDown, Sparkles, Filter, ChevronLeft, ChevronRight, X, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, PageHeader, SectionCard } from "../components/ui/layout";
+import MaaserPanel from "../components/MaaserPanel";
 
 const SOURCE_LABELS = { manual: "Manual", truelayer: "Bank", csv: "CSV", pdf: "PDF", statement: "Statement", sms: "SMS" };
 const emptyForm = { description: "", amount: "", category: "", is_income: false };
@@ -26,6 +27,8 @@ export default function Transactions() {
   const [aiQuery, setAiQuery] = useState("");
   const [aiResults, setAiResults] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [maaserRefresh, setMaaserRefresh] = useState(0);
+  const bumpMaaser = useCallback(() => setMaaserRefresh((k) => k + 1), []);
 
   const toggleFilter = (key, value) => {
     setOffset(0);
@@ -81,7 +84,7 @@ export default function Transactions() {
         await api.post("/transactions", { description: form.description, amount: signed, category: form.category || undefined, is_income: form.is_income });
         toast.success("Transaction added");
       }
-      setOpen(false); setEditingId(null); setForm(emptyForm); await load();
+      setOpen(false); setEditingId(null); setForm(emptyForm); await load(); bumpMaaser();
     } catch { toast.error(editingId ? "Could not update" : "Could not add"); }
   };
 
@@ -114,7 +117,7 @@ export default function Transactions() {
       const { data } = await api.post("/transactions/bulk-delete", { transaction_ids: Array.from(selectedIds) });
       toast.success(`Deleted ${data.deleted} transaction${data.deleted > 1 ? "s" : ""}`);
       setSelectedIds(new Set());
-      await load();
+      await load(); bumpMaaser();
     } catch (e) { toast.error(formatApiError(e?.response?.data?.detail) || "Could not delete"); }
   };
 
@@ -132,12 +135,12 @@ export default function Transactions() {
       const { data } = await api.post("/transactions/clear", body);
       toast.success(`Deleted ${data.deleted} transaction${data.deleted > 1 ? "s" : ""}`);
       setSelectedIds(new Set());
-      await load();
+      await load(); bumpMaaser();
     } catch (e) { toast.error(formatApiError(e?.response?.data?.detail) || "Could not clear"); }
   };
 
   const del = async (id) => {
-    try { await api.delete(`/transactions/${id}`); toast.success("Deleted"); await load(); }
+    try { await api.delete(`/transactions/${id}`); toast.success("Deleted"); await load(); bumpMaaser(); }
     catch { toast.error("Could not delete"); }
   };
 
@@ -177,6 +180,8 @@ export default function Transactions() {
           </div>
         }
       />
+
+      <MaaserPanel refreshKey={maaserRefresh} />
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto_auto] gap-3 items-center rounded-[1.5rem] border border-border bg-card/90 backdrop-blur-xl p-4">
         <label className="flex items-center gap-3 rounded-xl border border-border bg-background/70 px-4 h-11">

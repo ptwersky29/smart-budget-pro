@@ -352,90 +352,11 @@ export default function Jewish() {
           </div>
         </div>
 
-        {/* Auto-Maaser */}
-        <div className="rounded-2xl border-2 border-emerald/30 bg-card p-6" data-testid="auto-maaser-card">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl gradient-emerald grid place-items-center"><Sparkles className="h-5 w-5 text-white" /></div>
-              <div>
-                <p className="text-lg tracking-tight font-medium">Auto-Maaser</p>
-                <p className="text-xs text-muted-foreground">Every salary credit automatically accrues {maaserCfg.percent}% to your Tzedakah ledger.</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <input data-testid="maaser-pct" type="number" min={0} max={100} step={0.5} value={maaserCfg.percent}
-                     onChange={(e) => setMaaserCfg({ ...maaserCfg, percent: parseFloat(e.target.value) || 0 })}
-                     onBlur={() => saveMaaserCfg(maaserCfg)}
-                     className="h-10 w-20 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none text-center font-mono" />
-              <label className="inline-flex items-center gap-2 cursor-pointer">
-                <input data-testid="maaser-toggle" type="checkbox" checked={maaserCfg.enabled} disabled={maaserBusy}
-                       onChange={(e) => saveMaaserCfg({ ...maaserCfg, enabled: e.target.checked })} className="sr-only peer" />
-                <span className="w-11 h-6 bg-secondary rounded-full peer-checked:bg-emerald relative transition-colors">
-                  <span className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-5" style={{ transform: maaserCfg.enabled ? 'translateX(20px)' : 'translateX(0)' }} />
-                </span>
-                <span className="text-sm">{maaserCfg.enabled ? "On" : "Off"}</span>
-              </label>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-6">
-            <Stat testid="maaser-income" label="Income to date" value={`£${maaserSum.total_income.toFixed(2)}`} accent="emerald" />
-            <Stat testid="maaser-obligation" label={`Maaser (${maaserSum.percent}%)`} value={`£${maaserSum.obligation.toFixed(2)}`} accent="topaz" />
-            <Stat testid="maaser-given" label="Given so far" value={`£${maaserSum.given_total.toFixed(2)}`} accent="emerald" />
-            <Stat testid="maaser-owed" label={maaserSum.credit > 0 ? "Credit (over-given)" : "Balance owed"}
-                  value={`£${(maaserSum.credit > 0 ? maaserSum.credit : maaserSum.balance_owed).toFixed(2)}`}
-                  accent={maaserSum.balance_owed > 0 ? "ruby" : "emerald"} />
-          </div>
-          {(maaserSum.ledger_given > 0 || maaserSum.tx_given > 0) && (
-            <p className="text-xs text-muted-foreground mt-3">
-              Given includes <span className="font-medium text-foreground">£{(maaserSum.tx_given||0).toFixed(2)}</span> from tzedakah-category transactions
-              + <span className="font-medium text-foreground">£{(maaserSum.ledger_given||0).toFixed(2)}</span> from the ledger below.
-            </p>
-          )}
-          <div className="mt-4 flex items-center justify-between flex-wrap gap-3">
-            <p className="text-xs text-muted-foreground">
-              Obligation is <span className="font-medium text-foreground">{maaserSum.percent}%</span> of every income transaction.
-              Spend in the <span className="font-medium text-foreground">tzedakah</span> category to pay it down.
-            </p>
-            <div className="flex items-center gap-2">
-              {maaserSum.balance_owed > 0 && (
-                <button onClick={giveFromBalance} data-testid="maaser-give" disabled={maaserBusy}
-                        className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-emerald text-white hover:opacity-90 disabled:opacity-50">
-                  <CheckCircle2 className="h-3 w-3"/> Give £{maaserSum.balance_owed.toFixed(2)}
-                </button>
-              )}
-              <button onClick={recalcMaaser} disabled={maaserBusy} data-testid="maaser-recalc"
-                      className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full border border-border hover:border-emerald hover:text-emerald disabled:opacity-50">
-                <RefreshCw className={`h-3 w-3 ${maaserBusy ? "animate-spin" : ""}`} />
-                Recalculate
-              </button>
-              <button onClick={resetMaaser} disabled={maaserBusy} data-testid="maaser-reset"
-                      className="text-xs px-3 py-1.5 rounded-full border border-border hover:border-ruby hover:text-ruby disabled:opacity-50">
-                Reset audit
-              </button>
-            </div>
-          </div>
-
-        {pending.length > 0 && (
-          <div className="mt-6">
-            <p className="label-overline mb-2">Pending allocations ({pending.length})</p>
-            <ul className="divide-y divide-border max-h-56 overflow-auto">
-              {pending.slice(0, 12).map((e) => (
-                <li key={e.entry_id} className="flex items-center justify-between py-2.5 text-sm">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">£{e.amount.toFixed(2)} · {e.note}</p>
-                    <p className="text-xs text-muted-foreground">{e.date?.slice(0, 10)}</p>
-                  </div>
-                  <button onClick={() => payPending(e.entry_id)} data-testid={`pay-${e.entry_id}`}
-                          className="text-xs px-3 py-1.5 rounded-full bg-emerald text-white hover:opacity-90 inline-flex items-center gap-1">
-                    <CheckCircle2 className="h-3 w-3" /> Mark given
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
+        <p className="text-sm text-muted-foreground rounded-2xl border border-dashed border-border bg-card/40 p-6 text-center">
+          Auto-Maaser summary now lives on the{" "}
+          <a href="/transactions" className="text-emerald underline">Transactions</a>{" "}
+          page — it updates live as you add, edit, or categorise transactions.
+        </p>
 
       {/* Manual maaser + ledger */}
       <div className="grid lg:grid-cols-2 gap-4">
