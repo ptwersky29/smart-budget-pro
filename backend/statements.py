@@ -114,30 +114,31 @@ async def _ai_parse_statement(text: str, session=None, user_id: str = None) -> d
 
 
 CATEGORISE_KEYWORDS = {
-    "groceries": ["tesco", "sainsbury", "asda", "waitrose", "lidl", "aldi", "morrisons", "co-op", "coop", "m&s", "marks and spencer", "iceland", "farmfoods", "budgens", "spar", "nisa", "londis", "supermarket"],
-    "dining": ["mcdonald", "nando", "kfc", "subway", "pret", "starbucks", "costa", "cafe nero", "wagamama", "pizza hut", "dominos", "deliveroo", "uber eats", "just eat", "restaurant", "cafe", "bistro", "pub", "bar ", "grill", "kitchen", "diner", "brasserie", "eatery", "bagel", "sushi", "noodle", "thai", "indian", "chinese", "chippy"],
-    "transport": ["uber", "bolt", "lyft", "free now", "viavan", "addison lee", "tfl", "oyster", "tube", "rail", "trainline", "national rail", "stagecoach", "arriva", "first bus", "shell", "bp ", "esso", "texaco", "fuel", "petrol", "parking", "ncp", "apcoa", "zipcar", "enterprise car", "hertz", "avis", "budget rent", "mot", "autoglass", "kwik fit", "halfords"],
-    "utilities": ["british gas", "edf", "eon", "octopus", "scottish power", "npower", "bulb", "ovo", "thames water", "anglian water", "welsh water", "bt ", "sky", "virgin media", "vodafone", "ee", "three", "o2", "talk talk", "plusnet", "now tv", "amazon prime", "council tax", "gas", "electric", "broadband", "wifi", "phone bill"],
-    "subscriptions": ["netflix", "spotify", "disney", "apple.com/bill", "apple.com", "icloud", "google one", "microsoft 365", "office 365", "dropbox", "adobe", "notion", "slack", "zoom", "github", "patreon", "onlyfans", "paramount", "now tv", "hbo", "apple tv", "youtube premium", "tidal", "deezer", "audible", "kindle unlimited", "gym", "puregym", "david lloyd", "nuffield", "anytime fitness"],
-    "health": ["boots", "lloyds pharmacy", "superdrug", "pharmacy", "nhs", "bupa", "practitioner", "dental", "dentist", "optician", "specsavers", "vision express", "hospital", "clinic", "physio", "chiropractor", "counselling", "therapy", "prescription"],
-    "entertainment": ["odeon", "vue ", "cineworld", "cinema", "theatre", "concert", "ticket", "stubhub", "viagogo", "steam", "playstation", "xbox", "nintendo", "epic games", "gog.com", "spotify family"],
-    "shopping": ["amazon", "ebay", "argos", "john lewis", "next", "zara", "h&m", "primark", "tk maxx", "matalan", "asos", "boohoo", "river island", "new look", "debenhams", "selfridges", "harrods", "apple store", "currys", "pc world", "game ", "decathlon", "ikea", "dunelm", "wilko", "homebase", "b&q", "wickes", "screwfix", "toolstation"],
+    "subscriptions": ["netflix", "spotify", "disney+", "disney plus", "apple.com/bill", "apple.com", "icloud", "google one", "microsoft 365", "office 365", "dropbox", "adobe", "notion", "slack", "zoom", "github", "patreon", "onlyfans", "paramount", "now tv", "hbo", "apple tv", "youtube premium", "tidal", "deezer", "audible", "kindle unlimited", "puregym", "david lloyd", "nuffield", "anytime fitness", "the gym", "gym membership"],
+    "utilities": ["british gas", "edf energy", "edf ", "eon ", "octopus energy", "octopus ", "scottish power", "npower", "bulb ", "ovo energy", "ovo ", "thames water", "anglian water", "welsh water", "bt ", " sky ", "sky tv", "sky broadband", "virgin media", "vodafone", " ee ", " three ", " o2 ", "talk talk", "plusnet", "council tax", "gas bill", "electricity", "broadband", "phone bill", "internet bill", "water bill"],
+    "groceries": ["tesco", "sainsbury", "asda", "waitrose", "lidl", "aldi", "morrisons", "co-op", "coop", "m&s food", "marks & spencer", "iceland", "farmfoods", "budgens", "spar ", "nisa", "londis", "supermarket", "tesco metro", "sainsbury's", "ocado"],
+    "dining": ["mcdonald", "nando", "kfc", "subway ", "pret a manger", "pret ", "starbucks", "costa ", "cafe nero", "wagamama", "pizza hut", "dominos", "deliveroo", "uber eats", "just eat", "restaurant", "cafe ", "café", "bistro", " pub ", "bar ", "grill", "kitchen", "diner", "brasserie", "eatery", "bagel", "sushi", "noodle", " thai", " indian", " chinese", "chippy", "fish & chips", "greek", "burger"],
+    "transport": ["uber trip", "uber ", "bolt ", "lyft", "free now", "viavan", "addison lee", "tfl ", "oyster", "tube ", "trainline", "national rail", "stagecoach", "arriva", "first bus", "shell ", " bp ", "esso", "texaco", "petrol", "parking", "ncp", "apcoa", "zipcar", "enterprise rent", "hertz", "avis ", "budget rent", "autoglass", "kwik fit", "halfords", "dvla", "car tax", "vehicle tax"],
+    "health": ["boots", "lloyds pharmacy", "superdrug", "pharmacy", "nhs ", "bupa", "dental", "dentist", "optician", "specsavers", "vision express", "hospital", " clinic", "physio", "chiropractor", "counselling", "therapy", "prescription"],
+    "entertainment": ["odeon", "vue cinema", "vue ", "cineworld", " cinema", "theatre", "concert", "stubhub", "viagogo", "steam ", "playstation", "xbox", "nintendo", "epic games", "gog.com"],
+    "shopping": ["amazon", "ebay", "argos", "john lewis", "next ", "zara", "h&m", "primark", "tk maxx", "matalan", "asos", "boohoo", "river island", "new look", "debenhams", "selfridges", "harrods", "apple store", "currys", "pc world", "game ", "decathlon", "ikea", "dunelm", "wilko", "homebase", "b&q", "wickes", "screwfix", "toolstation", "amazon.co.uk"],
     "insurance": ["aviva", "direct line", "admiral", "lv=", "liverpool victoria", "churchill", "compare the market", "go compare", "money supermarket", "axa", "zurich", "legal & general", "scottish widows", "standard life", "hastings", "esure", "saga", "petplan", "animal friends"],
-    "education": ["university", "ucas", "tuition", "udemy", "coursera", "linkedin learning", "skillshare", "masterclass", "futurelearn", "open university", "oxford", "cambridge", "imperial"],
-    "transfer": ["faster payment", "bacs", "chaps", "standing order", "direct debit", "monzo to monzo", "revolut", "wise", "paypal", "venmo", "zelle"],
-    "cash": ["atm", "cashpoint", "link ", "cash withdrawal", "cashback"],
+    "education": ["university", "ucas", "tuition", "udemy", "coursera", "linkedin learning", "skillshare", "masterclass", "futurelearn", "open university"],
+    "transfer": ["faster payment", "bacs", "chaps", "standing order", "direct debit", "monzo to monzo", "revolut", "wise ", "paypal", "venmo", "zelle", "bank transfer"],
+    "cash": ["atm withdrawal", "atm ", "cashpoint", "link ", "cash withdrawal", "cashback"],
     "tax": ["hmrc", "self assessment", "vat payment"],
-    "fees": ["overdraft", "bank fee", "monthly fee", "service charge", "interest charge"],
-    "rent": ["rent", "landlord", "letting agent", "foxtons", "savills", "knight frank"],
+    "fees": ["overdraft", "bank fee", "monthly fee", "service charge", "interest charge", "account fee"],
+    "rent": [" rent ", "landlord", "letting agent", "foxtons", "savills", "knight frank"],
     "mortgage": ["mortgage", "halifax", "natwest", "santander", "barclays", "lloyds", "hsbc", "first direct", "yorkshire bs", "skipton", "nationwide"],
-    "tzedakah": ["tzedakah", "tzedaka", "jnf", "jewish national fund", "world jewish relief", "chabad", "jewish charity", "gift aid", "justgiving", "go fund me", "gofundme"],
-    "income": ["salary", "wages", "payroll", "pension", "interest", "dividend", "refund", "rebate", "tax credit", "child benefit", "universal credit"],
+    "tzedakah": ["tzedakah", "tzedaka", "jnf", "jewish national fund", "world jewish relief", "chabad", "jewish charity", "gift aid", "justgiving", "go fund me", "gofundme", "chesed", "yeshiva", "kollel", "shul donation"],
+    "income": ["salary", "wages", "payroll", "pension", "dividend", "tax credit", "child benefit", "universal credit"],
 }
 
 
 def _keyword_categorise(description: str, merchant: str | None, amount: float) -> str | None:
-    """Fast keyword-based categorisation. Returns category if confident, else None."""
-    text = f"{(description or '')} {(merchant or '')}".lower()
+    """Fast keyword-based categorisation. Returns category if confident, else None.
+    Categories are checked in priority order (most specific first) so e.g. 'amazon prime' → subscriptions, not shopping."""
+    text = f" {(description or '').lower()} {(merchant or '').lower()} "
     if not text.strip():
         return None
     for category, keywords in CATEGORISE_KEYWORDS.items():

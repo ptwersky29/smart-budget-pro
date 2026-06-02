@@ -491,23 +491,152 @@ def build_router() -> APIRouter:
                 "limit": limit,
             }
 
+    import re
+    _SEARCH_CATEGORIES = {
+        "groceries": "groceries", "grocery": "groceries", "supermarket": "groceries", "food shop": "groceries",
+        "dining": "dining", "restaurant": "dining", "restaurants": "dining", "cafe": "dining", "cafes": "dining",
+        "takeaway": "dining", "takeaways": "dining", "eating out": "dining", "food": "dining",
+        "transport": "transport", "uber": "transport", "taxi": "transport", "taxis": "transport",
+        "fuel": "transport", "petrol": "transport", "parking": "transport", "tube": "transport",
+        "train": "transport", "bus": "transport",
+        "utilities": "utilities", "bills": "utilities", "electric": "utilities", "gas bill": "utilities",
+        "water": "utilities", "broadband": "utilities", "phone": "utilities", "internet": "utilities",
+        "subscriptions": "subscriptions", "sub": "subscriptions", "subs": "subscriptions",
+        "streaming": "subscriptions", "membership": "subscriptions", "memberships": "subscriptions",
+        "tzedakah": "tzedakah", "charity": "tzedakah", "charities": "tzedakah", "donation": "tzedakah",
+        "donations": "tzedakah", "maaser": "tzedakah",
+        "rent": "rent", "rentals": "rent",
+        "shopping": "shopping", "shop": "shopping", "shops": "shopping", "amazon": "shopping", "purchases": "shopping",
+        "health": "health", "pharmacy": "health", "medical": "health", "dental": "health", "doctor": "health",
+        "entertainment": "entertainment", "fun": "entertainment", "cinema": "entertainment",
+        "insurance": "insurance",
+        "education": "education", "tuition": "education", "courses": "education",
+        "transfer": "transfer", "transfers": "transfer",
+        "cash": "cash", "atm": "cash", "withdrawal": "cash", "withdrawals": "cash",
+        "tax": "tax", "taxes": "tax", "hmrc": "tax",
+        "fees": "fees", "fee": "fees", "charges": "fees", "charge": "fees",
+        "mortgage": "mortgage",
+        "salary": "salary", "wages": "salary", "paycheck": "salary", "pay": "salary",
+        "income": "income",
+    }
+
+    def _regex_parse_search(q: str) -> dict:
+        """Regex-based filter parser as fallback when LLM is unavailable.
+        Handles: category keywords, amount bounds (£N, over/under N, more/less than N), date keywords (last week/month/year, this month, March, etc.), type (income/expense/spending)."""
+        text = q.lower().strip()
+        out: dict = {}
+
+        # Category detection — pick the longest matching keyword (to prefer "subscriptions" over "sub")
+        matches = sorted(
+            [(kw, cat) for kw, cat in _SEARCH_CATEGORIES.items() if re.search(rf"\b{re.escape(kw)}\b", text)],
+            key=lambda x: -len(x[0]),
+        )
+        if matches:
+            out["category"] = matches[0][1]
+
+        # Type detection
+        if re.search(r"\b(income|salary|wages|paycheck|earnings|deposits? in)\b", text) and "category" not in out:
+            out["type"] = "income"
+        elif re.search(r"\b(expense|expenses|spending|spent|purchases?|paid out)\b", text):
+            out["type"] = "expense"
+
+        # Amount bounds: "over £100", "under £50", "more than £20", "less than £10", "above £X", "below £X"
+        m = re.search(r"\b(over|above|more than|greater than|>=?)\s*[£$]?\s*(\d+(?:\.\d+)?)\b", text)
+        if m: out["amount_min"] = float(m.group(2))
+        m = re.search(r"\b(under|below|less than|<=?)\s*[£$]?\s*(\d+(?:\.\d+)?)\b", text)
+        if m: out["amount_max"] = float(m.group(2))
+        # Bare amount filter: "£100", "100 pounds"
+        m = re.search(r"[£$]\s*(\d+(?:\.\d+)?)\b", text)
+        if m and "amount_min" not in out and "amount_max" not in out:
+            out["amount_min"] = float(m.group(1))
+
+        # Date detection (relative)
+        now = datetime.now(timezone.utc)
+        if re.search(r"\btoday\b", text):
+            out["date_from"] = now.strftime("%Y-%m-%d")
+            out["date_to"] = now.strftime("%Y-%m-%d")
+        elif re.search(r"\byesterday\b", text):
+            d = now - timedelta(days=1)
+            out["date_from"] = d.strftime("%Y-%m-%d")
+            out["date_to"] = d.strftime("%Y-%m-%d")
+        elif re.search(r"\bthis week\b|\bcurrent week\b", text):
+            d = now - timedelta(days=now.weekday())
+            out["date_from"] = d.strftime("%Y-%m-%d")
+        elif re.search(r"\blast week\b|\bprevious week\b", text):
+            d = now - timedelta(days=now.weekday() + 7)
+            out["date_from"] = d.strftime("%Y-%m-%d")
+            out["date_to"] = (d + timedelta(days=6)).strftime("%Y-%m-%d")
+        elif re.search(r"\bthis month\b|\bcurrent month\b", text):
+            out["date_from"] = now.replace(day=1).strftime("%Y-%m-%d")
+        elif re.search(r"\blast month\b|\bprevious month\b", text):
+            first = now.replace(day=1)
+            prev_last = first - timedelta(days=1)
+            out["date_from"] = prev_last.replace(day=1).strftime("%Y-%m-%d")
+            out["date_to"] = prev_last.strftime("%Y-%m-%d")
+        elif re.search(r"\bthis year\b|\bcurrent year\b", text):
+            out["date_from"] = now.replace(month=1, day=1).strftime("%Y-%m-%d")
+        elif re.search(r"\blast year\b|\bprevious year\b", text):
+            last = now.year - 1
+            out["date_from"] = f"{last}-01-01"
+            out["date_to"] = f"{last}-12-31"
+        elif m := re.search(r"\blast\s+(\d+)\s+(day|days|week|weeks|month|months|year|years)\b", text):
+            n, unit = int(m.group(1)), m.group(2)
+            days = n * {"day": 1, "days": 1, "week": 7, "weeks": 7,
+                        "month": 30, "months": 30, "year": 365, "years": 365}[unit]
+            d = now - timedelta(days=days)
+            out["date_from"] = d.strftime("%Y-%m-%d")
+            out["date_to"] = now.strftime("%Y-%m-%d")
+        else:
+            # Month name detection (e.g. "in March", "March 2024", "from January")
+            months = {m_: i+1 for i, m_ in enumerate(
+                ["january", "february", "march", "april", "may", "june",
+                 "july", "august", "september", "october", "november", "december"])}
+            for name, num in months.items():
+                if re.search(rf"\b{name}\b", text):
+                    yr_match = re.search(r"\b(20\d{2})\b", text)
+                    yr = int(yr_match.group(1)) if yr_match else now.year
+                    start = datetime(yr, num, 1, tzinfo=timezone.utc)
+                    end_m = num + 1 if num < 12 else 1
+                    end_y = yr if num < 12 else yr + 1
+                    end = datetime(end_y, end_m, 1, tzinfo=timezone.utc)
+                    out["date_from"] = start.strftime("%Y-%m-%d")
+                    out["date_to"] = (end - timedelta(days=1)).strftime("%Y-%m-%d")
+                    break
+
+        # Sort detection
+        if re.search(r"\b(biggest|largest|highest|most expensive|most)\b", text):
+            out["sort"] = "amount_desc"
+        elif re.search(r"\b(smallest|lowest|cheapest|least)\b", text):
+            out["sort"] = "amount_asc"
+        elif re.search(r"\bnewest|latest|recent\b", text):
+            out["sort"] = "date_desc"
+        elif re.search(r"\b(oldest|earliest|first)\b", text):
+            out["sort"] = "date_asc"
+
+        # Anything else becomes a free-text search keyword
+        return out
+
     @router.post("/transactions/ai-search")
     async def ai_search(request: Request, user: dict = Depends(get_current_user), q: str = Query("")):
         """Two-pass natural language transaction search.
         1. LLM extracts structured filters (date range, category, amount, type, merchant keywords) from the query.
-        2. Server applies filters to the DB and returns matches, optionally re-ranked by LLM."""
+        2. Server applies filters to the DB and returns matches, optionally re-ranked by LLM.
+        Falls back to a regex-based parser if the LLM is unavailable."""
         clean_q = sanitize_input(q.strip(), max_len=200)
         if not clean_q:
             return {"query": q, "transactions": [], "total": 0, "filters": {}}
         sm = request.app.state.db
         async with sm() as session:
-            filter_resp, provider, model, pt, ct, cost = await call_llm(
-                "You extract structured filters from a UK personal-finance search query. "
-                "Output STRICT JSON only, no markdown. Infer relative dates from today "
-                f"({datetime.now(timezone.utc).strftime('%Y-%m-%d')}). Use ISO date format. "
-                "Categories are limited to: groceries, dining, transport, utilities, subscriptions, "
-                "tzedakah, rent, shopping, health, entertainment, insurance, education, transfer, cash, tax, fees, mortgage, salary, income.",
-                f"""Query: "{clean_q}"
+            filters: dict = {}
+            llm_used = False
+            try:
+                filter_resp, provider, model, pt, ct, cost = await call_llm(
+                    "You extract structured filters from a UK personal-finance search query. "
+                    "Output STRICT JSON only, no markdown. Infer relative dates from today "
+                    f"({datetime.now(timezone.utc).strftime('%Y-%m-%d')}). Use ISO date format. "
+                    "Categories are limited to: groceries, dining, transport, utilities, subscriptions, "
+                    "tzedakah, rent, shopping, health, entertainment, insurance, education, transfer, cash, tax, fees, mortgage, salary, income.",
+                    f"""Query: "{clean_q}"
 
 Examples:
 - "groceries last month" -> {{"category": "groceries", "date_from": "<first of last month>", "date_to": "<last of last month>"}}
@@ -530,15 +659,29 @@ Return JSON:
   "sort": "amount_desc|amount_asc|date_desc|date_asc|null",
   "limit": 50
 }}""",
-                temperature=0.0, max_tokens=400, json_mode=False,
-            )
-            await track_ai_usage(session, user["user_id"], provider, model, pt, ct, cost, endpoint="ai_search")
-            try:
-                filters = parse_json(filter_resp) if isinstance(filter_resp, str) else filter_resp
-                if not isinstance(filters, dict):
-                    filters = {}
-            except Exception:
-                filters = {}
+                    temperature=0.0, max_tokens=400, json_mode=False,
+                )
+                try:
+                    await track_ai_usage(session, user["user_id"], provider, model, pt, ct, cost, endpoint="ai_search")
+                except Exception:
+                    pass
+                try:
+                    parsed = parse_json(filter_resp) if isinstance(filter_resp, str) else filter_resp
+                    if isinstance(parsed, dict):
+                        filters = parsed
+                        llm_used = True
+                except Exception:
+                    pass
+            except Exception as e:
+                logger.warning(f"AI search LLM failed, using regex fallback: {e}")
+
+            # Regex fallback (or supplement) when LLM unavailable or returned nothing useful
+            if not filters:
+                filters = _regex_parse_search(clean_q)
+            else:
+                # Merge any missing fields from regex parser (so simple phrases still get date ranges)
+                for k, v in _regex_parse_search(clean_q).items():
+                    filters.setdefault(k, v)
 
             stmt = select(Transaction).where(Transaction.user_id == user["user_id"])
             cat = filters.get("category")
@@ -578,6 +721,9 @@ Return JSON:
                 if kw_filters:
                     stmt = stmt.where(_or(*kw_filters))
             search_text = filters.get("search_text")
+            if not search_text and not keywords and not filters.get("category") and not filters.get("type"):
+                # Nothing structured matched — fall back to free-text search over the original query
+                search_text = clean_q
             if search_text and search_text != "null":
                 pattern = f"%{str(search_text).lower()}%"
                 stmt = stmt.where(_or(
@@ -608,6 +754,7 @@ Return JSON:
                 "filters": filters,
                 "transactions": txs,
                 "total": len(txs),
+                "llm_used": llm_used,
             }
 
     @router.post("/transactions")
