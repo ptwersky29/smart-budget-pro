@@ -1,25 +1,44 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, formatApiError } from "../lib/api";
-import { Plus, Trash2, Loader2, Pencil, Search, ArrowUpDown, Sparkles, Filter, ChevronLeft, ChevronRight, X, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Loader2, Pencil, Search, ArrowUpDown, Sparkles, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, PageHeader, SectionCard } from "../components/ui/layout";
+import ComparePeriods from "../components/ComparePeriods";
 
 const SOURCE_LABELS = { manual: "Manual", truelayer: "Bank", csv: "CSV", pdf: "PDF", statement: "Statement", sms: "SMS" };
 const emptyForm = { description: "", amount: "", category: "", is_income: false };
 
+function today() {
+  const d = new Date();
+  return d.toISOString().slice(0, 10);
+}
+
+function firstOfMonth() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
+const fmt = (n) => `£${Number(n || 0).toFixed(2)}`;
+
 export default function Transactions() {
   const [txs, setTxs] = useState([]);
   const [total, setTotal] = useState(0);
+  const [incomeTotal, setIncomeTotal] = useState(0);
+  const [expenseTotal, setExpenseTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [selectedCats, setSelectedCats] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [showAiSearch, setShowAiSearch] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
 
   const [filters, setFilters] = useState({
     search: "", category: "", source: "", tx_type: "",
-    date_from: "", date_to: "", sort: "date", order: "desc",
+    date_from: firstOfMonth(), date_to: today(),
+    amount_min: "", amount_max: "",
+    sort: "date", order: "desc",
   });
   const [offset, setOffset] = useState(0);
   const [limit] = useState(50);
@@ -27,10 +46,29 @@ export default function Transactions() {
   const [aiResults, setAiResults] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
 
+  const debounceRef = useRef(null);
+
+  const setFilter = (key, value) => {
+    setOffset(0);
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
   const toggleFilter = (key, value) => {
     setOffset(0);
     setFilters((prev) => ({ ...prev, [key]: prev[key] === value ? "" : value }));
   };
+
+  const debouncedSetSearch = (value) => {
+    setOffset(0);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setFilters((prev) => ({ ...prev, search: value }));
+    }, 300);
+  };
+
+  useEffect(() => {
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true); setAiResults(null);
@@ -42,9 +80,13 @@ export default function Transactions() {
       if (filters.tx_type) params.tx_type = filters.tx_type;
       if (filters.date_from) params.date_from = filters.date_from;
       if (filters.date_to) params.date_to = filters.date_to;
+      if (filters.amount_min) params.amount_min = parseFloat(filters.amount_min);
+      if (filters.amount_max) params.amount_max = parseFloat(filters.amount_max);
       const { data } = await api.get("/transactions", { params });
       setTxs(data.transactions);
       setTotal(data.total);
+      setIncomeTotal(data.income_total || 0);
+      setExpenseTotal(data.expense_total || 0);
     } catch (err) { console.error("tx load", err); }
     finally { setLoading(false); }
   }, [offset, limit, filters]);
@@ -58,6 +100,18 @@ export default function Transactions() {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadCats(); }, [loadCats]);
+
+  const activeFilters = useMemo(() => {
+    const chips = [];
+    if (filters.tx_type) chips.push({ key: "tx_type", label: filters.tx_type === "income" ? "Income" : "Expense" });
+    if (filters.source) chips.push({ key: "source", label: `Source: ${SOURCE_LABELS[filters.source] || filters.source}` });
+    if (filters.category) chips.push({ key: "category", label: `Category: ${filters.category}` });
+    if (filters.amount_min) chips.push({ key: "amount_min", label: `Min: ${fmt(filters.amount_min)}` });
+    if (filters.amount_max) chips.push({ key: "amount_max", label: `Max: ${fmt(filters.amount_max)}` });
+    if (filters.date_from) chips.push({ key: "date_from", label: `From: ${filters.date_from}` });
+    if (filters.date_to) chips.push({ key: "date_to", label: `To: ${filters.date_to}` });
+    return chips;
+  }, [filters]);
 
   const totalPages = Math.ceil(total / limit);
   const currentPage = Math.floor(offset / limit) + 1;
@@ -129,6 +183,8 @@ export default function Transactions() {
       if (filters.search) body.search = filters.search;
       if (filters.date_from) body.date_from = filters.date_from;
       if (filters.date_to) body.date_to = filters.date_to;
+      if (filters.amount_min) body.amount_min = parseFloat(filters.amount_min);
+      if (filters.amount_max) body.amount_max = parseFloat(filters.amount_max);
       const { data } = await api.post("/transactions/clear", body);
       toast.success(`Deleted ${data.deleted} transaction${data.deleted > 1 ? "s" : ""}`);
       setSelectedIds(new Set());
@@ -153,6 +209,8 @@ export default function Transactions() {
     finally { setAiLoading(false); }
   };
 
+  const netTotal = incomeTotal - expenseTotal;
+
   return (
     <div className="space-y-6" data-testid="transactions-root">
       <PageHeader
@@ -171,6 +229,9 @@ export default function Transactions() {
                 <Trash2 className="h-4 w-4 mr-1.5" /> Clear all {total}
               </button>
             )}
+            <button onClick={() => setCompareOpen(true)} className="btn-pill border border-topaz text-topaz text-sm h-11 px-4">
+              <BarChart3 className="h-4 w-4 mr-1.5" /> Compare Periods
+            </button>
             <button onClick={openAdd} data-testid="add-transaction" className="btn-pill gradient-emerald text-white text-sm h-11 px-5">
               <Plus className="h-4 w-4 mr-2" /> Add transaction
             </button>
@@ -178,13 +239,32 @@ export default function Transactions() {
         }
       />
 
+      {/* Summary bar */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-2xl border border-border bg-card/80 p-4">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider">Income</p>
+          <p className="mt-1 text-xl tracking-tight font-medium text-emerald">{fmt(incomeTotal)}</p>
+        </div>
+        <div className="rounded-2xl border border-border bg-card/80 p-4">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider">Expenses</p>
+          <p className="mt-1 text-xl tracking-tight font-medium text-ruby">{fmt(expenseTotal)}</p>
+        </div>
+        <div className="rounded-2xl border border-border bg-card/80 p-4">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider">Net</p>
+          <p className={`mt-1 text-xl tracking-tight font-medium ${netTotal >= 0 ? "text-emerald" : "text-ruby"}`}>
+            {netTotal >= 0 ? "+" : ""}{fmt(netTotal)}
+          </p>
+        </div>
+      </div>
+
+      {/* Filter bar */}
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto_auto] gap-3 items-center rounded-[1.5rem] border border-border bg-card/90 backdrop-blur-xl p-4">
         <label className="flex items-center gap-3 rounded-xl border border-border bg-background/70 px-4 h-11">
           <Search className="h-4 w-4 text-muted-foreground shrink-0" />
-          <input value={filters.search} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, search: e.target.value })); }}
+          <input defaultValue={filters.search} onChange={(e) => debouncedSetSearch(e.target.value)}
             placeholder="Search descriptions, merchants, categories..."
             className="w-full bg-transparent outline-none text-sm" />
-          {filters.search && <button onClick={() => { setOffset(0); setFilters(p => ({ ...p, search: "" })); }} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>}
+          {filters.search && <button onClick={() => { setFilter("search", ""); }} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>}
         </label>
 
         <label className="flex items-center gap-2 rounded-xl border border-border bg-background/70 px-4 h-11 text-sm">
@@ -203,6 +283,23 @@ export default function Transactions() {
         </button>
       </div>
 
+      {/* Active filter chips */}
+      {activeFilters.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {activeFilters.map((chip) => (
+            <span key={chip.key} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-emerald/10 text-emerald border border-emerald/20">
+              {chip.label}
+              <button onClick={() => { setFilter(chip.key, ""); setOffset(0); }} className="hover:text-emerald/80"><X className="h-3 w-3" /></button>
+            </span>
+          ))}
+          <button onClick={() => { setFilters({ ...filters, tx_type: "", source: "", category: "", amount_min: "", amount_max: "", date_from: firstOfMonth(), date_to: today() }); setOffset(0); }}
+            className="text-xs px-3 py-1.5 rounded-full border border-border hover:border-muted-foreground text-muted-foreground">
+            Clear all
+          </button>
+        </div>
+      )}
+
+      {/* Filter panel */}
       {showFilters && (
         <div className="rounded-[1.5rem] border border-border bg-card/90 backdrop-blur-xl p-4 space-y-3">
           <div className="flex flex-wrap gap-3">
@@ -226,6 +323,18 @@ export default function Transactions() {
                 {selectedCats.map(c => <option key={c.category_id ?? `default-${c.name}`} value={c.name}>{c.name}</option>)}
               </select>
             </div>
+            <div className="flex flex-col gap-1 min-w-[130px]">
+              <label className="text-xs text-muted-foreground">Amount min</label>
+              <input type="number" min="0" step="0.01" placeholder="£" value={filters.amount_min}
+                onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_min: e.target.value })); }}
+                className="control-shell text-sm h-10" />
+            </div>
+            <div className="flex flex-col gap-1 min-w-[130px]">
+              <label className="text-xs text-muted-foreground">Amount max</label>
+              <input type="number" min="0" step="0.01" placeholder="£" value={filters.amount_max}
+                onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_max: e.target.value })); }}
+                className="control-shell text-sm h-10" />
+            </div>
             <div className="flex flex-col gap-1 min-w-[150px]">
               <label className="text-xs text-muted-foreground">From</label>
               <input type="date" value={filters.date_from} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_from: e.target.value })); }} className="control-shell text-sm h-10" />
@@ -236,24 +345,32 @@ export default function Transactions() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 pt-1">
-            <div className="flex-1 flex items-center gap-2">
-              <input value={aiQuery} onChange={(e) => setAiQuery(e.target.value)}
-                placeholder="AI search: e.g. 'grocery spending last month'"
-                className="flex-1 control-shell text-sm h-10" onKeyDown={(e) => e.key === "Enter" && runAiSearch()} />
-              <button onClick={runAiSearch} disabled={aiLoading || !aiQuery.trim()} className="btn-pill border border-emerald text-emerald text-sm h-10 disabled:opacity-50">
-                {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                <span className="ml-1.5 hidden sm:inline">AI Search</span>
-              </button>
-            </div>
+          {/* AI search collapsible */}
+          <div className="border-t border-border pt-3">
+            <button onClick={() => setShowAiSearch(!showAiSearch)} className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground">
+              {showAiSearch ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              <Sparkles className="h-3 w-3" /> AI natural-language search
+            </button>
+            {showAiSearch && (
+              <div className="flex items-center gap-3 mt-2">
+                <div className="flex-1 flex items-center gap-2">
+                  <input value={aiQuery} onChange={(e) => setAiQuery(e.target.value)}
+                    placeholder="e.g. 'grocery spending last month'"
+                    className="flex-1 control-shell text-sm h-10" onKeyDown={(e) => e.key === "Enter" && runAiSearch()} />
+                  <button onClick={runAiSearch} disabled={aiLoading || !aiQuery.trim()} className="btn-pill border border-emerald text-emerald text-sm h-10 disabled:opacity-50">
+                    {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    <span className="ml-1.5 hidden sm:inline">Search</span>
+                  </button>
+                </div>
+              </div>
+            )}
+            {aiResults && (
+              <div className="rounded-xl border border-emerald/30 bg-emerald/5 p-3 text-sm mt-2">
+                <p className="font-medium text-emerald mb-1">AI results for &ldquo;{aiResults.query}&rdquo; ({aiResults.total} matches)</p>
+                <button onClick={() => { setAiResults(null); setAiQuery(""); }} className="text-xs text-muted-foreground hover:text-foreground">Clear AI search</button>
+              </div>
+            )}
           </div>
-
-          {aiResults && (
-            <div className="rounded-xl border border-emerald/30 bg-emerald/5 p-3 text-sm">
-              <p className="font-medium text-emerald mb-1">AI results for &ldquo;{aiResults.query}&rdquo; ({aiResults.total} matches)</p>
-              <button onClick={() => { setAiResults(null); setAiQuery(""); }} className="text-xs text-muted-foreground hover:text-foreground">Clear AI search</button>
-            </div>
-          )}
         </div>
       )}
 
@@ -348,6 +465,8 @@ export default function Transactions() {
           </div>
         </div>
       )}
+
+      <ComparePeriods open={compareOpen} onClose={() => setCompareOpen(false)} />
     </div>
   );
 }

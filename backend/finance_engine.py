@@ -484,9 +484,49 @@ def build_router() -> APIRouter:
             count_result = await session.execute(count_stmt)
             total = count_result.scalar() or 0
 
+            agg_stmt = select(
+                func.coalesce(func.sum(Transaction.amount).filter(Transaction.amount > 0), 0),
+                func.coalesce(func.sum(Transaction.amount).filter(Transaction.amount < 0), 0),
+            ).where(Transaction.user_id == user["user_id"])
+            if category:
+                agg_stmt = agg_stmt.where(Transaction.category == category)
+            if source:
+                agg_stmt = agg_stmt.where(Transaction.source == source)
+            if pending == "true":
+                agg_stmt = agg_stmt.where(Transaction.pending == True)
+            elif pending == "false":
+                agg_stmt = agg_stmt.where(Transaction.pending == False)
+            if tx_type == "income":
+                agg_stmt = agg_stmt.where(Transaction.amount > 0)
+            elif tx_type == "expense":
+                agg_stmt = agg_stmt.where(Transaction.amount < 0)
+            if date_from:
+                agg_stmt = agg_stmt.where(Transaction.date >= datetime.fromisoformat(date_from))
+            if date_to:
+                agg_stmt = agg_stmt.where(Transaction.date <= datetime.fromisoformat(date_to) + timedelta(days=1))
+            if amount_min is not None:
+                agg_stmt = agg_stmt.where(abs(Transaction.amount) >= amount_min)
+            if amount_max is not None:
+                agg_stmt = agg_stmt.where(abs(Transaction.amount) <= amount_max)
+            if search:
+                term = f"%{search}%"
+                agg_stmt = agg_stmt.where(or_(
+                    Transaction.description.ilike(term),
+                    Transaction.merchant_name.ilike(term),
+                    Transaction.normalized_merchant.ilike(term),
+                    Transaction.notes.ilike(term),
+                    Transaction.category.ilike(term),
+                ))
+            agg_result = await session.execute(agg_stmt)
+            income_total, expense_total = agg_result.one()
+            income_total = round(float(income_total), 2)
+            expense_total = round(abs(float(expense_total)), 2)
+
             return {
                 "transactions": [_tx_to_dict(t) for t in rows],
                 "total": total,
+                "income_total": income_total,
+                "expense_total": expense_total,
                 "offset": offset,
                 "limit": limit,
             }
@@ -1585,6 +1625,80 @@ Return JSON:
                 "previous_period": {"label": prev_start.strftime("%B %Y"), **previous},
                 "spend_change_pct": round(spend_change, 1),
                 "income_change_pct": round(income_change, 1),
+            }
+
+    @router.get("/analytics/compare-periods")
+    async def compare_periods(
+        request: Request, user: dict = Depends(get_current_user),
+        period_a_from: str = Query(...), period_a_to: str = Query(...),
+        period_b_from: str = Query(...), period_b_to: str = Query(...),
+        category: str = Query(None),
+    ):
+        sm = request.app.state.db
+        async with sm() as session:
+
+            async def _period_stats(date_from: str, date_to: str):
+                stmt = select(
+                    func.coalesce(func.sum(Transaction.amount).filter(Transaction.amount > 0), 0),
+                    func.coalesce(func.sum(abs(Transaction.amount)).filter(Transaction.amount < 0), 0),
+                    func.count(),
+                ).where(
+                    Transaction.user_id == user["user_id"],
+                    Transaction.date >= datetime.fromisoformat(date_from),
+                    Transaction.date <= datetime.fromisoformat(date_to) + timedelta(days=1),
+                )
+                if category:
+                    stmt = stmt.where(Transaction.category == category)
+                result = await session.execute(stmt)
+                income, spend, cnt = result.one()
+                return {"income": round(float(income), 2), "spend": round(float(spend), 2), "count": cnt}
+
+            async def _cat_spend(date_from: str, date_to: str, cat: str):
+                q = select(func.coalesce(func.sum(abs(Transaction.amount)), 0)).where(
+                    Transaction.user_id == user["user_id"],
+                    Transaction.category == cat,
+                    Transaction.amount < 0,
+                    Transaction.date >= datetime.fromisoformat(date_from),
+                    Transaction.date <= datetime.fromisoformat(date_to) + timedelta(days=1),
+                )
+                r = await session.execute(q)
+                return round(float(r.scalar()), 2)
+
+            a_label = datetime.fromisoformat(period_a_from).strftime("%d %b %Y")
+            b_label = datetime.fromisoformat(period_b_from).strftime("%d %b %Y")
+
+            a_stats = await _period_stats(period_a_from, period_a_to)
+            b_stats = await _period_stats(period_b_from, period_b_to)
+
+            spend_change = ((a_stats["spend"] - b_stats["spend"]) / b_stats["spend"] * 100) if b_stats["spend"] else 0
+            income_change = ((a_stats["income"] - b_stats["income"]) / b_stats["income"] * 100) if b_stats["income"] else 0
+
+            cat_breakdown = []
+            if not category:
+                cat_stmt = select(Transaction.category.distinct()).where(
+                    Transaction.user_id == user["user_id"],
+                    Transaction.amount < 0,
+                )
+                cat_result = await session.execute(cat_stmt)
+                categories = [r[0] for r in cat_result.all() if r[0]]
+                for cat in categories:
+                    a_spend = await _cat_spend(period_a_from, period_a_to, cat)
+                    b_spend = await _cat_spend(period_b_from, period_b_to, cat)
+                    if a_spend > 0 or b_spend > 0:
+                        chg = ((a_spend - b_spend) / b_spend * 100) if b_spend else (100 if a_spend > 0 else 0)
+                        cat_breakdown.append({
+                            "category": cat,
+                            "a_spend": a_spend,
+                            "b_spend": b_spend,
+                            "change_pct": round(chg, 1),
+                        })
+
+            return {
+                "period_a": {"label": a_label, **a_stats},
+                "period_b": {"label": b_label, **b_stats},
+                "spend_change_pct": round(spend_change, 1),
+                "income_change_pct": round(income_change, 1),
+                "category_breakdown": cat_breakdown,
             }
 
     # ── Dashboard ────────────────────────────────────────────────────
