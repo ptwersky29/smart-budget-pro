@@ -1,18 +1,14 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
-import { Star, Plus, Calendar, Sunrise, MapPin, Sparkles, CheckCircle2, RefreshCw, Pencil, Trash2, Heart, DollarSign, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import { Star, Plus, Calendar, Sunrise, MapPin, Pencil, Trash2, Heart } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "../components/ui/layout";
+import MaaserPanel from "../components/MaaserPanel";
 
 const CITIES = ["london","manchester","gateshead","leeds","jerusalem","tel-aviv","new-york","monsey","lakewood","stamford-hill"];
 
-const CHASUNA_STATUSES = ["planned", "booked", "paid"];
-
 export default function Jewish() {
   const [maaser, setMaaser] = useState({ income: 5000, percent: 10, result: null });
-  const [entries, setEntries] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [form, setForm] = useState({ amount: "", recipient: "", note: "" });
   const [holidays, setHolidays] = useState([]);
   const [holidayBudgets, setHolidayBudgets] = useState([]);
   const [selectedHoliday, setSelectedHoliday] = useState(null);
@@ -34,27 +30,14 @@ export default function Jewish() {
   const [city, setCity] = useState(() => localStorage.getItem("zmanim_city") || "london");
   const [upcomingHols, setUpcomingHols] = useState([]);
 
-  // Auto-Maaser state
-  const [maaserCfg, setMaaserCfg] = useState({ enabled: false, percent: 10 });
-  const [maaserSum, setMaaserSum] = useState({
-    percent: 10, total_income: 0, obligation: 0,
-    given_total: 0, tx_given: 0, ledger_given: 0,
-    accrued_pending: 0, balance_owed: 0, credit: 0,
-  });
-  const [maaserBusy, setMaaserBusy] = useState(false);
   const [activeTab, setActiveTab] = useState("maaser");
 
-  const loadAll = useCallback(async () => {
+  const loadHolidays = useCallback(async () => {
     try {
-      const [tz, hd] = await Promise.all([
-        api.get("/jewish/tzedakah"),
-        api.get("/jewish/holidays/defaults"),
-      ]);
-      setEntries(tz.data.entries || []);
-      setTotal(tz.data.total_given || 0);
-      setHolidays(hd.data.holidays || []);
+      const { data } = await api.get("/jewish/holidays/defaults");
+      setHolidays(data.holidays || []);
     } catch (err) {
-      console.error("loadAll", err);
+      console.error("loadHolidays", err);
     }
   }, []);
 
@@ -95,85 +78,10 @@ export default function Jewish() {
     } catch (err) { console.error("hebcal load", err); }
   }, [city]);
 
-  const loadMaaser = useCallback(async () => {
-    try {
-      const [s, sum] = await Promise.all([
-        api.get("/jewish/maaser/settings"),
-        api.get("/jewish/maaser/summary"),
-      ]);
-      setMaaserCfg(s.data);
-      setMaaserSum(sum.data);
-    } catch (err) { console.error(err); }
-  }, []);
-
-  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => { loadHolidays(); }, [loadHolidays]);
   useEffect(() => { loadHebcal(); }, [loadHebcal]);
-  useEffect(() => { loadMaaser(); }, [loadMaaser]);
   useEffect(() => { loadHolidayBudgets(); }, [loadHolidayBudgets]);
   useEffect(() => { loadChasuna(); }, [loadChasuna]);
-
-  const saveMaaserCfg = async (next) => {
-    setMaaserBusy(true);
-    try {
-      const { data } = await api.put("/jewish/maaser/settings", next);
-      setMaaserCfg(next);
-      toast.success(`Auto-Maaser ${next.enabled ? "enabled" : "disabled"}`);
-      if (data?.backfill?.created > 0) {
-        toast.success(`Backfilled ${data.backfill.created} income tx · £${data.backfill.total_amount.toFixed(2)} accrued`);
-      }
-      await loadAll(); await loadMaaser();
-    } catch { toast.error("Could not save"); }
-    finally { setMaaserBusy(false); }
-  };
-
-  const recalcMaaser = async () => {
-    setMaaserBusy(true);
-    try {
-      const { data } = await api.post("/jewish/maaser/backfill");
-      if (data?.created > 0) {
-        toast.success(`Accrued maaser for ${data.created} income tx · £${data.total_amount.toFixed(2)}`);
-      } else if (data?.enabled === false) {
-        toast.error("Turn auto-Maaser on first");
-      } else {
-        toast.success("Already up to date");
-      }
-      await loadAll(); await loadMaaser();
-    } catch { toast.error("Could not recalculate"); }
-    finally { setMaaserBusy(false); }
-  };
-
-  const resetMaaser = async () => {
-    if (!window.confirm("Clear the auto-Maaser audit log? Manual ledger entries are kept.")) return;
-    setMaaserBusy(true);
-    try {
-      const { data } = await api.post("/jewish/maaser/reset");
-      toast.success(`Cleared ${data.deleted} audit entries`);
-      await loadAll(); await loadMaaser();
-    } catch { toast.error("Could not reset"); }
-    finally { setMaaserBusy(false); }
-  };
-
-  const giveFromBalance = async () => {
-    if (maaserSum.balance_owed <= 0) { toast.success("Nothing owed — you're up to date!"); return; }
-    const amt = window.prompt(`How much are you giving? (You owe £${maaserSum.balance_owed.toFixed(2)})`, maaserSum.balance_owed.toFixed(2));
-    if (!amt) return;
-    const num = parseFloat(amt);
-    if (isNaN(num) || num <= 0) { toast.error("Enter a valid amount"); return; }
-    const recipient = window.prompt("Recipient (e.g. Chesed Fund, Yeshiva)", "Tzedakah") || "Tzedakah";
-    try {
-      await api.post("/jewish/tzedakah", { amount: num, recipient, note: "Maaser given against balance" });
-      toast.success(`Recorded £${num.toFixed(2)} given to ${recipient}`);
-      await loadAll(); await loadMaaser();
-    } catch { toast.error("Could not record"); }
-  };
-
-  const payPending = async (id) => {
-    try {
-      await api.post(`/jewish/maaser/pay/${id}`, null, { params: { recipient: "Tzedakah" } });
-      toast.success("Marked as given");
-      await loadAll(); await loadMaaser();
-    } catch { toast.error("Could not update"); }
-  };
 
   const runMaaser = async () => {
     try {
@@ -181,14 +89,6 @@ export default function Jewish() {
       setMaaser({ ...maaser, result: data.maaser_amount });
     } catch { toast.error("Could not calculate"); }
   };
-
-  const addTz = async (e) => {
-    e.preventDefault();
-    await api.post("/jewish/tzedakah", { amount: parseFloat(form.amount), recipient: form.recipient, note: form.note });
-    toast.success("Tzedakah recorded"); setForm({ amount:"", recipient:"", note:"" }); await loadAll(); await loadMaaser();
-  };
-
-  const pending = entries.filter((e) => e.status === "pending");
 
   // ── Holiday budget CRUD ──
 
@@ -293,7 +193,7 @@ export default function Jewish() {
     <div className="space-y-8" data-testid="jewish-root">
       <PageHeader
         eyebrow="Tools"
-        title="Maaser, Tzedakah, Yom Tov."
+        title="Maaser, Yom Tov & Chasuna."
         description="A dedicated space for Jewish finance planning, giving, and holiday budgeting."
       />
 
@@ -302,7 +202,7 @@ export default function Jewish() {
         {["maaser", "holidays", "chasuna"].map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             className={`text-sm px-4 py-2 rounded-t-lg transition-colors capitalize ${activeTab === tab ? "bg-card border-b-2 border-emerald font-medium" : "text-muted-foreground hover:text-foreground"}`}>
-            {tab === "maaser" ? "Maaser & Tzedakah" : tab === "holidays" ? "Yom Tov Budgets" : "Chasuna Planning"}
+            {tab === "maaser" ? "Maaser" : tab === "holidays" ? "Yom Tov Budgets" : "Chasuna Planning"}
           </button>
         ))}
       </div>
@@ -352,13 +252,9 @@ export default function Jewish() {
           </div>
         </div>
 
-        <p className="text-sm text-muted-foreground rounded-2xl border border-dashed border-border bg-card/40 p-6 text-center">
-          Auto-Maaser summary now lives on the{" "}
-          <a href="/transactions" className="text-emerald underline">Transactions</a>{" "}
-          page — it updates live as you add, edit, or categorise transactions.
-        </p>
+        <MaaserPanel />
 
-      {/* Manual maaser + ledger */}
+      {/* Manual maaser calculator */}
       <div className="grid lg:grid-cols-2 gap-4">
         <div className="rounded-2xl border border-border bg-card p-6">
           <div className="flex items-center gap-2 mb-4"><Star className="h-4 w-4 text-topaz" /><p className="label-overline">Maaser calculator</p></div>
@@ -375,23 +271,14 @@ export default function Jewish() {
           )}
         </div>
 
-        <div className="rounded-2xl border border-border bg-card p-6">
-          <p className="label-overline">Tzedakah ledger</p>
-          <p className="text-2xl tracking-tight font-medium mt-2">£{total.toFixed(2)} <span className="text-sm text-muted-foreground">given</span></p>
-          <form onSubmit={addTz} className="mt-4 grid grid-cols-2 gap-2">
-            <input data-testid="tz-amount" required type="number" step="0.01" placeholder="£" value={form.amount} onChange={(e)=>setForm({...form, amount:e.target.value})} className="h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
-            <input data-testid="tz-recipient" required placeholder="Recipient" value={form.recipient} onChange={(e)=>setForm({...form, recipient:e.target.value})} className="h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
-            <input data-testid="tz-note" placeholder="Note (optional)" value={form.note} onChange={(e)=>setForm({...form, note:e.target.value})} className="col-span-2 h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
-            <button data-testid="tz-add" className="col-span-2 btn-pill gradient-emerald text-white text-sm"><Plus className="h-4 w-4 mr-2"/>Add</button>
-          </form>
-          <div className="mt-4 max-h-48 overflow-auto space-y-1 text-sm">
-            {entries.slice(0,8).map(e=>(
-              <div key={e.entry_id} className="flex justify-between py-1.5 border-b border-border last:border-0">
-                <span className="truncate">{e.recipient}{e.status === "pending" && <span className="ml-1 text-xs text-topaz">(pending)</span>}</span>
-                <span className="font-medium">£{e.amount.toFixed(2)}</span>
-              </div>
-            ))}
-          </div>
+        <div className="rounded-2xl border border-dashed border-border bg-card/40 p-6 flex flex-col justify-center">
+          <p className="label-overline">Tzedakah donations</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Record tzedakah gifts as regular transactions on the{" "}
+            <a href="/transactions" className="text-emerald underline">Transactions</a>{" "}
+            page using the <span className="font-medium text-foreground">Tzedakah</span> category —
+            they will automatically reduce your maaser balance above.
+          </p>
         </div>
       </div>
 
