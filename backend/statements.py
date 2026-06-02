@@ -113,23 +113,49 @@ async def _ai_parse_statement(text: str, session=None, user_id: str = None) -> d
         raise RuntimeError(f"AI JSON parse failed: {e}")
 
 
-CATEGORISE_PROMPT = """You are a bank transaction categoriser. Given the description, merchant, and amount of a transaction, choose the best single category.
+CATEGORISE_PROMPT = """You are a UK bank transaction categoriser. Given the description, merchant, and amount of a transaction, choose the best single category.
 
-INCOME vs EXPENSE:
-- If amount > 0 (money coming in): category is "salary" or "income" only
-- If amount < 0 (money going out): category is one of the expense categories
+SIGN: amount > 0 means money coming IN (income), amount < 0 means money going OUT (expense).
 
-Expense categories: groceries, dining, transport, utilities, subscriptions, tzedakah, rent, shopping, health, entertainment, insurance, education, transfer, cash, tax, fees, mortgage
+CATEGORIES:
+- income: salary, wages, pension, refunds, interest, dividends (amount > 0)
+- groceries: supermarkets, food shops (Tesco, Sainsbury's, Asda, Waitrose, Lidl, Aldi, M&S, Co-op, Morrisons)
+- dining: restaurants, cafes, takeaways, pubs, bars, fast food (McDonald's, Nando's, Pret, Starbucks, Deliveroo, Uber Eats, Just Eat)
+- transport: fuel, parking, tube, train, bus, taxi, Uber, Bolt, TfL, Oyster, rail tickets, car maintenance
+- utilities: gas, electric, water, broadband, phone, council tax (British Gas, EDF, Eon, Octopus, BT, Sky, Virgin, Vodafone, EE, Three, O2)
+- subscriptions: streaming, software, memberships (Netflix, Spotify, Disney+, Amazon Prime, Apple, iCloud, gym)
+- tzedakah: charitable donations, Jewish charitable giving (Jewish charities, tzedakah, Gift Aid to charity)
+- rent: monthly rent payments to landlord or letting agent
+- shopping: general retail, online shopping, clothes, electronics (Amazon non-Prime, eBay, Argos, John Lewis, Next, H&M, Zara, Primark)
+- health: pharmacies, GP, dentist, opticians, hospital (Boots, Lloyds Pharmacy, NHS, Bupa)
+- entertainment: cinema, theatre, concerts, books, games (Odeon, Vue, Cineworld, Steam, PlayStation, Xbox)
+- insurance: home, car, life, pet, travel insurance (Aviva, Direct Line, Admiral, LV=, Churchill)
+- education: tuition, books, courses, training (UCAS, university, Udemy, Coursera)
+- transfer: bank transfers between own accounts, peer-to-peer (Faster Payment, BACS, standing order to own account, Monzo to Monzo, Revolut)
+- cash: ATM withdrawals, cashback
+- tax: HMRC, VAT, self-assessment, council tax
+- fees: bank fees, overdraft, FX, interest charges
+- mortgage: monthly mortgage payments
+- uncategorized: only if nothing above fits
 
-Return STRICT JSON only: {{"category": "..."}}
+Output STRICT JSON only: {{"category": "<one of the above>"}}
 
 Examples:
 - "TESCO STORE 1234" | merchant: tesco | amount: -45.99 -> "groceries"
 - "MCDONALD'S" | merchant: mcdonald | amount: -12.50 -> "dining"
-- "SALARY" | merchant: employer | amount: 2500.00 -> "salary"
+- "BACS SALARY ACME LTD" | merchant: acme | amount: 2500.00 -> "salary"
 - "INTEREST" | merchant: bank | amount: 12.34 -> "income"
 - "AMAZON PRIME" | merchant: amazon | amount: -7.99 -> "subscriptions"
+- "AMAZON.CO.UK*XYZ" | merchant: amazon | amount: -34.99 -> "shopping"
 - "NATIONAL GRID" | merchant: national grid | amount: -85.00 -> "utilities"
+- "SHELL FORECOURT" | merchant: shell | amount: -52.30 -> "transport"
+- "UBER TRIP" | merchant: uber | amount: -15.40 -> "transport"
+- "NETFLIX.COM" | merchant: netflix | amount: -15.99 -> "subscriptions"
+- "BOOTS PHARMACY" | merchant: boots | amount: -8.75 -> "health"
+- "GIFT AID DONATION" | merchant: charity | amount: -50.00 -> "tzedakah"
+- "HMRC TAX" | merchant: hmrc | amount: -1200.00 -> "tax"
+- "ATM CASH" | merchant: link | amount: -100.00 -> "cash"
+- "MONZO TO MONZO" | merchant: monzo | amount: -25.00 -> "transfer"
 
 Transaction: {description}
 Merchant: {merchant}
@@ -158,6 +184,25 @@ def _fix_sign(tx: dict) -> dict:
 
 async def _ai_categorise(description: str, merchant: str | None, amount: float, session=None, user_id: str = None) -> str:
     from llm import call_llm, parse_json as llm_parse, track_ai_usage
+    from db import CategoryRule
+    if session and user_id and merchant:
+        try:
+            key = (merchant or "").strip().upper()
+            if key:
+                r = await session.execute(
+                    select(CategoryRule).where(
+                        CategoryRule.user_id == user_id,
+                        CategoryRule.merchant == key,
+                    )
+                )
+                rule = r.scalar_one_or_none()
+                if rule:
+                    rule.match_count = (rule.match_count or 0) + 1
+                    from datetime import datetime, timezone as _tz
+                    rule.last_used_at = datetime.now(_tz.utc)
+                    return rule.category
+        except Exception:
+            pass
     prompt = CATEGORISE_PROMPT.format(
         description=description[:100],
         merchant=merchant or "unknown",

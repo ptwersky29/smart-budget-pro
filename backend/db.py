@@ -538,6 +538,25 @@ class AiProvider(Base, TimestampMixin):
     )
 
 
+# ── Learned categorisation rules ──────────────────────────────────────────
+
+class CategoryRule(Base, TimestampMixin):
+    __tablename__ = "category_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
+    merchant: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    category: Mapped[str] = mapped_column(String(64), nullable=False)
+    match_count: Mapped[int] = mapped_column(Integer, default=1)
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    source: Mapped[str] = mapped_column(String(16), default="learned")  # learned, manual
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "merchant", name="uq_category_rules_user_merchant"),
+        Index("idx_category_rules_user_category", "user_id", "category"),
+    )
+
+
 # ── Billing ───────────────────────────────────────────────────────────────
 
 class PaymentTransaction(Base, TimestampMixin):

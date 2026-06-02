@@ -111,6 +111,66 @@ def normalize_merchant(name: str) -> str:
     return name.strip()
 
 
+def _merchant_rule_key(tx) -> str:
+    """Extract a normalised merchant key for rule matching."""
+    return (
+        getattr(tx, "normalized_merchant", None)
+        or (tx.merchant_name if getattr(tx, "merchant_name", None) else None)
+        or (tx.description[:60] if getattr(tx, "description", None) else "")
+    ).strip().upper()
+
+
+async def _learn_category_rule(session, user_id: str, tx, category: str) -> None:
+    """Save/update a user-learned merchant→category rule."""
+    from db import CategoryRule
+    key = _merchant_rule_key(tx)
+    if not key or category in ("uncategorized", ""):
+        return
+    try:
+        result = await session.execute(
+            select(CategoryRule).where(
+                CategoryRule.user_id == user_id,
+                CategoryRule.merchant == key,
+            )
+        )
+        rule = result.scalar_one_or_none()
+        if rule:
+            rule.category = category
+            rule.match_count = (rule.match_count or 0) + 1
+            rule.last_used_at = datetime.now(timezone.utc)
+        else:
+            session.add(CategoryRule(
+                user_id=user_id, merchant=key, category=category,
+                match_count=1, source="learned",
+                last_used_at=datetime.now(timezone.utc),
+            ))
+    except Exception:
+        pass
+
+
+async def _lookup_category_rule(session, user_id: str, tx) -> str | None:
+    """Look up a learned rule for this merchant. Returns category or None."""
+    from db import CategoryRule
+    key = _merchant_rule_key(tx)
+    if not key:
+        return None
+    try:
+        result = await session.execute(
+            select(CategoryRule).where(
+                CategoryRule.user_id == user_id,
+                CategoryRule.merchant == key,
+            )
+        )
+        rule = result.scalar_one_or_none()
+        if rule:
+            rule.match_count = (rule.match_count or 0) + 1
+            rule.last_used_at = datetime.now(timezone.utc)
+            return rule.category
+    except Exception:
+        return None
+    return None
+
+
 # ── Recurring detection ──────────────────────────────────────────────────
 
 def detect_recurring_txns(tx_list: list) -> list:
@@ -513,8 +573,11 @@ def build_router() -> APIRouter:
             if payload.merchant is not None:
                 tx.merchant_name = payload.merchant
                 tx.normalized_merchant = normalize_merchant(payload.merchant)
-            if payload.category is not None:
+            category_changed = False
+            old_category = tx.category
+            if payload.category is not None and payload.category != tx.category:
                 tx.category = payload.category
+                category_changed = True
             if payload.date is not None:
                 tx.date = datetime.fromisoformat(payload.date)
             if payload.notes is not None:
@@ -525,6 +588,8 @@ def build_router() -> APIRouter:
                 tx.pending = payload.pending
             if payload.exclude_from_maaser is not None:
                 tx.exclude_from_maaser = payload.exclude_from_maaser
+            if category_changed:
+                await _learn_category_rule(session, user["user_id"], tx, tx.category)
             await session.commit()
             await session.refresh(tx)
             doc = _tx_to_dict(tx)
@@ -1017,6 +1082,121 @@ def build_router() -> APIRouter:
             await session.delete(cat)
             await session.commit()
             return {"ok": True}
+
+    # ── Learned category rules ────────────────────────────────────────
+
+    @router.get("/category-rules")
+    async def list_category_rules(request: Request, user: dict = Depends(get_current_user)):
+        from db import CategoryRule
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(CategoryRule)
+                .where(CategoryRule.user_id == user["user_id"])
+                .order_by(CategoryRule.match_count.desc(), CategoryRule.updated_at.desc())
+            )
+            rules = result.scalars().all()
+            return {"rules": [
+                {"id": r.id, "merchant": r.merchant, "category": r.category,
+                 "match_count": r.match_count, "source": r.source,
+                 "last_used_at": r.last_used_at.isoformat() if r.last_used_at else None,
+                 "created_at": r.created_at.isoformat() if r.created_at else None}
+                for r in rules
+            ]}
+
+    @router.post("/category-rules")
+    async def create_category_rule(payload: dict, request: Request, user: dict = Depends(get_current_user)):
+        from db import CategoryRule
+        merchant = (payload.get("merchant") or "").strip().upper()
+        category = (payload.get("category") or "").strip().lower()
+        if not merchant or not category:
+            raise HTTPException(400, "merchant and category are required")
+        sm = request.app.state.db
+        async with sm() as session:
+            existing = await session.execute(
+                select(CategoryRule).where(
+                    CategoryRule.user_id == user["user_id"],
+                    CategoryRule.merchant == merchant,
+                )
+            )
+            rule = existing.scalar_one_or_none()
+            if rule:
+                rule.category = category
+                rule.match_count = (rule.match_count or 0) + 1
+                rule.source = "manual"
+            else:
+                rule = CategoryRule(
+                    user_id=user["user_id"], merchant=merchant, category=category,
+                    match_count=1, source="manual",
+                )
+                session.add(rule)
+            await session.commit()
+            return {"ok": True, "id": rule.id}
+
+    @router.patch("/category-rules/{rule_id}")
+    async def update_category_rule(rule_id: int, payload: dict, request: Request, user: dict = Depends(get_current_user)):
+        from db import CategoryRule
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(CategoryRule).where(
+                    CategoryRule.id == rule_id,
+                    CategoryRule.user_id == user["user_id"],
+                )
+            )
+            rule = result.scalar_one_or_none()
+            if not rule:
+                raise HTTPException(404, "Rule not found")
+            if "category" in payload:
+                rule.category = payload["category"].strip().lower()
+            if "merchant" in payload:
+                rule.merchant = payload["merchant"].strip().upper()
+            await session.commit()
+            return {"ok": True}
+
+    @router.delete("/category-rules/{rule_id}")
+    async def delete_category_rule(rule_id: int, request: Request, user: dict = Depends(get_current_user)):
+        from db import CategoryRule
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(CategoryRule).where(
+                    CategoryRule.id == rule_id,
+                    CategoryRule.user_id == user["user_id"],
+                )
+            )
+            rule = result.scalar_one_or_none()
+            if not rule:
+                raise HTTPException(404, "Rule not found")
+            await session.delete(rule)
+            await session.commit()
+            return {"ok": True}
+
+    @router.post("/category-rules/apply")
+    async def apply_rules_to_existing(request: Request, user: dict = Depends(get_current_user)):
+        """Re-categorise all existing transactions using learned rules."""
+        from db import CategoryRule
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(CategoryRule).where(CategoryRule.user_id == user["user_id"])
+            )
+            rules = {r.merchant: r.category for r in result.scalars().all()}
+            if not rules:
+                return {"updated": 0}
+            tx_result = await session.execute(
+                select(Transaction).where(Transaction.user_id == user["user_id"])
+            )
+            updated = 0
+            for tx in tx_result.scalars().all():
+                key = _merchant_rule_key(tx)
+                if key in rules and tx.category != rules[key]:
+                    tx.category = rules[key]
+                    updated += 1
+            if updated:
+                await session.commit()
+                _query_cache.delete(f"dash:{user['user_id']}")
+            return {"updated": updated}
 
     # ── Analytics ────────────────────────────────────────────────────
 
