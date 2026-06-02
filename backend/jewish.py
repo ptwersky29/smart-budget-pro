@@ -277,16 +277,37 @@ def build_router() -> APIRouter:
     @router.post("/maaser/ledger")
     async def add_ledger_entry(payload: TzedakahEntryIn, request: Request, user: dict = Depends(get_current_user)):
         sm = request.app.state.db
+        import uuid as _uuid
         async with sm() as session:
+            tx_id = payload.transaction_id or f"tz_{_uuid.uuid4().hex[:12]}"
+            entry_date = _parse_date(payload.date) or datetime.now(timezone.utc)
+            desc = f"Tzedakah — {payload.recipient}" + (f" ({payload.note})" if payload.note else "")
+            tx = Transaction(
+                transaction_id=tx_id,
+                user_id=user["user_id"],
+                amount=-abs(float(payload.amount)),
+                currency="GBP",
+                description=desc,
+                merchant_name=payload.recipient,
+                normalized_merchant=(payload.recipient or "").strip().upper() or None,
+                category="tzedakah",
+                date=entry_date,
+                source="tzedakah",
+                notes=payload.note,
+            )
+            session.add(tx)
+            await session.flush()
             entry = MaaserLedger(
                 user_id=user["user_id"], maaser_paid=payload.amount, paid_to=payload.recipient,
-                note=payload.note, transaction_id=payload.transaction_id,
-                date=_parse_date(payload.date) or datetime.now(timezone.utc),
+                note=payload.note, transaction_id=tx_id,
+                date=entry_date,
             )
             session.add(entry)
             await session.commit()
             await session.refresh(entry)
-            return _tz_to_dict(entry)
+            out = _tz_to_dict(entry)
+            out["transaction_id"] = tx_id
+            return out
 
     @router.put("/maaser/ledger/{entry_id}")
     async def update_ledger_entry(entry_id: str, payload: TzedakahEntryIn, request: Request,
@@ -321,6 +342,16 @@ def build_router() -> APIRouter:
             entry = result.scalar_one_or_none()
             if not entry:
                 raise HTTPException(404, "Entry not found")
+            if entry.transaction_id:
+                tx_result = await session.execute(
+                    select(Transaction).where(
+                        Transaction.transaction_id == entry.transaction_id,
+                        Transaction.user_id == user["user_id"],
+                    )
+                )
+                tx = tx_result.scalar_one_or_none()
+                if tx:
+                    await session.delete(tx)
             await session.delete(entry)
             await session.commit()
             return {"ok": True}
@@ -386,16 +417,37 @@ def build_router() -> APIRouter:
     @router.post("/tzedakah")
     async def add_tzedakah(payload: TzedakahEntryIn, request: Request, user: dict = Depends(get_current_user)):
         sm = request.app.state.db
+        import uuid as _uuid
         async with sm() as session:
+            tx_id = payload.transaction_id or f"tz_{_uuid.uuid4().hex[:12]}"
+            entry_date = _parse_date(payload.date) or datetime.now(timezone.utc)
+            desc = f"Tzedakah — {payload.recipient}" + (f" ({payload.note})" if payload.note else "")
+            tx = Transaction(
+                transaction_id=tx_id,
+                user_id=user["user_id"],
+                amount=-abs(float(payload.amount)),
+                currency="GBP",
+                description=desc,
+                merchant_name=payload.recipient,
+                normalized_merchant=(payload.recipient or "").strip().upper() or None,
+                category="tzedakah",
+                date=entry_date,
+                source="tzedakah",
+                notes=payload.note,
+            )
+            session.add(tx)
+            await session.flush()
             entry = MaaserLedger(
                 user_id=user["user_id"], maaser_paid=payload.amount, paid_to=payload.recipient,
-                note=payload.note, transaction_id=payload.transaction_id,
-                date=_parse_date(payload.date) or datetime.now(timezone.utc),
+                note=payload.note, transaction_id=tx_id,
+                date=entry_date,
             )
             session.add(entry)
             await session.commit()
             await session.refresh(entry)
-            return _tz_to_dict(entry)
+            out = _tz_to_dict(entry)
+            out["transaction_id"] = tx_id
+            return out
 
     # ════════════════════════════════════════════════════════════════════
     # YOM TOV / HOLIDAY BUDGETING

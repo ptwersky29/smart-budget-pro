@@ -872,6 +872,13 @@ Return JSON:
             await session.execute(
                 delete(SplitTransaction).where(SplitTransaction.parent_transaction_id == tx_id)
             )
+            from db import MaaserLedger
+            await session.execute(
+                delete(MaaserLedger).where(
+                    MaaserLedger.transaction_id == tx_id,
+                    MaaserLedger.user_id == user["user_id"],
+                )
+            )
             await session.delete(tx)
             await session.commit()
             _query_cache.delete(f"dash:{user['user_id']}")
@@ -893,6 +900,13 @@ Return JSON:
                 delete(SplitTransaction).where(
                     SplitTransaction.parent_transaction_id.in_(payload.transaction_ids),
                     SplitTransaction.user_id == user["user_id"],
+                )
+            )
+            from db import MaaserLedger
+            await session.execute(
+                delete(MaaserLedger).where(
+                    MaaserLedger.transaction_id.in_(payload.transaction_ids),
+                    MaaserLedger.user_id == user["user_id"],
                 )
             )
             result = await session.execute(
@@ -933,6 +947,13 @@ Return JSON:
                     delete(SplitTransaction).where(
                         SplitTransaction.parent_transaction_id.in_(ids),
                         SplitTransaction.user_id == user["user_id"],
+                    )
+                )
+                from db import MaaserLedger
+                await session.execute(
+                    delete(MaaserLedger).where(
+                        MaaserLedger.transaction_id.in_(ids),
+                        MaaserLedger.user_id == user["user_id"],
                     )
                 )
                 result = await session.execute(
