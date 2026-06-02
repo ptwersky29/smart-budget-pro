@@ -16,6 +16,18 @@ export default function SMS() {
   const [tw, setTw] = useState(null);
   const [twForm, setTwForm] = useState({ account_sid: "", auth_token: "", phone_number: "" });
 
+  // Phone registration
+  const [senders, setSenders] = useState([]);
+  const [phoneInput, setPhoneInput] = useState("");
+  const [regBusy, setRegBusy] = useState(false);
+
+  const loadSenders = useCallback(async () => {
+    try {
+      const { data } = await api.get("/sms/senders");
+      setSenders(data.senders);
+    } catch { /* not critical */ }
+  }, []);
+
   const loadInbox = useCallback(async () => {
     const { data } = await api.get("/sms/inbox");
     setInbox(data.messages);
@@ -28,7 +40,7 @@ export default function SMS() {
       setTwForm({ account_sid: data.account_sid || "", auth_token: "", phone_number: data.phone_number || "" });
     } catch (err) { console.error("twilio config load", err); }
   }, [user?.role]);
-  useEffect(() => { loadInbox(); loadTw(); }, [loadInbox, loadTw]);
+  useEffect(() => { loadInbox(); loadTw(); loadSenders(); }, [loadInbox, loadTw, loadSenders]);
 
   const parse = async (autoSave = false) => {
     if (!text.trim()) return;
@@ -65,6 +77,28 @@ export default function SMS() {
     } catch { toast.error("Could not save"); }
   };
 
+  const registerPhone = async (e) => {
+    e.preventDefault();
+    if (!phoneInput.trim()) return;
+    setRegBusy(true);
+    try {
+      await api.post("/sms/register-sender", { phone_number: phoneInput.trim() });
+      toast.success("Phone number registered");
+      setPhoneInput("");
+      await loadSenders();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail) || "Could not register");
+    } finally { setRegBusy(false); }
+  };
+
+  const deleteSender = async (id) => {
+    try {
+      await api.delete(`/sms/senders/${id}`);
+      toast.success("Phone number removed");
+      await loadSenders();
+    } catch { toast.error("Could not remove"); }
+  };
+
   return (
     <div className="space-y-8" data-testid="sms-root">
       <PageHeader
@@ -73,6 +107,30 @@ export default function SMS() {
         description="Drop in a bank SMS and FinanceAI will extract the transaction, category, and useful metadata."
         meta={user?.tier !== "premium" && user?.role !== "admin" ? [<span key="limit" className="toolbar-chip">Free tier · 3 parses/day</span>] : null}
       />
+
+      <SectionCard eyebrow="Your Phone" title={senders.length ? `${senders.length} phone${senders.length !== 1 ? "s" : ""} registered` : "Register your phone"} data-testid="phone-card">
+        <p className="text-xs text-muted-foreground mb-4">Register your mobile number so the system recognises your SMS messages and can send automatic replies.</p>
+        <form onSubmit={registerPhone} className="flex items-center gap-3 mb-4">
+          <input value={phoneInput} onChange={(e) => setPhoneInput(e.target.value)} placeholder="+447700900123" className="flex-1 h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none font-mono text-sm" />
+          <button type="submit" disabled={regBusy || !phoneInput.trim()} className="btn-pill gradient-emerald text-white text-sm shrink-0 disabled:opacity-50">
+            {regBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Register"}
+          </button>
+        </form>
+        {senders.length > 0 && (
+          <ul className="divide-y divide-border -mx-6 -mb-4">
+            {senders.map((s) => (
+              <li key={s.id} className="px-6 py-3 flex items-center gap-3">
+                <CheckCircle2 className="h-4 w-4 text-emerald shrink-0" />
+                <span className="text-sm font-mono">{s.phone_number}</span>
+                <span className="text-xs text-muted-foreground">{s.verified_at ? `verified ${s.verified_at.slice(0, 10)}` : "pending"}</span>
+                <button onClick={() => deleteSender(s.id)} className="ml-auto text-muted-foreground hover:text-ruby" title="Remove">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </SectionCard>
 
       <SectionCard eyebrow="Parse" title="Paste a transaction SMS" contentClassName="pt-0">
         <div className="flex items-center gap-2 mb-3"><MessageSquare className="h-4 w-4 text-emerald" /><p className="label-overline">Paste a transaction SMS</p></div>
