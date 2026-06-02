@@ -118,6 +118,24 @@ export default function Transactions() {
     } catch (e) { toast.error(formatApiError(e?.response?.data?.detail) || "Could not delete"); }
   };
 
+  const clearAllMatching = async () => {
+    const label = filters.source ? `all "${SOURCE_LABELS[filters.source] || filters.source}" transactions` : "all matching transactions";
+    if (!window.confirm(`Delete ${label} (${total} total)? This cannot be undone.`)) return;
+    try {
+      const body = {};
+      if (filters.source) body.source = filters.source;
+      if (filters.category) body.category = filters.category;
+      if (filters.tx_type) body.tx_type = filters.tx_type;
+      if (filters.search) body.search = filters.search;
+      if (filters.date_from) body.date_from = filters.date_from;
+      if (filters.date_to) body.date_to = filters.date_to;
+      const { data } = await api.post("/transactions/clear", body);
+      toast.success(`Deleted ${data.deleted} transaction${data.deleted > 1 ? "s" : ""}`);
+      setSelectedIds(new Set());
+      await load();
+    } catch (e) { toast.error(formatApiError(e?.response?.data?.detail) || "Could not clear"); }
+  };
+
   const del = async (id) => {
     try { await api.delete(`/transactions/${id}`); toast.success("Deleted"); await load(); }
     catch { toast.error("Could not delete"); }
@@ -146,6 +164,11 @@ export default function Transactions() {
             {someSelected && (
               <button onClick={bulkDelete} className="btn-pill border border-ruby text-ruby text-sm h-11 px-4">
                 <Trash2 className="h-4 w-4 mr-1.5" /> Delete {selectedIds.size}
+              </button>
+            )}
+            {(filters.source || filters.category || filters.tx_type || filters.search) && total > 0 && (
+              <button onClick={clearAllMatching} className="btn-pill border border-ruby/60 text-ruby/80 text-sm h-11 px-4">
+                <Trash2 className="h-4 w-4 mr-1.5" /> Clear all {total}
               </button>
             )}
             <button onClick={openAdd} data-testid="add-transaction" className="btn-pill gradient-emerald text-white text-sm h-11 px-5">
