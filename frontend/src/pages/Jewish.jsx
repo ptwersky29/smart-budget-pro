@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
-import { Star, Plus, Calendar, Sunrise, MapPin, Pencil, Trash2, Heart } from "lucide-react";
+import { Plus, Calendar, Sunrise, MapPin, Pencil, Trash2, Heart } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "../components/ui/layout";
 import MaaserPanel from "../components/MaaserPanel";
@@ -8,7 +8,6 @@ import MaaserPanel from "../components/MaaserPanel";
 const CITIES = ["london","manchester","gateshead","leeds","jerusalem","tel-aviv","new-york","monsey","lakewood","stamford-hill"];
 
 export default function Jewish() {
-  const [maaser, setMaaser] = useState({ income: 5000, percent: 10, result: null });
   const [holidays, setHolidays] = useState([]);
   const [holidayBudgets, setHolidayBudgets] = useState([]);
   const [selectedHoliday, setSelectedHoliday] = useState(null);
@@ -82,13 +81,6 @@ export default function Jewish() {
   useEffect(() => { loadHebcal(); }, [loadHebcal]);
   useEffect(() => { loadHolidayBudgets(); }, [loadHolidayBudgets]);
   useEffect(() => { loadChasuna(); }, [loadChasuna]);
-
-  const runMaaser = async () => {
-    try {
-      const { data } = await api.post(`/jewish/maaser/calc?income=${Number(maaser.income)}&percent=${Number(maaser.percent)}`);
-      setMaaser({ ...maaser, result: data.maaser_amount });
-    } catch { toast.error("Could not calculate"); }
-  };
 
   // ── Holiday budget CRUD ──
 
@@ -253,34 +245,6 @@ export default function Jewish() {
         </div>
 
         <MaaserPanel />
-
-      {/* Manual maaser calculator */}
-      <div className="grid lg:grid-cols-2 gap-4">
-        <div className="rounded-2xl border border-border bg-card p-6">
-          <div className="flex items-center gap-2 mb-4"><Star className="h-4 w-4 text-topaz" /><p className="label-overline">Maaser calculator</p></div>
-          <div className="grid grid-cols-2 gap-3">
-            <input data-testid="maaser-income" type="number" value={maaser.income} onChange={(e)=>setMaaser({...maaser, income:e.target.value})} placeholder="Income" className="h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
-            <input data-testid="maaser-percent" type="number" value={maaser.percent} onChange={(e)=>setMaaser({...maaser, percent:e.target.value})} placeholder="%" className="h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
-          </div>
-          <button onClick={runMaaser} data-testid="maaser-calc" className="btn-pill gradient-emerald text-white mt-4 text-sm">Calculate</button>
-          {maaser.result !== null && (
-            <div className="mt-6 p-4 rounded-xl bg-secondary/40">
-              <p className="label-overline">Maaser due</p>
-              <p className="text-3xl tracking-tight font-medium text-emerald mt-2">£{maaser.result.toFixed(2)}</p>
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-2xl border border-dashed border-border bg-card/40 p-6 flex flex-col justify-center">
-          <p className="label-overline">Tzedakah donations</p>
-          <p className="text-sm text-muted-foreground mt-2">
-            Record tzedakah gifts as regular transactions on the{" "}
-            <a href="/transactions" className="text-emerald underline">Transactions</a>{" "}
-            page using the <span className="font-medium text-foreground">Tzedakah</span> category —
-            they will automatically reduce your maaser balance above.
-          </p>
-        </div>
-      </div>
 
       {upcomingHols.length > 0 && (
         <div className="rounded-2xl border border-border bg-card p-6" data-testid="upcoming-holidays">
