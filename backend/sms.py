@@ -107,6 +107,174 @@ async def _send_twilio_sms(session, to: str, body: str) -> bool:
     return True
 
 
+# ── SMS Command Routing ─────────────────────────────────────────────────────
+
+_REPORT_CMDS = {"report", "summary", "this month", "last month", "balance", "spending", "status"}
+
+
+async def _handle_sms_command(body: str, session, user) -> tuple[bool, str | None]:
+    """Check if body is an SMS command (REPORT, SUMMARY, etc). Returns (is_command, reply_text)."""
+    text = body.strip().lower()
+    now = datetime.now(timezone.utc)
+
+    if text not in _REPORT_CMDS and not any(cmd in text for cmd in _REPORT_CMDS):
+        return False, None
+
+    # Determine period
+    if text in ("last month",):
+        start = (now.replace(day=1) - timedelta(days=1)).replace(day=1)
+        end = now.replace(day=1) - timedelta(days=1)
+        period_label = start.strftime("%B %Y")
+    else:
+        start = now.replace(day=1)
+        end = now
+        period_label = now.strftime("%B %Y")
+
+    # Query transactions for period
+    txs_result = await session.execute(
+        select(Transaction).where(
+            Transaction.user_id == user.user_id,
+            Transaction.date >= start,
+            Transaction.date <= end + timedelta(days=1),
+        ).order_by(Transaction.date.desc()).limit(1000)
+    )
+    txs = txs_result.scalars().all()
+
+    income = sum(t.amount for t in txs if t.amount > 0)
+    spend = sum(-t.amount for t in txs if t.amount < 0)
+    tx_count = len(txs)
+
+    # Category breakdown
+    by_cat = {}
+    for t in txs:
+        if t.amount < 0:
+            c = (t.category or "uncategorized").capitalize()
+            by_cat[c] = by_cat.get(c, 0) + (-t.amount)
+    sorted_cats = sorted(by_cat.items(), key=lambda kv: -kv[1])[:5]
+
+    # Merchant breakdown
+    by_merchant = {}
+    for t in txs:
+        if t.amount < 0 and (t.merchant_name or t.normalized_merchant):
+            m = t.normalized_merchant or t.merchant_name or "Unknown"
+            by_merchant[m] = by_merchant.get(m, 0) + (-t.amount)
+    sorted_merchants = sorted(by_merchant.items(), key=lambda kv: -kv[1])[:5]
+
+    if text == "balance" or text == "balance ":
+        net = income - spend
+        lines = [
+            f"FinanceAI Balance ({period_label}):",
+            f"In: £{income:.2f}  Out: £{spend:.2f}",
+            f"Net: £{net:.2f}",
+            f"Transactions: {tx_count}",
+        ]
+        return True, "\n".join(lines)
+
+    if text == "this month":
+        lines = [
+            f"📊 {period_label} Summary",
+            f"Spent: £{spend:.2f}  Earned: £{income:.2f}",
+            f"Transactions: {tx_count}",
+        ]
+        if sorted_cats:
+            lines.append("")
+            lines.append("Top Categories:")
+            lines.extend(f"  {c}: £{v:.2f}" for c, v in sorted_cats)
+        if sorted_merchants:
+            lines.append("")
+            lines.append("Top Merchants:")
+            lines.extend(f"  {m}: £{v:.2f}" for m, v in sorted_merchants)
+        return True, "\n".join(lines)
+
+    report_lines = [
+        f"FinanceAI Report ({period_label})",
+        f"Spending: £{spend:.2f}",
+        f"Transactions: {tx_count}",
+    ]
+    if sorted_cats:
+        report_lines.append("")
+        report_lines.append("By Category:")
+        total_spend = sum(v for _, v in sorted_cats) or 1
+        report_lines.extend(f"  {c}: £{v:.2f} ({v/total_spend*100:.0f}%)" for c, v in sorted_cats)
+    if sorted_merchants:
+        report_lines.append("")
+        report_lines.append("Top Merchants:")
+        report_lines.extend(f"  {m}: £{v:.2f}" for m, v in sorted_merchants)
+    if income > 0:
+        savings_rate = round((income - spend) / income * 100, 1)
+        report_lines.append("")
+        report_lines.append(f"Savings rate: {savings_rate}%")
+
+    return True, "\n".join(report_lines)
+
+
+async def _get_merchant_month_total(session, user_id: str, merchant: str) -> float:
+    """Total spending at a specific merchant this calendar month."""
+    now = datetime.now(timezone.utc)
+    start = now.replace(day=1)
+    result = await session.execute(
+        select(func.coalesce(func.sum(func.abs(Transaction.amount)), 0)).where(
+            Transaction.user_id == user_id,
+            Transaction.amount < 0,
+            Transaction.date >= start,
+            Transaction.date <= now + timedelta(days=1),
+            ((Transaction.normalized_merchant.ilike(f"%{merchant}%")) |
+             (Transaction.merchant_name.ilike(f"%{merchant}%")))
+        )
+    )
+    return float(result.scalar() or 0)
+
+
+async def _get_category_month_total(session, user_id: str, category: str) -> float:
+    """Total spending in a category this calendar month."""
+    now = datetime.now(timezone.utc)
+    start = now.replace(day=1)
+    result = await session.execute(
+        select(func.coalesce(func.sum(func.abs(Transaction.amount)), 0)).where(
+            Transaction.user_id == user_id,
+            Transaction.amount < 0,
+            Transaction.category == category,
+            Transaction.date >= start,
+            Transaction.date <= now + timedelta(days=1),
+        )
+    )
+    return float(result.scalar() or 0)
+
+
+async def _build_transaction_reply(session, user_id: str, parsed: dict) -> str:
+    """Build a friendly SMS reply after a transaction is recorded."""
+    amt = abs(float(parsed.get("amount", 0)))
+    merchant = parsed.get("merchant") or "Unknown"
+    category = parsed.get("category", "uncategorized").capitalize()
+    is_income = parsed.get("is_income", False)
+
+    if is_income:
+        lines = [
+            f"Income recorded.",
+            f"Amount: £{amt:.2f}",
+            f"Source: {merchant}",
+            f"Category: {category}",
+        ]
+    else:
+        lines = [
+            f"Transaction recorded.",
+            f"Amount: £{amt:.2f}",
+            f"Merchant: {merchant}",
+            f"Category: {category}",
+        ]
+        # Add this month's merchant total
+        if merchant and merchant != "Unknown":
+            merchant_total = await _get_merchant_month_total(session, user_id, merchant)
+            if merchant_total > 0:
+                lines.append(f"This month at {merchant}: £{merchant_total:.2f}")
+        # Add this month's category total
+        cat_total = await _get_category_month_total(session, user_id, parsed.get("category", ""))
+        if cat_total > 0:
+            lines.append(f"Total {category} this month: £{cat_total:.2f}")
+
+    return "\n".join(lines)
+
+
 def build_router() -> APIRouter:
     router = APIRouter(tags=["sms"])
 
@@ -147,6 +315,20 @@ def build_router() -> APIRouter:
                 logger.info(f"sms dedup hit for {user.user_id}")
                 return {"ok": True, "status": "duplicate"}
 
+            # Check for SMS commands (REPORT, SUMMARY, etc.)
+            is_cmd, cmd_reply = await _handle_sms_command(Body, session, user)
+            if is_cmd and cmd_reply:
+                sms = SmsMessage(
+                    user_id=user.user_id, to_number=To, body=Body[:2000], direction="inbound",
+                    provider="twilio", external_id=SmsMessageSid[:128], sender_phone=phone,
+                )
+                session.add(sms)
+                await session.commit()
+                # Send reply SMS
+                send_ok = await _send_twilio_sms(session, phone, cmd_reply[:600])
+                return {"ok": True, "status": "command", "command": Body.strip().lower(),
+                        "reply": cmd_reply, "delivered": send_ok}
+
             parsed = {}
             try:
                 text, provider, model, pt, ct, cost = await call_llm("You are a precise SMS parser. Always output valid JSON.", PARSE_PROMPT + Body, json_mode=True)
@@ -166,15 +348,19 @@ def build_router() -> APIRouter:
             session.add(sms)
 
             transaction_id = None
+            reply_text = None
             if parsed.get("is_transaction") and parsed.get("confidence", 0) >= 0.7:
+                from finance_engine import normalize_merchant
                 tx_id = f"tx_{uuid.uuid4().hex[:12]}"
                 amt = abs(float(parsed.get("amount", 0)))
+                merchant_raw = parsed.get("merchant")
                 tx = Transaction(
                     transaction_id=tx_id, user_id=user.user_id,
                     amount=amt if parsed.get("is_income") else -amt,
                     currency=parsed.get("currency", "GBP"),
                     description=parsed.get("description", ""),
-                    merchant_name=parsed.get("merchant"),
+                    merchant_name=merchant_raw,
+                    normalized_merchant=normalize_merchant(merchant_raw) if merchant_raw else None,
                     category=parsed.get("category", "uncategorized"),
                     date=now, source="sms",
                 )
@@ -189,9 +375,25 @@ def build_router() -> APIRouter:
                 }
                 await maaser_mod.maybe_accrue(session, user.user_id, tx_doc)
 
+                # Build and send auto-reply
+                reply_text = await _build_transaction_reply(session, user.user_id, parsed)
+
             await session.commit()
+
+            # Send reply SMS after commit
+            sent_ok = False
+            if reply_text:
+                sent_ok = await _send_twilio_sms(session, phone, reply_text[:600])
+                reply_log = SmsMessage(
+                    user_id=user.user_id, to_number=phone, body=reply_text[:600],
+                    direction="outbound", provider="twilio", status="delivered" if sent_ok else "failed",
+                )
+                session.add(reply_log)
+                await session.commit()
+
             return {"ok": True, "parsed": parsed.get("is_transaction"), "confidence": parsed.get("confidence", 0),
-                    "transaction_id": transaction_id, "user_id": user.user_id}
+                    "transaction_id": transaction_id, "user_id": user.user_id,
+                    "reply_sent": sent_ok, "reply_text": reply_text}
 
     @router.post("/sms/make-webhook")
     async def make_webhook(request: Request):
@@ -211,6 +413,19 @@ def build_router() -> APIRouter:
 
             if await _dedup_check(session, user.user_id, text):
                 return {"ok": True, "status": "duplicate"}
+
+            # Check for SMS commands
+            is_cmd, cmd_reply = await _handle_sms_command(text, session, user)
+            if is_cmd and cmd_reply:
+                sms = SmsMessage(
+                    user_id=user.user_id, to_number="make_webhook", body=text[:2000],
+                    direction="inbound", provider="twilio", sender_phone=phone,
+                )
+                session.add(sms)
+                await session.commit()
+                send_ok = await _send_twilio_sms(session, phone, cmd_reply[:600])
+                return {"ok": True, "status": "command", "command": text.strip().lower(),
+                        "reply": cmd_reply, "delivered": send_ok}
 
             parsed = {}
             try:
@@ -232,15 +447,19 @@ def build_router() -> APIRouter:
             session.add(sms)
 
             transaction_id = None
+            reply_text = None
             if parsed.get("is_transaction") and parsed.get("confidence", 0) >= 0.7:
+                from finance_engine import normalize_merchant
                 tx_id = f"tx_{uuid.uuid4().hex[:12]}"
                 amt = abs(float(parsed.get("amount", 0)))
+                merchant_raw = parsed.get("merchant")
                 tx = Transaction(
                     transaction_id=tx_id, user_id=user.user_id,
                     amount=amt if parsed.get("is_income") else -amt,
                     currency=parsed.get("currency", "GBP"),
                     description=parsed.get("description", ""),
-                    merchant_name=parsed.get("merchant"),
+                    merchant_name=merchant_raw,
+                    normalized_merchant=normalize_merchant(merchant_raw) if merchant_raw else None,
                     category=parsed.get("category", "uncategorized"),
                     date=now, source="sms",
                 )
@@ -254,10 +473,23 @@ def build_router() -> APIRouter:
                     "is_income": bool(parsed.get("is_income")),
                 }
                 await maaser_mod.maybe_accrue(session, user.user_id, tx_doc)
+                reply_text = await _build_transaction_reply(session, user.user_id, parsed)
 
             await session.commit()
+
+            sent_ok = False
+            if reply_text and phone:
+                sent_ok = await _send_twilio_sms(session, phone, reply_text[:600])
+                reply_log = SmsMessage(
+                    user_id=user.user_id, to_number=phone, body=reply_text[:600],
+                    direction="outbound", provider="twilio", status="delivered" if sent_ok else "failed",
+                )
+                session.add(reply_log)
+                await session.commit()
+
             return {"ok": True, "parsed": parsed.get("is_transaction"), "confidence": parsed.get("confidence", 0),
-                    "transaction_id": transaction_id, "user_id": user.user_id}
+                    "transaction_id": transaction_id, "user_id": user.user_id,
+                    "reply_sent": sent_ok, "reply_text": reply_text}
 
     @router.post("/sms/register-sender")
     async def register_sender(payload: RegisterSenderIn, request: Request, user: dict = Depends(get_current_user)):

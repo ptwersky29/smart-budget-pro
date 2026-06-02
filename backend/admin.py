@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 
 from db import User, Transaction, AuditLog, FeatureFlag, SupportTicket, OnboardingProgress
+from db import SmsMessage, SmsSender
 from auth import get_current_user, require_admin
 from audit import log_action
 
@@ -46,6 +47,58 @@ def build_router() -> APIRouter:
             recent_logs = (await session.execute(
                 select(AuditLog).order_by(AuditLog.created_at.desc()).limit(10)
             )).scalars().all()
+
+            # SMS stats
+            now = datetime.now(timezone.utc)
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            month_start = now.replace(day=1)
+            sms_total = (await session.execute(select(func.count()).select_from(SmsMessage))).scalar() or 0
+            sms_today = (await session.execute(
+                select(func.count()).select_from(SmsMessage).where(SmsMessage.created_at >= today_start)
+            )).scalar() or 0
+            sms_month = (await session.execute(
+                select(func.count()).select_from(SmsMessage).where(SmsMessage.created_at >= month_start)
+            )).scalar() or 0
+            sms_inbound = (await session.execute(
+                select(func.count()).select_from(SmsMessage).where(SmsMessage.direction == "inbound")
+            )).scalar() or 0
+            sms_outbound = (await session.execute(
+                select(func.count()).select_from(SmsMessage).where(SmsMessage.direction == "outbound")
+            )).scalar() or 0
+            sms_orphans = (await session.execute(
+                select(func.count()).select_from(SmsMessage).where(SmsMessage.user_id == "orphan")
+            )).scalar() or 0
+            sender_count = (await session.execute(select(func.count()).select_from(SmsSender))).scalar() or 0
+            sms_success = (await session.execute(
+                select(func.count()).select_from(SmsMessage).where(
+                    SmsMessage.status == "delivered", SmsMessage.direction == "outbound"
+                )
+            )).scalar() or 0
+            sms_failed = (await session.execute(
+                select(func.count()).select_from(SmsMessage).where(
+                    SmsMessage.status == "failed", SmsMessage.direction == "outbound"
+                )
+            )).scalar() or 0
+
+            # Top merchants across all users
+            top_merchants_result = await session.execute(
+                select(Transaction.normalized_merchant, func.sum(func.abs(Transaction.amount)).label("total"))
+                .where(Transaction.normalized_merchant.isnot(None), Transaction.normalized_merchant != "",
+                       Transaction.amount < 0)
+                .group_by(Transaction.normalized_merchant)
+                .order_by(func.sum(func.abs(Transaction.amount)).desc())
+                .limit(10)
+            )
+            top_merchants = [
+                {"merchant": row.normalized_merchant, "total_spend": round(float(row.total), 2)}
+                for row in top_merchants_result
+            ]
+
+            # SMS source transactions count
+            sms_tx_count = (await session.execute(
+                select(func.count()).select_from(Transaction).where(Transaction.source == "sms")
+            )).scalar() or 0
+
             return {
                 "stats": {
                     "total_users": total_users,
@@ -56,6 +109,20 @@ def build_router() -> APIRouter:
                     "open_support_tickets": open_tickets,
                     "feature_flags": flags_count,
                 },
+                "sms": {
+                    "total_messages": sms_total,
+                    "inbound": sms_inbound,
+                    "outbound": sms_outbound,
+                    "today": sms_today,
+                    "this_month": sms_month,
+                    "orphan_messages": sms_orphans,
+                    "registered_senders": sender_count,
+                    "delivered": sms_success,
+                    "failed": sms_failed,
+                    "transactions_from_sms": sms_tx_count,
+                    "delivery_rate": round(sms_success / (sms_success + sms_failed) * 100, 1) if (sms_success + sms_failed) > 0 else 0,
+                },
+                "top_merchants": top_merchants,
                 "recent_activity": [
                     {"action": a.action, "user_id": a.user_id, "resource": a.resource, "at": a.created_at.isoformat() if a.created_at else None}
                     for a in recent_logs
