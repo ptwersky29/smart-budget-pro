@@ -1637,53 +1637,43 @@ Return JSON:
         sm = request.app.state.db
         async with sm() as session:
 
-            async def _period_stats(date_from: str, date_to: str):
-                stmt = select(
-                    func.coalesce(func.sum(Transaction.amount).filter(Transaction.amount > 0), 0),
-                    func.coalesce(func.sum(abs(Transaction.amount)).filter(Transaction.amount < 0), 0),
-                    func.count(),
-                ).where(
+            def _compute(txs_list, label):
+                inc = sum(t.amount for t in txs_list if t.amount > 0)
+                spd = sum(abs(t.amount) for t in txs_list if t.amount < 0)
+                return {"label": label, "income": round(inc, 2), "spend": round(spd, 2), "count": len(txs_list)}
+
+            async def _load_period(date_from: str, date_to: str):
+                stmt = select(Transaction).where(
                     Transaction.user_id == user["user_id"],
                     Transaction.date >= datetime.fromisoformat(date_from),
                     Transaction.date <= datetime.fromisoformat(date_to) + timedelta(days=1),
                 )
                 if category:
                     stmt = stmt.where(Transaction.category == category)
-                result = await session.execute(stmt)
-                income, spend, cnt = result.one()
-                return {"income": round(float(income), 2), "spend": round(float(spend), 2), "count": cnt}
+                r = await session.execute(stmt.order_by(Transaction.date))
+                return r.scalars().all()
 
-            async def _cat_spend(date_from: str, date_to: str, cat: str):
-                q = select(func.coalesce(func.sum(abs(Transaction.amount)), 0)).where(
-                    Transaction.user_id == user["user_id"],
-                    Transaction.category == cat,
-                    Transaction.amount < 0,
-                    Transaction.date >= datetime.fromisoformat(date_from),
-                    Transaction.date <= datetime.fromisoformat(date_to) + timedelta(days=1),
-                )
-                r = await session.execute(q)
-                return round(float(r.scalar()), 2)
+            a_txs = await _load_period(period_a_from, period_a_to)
+            b_txs = await _load_period(period_b_from, period_b_to)
 
             a_label = datetime.fromisoformat(period_a_from).strftime("%d %b %Y")
             b_label = datetime.fromisoformat(period_b_from).strftime("%d %b %Y")
 
-            a_stats = await _period_stats(period_a_from, period_a_to)
-            b_stats = await _period_stats(period_b_from, period_b_to)
+            a_stats = _compute(a_txs, a_label)
+            b_stats = _compute(b_txs, b_label)
 
             spend_change = ((a_stats["spend"] - b_stats["spend"]) / b_stats["spend"] * 100) if b_stats["spend"] else 0
             income_change = ((a_stats["income"] - b_stats["income"]) / b_stats["income"] * 100) if b_stats["income"] else 0
 
             cat_breakdown = []
             if not category:
-                cat_stmt = select(Transaction.category.distinct()).where(
-                    Transaction.user_id == user["user_id"],
-                    Transaction.amount < 0,
-                )
-                cat_result = await session.execute(cat_stmt)
-                categories = [r[0] for r in cat_result.all() if r[0]]
-                for cat in categories:
-                    a_spend = await _cat_spend(period_a_from, period_a_to, cat)
-                    b_spend = await _cat_spend(period_b_from, period_b_to, cat)
+                all_cats = set()
+                for t in a_txs + b_txs:
+                    if t.amount < 0 and t.category:
+                        all_cats.add(t.category)
+                for cat in sorted(all_cats):
+                    a_spend = round(sum(abs(t.amount) for t in a_txs if t.amount < 0 and t.category == cat), 2)
+                    b_spend = round(sum(abs(t.amount) for t in b_txs if t.amount < 0 and t.category == cat), 2)
                     if a_spend > 0 or b_spend > 0:
                         chg = ((a_spend - b_spend) / b_spend * 100) if b_spend else (100 if a_spend > 0 else 0)
                         cat_breakdown.append({
@@ -1694,8 +1684,8 @@ Return JSON:
                         })
 
             return {
-                "period_a": {"label": a_label, **a_stats},
-                "period_b": {"label": b_label, **b_stats},
+                "period_a": a_stats,
+                "period_b": b_stats,
                 "spend_change_pct": round(spend_change, 1),
                 "income_change_pct": round(income_change, 1),
                 "category_breakdown": cat_breakdown,
