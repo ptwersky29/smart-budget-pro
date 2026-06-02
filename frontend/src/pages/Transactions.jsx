@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, formatApiError } from "../lib/api";
-import { Plus, Trash2, Loader2, Pencil, Search, ArrowUpDown, Sparkles, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, BarChart3 } from "lucide-react";
+import { Plus, Trash2, Loader2, Pencil, Search, ArrowUpDown, Sparkles, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, BarChart3, Star } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, PageHeader, SectionCard } from "../components/ui/layout";
 import ComparePeriods from "../components/ComparePeriods";
+import MaaserPanel from "../components/MaaserPanel";
 
 const SOURCE_LABELS = { manual: "Manual", truelayer: "Bank", csv: "CSV", pdf: "PDF", statement: "Statement", sms: "SMS" };
 const emptyForm = { description: "", amount: "", category: "", is_income: false };
@@ -33,6 +34,7 @@ export default function Transactions() {
   const [showFilters, setShowFilters] = useState(false);
   const [showAiSearch, setShowAiSearch] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("ledger");
 
   const [filters, setFilters] = useState({
     search: "", category: "", source: "", tx_type: "",
@@ -239,23 +241,38 @@ export default function Transactions() {
         }
       />
 
-      {/* Summary bar */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-2xl border border-border bg-card/80 p-4">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider">Income</p>
-          <p className="mt-1 text-xl tracking-tight font-medium text-emerald">{fmt(incomeTotal)}</p>
-        </div>
-        <div className="rounded-2xl border border-border bg-card/80 p-4">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider">Expenses</p>
-          <p className="mt-1 text-xl tracking-tight font-medium text-ruby">{fmt(expenseTotal)}</p>
-        </div>
-        <div className="rounded-2xl border border-border bg-card/80 p-4">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider">Net</p>
-          <p className={`mt-1 text-xl tracking-tight font-medium ${netTotal >= 0 ? "text-emerald" : "text-ruby"}`}>
-            {netTotal >= 0 ? "+" : ""}{fmt(netTotal)}
-          </p>
-        </div>
+      {/* Tab navigation */}
+      <div className="flex gap-2 flex-wrap border-b border-border pb-2">
+        {[
+          { key: "ledger", label: "Ledger", icon: BarChart3 },
+          { key: "maaser", label: "Maaser", icon: Star },
+        ].map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+            className={`inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-t-lg transition-colors capitalize ${activeTab === tab.key ? "bg-card border-b-2 border-emerald font-medium" : "text-muted-foreground hover:text-foreground"}`}>
+            <tab.icon className="h-4 w-4" />
+            {tab.label}
+          </button>
+        ))}
       </div>
+
+      {activeTab === "ledger" && <>
+        {/* Summary bar */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-2xl border border-border bg-card/80 p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Income</p>
+            <p className="mt-1 text-xl tracking-tight font-medium text-emerald">{fmt(incomeTotal)}</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-card/80 p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Expenses</p>
+            <p className="mt-1 text-xl tracking-tight font-medium text-ruby">{fmt(expenseTotal)}</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-card/80 p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Net</p>
+            <p className={`mt-1 text-xl tracking-tight font-medium ${netTotal >= 0 ? "text-emerald" : "text-ruby"}`}>
+              {netTotal >= 0 ? "+" : ""}{fmt(netTotal)}
+            </p>
+          </div>
+        </div>
 
       {/* Filter bar */}
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto_auto] gap-3 items-center rounded-[1.5rem] border border-border bg-card/90 backdrop-blur-xl p-4">
@@ -444,6 +461,12 @@ export default function Transactions() {
           </>
         )}
       </SectionCard>
+
+      </>}
+
+      {activeTab === "maaser" && <>
+        <MaaserPanel />
+      </>}
 
       {open && (
         <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={() => setOpen(false)}>
