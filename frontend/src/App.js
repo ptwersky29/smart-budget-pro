@@ -1,4 +1,4 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import "./App.css";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -8,29 +8,41 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ConsentBanner from "./components/ConsentBanner";
 import AppLayout from "./pages/AppLayout";
-import Landing from "./pages/Landing";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import Dashboard from "./pages/Dashboard";
-import Transactions from "./pages/Transactions";
-import Budgets from "./pages/Budgets";
-import Connections from "./pages/Connections";
-import Investments from "./pages/Investments";
-import Jewish from "./pages/Jewish";
-import UKTools from "./pages/UKTools";
-import Reports from "./pages/Reports";
-import Settings from "./pages/Settings";
-import SMS from "./pages/SMS";
-import Statements from "./pages/Statements";
-import Subscriptions from "./pages/Subscriptions";
-import Integrations from "./pages/Integrations";
-import Pricing from "./pages/Pricing";
-import PaymentSuccess from "./pages/PaymentSuccess";
 import AuthCallback from "./pages/AuthCallback";
-import OnboardingWizard from "./pages/OnboardingWizard";
-import Privacy from "./pages/Privacy";
+
+const Landing = lazy(() => import("./pages/Landing"));
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Transactions = lazy(() => import("./pages/Transactions"));
+const Budgets = lazy(() => import("./pages/Budgets"));
+const Connections = lazy(() => import("./pages/Connections"));
+const Investments = lazy(() => import("./pages/Investments"));
+const Jewish = lazy(() => import("./pages/Jewish"));
+const UKTools = lazy(() => import("./pages/UKTools"));
+const Reports = lazy(() => import("./pages/Reports"));
+const Settings = lazy(() => import("./pages/Settings"));
+const SMS = lazy(() => import("./pages/SMS"));
+const Statements = lazy(() => import("./pages/Statements"));
+const Subscriptions = lazy(() => import("./pages/Subscriptions"));
+const Integrations = lazy(() => import("./pages/Integrations"));
+const Pricing = lazy(() => import("./pages/Pricing"));
+const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
+const OnboardingWizard = lazy(() => import("./pages/OnboardingWizard"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+
+function PageLoader() {
+  return (
+    <div className="min-h-screen grid place-items-center bg-background">
+      <div className="flex items-center gap-3 text-muted-foreground">
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-emerald border-t-transparent" />
+        <span className="text-sm">Loading...</span>
+      </div>
+    </div>
+  );
+}
 
 function AppRouter() {
   const location = useLocation();
@@ -74,7 +86,9 @@ export default function App() {
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <AuthProvider>
           <ErrorBoundary>
-            <AppRouter />
+            <Suspense fallback={<PageLoader />}>
+              <AppRouter />
+            </Suspense>
             <ConsentBanner />
           </ErrorBoundary>
           <Toaster richColors position="top-right" />

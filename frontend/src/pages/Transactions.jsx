@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { EmptyState, PageHeader, SectionCard } from "../components/ui/layout";
 import ComparePeriods from "../components/ComparePeriods";
 import MaaserPanel from "../components/MaaserPanel";
+import TransactionRow from "../components/TransactionRow";
+import TransactionForm from "../components/TransactionForm";
 
 const SOURCE_LABELS = { manual: "Manual", truelayer: "Bank", csv: "CSV", pdf: "PDF", statement: "Statement", sms: "SMS" };
 const emptyForm = { description: "", amount: "", category: "", is_income: false };
@@ -47,26 +49,27 @@ export default function Transactions() {
   const [aiQuery, setAiQuery] = useState("");
   const [aiResults, setAiResults] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   const debounceRef = useRef(null);
 
-  const setFilter = (key, value) => {
+  const setFilter = useCallback((key, value) => {
     setOffset(0);
     setFilters((prev) => ({ ...prev, [key]: value }));
-  };
+  }, []);
 
-  const toggleFilter = (key, value) => {
+  const toggleFilter = useCallback((key, value) => {
     setOffset(0);
     setFilters((prev) => ({ ...prev, [key]: prev[key] === value ? "" : value }));
-  };
+  }, []);
 
-  const debouncedSetSearch = (value) => {
+  const debouncedSetSearch = useCallback((value) => {
     setOffset(0);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       setFilters((prev) => ({ ...prev, search: value }));
     }, 300);
-  };
+  }, []);
 
   useEffect(() => {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
@@ -115,22 +118,23 @@ export default function Transactions() {
     return chips;
   }, [filters]);
 
-  const clearAllFilters = () => {
-    setFilters({ ...filters, tx_type: "", source: "", category: "", amount_min: "", amount_max: "", date_from: firstOfMonth(), date_to: today() });
+  const clearAllFilters = useCallback(() => {
+    setFilters(prev => ({ ...prev, tx_type: "", source: "", category: "", amount_min: "", amount_max: "", date_from: firstOfMonth(), date_to: today() }));
     setOffset(0);
-  };
+  }, []);
 
   const totalPages = Math.ceil(total / limit);
   const currentPage = Math.floor(offset / limit) + 1;
 
-  const openAdd = () => { setEditingId(null); setForm(emptyForm); setOpen(true); };
-  const openEdit = (t) => {
+  const openAdd = useCallback(() => { setEditingId(null); setForm(emptyForm); setOpen(true); }, []);
+  const openEdit = useCallback((t) => {
     setEditingId(t.transaction_id);
     setForm({ description: t.description || "", amount: String(Math.abs(t.amount)), category: t.category || "", is_income: t.amount > 0 });
     setOpen(true);
-  };
+  }, []);
+  const closeForm = useCallback(() => { setOpen(false); setEditingId(null); setForm(emptyForm); }, []);
 
-  const submit = async (e) => {
+  const submit = useCallback(async (e) => {
     e.preventDefault();
     try {
       const amt = parseFloat(form.amount);
@@ -144,31 +148,32 @@ export default function Transactions() {
       }
       setOpen(false); setEditingId(null); setForm(emptyForm); await load();
     } catch { toast.error(editingId ? "Could not update" : "Could not add"); }
-  };
-
-  const [selectedIds, setSelectedIds] = useState(new Set());
+  }, [editingId, form, load]);
 
   const allDisplayed = aiResults?.transactions || txs;
   const someSelected = selectedIds.size > 0;
-  const allDisplayedSelected = allDisplayed.length > 0 && allDisplayed.every(t => selectedIds.has(t.transaction_id));
+  const allDisplayedSelected = useMemo(
+    () => allDisplayed.length > 0 && allDisplayed.every(t => selectedIds.has(t.transaction_id)),
+    [allDisplayed, selectedIds]
+  );
 
-  const toggleSelect = (id) => {
+  const toggleSelect = useCallback((id) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
-  };
+  }, []);
 
-  const toggleSelectAll = () => {
+  const toggleSelectAll = useCallback(() => {
     if (allDisplayedSelected) {
       setSelectedIds(new Set());
     } else {
       setSelectedIds(new Set(allDisplayed.map(t => t.transaction_id)));
     }
-  };
+  }, [allDisplayedSelected, allDisplayed]);
 
-  const bulkDelete = async () => {
+  const bulkDelete = useCallback(async () => {
     if (selectedIds.size === 0) return;
     if (!window.confirm(`Delete ${selectedIds.size} transaction${selectedIds.size > 1 ? "s" : ""}?`)) return;
     try {
@@ -177,9 +182,9 @@ export default function Transactions() {
       setSelectedIds(new Set());
       await load();
     } catch (e) { toast.error(formatApiError(e?.response?.data?.detail) || "Could not delete"); }
-  };
+  }, [selectedIds, load]);
 
-  const clearAllMatching = async () => {
+  const clearAllMatching = useCallback(async () => {
     const label = filters.source ? `all "${SOURCE_LABELS[filters.source] || filters.source}"` : "all matching";
     if (!window.confirm(`Delete ${label} (${total})?`)) return;
     try {
@@ -197,14 +202,14 @@ export default function Transactions() {
       setSelectedIds(new Set());
       await load();
     } catch (e) { toast.error(formatApiError(e?.response?.data?.detail) || "Could not clear"); }
-  };
+  }, [filters, total, load]);
 
-  const del = async (id) => {
+  const del = useCallback(async (id) => {
     try { await api.delete(`/transactions/${id}`); toast.success("Deleted"); await load(); }
     catch { toast.error("Could not delete"); }
-  };
+  }, [load]);
 
-  const runAiSearch = async () => {
+  const runAiSearch = useCallback(async () => {
     if (!aiQuery.trim()) return;
     setAiLoading(true); setAiResults(null);
     try {
@@ -214,7 +219,7 @@ export default function Transactions() {
       else toast.success(`AI found ${data.total} matches`);
     } catch (e) { toast.error(formatApiError(e) || "AI search failed"); }
     finally { setAiLoading(false); }
-  };
+  }, [aiQuery]);
 
   const netTotal = incomeTotal - expenseTotal;
 
@@ -400,30 +405,9 @@ export default function Transactions() {
                   </tr></thead>
                   <tbody>
                     {(aiResults?.transactions || txs).map((t) => (
-                      <tr key={t.transaction_id} className={`border-b border-border last:border-0 hover:bg-secondary/30 ${selectedIds.has(t.transaction_id) ? "bg-emerald/5" : ""}`}>
-                        <td className="px-4 py-3">
-                          <input type="checkbox" checked={selectedIds.has(t.transaction_id)} onChange={() => toggleSelect(t.transaction_id)}
-                            className="h-4 w-4 rounded border-border accent-emerald cursor-pointer" />
-                        </td>
-                        <td className="px-6 py-3 text-xs text-muted-foreground">{t.date?.slice(0, 10)}</td>
-                        <td className="px-6 py-3">
-                          <div className="font-medium">{t.description}</div>
-                          {t.normalized_merchant && t.normalized_merchant !== t.description && (
-                            <div className="text-xs text-muted-foreground">{t.normalized_merchant}</div>
-                          )}
-                        </td>
-                        <td className="px-6 py-3">
-                          <span className="text-xs px-2 py-1 rounded-full bg-secondary capitalize">{t.category || "uncategorized"}</span>
-                          {t.source_label && <span className="text-xs text-muted-foreground ml-1.5">{t.source_label}</span>}
-                        </td>
-                        <td className={`px-6 py-3 text-right font-medium tabular-nums ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}>
-                          {t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}
-                        </td>
-                        <td className="px-6 py-3 text-right whitespace-nowrap">
-                          <button onClick={() => openEdit(t)} data-testid={`edit-${t.transaction_id}`} className="text-muted-foreground hover:text-emerald mr-3" title="Edit"><Pencil className="h-4 w-4" /></button>
-                          <button onClick={() => del(t.transaction_id)} data-testid={`del-${t.transaction_id}`} className="text-muted-foreground hover:text-ruby" title="Delete"><Trash2 className="h-4 w-4" /></button>
-                        </td>
-                      </tr>
+                      <TransactionRow key={t.transaction_id} t={t}
+                        isSelected={selectedIds.has(t.transaction_id)}
+                        onToggleSelect={toggleSelect} onEdit={openEdit} onDelete={del} />
                     ))}
                   </tbody>
                 </table>
@@ -455,27 +439,8 @@ export default function Transactions() {
         <MaaserPanel />
       </>}
 
-      {/* Add / Edit modal */}
-      {open && (
-        <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={() => setOpen(false)}>
-          <div className="page-shell p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-xl tracking-tight font-medium mb-4">{editingId ? "Edit transaction" : "New transaction"}</h3>
-            <form onSubmit={submit} className="space-y-3">
-              <input data-testid="tx-desc" required placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full control-shell" />
-              <input data-testid="tx-amount" required type="number" step="0.01" placeholder="Amount (£)" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="w-full control-shell" />
-              <select data-testid="tx-category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full control-shell">
-                <option value="">Auto-categorise</option>
-                {selectedCats.map(c => <option key={c.category_id ?? `default-${c.name}`} value={c.name}>{c.name}</option>)}
-              </select>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.is_income} onChange={(e) => setForm({ ...form, is_income: e.target.checked })} /> This is income</label>
-              <div className="flex gap-2 pt-2">
-                <button type="button" onClick={() => setOpen(false)} className="flex-1 h-11 rounded-full border border-border hover:bg-secondary/50 text-sm">Cancel</button>
-                <button data-testid="tx-submit" className="btn-pill flex-1 gradient-emerald text-white">{editingId ? "Save changes" : "Add"}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <TransactionForm open={open} editingId={editingId} form={form} setForm={setForm}
+        selectedCats={selectedCats} onClose={closeForm} onSubmit={submit} />
 
       <ComparePeriods open={compareOpen} onClose={() => setCompareOpen(false)} />
     </div>
