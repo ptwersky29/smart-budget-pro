@@ -113,6 +113,42 @@ async def _ai_parse_statement(text: str, session=None, user_id: str = None) -> d
         raise RuntimeError(f"AI JSON parse failed: {e}")
 
 
+CATEGORISE_KEYWORDS = {
+    "groceries": ["tesco", "sainsbury", "asda", "waitrose", "lidl", "aldi", "morrisons", "co-op", "coop", "m&s", "marks and spencer", "iceland", "farmfoods", "budgens", "spar", "nisa", "londis", "supermarket"],
+    "dining": ["mcdonald", "nando", "kfc", "subway", "pret", "starbucks", "costa", "cafe nero", "wagamama", "pizza hut", "dominos", "deliveroo", "uber eats", "just eat", "restaurant", "cafe", "bistro", "pub", "bar ", "grill", "kitchen", "diner", "brasserie", "eatery", "bagel", "sushi", "noodle", "thai", "indian", "chinese", "chippy"],
+    "transport": ["uber", "bolt", "lyft", "free now", "viavan", "addison lee", "tfl", "oyster", "tube", "rail", "trainline", "national rail", "stagecoach", "arriva", "first bus", "shell", "bp ", "esso", "texaco", "fuel", "petrol", "parking", "ncp", "apcoa", "zipcar", "enterprise car", "hertz", "avis", "budget rent", "mot", "autoglass", "kwik fit", "halfords"],
+    "utilities": ["british gas", "edf", "eon", "octopus", "scottish power", "npower", "bulb", "ovo", "thames water", "anglian water", "welsh water", "bt ", "sky", "virgin media", "vodafone", "ee", "three", "o2", "talk talk", "plusnet", "now tv", "amazon prime", "council tax", "gas", "electric", "broadband", "wifi", "phone bill"],
+    "subscriptions": ["netflix", "spotify", "disney", "apple.com/bill", "apple.com", "icloud", "google one", "microsoft 365", "office 365", "dropbox", "adobe", "notion", "slack", "zoom", "github", "patreon", "onlyfans", "paramount", "now tv", "hbo", "apple tv", "youtube premium", "tidal", "deezer", "audible", "kindle unlimited", "gym", "puregym", "david lloyd", "nuffield", "anytime fitness"],
+    "health": ["boots", "lloyds pharmacy", "superdrug", "pharmacy", "nhs", "bupa", "practitioner", "dental", "dentist", "optician", "specsavers", "vision express", "hospital", "clinic", "physio", "chiropractor", "counselling", "therapy", "prescription"],
+    "entertainment": ["odeon", "vue ", "cineworld", "cinema", "theatre", "concert", "ticket", "stubhub", "viagogo", "steam", "playstation", "xbox", "nintendo", "epic games", "gog.com", "spotify family"],
+    "shopping": ["amazon", "ebay", "argos", "john lewis", "next", "zara", "h&m", "primark", "tk maxx", "matalan", "asos", "boohoo", "river island", "new look", "debenhams", "selfridges", "harrods", "apple store", "currys", "pc world", "game ", "decathlon", "ikea", "dunelm", "wilko", "homebase", "b&q", "wickes", "screwfix", "toolstation"],
+    "insurance": ["aviva", "direct line", "admiral", "lv=", "liverpool victoria", "churchill", "compare the market", "go compare", "money supermarket", "axa", "zurich", "legal & general", "scottish widows", "standard life", "hastings", "esure", "saga", "petplan", "animal friends"],
+    "education": ["university", "ucas", "tuition", "udemy", "coursera", "linkedin learning", "skillshare", "masterclass", "futurelearn", "open university", "oxford", "cambridge", "imperial"],
+    "transfer": ["faster payment", "bacs", "chaps", "standing order", "direct debit", "monzo to monzo", "revolut", "wise", "paypal", "venmo", "zelle"],
+    "cash": ["atm", "cashpoint", "link ", "cash withdrawal", "cashback"],
+    "tax": ["hmrc", "self assessment", "vat payment"],
+    "fees": ["overdraft", "bank fee", "monthly fee", "service charge", "interest charge"],
+    "rent": ["rent", "landlord", "letting agent", "foxtons", "savills", "knight frank"],
+    "mortgage": ["mortgage", "halifax", "natwest", "santander", "barclays", "lloyds", "hsbc", "first direct", "yorkshire bs", "skipton", "nationwide"],
+    "tzedakah": ["tzedakah", "tzedaka", "jnf", "jewish national fund", "world jewish relief", "chabad", "jewish charity", "gift aid", "justgiving", "go fund me", "gofundme"],
+    "income": ["salary", "wages", "payroll", "pension", "interest", "dividend", "refund", "rebate", "tax credit", "child benefit", "universal credit"],
+}
+
+
+def _keyword_categorise(description: str, merchant: str | None, amount: float) -> str | None:
+    """Fast keyword-based categorisation. Returns category if confident, else None."""
+    text = f"{(description or '')} {(merchant or '')}".lower()
+    if not text.strip():
+        return None
+    for category, keywords in CATEGORISE_KEYWORDS.items():
+        for kw in keywords:
+            if kw in text:
+                if category in ("income", "salary") and amount <= 0:
+                    continue
+                return category
+    return None
+
+
 CATEGORISE_PROMPT = """You are a UK bank transaction categoriser. Given the description, merchant, and amount of a transaction, choose the best single category.
 
 SIGN: amount > 0 means money coming IN (income), amount < 0 means money going OUT (expense).
@@ -185,6 +221,10 @@ def _fix_sign(tx: dict) -> dict:
 async def _ai_categorise(description: str, merchant: str | None, amount: float, session=None, user_id: str = None) -> str:
     from llm import call_llm, parse_json as llm_parse, track_ai_usage
     from db import CategoryRule
+    # Fast path: keyword matching for obvious cases
+    fast = _keyword_categorise(description, merchant, amount)
+    if fast:
+        return fast
     if session and user_id and merchant:
         try:
             key = (merchant or "").strip().upper()

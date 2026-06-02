@@ -15,7 +15,7 @@ from db import (
     RecurringTransaction, Category, Subscription, get_session_maker,
 )
 from auth import get_current_user
-from llm import call_llm, track_ai_usage
+from llm import call_llm, track_ai_usage, parse_json
 from security import sanitize_input
 from cache import TTLCache
 from statements import CATEGORIES, ALL_CATEGORIES
@@ -258,15 +258,27 @@ def smart_categorize(text: str) -> str:
     return "uncategorized"
 
 
-CATEGORISE_PROMPT_FE = """You are a bank transaction categoriser. Given the description, merchant, and amount of a transaction, choose the best single category.
+CATEGORISE_PROMPT_FE = """You are a UK bank transaction categoriser. Given the description, merchant, and amount of a transaction, choose the best single category.
 
-INCOME vs EXPENSE:
-- If amount > 0 (money coming in): category is "salary" or "income" only
-- If amount < 0 (money going out): category is one of the expense categories
+CATEGORIES (pick exactly one):
+income, salary, groceries, dining, transport, utilities, subscriptions, tzedakah, rent, shopping, health, entertainment, insurance, education, transfer, cash, tax, fees, mortgage, uncategorized
 
-Expense categories: groceries, dining, transport, utilities, subscriptions, tzedakah, rent, shopping, health, entertainment, insurance, education, transfer, cash, tax, fees, mortgage
+SIGN: amount > 0 means money coming IN (use 'salary' or 'income'), amount < 0 means money going OUT (use an expense category).
 
-Return STRICT JSON only: {{"category": "..."}}
+UK MERCHANT HINTS:
+- Tesco/Sainsbury/Asda/Waitrose/Lidl/Aldi/M&S/Co-op/Morrisons → groceries
+- McDonald/Nando/KFC/Pret/Starbucks/Deliveroo/Uber Eats → dining
+- Uber/Bolt/TfL/Oyster/Shell/BP/Trainline → transport
+- British Gas/EDF/Eon/Octopus/BT/Sky/Vodafone/EE → utilities
+- Netflix/Spotify/Disney+/Apple.com/Amazon Prime → subscriptions
+- Boots/Lloyds Pharmacy/Specsavers → health
+- Amazon non-Prime/eBay/Argos/John Lewis/Next/H&M/Primark → shopping
+- HMRC/tax/VAT → tax
+- ATM/cash withdrawal → cash
+- Faster payment/standing order/Monzo-to-Monzo/PayPal → transfer
+- Charity/tzedakah → tzedakah
+
+Output STRICT JSON only: {{"category": "<one of the above>"}}
 
 Transaction: {description}
 Merchant: {merchant}
@@ -481,28 +493,122 @@ def build_router() -> APIRouter:
 
     @router.post("/transactions/ai-search")
     async def ai_search(request: Request, user: dict = Depends(get_current_user), q: str = Query("")):
+        """Two-pass natural language transaction search.
+        1. LLM extracts structured filters (date range, category, amount, type, merchant keywords) from the query.
+        2. Server applies filters to the DB and returns matches, optionally re-ranked by LLM."""
         clean_q = sanitize_input(q.strip(), max_len=200)
         if not clean_q:
-            return {"query": q, "transactions": [], "total": 0}
+            return {"query": q, "transactions": [], "total": 0, "filters": {}}
         sm = request.app.state.db
         async with sm() as session:
-            result = await session.execute(
-                select(Transaction).where(Transaction.user_id == user["user_id"])
-                .order_by(Transaction.date.desc()).limit(50)
+            filter_resp, provider, model, pt, ct, cost = await call_llm(
+                "You extract structured filters from a UK personal-finance search query. "
+                "Output STRICT JSON only, no markdown. Infer relative dates from today "
+                f"({datetime.now(timezone.utc).strftime('%Y-%m-%d')}). Use ISO date format. "
+                "Categories are limited to: groceries, dining, transport, utilities, subscriptions, "
+                "tzedakah, rent, shopping, health, entertainment, insurance, education, transfer, cash, tax, fees, mortgage, salary, income.",
+                f"""Query: "{clean_q}"
+
+Examples:
+- "groceries last month" -> {{"category": "groceries", "date_from": "<first of last month>", "date_to": "<last of last month>"}}
+- "biggest expenses in March" -> {{"type": "expense", "date_from": "<1 Mar>", "date_to": "<31 Mar>", "sort": "amount_desc"}}
+- "subscriptions over £10" -> {{"category": "subscriptions", "amount_min": 10, "type": "expense"}}
+- "Uber trips last week" -> {{"merchant_keywords": ["uber"], "date_from": "<7 days ago>", "date_to": "<today>"}}
+- "salary payments" -> {{"type": "income", "category": "salary"}}
+- "Tesco" -> {{"merchant_keywords": ["tesco"]}}
+
+Return JSON:
+{{
+  "category": "category name or null",
+  "type": "expense|income|null",
+  "date_from": "YYYY-MM-DD or null",
+  "date_to": "YYYY-MM-DD or null",
+  "amount_min": "number or null",
+  "amount_max": "number or null",
+  "merchant_keywords": ["keyword1", "keyword2"] or [],
+  "search_text": "free text to match in description/merchant or null",
+  "sort": "amount_desc|amount_asc|date_desc|date_asc|null",
+  "limit": 50
+}}""",
+                temperature=0.0, max_tokens=400, json_mode=False,
             )
-            recent = [_tx_to_dict(t) for t in result.scalars().all()]
-            descs = "\n".join(f"- {t['date'][:10] if t['date'] else '?'} | {t['description']} | {t['merchant'] or ''} | £{abs(t['amount']):.2f} | {t['category']}" for t in recent)
-            system = "You are a financial search assistant. Given a user's question and their recent transactions, return a JSON object with \"matches\": an array of line numbers (0-indexed) that are relevant to the query."
+            await track_ai_usage(session, user["user_id"], provider, model, pt, ct, cost, endpoint="ai_search")
             try:
-                resp, provider, model, pt, ct, cost = await call_llm(system, f"User query: {clean_q}\n\nRecent transactions:\n{descs}", max_tokens=512)
-                await track_ai_usage(session, user["user_id"], provider, model, pt, ct, cost, endpoint="ai_search")
-                import json
-                data = json.loads(resp) if isinstance(resp, str) else resp
-                indices = data.get("matches", [])
+                filters = parse_json(filter_resp) if isinstance(filter_resp, str) else filter_resp
+                if not isinstance(filters, dict):
+                    filters = {}
             except Exception:
-                indices = []
-            matches = [recent[i] for i in indices if isinstance(i, int) and 0 <= i < len(recent)]
-            return {"query": q, "transactions": matches, "total": len(matches)}
+                filters = {}
+
+            stmt = select(Transaction).where(Transaction.user_id == user["user_id"])
+            cat = filters.get("category")
+            if cat and cat != "null":
+                stmt = stmt.where(Transaction.category == cat)
+            t = filters.get("type")
+            if t == "expense":
+                stmt = stmt.where(Transaction.amount < 0)
+            elif t == "income":
+                stmt = stmt.where(Transaction.amount > 0)
+            df = filters.get("date_from")
+            if df and df != "null":
+                try: stmt = stmt.where(Transaction.date >= datetime.fromisoformat(df))
+                except Exception: pass
+            dto = filters.get("date_to")
+            if dto and dto != "null":
+                try: stmt = stmt.where(Transaction.date <= datetime.fromisoformat(dto) + timedelta(days=1))
+                except Exception: pass
+            amin = filters.get("amount_min")
+            if amin is not None and amin != "null":
+                try: stmt = stmt.where(Transaction.amount <= -abs(float(amin)))
+                except Exception: pass
+            amax = filters.get("amount_max")
+            if amax is not None and amax != "null":
+                try: stmt = stmt.where(Transaction.amount >= -abs(float(amax)))
+                except Exception: pass
+            keywords = filters.get("merchant_keywords") or []
+            if isinstance(keywords, list) and keywords:
+                from sqlalchemy import or_ as _or
+                kw_filters = []
+                for kw in keywords[:5]:
+                    if isinstance(kw, str) and kw.strip():
+                        pattern = f"%{kw.strip().lower()}%"
+                        kw_filters.append(func.lower(Transaction.description).like(pattern))
+                        kw_filters.append(func.lower(Transaction.merchant_name).like(pattern))
+                        kw_filters.append(func.lower(Transaction.normalized_merchant).like(pattern))
+                if kw_filters:
+                    stmt = stmt.where(_or(*kw_filters))
+            search_text = filters.get("search_text")
+            if search_text and search_text != "null":
+                pattern = f"%{str(search_text).lower()}%"
+                stmt = stmt.where(_or(
+                    func.lower(Transaction.description).like(pattern),
+                    func.lower(Transaction.merchant_name).like(pattern),
+                    func.lower(Transaction.normalized_merchant).like(pattern),
+                    func.lower(Transaction.category).like(pattern),
+                    func.lower(Transaction.notes).like(pattern),
+                ))
+            sort = filters.get("sort")
+            if sort == "amount_desc":
+                stmt = stmt.order_by(Transaction.amount.asc())
+            elif sort == "amount_asc":
+                stmt = stmt.order_by(Transaction.amount.desc())
+            elif sort == "date_asc":
+                stmt = stmt.order_by(Transaction.date.asc())
+            else:
+                stmt = stmt.order_by(Transaction.date.desc())
+            try:
+                limit_n = min(int(filters.get("limit") or 50), 200)
+            except Exception:
+                limit_n = 50
+            stmt = stmt.limit(limit_n)
+            result = await session.execute(stmt)
+            txs = [_tx_to_dict(t) for t in result.scalars().all()]
+            return {
+                "query": q,
+                "filters": filters,
+                "transactions": txs,
+                "total": len(txs),
+            }
 
     @router.post("/transactions")
     async def create_transaction(payload: TransactionIn, request: Request, user: dict = Depends(get_current_user)):
@@ -513,19 +619,25 @@ def build_router() -> APIRouter:
             merch = payload.merchant or ""
             category = payload.category or smart_categorize(f"{desc} {merch}")
             if category == "uncategorized":
-                from llm import call_llm, parse_json as llm_parse, track_ai_usage as track_usage
-                try:
-                    raw, provider, model, pt, ct, cost = await call_llm(
-                        "You categorise transactions. Output valid JSON only.",
-                        CATEGORISE_PROMPT_FE.format(description=desc[:100], merchant=merch or "unknown", amount=payload.amount),
-                        json_mode=True,
-                    )
-                    await track_usage(session, user["user_id"], provider, model, pt, ct, cost, endpoint="manual_categorize")
-                    ai_cat = str(llm_parse(raw).get("category", "uncategorized")).lower().strip()
-                    if ai_cat in ALL_CATEGORIES and ai_cat != "uncategorized":
-                        category = ai_cat
-                except Exception:
-                    pass
+                # Fast path: keyword match
+                from statements import _keyword_categorise as kw_cat
+                fast = kw_cat(desc, merch, payload.amount)
+                if fast:
+                    category = fast
+                else:
+                    from llm import call_llm, parse_json as llm_parse, track_ai_usage as track_usage
+                    try:
+                        raw, provider, model, pt, ct, cost = await call_llm(
+                            "You categorise UK transactions. Output valid JSON only.",
+                            CATEGORISE_PROMPT_FE.format(description=desc[:100], merchant=merch or "unknown", amount=payload.amount),
+                            json_mode=False,
+                        )
+                        await track_usage(session, user["user_id"], provider, model, pt, ct, cost, endpoint="manual_categorize")
+                        ai_cat = str(llm_parse(raw).get("category", "uncategorized")).lower().strip()
+                        if ai_cat in ALL_CATEGORIES and ai_cat != "uncategorized":
+                            category = ai_cat
+                    except Exception:
+                        pass
             normalized = normalize_merchant(merch or desc)
             signed_amount = abs(payload.amount) if payload.is_income else -abs(payload.amount)
             tx = Transaction(
