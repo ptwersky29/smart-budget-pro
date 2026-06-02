@@ -36,7 +36,7 @@ def estimate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> flo
 async def call_llm(
     system: str,
     prompt: str,
-    model: str = "meta-llama/llama-4-maverick:free",
+    model: str = "openrouter/free",
     api_key: str = None,
     max_tokens: int = 4096,
     temperature: float = 0.1,
