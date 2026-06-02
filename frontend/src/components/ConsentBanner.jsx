@@ -9,10 +9,8 @@ export default function ConsentBanner() {
 
   useEffect(() => {
     api.get("/gdpr/consent").then(({ data }) => {
-      const consented = data?.consents?.some(
-        (c) => c.consent_type === "privacy" && c.granted
-      );
-      setVisible(!consented);
+      const hasChoice = data?.current?.privacy !== null && data?.current?.privacy !== undefined;
+      setVisible(!hasChoice);
     }).catch(() => setVisible(true));
   }, []);
 

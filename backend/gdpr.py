@@ -124,9 +124,9 @@ def build_router() -> APIRouter:
                 history.setdefault(r.consent_type, []).append({"granted": r.granted, "at": r.created_at.isoformat() if r.created_at else None})
             return {
                 "current": {
-                    "terms": u.consent_terms or False,
-                    "privacy": u.consent_privacy or False,
-                    "marketing": u.consent_marketing or False,
+                    "terms": u.consent_terms if u.consent_terms is not None else None,
+                    "privacy": u.consent_privacy if u.consent_privacy is not None else None,
+                    "marketing": u.consent_marketing if u.consent_marketing is not None else None,
                 },
                 "history": history,
             }
