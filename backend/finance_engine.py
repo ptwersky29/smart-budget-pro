@@ -18,6 +18,7 @@ from auth import get_current_user
 from llm import call_llm, track_ai_usage
 from security import sanitize_input
 from cache import TTLCache
+from statements import CATEGORIES, ALL_CATEGORIES
 import maaser
 
 logger = logging.getLogger("finance")
@@ -945,13 +946,21 @@ def build_router() -> APIRouter:
                 select(Category).where(Category.user_id == user["user_id"]).order_by(Category.sort_order, Category.name)
             )
             cats = result.scalars().all()
-            return {"categories": [
+            user_names = {c.name for c in cats}
+            defaults = [
+                {"category_id": None, "name": n, "icon": None, "color": None,
+                 "is_income": n in {"salary", "income"}, "budget": None,
+                 "sort_order": i, "is_default": True}
+                for i, n in enumerate(CATEGORIES) if n != "uncategorized" and n not in user_names
+            ]
+            user_cats = [
                 {"category_id": c.category_id, "name": c.name, "icon": c.icon,
                  "color": c.color, "is_income": c.is_income,
                  "budget": float(c.budget) if c.budget else None,
-                 "sort_order": c.sort_order}
+                 "sort_order": c.sort_order, "is_default": False}
                 for c in cats
-            ]}
+            ]
+            return {"categories": defaults + user_cats}
 
     @router.post("/categories")
     async def create_category(payload: dict, request: Request, user: dict = Depends(get_current_user)):

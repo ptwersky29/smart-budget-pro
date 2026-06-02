@@ -223,7 +223,7 @@ export default function Transactions() {
               <label className="text-xs text-muted-foreground">Category</label>
               <select value={filters.category} onChange={(e) => toggleFilter("category", e.target.value)} className="control-shell text-sm h-10">
                 <option value="">All</option>
-                {selectedCats.map(c => <option key={c.category_id} value={c.name}>{c.name}</option>)}
+                {selectedCats.map(c => <option key={c.category_id ?? `default-${c.name}`} value={c.name}>{c.name}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1 min-w-[150px]">
@@ -337,7 +337,7 @@ export default function Transactions() {
               <input data-testid="tx-amount" required type="number" step="0.01" placeholder="Amount (£)" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="w-full control-shell" />
               <select data-testid="tx-category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full control-shell">
                 <option value="">Auto-categorise</option>
-                {selectedCats.map(c => <option key={c.category_id} value={c.name}>{c.name}</option>)}
+                {selectedCats.map(c => <option key={c.category_id ?? `default-${c.name}`} value={c.name}>{c.name}</option>)}
               </select>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.is_income} onChange={(e) => setForm({ ...form, is_income: e.target.checked })} /> This is income</label>
               <div className="flex gap-2 pt-2">
