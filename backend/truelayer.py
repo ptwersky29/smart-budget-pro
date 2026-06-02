@@ -81,7 +81,7 @@ async def _tl_config_from_db(session=None) -> dict:
                 val = c.value
         return val or ""
 
-    env = os.environ.get("TRUELAYER_ENVIRONMENT", "sandbox")
+    env = os.environ.get("TRUELAYER_ENVIRONMENT") or await _get("environment", "") or "sandbox"
     client_id = await _get("client_id", "TRUELAYER_CLIENT_ID")
     client_secret = await _get("client_secret", "TRUELAYER_CLIENT_SECRET")
     redirect_uri = await _get("redirect_uri", "TRUELAYER_REDIRECT_URI")
