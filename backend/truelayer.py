@@ -137,6 +137,15 @@ def _token_value(value: Optional[str]) -> str:
     return value or ""
 
 
+def _parse_date_str(value: Optional[str]) -> Optional[date]:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except (ValueError, TypeError):
+        return None
+
+
 def _normalize_accounts_payload(payload) -> list[dict]:
     if isinstance(payload, list):
         return [item for item in payload if isinstance(item, dict)]
@@ -416,7 +425,8 @@ def build_router() -> APIRouter:
                     return RedirectResponse(_connections_url(frontend, "failed", reason="invalid_state"))
                 user_id = state_doc.user_id
                 state_meta = state_doc.meta or {}
-                import_from_date = state_meta.get("from_date") if isinstance(state_meta, dict) else None
+                raw_from_date = state_meta.get("from_date") if isinstance(state_meta, dict) else None
+                import_from_date = _parse_date_str(raw_from_date)
                 connection_id_to_update = state_meta.get("connection_id") if isinstance(state_meta, dict) else None
                 try:
                     token_data = await _exchange_code(code, state_doc.redirect_uri, session)
