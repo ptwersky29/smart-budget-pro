@@ -50,6 +50,7 @@ api.interceptors.response.use(
       error?.response?.status === 401 &&
       !originalRequest._retry &&
       !requestUrl.includes("/auth/refresh") &&
+      !requestUrl.includes("/auth/me") &&
       !requestUrl.includes("/auth/login") &&
       !requestUrl.includes("/auth/register") &&
       !requestUrl.includes("/auth/forgot-password") &&
