@@ -3,11 +3,11 @@ import uuid
 import re
 import logging
 from datetime import datetime, timezone, timedelta
-from typing import Optional, List
+from typing import Optional
 from collections import defaultdict
 
 from fastapi import APIRouter, HTTPException, Request, Depends, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy import select, update, delete, func, or_
 
 from db import (
@@ -247,7 +247,8 @@ CATEGORY_RULES = {
 }
 
 
-ALL_CATEGORIES = set(CATEGORY_RULES.keys()) | {"salary", "income", "uncategorized"}
+# Use canonical category set from statements.py (includes mortgage)
+# The imported ALL_CATEGORIES has the authoritative list
 
 
 def smart_categorize(text: str) -> str:
@@ -544,7 +545,6 @@ def build_router() -> APIRouter:
                 "limit": limit,
             }
 
-    import re
     _SEARCH_CATEGORIES = {
         "groceries": "groceries", "grocery": "groceries", "supermarket": "groceries", "food shop": "groceries",
         "dining": "dining", "restaurant": "dining", "restaurants": "dining", "cafe": "dining", "cafes": "dining",
@@ -595,9 +595,20 @@ def build_router() -> APIRouter:
 
         # Amount bounds: "over £100", "under £50", "more than £20", "less than £10", "above £X", "below £X"
         m = re.search(r"\b(over|above|more than|greater than|>=?)\s*[£$]?\s*(\d+(?:\.\d+)?)\b", text)
-        if m: out["amount_min"] = float(m.group(2))
+        if m:
+            out["amount_min"] = float(m.group(2))
+            out["amount_comparator"] = "over"
         m = re.search(r"\b(under|below|less than|<=?)\s*[£$]?\s*(\d+(?:\.\d+)?)\b", text)
-        if m: out["amount_max"] = float(m.group(2))
+        if m:
+            out["amount_max"] = float(m.group(2))
+            out["amount_comparator"] = "under"
+        # Price adjectives
+        if re.search(r"\b(expensive|large|big|high value)\b", text) and "amount_min" not in out:
+            out["amount_min"] = 50
+            out["amount_comparator"] = "over"
+        if re.search(r"\b(cheap|small|low value|minor)\b", text) and "amount_max" not in out:
+            out["amount_max"] = 20
+            out["amount_comparator"] = "under"
         # Bare amount filter: "£100", "100 pounds"
         m = re.search(r"[£$]\s*(\d+(?:\.\d+)?)\b", text)
         if m and "amount_min" not in out and "amount_max" not in out:
@@ -666,7 +677,46 @@ def build_router() -> APIRouter:
         elif re.search(r"\b(oldest|earliest|first)\b", text):
             out["sort"] = "date_asc"
 
-        # Anything else becomes a free-text search keyword
+        # Merchant keyword detection
+        _MERCHANT_ALIASES = {
+            "tesco": ["tesco", "tescos", "tesco store"],
+            "sainsbury": ["sainsbury", "sainsburys", "sains", "sainsbury's"],
+            "asda": ["asda"],
+            "waitrose": ["waitrose", "waitrose & partners", "waitrose and partners"],
+            "lidl": ["lidl"],
+            "aldi": ["aldi"],
+            "mcdonald": ["mcdonald", "mcdonalds", "mcd", "mc donald", "mc donalds", "maccies"],
+            "amazon": ["amazon", "amzn"],
+            "uber": ["uber", "uber eats", "uber trip"],
+            "netflix": ["netflix", "netflix.com"],
+            "spotify": ["spotify"],
+            "pret": ["pret", "pret a manger", "pret a manger"],
+            "starbucks": ["starbucks", "starbucks coffee"],
+            "hmrc": ["hmrc", "taxman", "inland revenue"],
+            "tfl": ["tfl", "transport for london", "oyster"],
+            "shell": ["shell", "shell petrol"],
+            "bp": ["bp", "bp petrol"],
+            "trainline": ["trainline", "the train line"],
+            "boots": ["boots", "boots pharmacy", "boots the chemist"],
+            "argos": ["argos"],
+            "ikea": ["ikea"],
+            "currys": ["currys", "currys pc world"],
+        }
+        merchant_matches = [name for name, aliases in _MERCHANT_ALIASES.items()
+                           if any(a in text for a in aliases)]
+        if merchant_matches:
+            out["merchant_keywords"] = merchant_matches[:5]
+
+        # Aggregate detection: "how much did I spend", "total", "sum"
+        if re.search(r"\b(how much|total spent|total spend|sum of|what did i spend|spending on)\b", text):
+            out["aggregate"] = "how_much"
+        elif re.search(r"\b(how many|count of|number of)\b", text):
+            out["aggregate"] = "count"
+
+        # Comparative detection: "compare", "vs", "versus", "difference between"
+        if re.search(r"\b(compare|comparison|vs\.?|versus|difference between)\b", text) and out.get("date_from") and out.get("date_to"):
+            out["comparative"] = True
+
         return out
 
     @router.post("/transactions/ai-search")
@@ -809,9 +859,9 @@ Output ONLY valid JSON, no markdown, no explanation:
                 ))
             sort = filters.get("sort")
             if sort == "amount_desc":
-                stmt = stmt.order_by(Transaction.amount.asc())
-            elif sort == "amount_asc":
                 stmt = stmt.order_by(Transaction.amount.desc())
+            elif sort == "amount_asc":
+                stmt = stmt.order_by(Transaction.amount.asc())
             elif sort == "date_asc":
                 stmt = stmt.order_by(Transaction.date.asc())
             else:

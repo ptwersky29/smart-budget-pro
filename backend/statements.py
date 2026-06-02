@@ -1,19 +1,14 @@
 """Statement upload + AI-parsed transactions (CSV / PDF)."""
 import io
 import csv
-import json
-import re
 import uuid
 import logging
 from datetime import datetime, timezone
-from typing import List, Optional
-
+from typing import Optional
 from fastapi import APIRouter, Request, Depends, UploadFile, File, HTTPException
 from pydantic import BaseModel
 from pypdf import PdfReader
 from sqlalchemy import select, func, delete
-
-import os
 from db import Transaction, Statement, MaaserLedger
 from auth import get_current_user
 import maaser as maaser_mod

@@ -109,7 +109,6 @@ async def track_ai_usage(session, user_id: str, provider: str, model: str,
         await session.commit()
     except Exception as e:
         logger.warning(f"AI usage tracking failed: {e}")
-    session.close()
 
 
 def parse_json(text: str) -> dict:
