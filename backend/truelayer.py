@@ -149,6 +149,22 @@ def _normalize_accounts_payload(payload) -> list[dict]:
     return []
 
 
+def _frontend_base_url() -> str:
+    frontend = os.environ.get("FRONTEND_URL", "").strip().rstrip("/")
+    if frontend:
+        return frontend
+    return "https://smart-budget-pro-ewtm.vercel.app"
+
+
+def _connections_url(frontend: str, status: str, reason: Optional[str] = None, accounts: Optional[int] = None) -> str:
+    params = {"status": status}
+    if reason:
+        params["reason"] = reason
+    if accounts is not None:
+        params["accounts"] = str(accounts)
+    return f"{frontend.rstrip('/')}/connections?{urlencode(params)}"
+
+
 async def _is_configured(session=None) -> bool:
     cfg = await _tl_config_from_db(session)
     return bool(cfg["client_id"] and cfg["client_secret"])
@@ -386,90 +402,95 @@ def build_router() -> APIRouter:
     @router.get("/callback")
     async def callback(request: Request, code: str = Query(None), state: str = Query(None), error: str = Query(None), error_description: str = Query(None)):
         sm = request.app.state.db
-        async with sm() as session:
-            frontend = os.environ.get("FRONTEND_URL", "")
-            if error:
-                await _log_oauth(session, None, "callback_error", {"error": error, "desc": error_description})
-                return RedirectResponse(f"{frontend}/connections?status=failed&reason={error}")
-            if not code or not state:
-                return RedirectResponse(f"{frontend}/connections?status=failed&reason=missing_params")
-            result = await session.execute(select(TrueLayerState).where(TrueLayerState.state == state))
-            state_doc = result.scalar_one_or_none()
-            if not state_doc:
-                return RedirectResponse(f"{frontend}/connections?status=failed&reason=invalid_state")
-            user_id = state_doc.user_id
-            state_meta = state_doc.meta or {}
-            import_from_date = state_meta.get("from_date") if isinstance(state_meta, dict) else None
-            connection_id_to_update = state_meta.get("connection_id") if isinstance(state_meta, dict) else None
-            try:
-                token_data = await _exchange_code(code, state_doc.redirect_uri, session)
-            except Exception as e:
-                await _log_oauth(session, user_id, "token_exchange_failed", {"error": str(e)})
-                return RedirectResponse(f"{frontend}/connections?status=failed&reason=token_exchange")
+        frontend = _frontend_base_url()
+        try:
+            async with sm() as session:
+                if error:
+                    await _log_oauth(session, None, "callback_error", {"error": error, "desc": error_description})
+                    return RedirectResponse(_connections_url(frontend, "failed", reason=error))
+                if not code or not state:
+                    return RedirectResponse(_connections_url(frontend, "failed", reason="missing_params"))
+                result = await session.execute(select(TrueLayerState).where(TrueLayerState.state == state))
+                state_doc = result.scalar_one_or_none()
+                if not state_doc:
+                    return RedirectResponse(_connections_url(frontend, "failed", reason="invalid_state"))
+                user_id = state_doc.user_id
+                state_meta = state_doc.meta or {}
+                import_from_date = state_meta.get("from_date") if isinstance(state_meta, dict) else None
+                connection_id_to_update = state_meta.get("connection_id") if isinstance(state_meta, dict) else None
+                try:
+                    token_data = await _exchange_code(code, state_doc.redirect_uri, session)
+                except Exception as e:
+                    await _log_oauth(session, user_id, "token_exchange_failed", {"error": str(e)})
+                    return RedirectResponse(_connections_url(frontend, "failed", reason="token_exchange"))
 
-            # Reconnect flow — update existing connection tokens
-            if connection_id_to_update:
-                result = await session.execute(
-                    select(BankConnection).where(
-                        BankConnection.connection_id == connection_id_to_update,
-                        BankConnection.user_id == user_id,
+                # Reconnect flow — update existing connection tokens
+                if connection_id_to_update:
+                    result = await session.execute(
+                        select(BankConnection).where(
+                            BankConnection.connection_id == connection_id_to_update,
+                            BankConnection.user_id == user_id,
+                        )
                     )
-                )
-                existing = result.scalar_one_or_none()
-                if existing:
-                    existing.access_token = _encrypt(token_data["access_token"])
-                    existing.refresh_token = _encrypt(_token_value(token_data.get("refresh_token")))
-                    existing.expires_at = datetime.now(timezone.utc) + timedelta(seconds=token_data.get("expires_in", 3600))
-                    existing.status = "active"
-                    existing.last_error = None
-                    existing.last_error_at = None
-                    existing.last_sync_status = "connected"
-                    existing.update_count = (existing.update_count or 0) + 1
+                    existing = result.scalar_one_or_none()
+                    if existing:
+                        existing.access_token = _encrypt(token_data["access_token"])
+                        existing.refresh_token = _encrypt(_token_value(token_data.get("refresh_token")))
+                        existing.expires_at = datetime.now(timezone.utc) + timedelta(seconds=token_data.get("expires_in", 3600))
+                        existing.status = "active"
+                        existing.last_error = None
+                        existing.last_error_at = None
+                        existing.last_sync_status = "connected"
+                        existing.update_count = (existing.update_count or 0) + 1
+                        await session.delete(state_doc)
+                        await session.commit()
+                        # Trigger initial sync for reconnected connection
+                        try:
+                            _, _ = await _sync_connection(session, existing, user_id)
+                        except Exception as e:
+                            logger.error(f"reconnect sync failed for {existing.connection_id}: {e}")
+                        return RedirectResponse(_connections_url(frontend, "success", accounts=1))
+
+                # New connection flow
+                accounts = await _fetch_accounts(token_data["access_token"], session)
+                if not accounts:
+                    await _log_oauth(session, user_id, "no_accounts_selected", {"state": state, "meta": state_meta})
                     await session.delete(state_doc)
                     await session.commit()
-                    # Trigger initial sync for reconnected connection
-                    try:
-                        _, _ = await _sync_connection(session, existing, user_id)
-                    except Exception as e:
-                        logger.error(f"reconnect sync failed for {existing.connection_id}: {e}")
-                    return RedirectResponse(f"{frontend}/connections?status=success&accounts=1")
-
-            # New connection flow
-            accounts = await _fetch_accounts(token_data["access_token"], session)
-            if not accounts:
-                await _log_oauth(session, user_id, "no_accounts_selected", {"state": state, "meta": state_meta})
+                    return RedirectResponse(_connections_url(frontend, "failed", reason="no_accounts"))
+                created_connections = []
+                for acc in accounts:
+                    provider_info = acc.get("provider") or {}
+                    connection_id = f"conn_{uuid.uuid4().hex[:12]}"
+                    conn = BankConnection(
+                        connection_id=connection_id, user_id=user_id, provider="truelayer",
+                        account_id=acc.get("account_id") or provider_info.get("provider_id", "unknown"),
+                        account_name=acc.get("display_name") or provider_info.get("display_name", "UK Bank"),
+                        account_type=acc.get("account_type", ""),
+                        access_token=_encrypt(token_data["access_token"]),
+                        refresh_token=_encrypt(_token_value(token_data.get("refresh_token"))),
+                        expires_at=datetime.now(timezone.utc) + timedelta(seconds=token_data.get("expires_in", 3600)),
+                        import_start_date=import_from_date,
+                        config={"account_ids": [acc.get("account_id", "")]} if acc.get("account_id") else None,
+                        status="active",
+                        last_sync_status="connected",
+                    )
+                    session.add(conn)
+                    created_connections.append(conn)
                 await session.delete(state_doc)
+                await _log_oauth(session, user_id, "connection_success", {"accounts_count": len(accounts)})
                 await session.commit()
-                return RedirectResponse(f"{frontend}/connections?status=failed&reason=no_accounts")
-            created_connections = []
-            for acc in accounts:
-                provider_info = acc.get("provider") or {}
-                connection_id = f"conn_{uuid.uuid4().hex[:12]}"
-                conn = BankConnection(
-                    connection_id=connection_id, user_id=user_id, provider="truelayer",
-                    account_id=acc.get("account_id") or provider_info.get("provider_id", "unknown"),
-                    account_name=acc.get("display_name") or provider_info.get("display_name", "UK Bank"),
-                    account_type=acc.get("account_type", ""),
-                    access_token=_encrypt(token_data["access_token"]),
-                    refresh_token=_encrypt(_token_value(token_data.get("refresh_token"))),
-                    expires_at=datetime.now(timezone.utc) + timedelta(seconds=token_data.get("expires_in", 3600)),
-                    import_start_date=import_from_date,
-                    config={"account_ids": [acc.get("account_id", "")]} if acc.get("account_id") else None,
-                    status="active",
-                    last_sync_status="connected",
-                )
-                session.add(conn)
-                created_connections.append(conn)
-            await session.delete(state_doc)
-            await _log_oauth(session, user_id, "connection_success", {"accounts_count": len(accounts)})
-            await session.commit()
-            # Trigger initial sync for all new connections
-            for conn in created_connections:
-                try:
-                    _, _ = await _sync_connection(session, conn, user_id)
-                except Exception as e:
-                    logger.error(f"initial sync failed for {conn.connection_id}: {e}")
-            return RedirectResponse(f"{frontend}/connections?status=success&accounts={len(accounts)}")
+                # Trigger initial sync for all new connections
+                for conn in created_connections:
+                    try:
+                        _, _ = await _sync_connection(session, conn, user_id)
+                    except Exception as e:
+                        logger.error(f"initial sync failed for {conn.connection_id}: {e}")
+                return RedirectResponse(_connections_url(frontend, "success", accounts=len(accounts)))
+        except Exception as e:
+            rid = getattr(request.state, "request_id", "?")
+            logger.exception("RID=%s TrueLayer callback failed: %s", rid, e)
+            return RedirectResponse(_connections_url(frontend, "failed", reason="callback_error"))
 
     @router.get("/connections")
     async def list_connections(request: Request, user: dict = Depends(get_current_user)):

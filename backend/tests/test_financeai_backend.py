@@ -93,7 +93,6 @@ def test_truelayer_auth_url(admin):
     for k in ("client_id", "redirect_uri", "response_type", "scope", "state", "nonce"):
         assert k in qs, f"missing param {k} in auth URL"
     assert qs["response_type"] == ["code"]
-    assert "providers" not in qs
     assert "provider_id" not in qs
     if "sandbox" in url:
         assert qs.get("providers") == ["uk-cs-mock"]

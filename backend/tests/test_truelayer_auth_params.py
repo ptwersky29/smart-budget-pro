@@ -6,6 +6,8 @@ os.environ.setdefault("JWT_SECRET", "test-jwt-secret-for-truelayer-auth-params")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from truelayer import _build_auth_link_params
+from truelayer import _connections_url
+from truelayer import _frontend_base_url
 from truelayer import _normalize_accounts_payload
 from truelayer import _token_value
 
@@ -57,3 +59,22 @@ def test_normalize_accounts_payload():
     normalized = _normalize_accounts_payload(payload)
     assert normalized == [{"account_id": "acc_1", "provider": None}]
     assert _normalize_accounts_payload({"results": {"account_id": "acc_2"}}) == [{"account_id": "acc_2"}]
+
+
+def test_connections_url():
+    assert _connections_url("https://app.example.com", "success", accounts=2) == (
+        "https://app.example.com/connections?status=success&accounts=2"
+    )
+    assert _connections_url("https://app.example.com/", "failed", reason="callback_error") == (
+        "https://app.example.com/connections?status=failed&reason=callback_error"
+    )
+
+
+def test_frontend_base_url_defaults(monkeypatch):
+    monkeypatch.delenv("FRONTEND_URL", raising=False)
+    assert _frontend_base_url() == "https://smart-budget-pro-ewtm.vercel.app"
+
+
+def test_frontend_base_url_env(monkeypatch):
+    monkeypatch.setenv("FRONTEND_URL", "https://app.example.com/")
+    assert _frontend_base_url() == "https://app.example.com"

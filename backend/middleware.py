@@ -1,14 +1,33 @@
 """Error monitoring, request ID, and performance middleware."""
+import os
 import time
 import uuid
 import logging
+from urllib.parse import urlencode
 from fastapi import Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger("monitor")
 
 SLOW_REQUEST_MS = 1000
+DEFAULT_FRONTEND_URL = "https://smart-budget-pro-ewtm.vercel.app"
+
+
+def frontend_base_url() -> str:
+    frontend = os.environ.get("FRONTEND_URL", "").strip().rstrip("/")
+    return frontend or DEFAULT_FRONTEND_URL
+
+
+def connections_redirect_url(status: str, reason: str = None) -> str:
+    params = {"status": status}
+    if reason:
+        params["reason"] = reason
+    return f"{frontend_base_url()}/connections?{urlencode(params)}"
+
+
+def is_truelayer_callback_path(path: str) -> bool:
+    return path == "/api/truelayer/callback"
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
@@ -28,6 +47,11 @@ class ErrorMonitorMiddleware(BaseHTTPMiddleware):
         except Exception as e:
             rid = getattr(request.state, "request_id", "?")
             logger.exception("RID=%s Unhandled error %s %s: %s", rid, request.method, request.url.path, e)
+            if is_truelayer_callback_path(request.url.path):
+                return RedirectResponse(
+                    connections_redirect_url("failed", "callback_error"),
+                    status_code=302,
+                )
             return JSONResponse(
                 status_code=500,
                 content={"detail": "Internal server error. Our team has been notified.", "request_id": rid},
