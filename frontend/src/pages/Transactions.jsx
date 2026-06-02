@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { api, formatApiError } from "../lib/api";
-import { Plus, Trash2, Loader2, Pencil, Search, ArrowUpDown, Sparkles, Filter, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Plus, Trash2, Loader2, Pencil, Search, ArrowUpDown, Sparkles, Filter, ChevronLeft, ChevronRight, X, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, PageHeader, SectionCard } from "../components/ui/layout";
 
@@ -85,6 +85,39 @@ export default function Transactions() {
     } catch { toast.error(editingId ? "Could not update" : "Could not add"); }
   };
 
+  const [selectedIds, setSelectedIds] = useState(new Set());
+
+  const allDisplayed = aiResults?.transactions || txs;
+  const someSelected = selectedIds.size > 0;
+  const allDisplayedSelected = allDisplayed.length > 0 && allDisplayed.every(t => selectedIds.has(t.transaction_id));
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (allDisplayedSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(allDisplayed.map(t => t.transaction_id)));
+    }
+  };
+
+  const bulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Delete ${selectedIds.size} transaction${selectedIds.size > 1 ? "s" : ""}? This cannot be undone.`)) return;
+    try {
+      const { data } = await api.post("/transactions/bulk-delete", { transaction_ids: Array.from(selectedIds) });
+      toast.success(`Deleted ${data.deleted} transaction${data.deleted > 1 ? "s" : ""}`);
+      setSelectedIds(new Set());
+      await load();
+    } catch (e) { toast.error(formatApiError(e?.response?.data?.detail) || "Could not delete"); }
+  };
+
   const del = async (id) => {
     try { await api.delete(`/transactions/${id}`); toast.success("Deleted"); await load(); }
     catch { toast.error("Could not delete"); }
@@ -109,9 +142,16 @@ export default function Transactions() {
         title="Every penny."
         description="Search, sort, and edit your transactions."
         actions={
-          <button onClick={openAdd} data-testid="add-transaction" className="btn-pill gradient-emerald text-white text-sm h-11 px-5">
-            <Plus className="h-4 w-4 mr-2" /> Add transaction
-          </button>
+          <div className="flex items-center gap-2">
+            {someSelected && (
+              <button onClick={bulkDelete} className="btn-pill border border-ruby text-ruby text-sm h-11 px-4">
+                <Trash2 className="h-4 w-4 mr-1.5" /> Delete {selectedIds.size}
+              </button>
+            )}
+            <button onClick={openAdd} data-testid="add-transaction" className="btn-pill gradient-emerald text-white text-sm h-11 px-5">
+              <Plus className="h-4 w-4 mr-2" /> Add transaction
+            </button>
+          </div>
         }
       />
 
@@ -208,11 +248,19 @@ export default function Transactions() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[760px]">
                 <thead><tr className="text-left text-xs text-muted-foreground border-b border-border">
+                  <th className="px-4 py-3 w-10">
+                    <input type="checkbox" checked={allDisplayedSelected} onChange={toggleSelectAll}
+                      className="h-4 w-4 rounded border-border accent-emerald cursor-pointer" />
+                  </th>
                   <th className="px-6 py-3">Date</th><th className="px-6 py-3">Description</th><th className="px-6 py-3">Category</th><th className="px-6 py-3 text-right">Amount</th><th className="px-6 py-3 w-24"></th>
                 </tr></thead>
                 <tbody>
                   {(aiResults?.transactions || txs).map((t) => (
-                    <tr key={t.transaction_id} className="border-b border-border last:border-0 hover:bg-secondary/30">
+                    <tr key={t.transaction_id} className={`border-b border-border last:border-0 hover:bg-secondary/30 ${selectedIds.has(t.transaction_id) ? "bg-emerald/5" : ""}`}>
+                      <td className="px-4 py-3">
+                        <input type="checkbox" checked={selectedIds.has(t.transaction_id)} onChange={() => toggleSelect(t.transaction_id)}
+                          className="h-4 w-4 rounded border-border accent-emerald cursor-pointer" />
+                      </td>
                       <td className="px-6 py-3 text-xs text-muted-foreground">{t.date?.slice(0, 10)}</td>
                       <td className="px-6 py-3">
                         <div className="font-medium">{t.description}</div>

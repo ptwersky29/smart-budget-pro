@@ -552,6 +552,27 @@ def build_router() -> APIRouter:
             _query_cache.delete(f"dash:{user['user_id']}")
             return {"ok": True}
 
+    @router.post("/transactions/bulk-delete")
+    async def bulk_delete(payload: BulkUpdateIn, request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            await session.execute(
+                delete(SplitTransaction).where(
+                    SplitTransaction.parent_transaction_id.in_(payload.transaction_ids),
+                    SplitTransaction.user_id == user["user_id"],
+                )
+            )
+            result = await session.execute(
+                delete(Transaction).where(
+                    Transaction.transaction_id.in_(payload.transaction_ids),
+                    Transaction.user_id == user["user_id"],
+                ).returning(Transaction.transaction_id)
+            )
+            deleted = len(result.fetchall())
+            await session.commit()
+            _query_cache.delete(f"dash:{user['user_id']}")
+            return {"ok": True, "deleted": deleted}
+
     @router.post("/transactions/bulk-update")
     async def bulk_update(payload: BulkUpdateIn, request: Request, user: dict = Depends(get_current_user)):
         sm = request.app.state.db
