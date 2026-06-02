@@ -1,4 +1,5 @@
 """Shared LLM helper — direct OpenRouter + provider-specific calls, replaces emergentintegrations.llm.chat."""
+import asyncio
 import os
 import json
 import logging
@@ -68,10 +69,18 @@ async def call_llm(
         body["response_format"] = {"type": "json_object"}
 
     async with httpx.AsyncClient(timeout=90.0) as client:
-        resp = await client.post(OPENROUTER_API, headers=headers, json=body)
-        if resp.status_code != 200:
-            logger.error(f"OpenRouter error {resp.status_code}: {resp.text[:500]}")
-            raise RuntimeError(f"LLM call failed ({resp.status_code})")
+        # Retry up to 3 times with exponential backoff on 429
+        for attempt in range(4):
+            resp = await client.post(OPENROUTER_API, headers=headers, json=body)
+            if resp.status_code == 429 and attempt < 3:
+                wait = 2 ** attempt
+                logger.warning(f"LLM rate-limited (429), retrying in {wait}s (attempt {attempt + 1}/3)")
+                await asyncio.sleep(wait)
+                continue
+            if resp.status_code != 200:
+                logger.error(f"OpenRouter error {resp.status_code}: {resp.text[:500]}")
+                raise RuntimeError(f"LLM call failed ({resp.status_code})")
+            break
         data = resp.json()
 
     choices = data.get("choices", [])

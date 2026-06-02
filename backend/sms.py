@@ -3,6 +3,7 @@ import uuid
 import hashlib
 import hmac
 import base64
+import re
 import logging
 from datetime import datetime, timezone, timedelta
 
@@ -18,6 +19,84 @@ from security import sanitize_input
 import maaser as maaser_mod
 
 logger = logging.getLogger("sms")
+
+# ── Regex SMS parser fallback (when LLM is rate-limited) ────────────────────
+
+_SMS_EXPENSE_KEYWORDS = {
+    "groceries": ["tesco", "sainsbury", "asda", "waitrose", "lidl", "aldi", "morrisons", "co-op", "coop", "iceland", "supermarket", "food shop", "groceries"],
+    "dining": ["mcdonald", "nando", "kfc", "pret", "starbucks", "costa", "cafe", "restaurant", "pizza", "burger", "kebab", "takeaway", "deliveroo", "uber eats", "just eat", "dinner", "lunch", "breakfast"],
+    "transport": ["uber", "bolt", "taxi", "tfl", "oyster", "tube", "train", "bus", "petrol", "fuel", "shell", "parking", "trainline"],
+    "subscriptions": ["netflix", "spotify", "disney", "apple", "amazon prime", "gym", "subscription"],
+    "shopping": ["amazon", "ebay", "argos", "clothes", "shopping", "next", "h&m", "primark", "zara"],
+    "entertainment": ["cinema", "odeon", "vue", "netflix", "spotify", "game", "steam"],
+    "utilities": ["bill", "gas", "electric", "water", "council tax", "phone", "broadband", "sky", "virgin"],
+    "health": ["boots", "pharmacy", "dentist", "doctor", "hospital", "prescription", "nhs"],
+    "tzedakah": ["charity", "donation", "tzedakah", "gift aid"],
+    "cash": ["atm", "cash withdrawal", "cashback"],
+    "rent": ["rent"],
+    "mortgage": ["mortgage"],
+    "transfer": ["transfer", "paypal", "monzo to monzo", "standing order"],
+    "income": ["salary", "wages", "pay", "refund", "interest", "dividend"],
+}
+
+
+def _regex_parse_sms(text: str) -> dict | None:
+    """Simple regex-based SMS parser fallback when LLM is unavailable.
+    Handles patterns like 'Spent £10 at Tesco', 'Paid £50 to Uber', '£30 Amazon'."""
+    t = text.strip().lower()
+
+    # Amount detection
+    amt_match = re.search(r'[£$]\s*(\d+(?:\.\d{1,2})?)', t)
+    if not amt_match:
+        # Try "X pounds"
+        amt_match = re.search(r'(\d+(?:\.\d{1,2})?)\s*(?:pounds|quid|gbp)', t)
+    if not amt_match:
+        return None
+    amount = float(amt_match.group(1))
+    if amount <= 0:
+        return None
+
+    # Detect income vs expense
+    income_words = ["salary", "paid in", "received", "refund", "credit", "wages", "deposit"]
+    is_income = any(w in t for w in income_words) and "atm" not in t
+
+    # Merchant detection — try "at X", "to X", "from X", or last word
+    merchant_match = re.search(r'\b(?:at|to|from|for|@)\s+(.+)$', t) or \
+                     re.search(r'\b(?:at|to|from|for|@)\s+(.+?)(?:\s+\d+|$)', t)
+    merchant = None
+    if merchant_match:
+        merchant = merchant_match.group(1).strip().title()
+    else:
+        # Try the last significant word as merchant
+        words = [w for w in t.split() if w not in ("spent", "paid", "i", "a", "the", "for", "at", "to", "with", "my", "just", "£", "$")]
+        if words:
+            merchant = words[-1].title()
+
+    # Category detection
+    category = "uncategorized"
+    for cat, keywords in _SMS_EXPENSE_KEYWORDS.items():
+        for kw in keywords:
+            if kw in t:
+                category = cat
+                break
+        if category != "uncategorized":
+            break
+    if is_income:
+        category = "income" if "refund" not in t else "income"
+
+    description = t[:80]
+
+    return {
+        "is_transaction": True,
+        "amount": amount,
+        "currency": "GBP",
+        "merchant": merchant,
+        "description": description,
+        "is_income": is_income,
+        "category": category,
+        "confidence": 0.6,
+        "reason_if_not_transaction": None,
+    }
 
 PARSE_PROMPT = """You are a UK bank-SMS parser. Extract a transaction from this SMS. Return STRICT JSON only:
 {"is_transaction": bool, "amount": number, "currency": "GBP|USD|EUR", "merchant": string|null, "description": string, "is_income": bool, "category": "groceries|dining|transport|utilities|subscriptions|tzedakah|rent|salary|income|shopping|health|entertainment|insurance|education|transfer|cash|tax|fees|mortgage|uncategorized", "confidence": 0..1, "reason_if_not_transaction": string|null}
@@ -335,8 +414,8 @@ def build_router() -> APIRouter:
                 await track_ai_usage(session, user.user_id, provider, model, pt, ct, cost, endpoint="sms_webhook")
                 parsed = parse_json(text)
             except Exception as e:
-                logger.error(f"sms webhook AI parse failed: {e}")
-                parsed = {"is_transaction": False, "confidence": 0, "reason_if_not_transaction": str(e)[:120]}
+                logger.error(f"sms webhook AI parse failed: {e}, using regex fallback")
+                parsed = _regex_parse_sms(Body) or {"is_transaction": False, "confidence": 0, "reason_if_not_transaction": str(e)[:120]}
 
             raw = f"{user.user_id}|{Body.strip().lower()}"
             dedup = hashlib.sha256(raw.encode()).hexdigest()
@@ -434,8 +513,8 @@ def build_router() -> APIRouter:
                 await track_ai_usage(session, user.user_id, provider, model, pt, ct, cost, endpoint="sms_make_webhook")
                 parsed = parse_json(text_resp)
             except Exception as e:
-                logger.error(f"make webhook AI parse failed: {e}")
-                parsed = {"is_transaction": False, "confidence": 0, "reason_if_not_transaction": str(e)[:120]}
+                logger.error(f"make webhook AI parse failed: {e}, using regex fallback")
+                parsed = _regex_parse_sms(text) or {"is_transaction": False, "confidence": 0, "reason_if_not_transaction": str(e)[:120]}
 
             raw = f"{user.user_id}|{text.strip().lower()}"
             dedup = hashlib.sha256(raw.encode()).hexdigest()
@@ -557,8 +636,8 @@ def build_router() -> APIRouter:
                 await track_ai_usage(session, user["user_id"], provider, model, pt, ct, cost, endpoint="sms_parse")
                 parsed = parse_json(text)
             except Exception as e:
-                logger.error(f"sms parse failed: {e}")
-                raise HTTPException(500, f"AI parse failed: {str(e)[:200]}")
+                logger.error(f"sms parse AI failed: {e}, using regex fallback")
+                parsed = _regex_parse_sms(clean_text) or {"is_transaction": False, "confidence": 0, "reason_if_not_transaction": str(e)[:120]}
 
             now = datetime.now(timezone.utc)
             sms_id = f"sms_{uuid.uuid4().hex[:10]}"
@@ -647,7 +726,10 @@ def build_router() -> APIRouter:
                 await track_ai_usage(session, user["user_id"], provider, model, pt, ct, cost, endpoint="sms_save")
                 parsed = parse_json(text)
             except Exception as e:
-                raise HTTPException(500, f"AI parse failed: {str(e)[:200]}")
+                logger.error(f"sms save AI parse failed: {e}, using regex fallback")
+                parsed = _regex_parse_sms(rec.body) or None
+                if not parsed:
+                    raise HTTPException(500, f"AI parse failed: {str(e)[:200]}")
             if not parsed.get("is_transaction") or parsed.get("confidence", 0) < 0.7:
                 raise HTTPException(400, f"Not a transaction (confidence {parsed.get('confidence', 0):.1f}): {parsed.get('reason_if_not_transaction', 'unknown')}")
             tx_id = f"tx_{uuid.uuid4().hex[:12]}"
