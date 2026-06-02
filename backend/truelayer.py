@@ -24,6 +24,7 @@ from bank_sync_utils import (
     connection_error_message,
     transaction_sync_id,
 )
+from statements import _ai_categorise
 
 logger = logging.getLogger("truelayer")
 
@@ -775,6 +776,30 @@ async def _sync_connection(session, conn: BankConnection, user_id: str) -> tuple
 
         conn.update_count = (conn.update_count or 0) + 1
         await session.commit()
+
+        # AI categorise uncategorized transactions after every sync
+        try:
+            result = await session.execute(
+                select(Transaction).where(
+                    Transaction.connection_id == conn.connection_id,
+                    Transaction.user_id == user_id,
+                    Transaction.category == "uncategorized",
+                )
+            )
+            uncategorized = result.scalars().all()
+            if uncategorized:
+                cat_count = 0
+                for tx in uncategorized[:50]:
+                    new_cat = await _ai_categorise(tx.description, tx.merchant_name, tx.amount, session, user_id)
+                    if new_cat and new_cat != "uncategorized":
+                        tx.category = new_cat
+                        cat_count += 1
+                if cat_count:
+                    await session.commit()
+                    logger.info("AI categorised %s transactions for %s", cat_count, conn.connection_id)
+        except Exception as e:
+            logger.warning("AI categorisation failed for %s: %s", conn.connection_id, e)
+
         await _mark_connection_state(
             session,
             conn,
