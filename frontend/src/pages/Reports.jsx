@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { api, API } from "../lib/api";
+import { getToken } from "../lib/storage";
 import { useAuth } from "../contexts/AuthContext";
 import { FileText, TrendingDown, TrendingUp, ShieldCheck, Download, Loader2, Lock, AlertCircle, Sparkles, Wallet } from "lucide-react";
 import { toast } from "sonner";
@@ -19,10 +20,14 @@ export default function Reports() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(null);
+  const today = () => new Date().toISOString().slice(0, 10);
+  const firstOfMonth = () => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10); };
+  const [dateFrom, setDateFrom] = useState(firstOfMonth);
+  const [dateTo, setDateTo] = useState(today);
 
   useEffect(() => { (async () => {
-    try { const { data } = await api.get("/dashboard/overview"); setData(data); } catch (err) { console.error("reports overview", err); }
-  })(); }, []);
+    try { const { data } = await api.get("/dashboard/overview", { params: { date_from: dateFrom, date_to: dateTo } }); setData(data); } catch { toast.error("Could not load report data"); }
+  })(); }, [dateFrom, dateTo]);
 
   const isPremium = user?.tier === "premium" || user?.role === "admin";
 
@@ -30,7 +35,7 @@ export default function Reports() {
     if (!isPremium) { toast.error("Premium feature — upgrade to download PDF reports."); return; }
     setBusy(kind);
     try {
-      const token = localStorage.getItem("access_token") || localStorage.getItem("financeai_token");
+      const token = getToken("access_token") || localStorage.getItem("financeai_token");
       const res = await fetch(`${API}/reports/${kind}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -51,6 +56,26 @@ export default function Reports() {
     finally { setBusy(null); }
   };
 
+  const downloadCsv = async () => {
+    if (!isPremium) { toast.error("Premium feature — upgrade to download CSV reports."); return; }
+    setBusy("csv-monthly");
+    try {
+      const token = getToken("access_token") || localStorage.getItem("financeai_token");
+      const res = await fetch(`${API}/reports/monthly?format=csv&date_from=${dateFrom}&date_to=${dateTo}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `financeai-${dateFrom}-${dateTo}.csv`; document.body.appendChild(a); a.click();
+      a.remove(); URL.revokeObjectURL(url);
+      toast.success("CSV downloaded");
+    } catch (e) {
+      toast.error("CSV download failed");
+    } finally { setBusy(null); }
+  };
+
   if (!data) return null;
   const topSpend = data.categories?.[0];
   const subs = data.categories?.find(c=>c.name==="subscriptions");
@@ -62,7 +87,15 @@ export default function Reports() {
         title="Your financial health, explained."
         description="A cleaner monthly readout with health score, insights, and premium PDF reports."
         actions={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground">From</label>
+              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                className="h-10 px-3 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:outline-none" />
+              <label className="text-xs text-muted-foreground">To</label>
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                className="h-10 px-3 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:outline-none" />
+            </div>
             {[
               {kind: "monthly", label: "This month"},
               {kind: "yearly", label: "This year"},
@@ -72,6 +105,14 @@ export default function Reports() {
                 className={`btn-pill h-11 px-4 text-sm ${isPremium ? "gradient-emerald text-white" : "border border-border bg-card/80 text-muted-foreground"} disabled:opacity-50`}>
                 {busy === kind ? <Loader2 className="h-4 w-4 animate-spin" /> : isPremium ? <Download className="h-4 w-4 mr-2"/> : <Lock className="h-4 w-4 mr-2"/>}
                 {label} PDF
+              </button>
+            ))}
+            {isPremium && [
+              {kind: "csv-monthly", label: "CSV"},
+            ].map(({kind, label}) => (
+              <button key={kind} onClick={() => downloadCsv()} disabled={busy === kind} className="btn-pill h-11 px-4 text-sm border border-border bg-card/80 text-muted-foreground disabled:opacity-50 hover:bg-secondary/60">
+                {busy === kind ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4 mr-2"/>}
+                {label}
               </button>
             ))}
           </div>

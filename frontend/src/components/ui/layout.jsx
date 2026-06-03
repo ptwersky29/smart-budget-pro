@@ -4,7 +4,7 @@ import { ArrowRight } from "lucide-react";
 
 export const PageHeader = React.memo(function PageHeader({ eyebrow, title, description, actions, meta, className = "", ...props }) {
   return (
-    <div {...props} className={`rounded-[2rem] border border-border bg-card/90 backdrop-blur-xl p-6 lg:p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] ${className}`}>
+    <div {...props} className={`rounded-2xl border border-border bg-card/90 backdrop-blur-xl p-6 lg:p-8 shadow-modal ${className}`}>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl space-y-3">
           {eyebrow && <p className="label-overline text-emerald">{eyebrow}</p>}
@@ -20,7 +20,7 @@ export const PageHeader = React.memo(function PageHeader({ eyebrow, title, descr
 
 export const SectionCard = React.memo(function SectionCard({ eyebrow, title, description, actions, children, className = "", contentClassName = "", ...props }) {
   return (
-    <section {...props} className={`rounded-[1.75rem] border border-border bg-card/90 backdrop-blur-xl shadow-[0_16px_45px_rgba(15,23,42,0.06)] ${className}`}>
+    <section {...props} className={`rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card ${className}`}>
       {(eyebrow || title || description || actions) && (
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between p-6 border-b border-border/70">
           <div className="max-w-2xl space-y-1.5">
@@ -39,7 +39,7 @@ export const SectionCard = React.memo(function SectionCard({ eyebrow, title, des
 export const MetricCard = React.memo(function MetricCard({ label, value, icon: Icon, tone = "emerald", detail, className = "", ...props }) {
   const toneClasses = tone === "ruby" ? "text-ruby bg-ruby/10" : tone === "topaz" ? "text-topaz bg-topaz/10" : "text-emerald bg-emerald/10";
   return (
-    <div {...props} className={`rounded-[1.5rem] border border-border bg-card/90 backdrop-blur-xl p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)] ${className}`}>
+    <div {...props} className={`rounded-[1.5rem] border border-border bg-card/90 backdrop-blur-xl p-5 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${className}`}>
       <div className="flex items-center justify-between gap-3">
         <p className="label-overline">{label}</p>
         {Icon && <span className={`grid h-9 w-9 place-items-center rounded-full ${toneClasses}`}><Icon className="h-4 w-4" /></span>}
@@ -52,7 +52,7 @@ export const MetricCard = React.memo(function MetricCard({ label, value, icon: I
 
 export const EmptyState = React.memo(function EmptyState({ icon: Icon, title, description, action, className = "", ...props }) {
   return (
-    <div {...props} className={`rounded-[1.75rem] border border-dashed border-border bg-card/70 backdrop-blur-xl p-10 text-center ${className}`}>
+    <div {...props} className={`rounded-2xl border border-dashed border-border bg-card/70 backdrop-blur-xl p-10 text-center ${className}`}>
       {Icon && <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-secondary text-muted-foreground"><Icon className="h-6 w-6" /></div>}
       <h3 className="text-xl tracking-tight font-medium">{title}</h3>
       {description && <p className="mt-2 text-sm text-muted-foreground max-w-lg mx-auto leading-relaxed">{description}</p>}

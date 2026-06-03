@@ -50,11 +50,11 @@ export default function Login() {
           <form onSubmit={onSubmit} className="space-y-4 mt-8">
             <div>
               <label className="label-overline">Email</label>
-              <input data-testid="login-email" type="email" required value={email} onChange={(e)=>setEmail(e.target.value)} className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
+              <input data-testid="login-email" type="email" required value={email} onChange={(e)=>setEmail(e.target.value)} className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
             </div>
             <div>
               <label className="label-overline">Password</label>
-              <input data-testid="login-password" type="password" required value={password} onChange={(e)=>setPassword(e.target.value)} className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
+              <input data-testid="login-password" type="password" required value={password} onChange={(e)=>setPassword(e.target.value)} className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
             </div>
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">

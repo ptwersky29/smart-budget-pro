@@ -5,6 +5,9 @@
 :root {
   --font-heading: "Cabinet Grotesk", "Fraunces", ui-sans-serif, system-ui;
   --font-body: "Manrope", ui-sans-serif, system-ui;
+  --shadow-card: 0 12px 30px rgba(15,23,42,0.05);
+  --shadow-modal: 0 20px 60px rgba(15,23,42,0.08);
+  --shadow-dropdown: 0 4px 20px rgba(15,23,42,0.06);
 }
 
 html, body, #root { height: 100%; }
@@ -46,6 +49,14 @@ body {
     --emerald: 158 64% 40%;
     --topaz: 35 92% 50%;
     --ruby: 0 72% 51%;
+    --chart-1: 158 64% 40%;
+    --chart-2: 35 92% 50%;
+    --chart-3: 217 91% 60%;
+    --chart-4: 0 72% 51%;
+    --chart-5: 271 81% 56%;
+    --chart-6: 190 90% 50%;
+    --chart-7: 330 81% 60%;
+    --chart-8: 84 80% 44%;
   }
   .dark {
     --background: 222 35% 5%;
@@ -70,6 +81,14 @@ body {
     --emerald: 158 64% 45%;
     --topaz: 35 92% 55%;
     --ruby: 0 72% 60%;
+    --chart-1: 158 64% 45%;
+    --chart-2: 35 92% 55%;
+    --chart-3: 217 91% 65%;
+    --chart-4: 0 72% 55%;
+    --chart-5: 271 81% 60%;
+    --chart-6: 190 90% 55%;
+    --chart-7: 330 81% 65%;
+    --chart-8: 84 80% 48%;
   }
 }
 
@@ -104,6 +123,12 @@ body {
 .gradient-emerald {
   background: linear-gradient(135deg, hsl(var(--emerald)) 0%, hsl(173 80% 40%) 100%);
 }
+.gradient-topaz {
+  background: linear-gradient(135deg, hsl(var(--topaz)) 0%, hsl(43 80% 50%) 100%);
+}
+.gradient-ruby {
+  background: linear-gradient(135deg, hsl(var(--ruby)) 0%, hsl(348 80% 50%) 100%);
+}
 .text-emerald { color: hsl(var(--emerald)); }
 .text-topaz { color: hsl(var(--topaz)); }
 .text-ruby { color: hsl(var(--ruby)); }
@@ -115,7 +140,7 @@ body {
 .no-scrollbar { scrollbar-width: none; }
 
 .btn-pill {
-  @apply inline-flex items-center justify-center rounded-full px-6 py-3 font-semibold transition-all duration-300 ease-out;
+  @apply inline-flex items-center justify-center rounded-full px-6 py-3 font-semibold transition-all duration-200 ease-out active:scale-[0.97];
 }
 
 .app-shell {
@@ -130,11 +155,11 @@ body {
 }
 
 .page-shell {
-  @apply rounded-[2rem] border border-border bg-card/90 backdrop-blur-xl shadow-[0_20px_60px_rgba(15,23,42,0.08)];
+  @apply rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal;
 }
 
 .section-shell {
-  @apply rounded-[1.75rem] border border-border bg-card/90 backdrop-blur-xl shadow-[0_16px_45px_rgba(15,23,42,0.06)];
+  @apply rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card;
 }
 
 .control-shell {
@@ -142,7 +167,7 @@ body {
 }
 
 .toolbar-chip {
-  @apply inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-3 py-1.5 text-xs font-medium text-muted-foreground;
+  @apply inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-all duration-200 active:scale-[0.96];
 }
 
 @keyframes fadeUp {
@@ -157,6 +182,11 @@ body {
 .delay-5 { animation-delay: 0.40s; }
 
 @layer base {
+    a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+      outline: 2px solid hsl(var(--ring) / 0.4);
+      outline-offset: 2px;
+      border-radius: var(--radius);
+    }
     [data-debug-wrapper="true"] { display: contents !important; }
     [data-debug-wrapper="true"] > * {
         margin-left: inherit; margin-right: inherit; margin-top: inherit; margin-bottom: inherit;

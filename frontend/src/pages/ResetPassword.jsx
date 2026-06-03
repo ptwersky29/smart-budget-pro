@@ -66,13 +66,13 @@ export default function ResetPassword() {
                 <label className="label-overline">New password</label>
                 <input type="password" required minLength={8} value={password}
                        onChange={(e) => setPassword(e.target.value)}
-                       placeholder="At least 8 characters" className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
+                       placeholder="At least 8 characters" className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
               </div>
               <div>
                 <label className="label-overline">Confirm password</label>
                 <input type="password" required minLength={8} value={confirm}
                        onChange={(e) => setConfirm(e.target.value)}
-                       placeholder="Repeat password" className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
+                       placeholder="Repeat password" className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
               </div>
               <button disabled={busy} className="btn-pill w-full gradient-emerald text-white disabled:opacity-50">
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Reset password"}

@@ -6,14 +6,16 @@ import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, PieChart, 
 import { toast } from "sonner";
 import AIInsightPanel from "../components/AIInsightPanel";
 import { ActionLink, EmptyState, MetricCard, PageHeader, SectionCard } from "../components/ui/layout";
+import Skeleton, { SkeletonCard, SkeletonChart } from "../components/ui/Skeleton";
 
-const PIE_COLORS = ["#10B981", "#F59E0B", "#3B82F6", "#EF4444", "#8B5CF6", "#06B6D4", "#EC4899", "#84CC16"];
+const PIE_COLORS = Array.from({length: 8}, (_, i) => `var(--chart-${i + 1})`);
 const TOOLTIP_STYLE = { backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px" };
 
-export default function Dashboard() {
+const Dashboard = React.memo(function Dashboard() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
 
   const downloadMonth = async () => {
@@ -35,6 +37,7 @@ export default function Dashboard() {
   };
 
   const load = useCallback(async () => {
+    setRefreshing(true);
     try {
       const { data } = await api.get("/dashboard/overview");
       setData(data);
@@ -43,7 +46,7 @@ export default function Dashboard() {
       const detail = err?.response?.data?.detail || err?.message || "Unknown error";
       console.error("dashboard load failed", err);
       toast.error(`Dashboard failed (${status || "?"}): ${detail}`);
-    } finally { setLoading(false); }
+    } finally { setLoading(false); setRefreshing(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -54,8 +57,30 @@ export default function Dashboard() {
     catch (err) { console.error("seed failed", err); toast.error("Could not seed demo"); setLoading(false); }
   };
 
-  if (loading) return <div className="grid place-items-center min-h-[60vh]"><Loader2 className="h-6 w-6 animate-spin text-emerald" /></div>;
-  if (!data) return null;
+  if (loading) return (
+    <div className="space-y-8" data-testid="dashboard-root">
+      <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl p-6 lg:p-8 shadow-modal">
+        <Skeleton className="h-3 w-16 mb-3" />
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-5 w-96 mt-3" />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {[1,2,3,4].map(i => <SkeletonCard key={i} />)}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <SkeletonChart className="lg:col-span-2" />
+        <SkeletonChart />
+      </div>
+    </div>
+  );
+  if (!data) return (
+    <div className="grid place-items-center min-h-[60vh] text-center p-8">
+      <div>
+        <p className="text-lg font-medium text-muted-foreground">Could not load dashboard</p>
+        <button onClick={load} className="mt-4 btn-pill border border-emerald text-emerald text-sm">Try again</button>
+      </div>
+    </div>
+  );
 
   const empty = !data.recent || data.recent.length === 0;
 
@@ -67,8 +92,8 @@ export default function Dashboard() {
         description="A premium, simple view of your balance, spend, cash flow, and AI-backed insights."
         actions={
           <>
-            <button onClick={load} data-testid="dashboard-refresh" className="toolbar-chip hover:bg-secondary/70">
-              <RefreshCw className="h-3.5 w-3.5" /> Refresh
+            <button onClick={load} disabled={refreshing} data-testid="dashboard-refresh" className="toolbar-chip hover:bg-secondary/70 disabled:opacity-50">
+              {refreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} Refresh
             </button>
             <button onClick={downloadMonth} disabled={pdfBusy} data-testid="download-month-pdf" className="btn-pill border border-border bg-card/80 text-sm h-11 px-5 disabled:opacity-50">
               {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
@@ -76,7 +101,8 @@ export default function Dashboard() {
             </button>
             <ActionLink to="/transactions" label="Add transaction" />
           </>
-        }
+});
+
       />
 
       {empty && (
@@ -104,8 +130,8 @@ export default function Dashboard() {
                 <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={11} />
                 <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
                 <Tooltip contentStyle={TOOLTIP_STYLE} />
-                <Line type="monotone" dataKey="income" stroke="#10B981" strokeWidth={2.5} dot={false} />
-                <Line type="monotone" dataKey="spend" stroke="#F59E0B" strokeWidth={2.5} dot={false} />
+                <Line type="monotone" dataKey="income" stroke="hsl(var(--emerald))" strokeWidth={2.5} dot={false} />
+                <Line type="monotone" dataKey="spend" stroke="hsl(var(--topaz))" strokeWidth={2.5} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -116,7 +142,7 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={data.categories.slice(0, 6)} dataKey="value" nameKey="name" innerRadius={45} outerRadius={75} paddingAngle={3}>
-                  {data.categories.slice(0, 6).map((c) => <Cell key={c.name} fill={PIE_COLORS[data.categories.indexOf(c) % PIE_COLORS.length]} />)}
+                  {data.categories.slice(0, 6).map((c, i) => <Cell key={c.name} style={{ fill: `var(--chart-${(i % 8) + 1})` }} />)}
                 </Pie>
                 <Tooltip contentStyle={TOOLTIP_STYLE} />
               </PieChart>
@@ -140,7 +166,23 @@ export default function Dashboard() {
       />
 
       <SectionCard eyebrow="Recent" title="Transactions" contentClassName="p-0">
-        <table className="w-full text-sm">
+        {/* Mobile card view */}
+        <div className="block sm:hidden divide-y divide-border">
+          {data.recent.map((t) => (
+            <div key={t.transaction_id} style={{ contentVisibility: "auto" }} className="px-4 py-3 space-y-1.5">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-xs text-muted-foreground">{t.date?.slice(0,10)}</p>
+                <span className={`shrink-0 font-medium tabular-nums ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}>
+                  {t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}
+                </span>
+              </div>
+              <p className="font-medium text-sm truncate">{t.description}</p>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-secondary capitalize">{t.category}</span>
+            </div>
+          ))}
+        </div>
+        {/* Desktop table */}
+        <div className="hidden sm:block overflow-x-auto"><table className="w-full text-sm">
           <thead><tr className="text-left text-xs text-muted-foreground border-y border-border bg-secondary/30">
             <th className="px-6 py-3">Date</th><th className="px-6 py-3">Description</th><th className="px-6 py-3">Category</th><th className="px-6 py-3 text-right">Amount</th>
           </tr></thead>
@@ -148,13 +190,13 @@ export default function Dashboard() {
             {data.recent.map((t) => (
               <tr key={t.transaction_id} className="border-b border-border last:border-0 hover:bg-secondary/40">
                 <td className="px-6 py-3 text-muted-foreground text-xs">{t.date?.slice(0,10)}</td>
-                <td className="px-6 py-3 font-medium">{t.description}</td>
+                <td className="px-6 py-3 font-medium truncate max-w-xs">{t.description}</td>
                 <td className="px-6 py-3"><span className="text-xs px-2 py-1 rounded-full bg-secondary capitalize">{t.category}</span></td>
                 <td className={`px-6 py-3 text-right font-medium ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}>{t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}</td>
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </SectionCard>
       </>}
     </div>

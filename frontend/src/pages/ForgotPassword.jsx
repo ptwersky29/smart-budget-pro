@@ -47,7 +47,7 @@ export default function ForgotPassword() {
               <div>
                 <label className="label-overline">Email</label>
                 <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-                       placeholder="you@example.com" className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
+                       placeholder="you@example.com" className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
               </div>
               <button disabled={busy} className="btn-pill w-full gradient-emerald text-white disabled:opacity-50">
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send reset link"}

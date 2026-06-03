@@ -125,7 +125,7 @@ export default function MaaserPanel({ refreshKey = 0, onChange }) {
             value={cfg.percent}
             onChange={(e) => setCfg({ ...cfg, percent: parseFloat(e.target.value) || 0 })}
             onBlur={() => saveCfg(cfg)}
-            className="h-10 w-20 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none text-center font-mono"
+            className="h-10 w-20 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none text-center font-mono"
             title="Maaser percent"
           />
           <label className="inline-flex items-center gap-2 cursor-pointer">

@@ -37,15 +37,15 @@ export default function Register() {
           <form onSubmit={onSubmit} className="space-y-4 mt-8">
             <div>
               <label className="label-overline">Name</label>
-              <input data-testid="register-name" required value={form.name} onChange={(e)=>setForm({...form, name:e.target.value})} className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
+              <input data-testid="register-name" required value={form.name} onChange={(e)=>setForm({...form, name:e.target.value})} className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
             </div>
             <div>
               <label className="label-overline">Email</label>
-              <input data-testid="register-email" type="email" required value={form.email} onChange={(e)=>setForm({...form, email:e.target.value})} className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
+              <input data-testid="register-email" type="email" required value={form.email} onChange={(e)=>setForm({...form, email:e.target.value})} className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
             </div>
             <div>
               <label className="label-overline">Password</label>
-              <input data-testid="register-password" type="password" required minLength={8} value={form.password} onChange={(e)=>setForm({...form, password:e.target.value})} className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
+              <input data-testid="register-password" type="password" required minLength={8} value={form.password} onChange={(e)=>setForm({...form, password:e.target.value})} className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
             </div>
             <button data-testid="register-submit" disabled={busy} className="btn-pill w-full gradient-emerald text-white disabled:opacity-50">
               {busy ? <Loader2 className="h-4 w-4 animate-spin"/> : "Create account"}

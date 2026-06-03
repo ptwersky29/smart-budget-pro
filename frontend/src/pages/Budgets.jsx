@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
-import { Plus, Trash2, Pencil, X, Check } from "lucide-react";
+import { Plus, Trash2, Pencil, X, Check, Loader2, PiggyBank } from "lucide-react";
 import { toast } from "sonner";
 import AIInsightPanel from "../components/AIInsightPanel";
 import { EmptyState, MetricCard, PageHeader, SectionCard } from "../components/ui/layout";
+import { SkeletonCard } from "../components/ui/Skeleton";
 
 const CATS = ["groceries","dining","transport","utilities","subscriptions","tzedakah","rent","salary","income","shopping","health","entertainment","insurance","education","transfer","cash","tax","fees","mortgage","uncategorized"];
 
@@ -12,10 +13,15 @@ export default function Budgets() {
   const [form, setForm] = useState({ category: "", limit: "" });
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ category: "", limit: "" });
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const { data } = await api.get("/budgets");
-    setBudgets(data.budgets);
+    setLoading(true);
+    try {
+      const { data } = await api.get("/budgets");
+      setBudgets(data.budgets);
+    } catch { toast.error("Could not load budgets"); }
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -30,8 +36,11 @@ export default function Budgets() {
   const create = async (e) => {
     e.preventDefault();
     try {
-      await api.post("/budgets", { category: form.category.toLowerCase(), limit: parseFloat(form.limit) });
-      toast.success("Budget created");
+      const { data } = await api.post("/budgets", { category: form.category.toLowerCase(), limit: parseFloat(form.limit) });
+      toast("Budget created", {
+        action: { label: "Undo", onClick: async () => { await api.delete(`/budgets/${data.budget_id}`); toast.success("Undone"); await load(); } },
+        duration: 6000,
+      });
       setForm({ category: "", limit: "" });
       await load();
     } catch {
@@ -40,9 +49,13 @@ export default function Budgets() {
   };
 
   const del = async (id) => {
+    const budget = budgets.find(b => b.budget_id === id);
     try {
       await api.delete(`/budgets/${id}`);
-      toast.success("Removed");
+      toast("Budget removed", {
+        action: { label: "Undo", onClick: async () => { await api.post("/budgets", { category: budget.category, limit: Number(budget.limit) }); toast.success("Restored"); await load(); } },
+        duration: 6000,
+      });
       await load();
     } catch {
       toast.error("Could not delete");
@@ -152,9 +165,14 @@ export default function Budgets() {
         </div>
       </SectionCard>
 
+      {loading ? (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1,2,3,4,5,6].map(i => <SkeletonCard key={i} />)}
+        </div>
+      ) : (
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {budgets.length === 0 ? (
-          <EmptyState
+          <EmptyState icon={PiggyBank}
             title="No budgets yet"
             description="Add your first monthly budget to start tracking spending."
             className="col-span-full"
@@ -185,8 +203,8 @@ export default function Budgets() {
                     <div className="flex items-center justify-between">
                       <p className="font-medium capitalize">{b.category}</p>
                       <div className="flex items-center gap-2">
-                        <button onClick={()=>startEdit(b)} data-testid={`edit-budget-${b.budget_id}`} className="text-muted-foreground hover:text-emerald" title="Edit"><Pencil className="h-4 w-4"/></button>
-                        <button onClick={()=>del(b.budget_id)} data-testid={`del-budget-${b.budget_id}`} className="text-muted-foreground hover:text-ruby" title="Delete"><Trash2 className="h-4 w-4"/></button>
+                        <button onClick={()=>startEdit(b)} data-testid={`edit-budget-${b.budget_id}`} className="p-2 text-muted-foreground hover:text-emerald" title="Edit"><Pencil className="h-4 w-4"/></button>
+                        <button onClick={()=>del(b.budget_id)} data-testid={`del-budget-${b.budget_id}`} className="p-2 text-muted-foreground hover:text-ruby" title="Delete"><Trash2 className="h-4 w-4"/></button>
                       </div>
                     </div>
                     <p className="text-2xl tracking-tight font-semibold mt-3">£{b.spent} <span className="text-sm text-muted-foreground">/ £{b.limit}</span></p>
@@ -201,8 +219,10 @@ export default function Budgets() {
               </div>
             );
           })
+          )}
         )}
       </div>
+      )}
     </div>
   );
 }

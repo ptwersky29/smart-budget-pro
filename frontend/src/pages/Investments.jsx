@@ -125,21 +125,21 @@ export default function Investments() {
       <form onSubmit={run} className="rounded-2xl border border-border bg-card p-6 grid grid-cols-2 lg:grid-cols-5 gap-4 items-end">
         <div>
           <label className="label-overline">Symbol</label>
-          <select data-testid="inv-symbol" value={form.symbol} onChange={(e)=>setForm({...form, symbol:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none">
+          <select data-testid="inv-symbol" value={form.symbol} onChange={(e)=>setForm({...form, symbol:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none">
             {SYMBOLS.map(s=><option key={s}>{s}</option>)}
           </select>
         </div>
         <div>
           <label className="label-overline">Initial (£)</label>
-          <input data-testid="inv-initial" type="number" value={form.initial_value} onChange={(e)=>setForm({...form, initial_value:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
+          <input data-testid="inv-initial" type="number" value={form.initial_value} onChange={(e)=>setForm({...form, initial_value:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
         </div>
         <div>
           <label className="label-overline">Monthly (£)</label>
-          <input data-testid="inv-monthly" type="number" value={form.monthly_contribution} onChange={(e)=>setForm({...form, monthly_contribution:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
+          <input data-testid="inv-monthly" type="number" value={form.monthly_contribution} onChange={(e)=>setForm({...form, monthly_contribution:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
         </div>
         <div>
           <label className="label-overline">Years</label>
-          <input data-testid="inv-years" type="number" value={form.years} onChange={(e)=>setForm({...form, years:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
+          <input data-testid="inv-years" type="number" value={form.years} onChange={(e)=>setForm({...form, years:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
         </div>
         <button data-testid="inv-run" disabled={busy} className="btn-pill gradient-emerald text-white text-sm h-11 disabled:opacity-50">
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Forecast"}
@@ -155,15 +155,15 @@ export default function Investments() {
                 <AreaChart data={result.points}>
                   <defs>
                     <linearGradient id="emerald" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#10B981" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="#10B981" stopOpacity={0} />
+                      <stop offset="0%" stopColor="hsl(var(--emerald))" stopOpacity={0.4} />
+                      <stop offset="100%" stopColor="hsl(var(--emerald))" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="year" stroke="hsl(var(--muted-foreground))" fontSize={11} />
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
                   <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
-                  <Area type="monotone" dataKey="value" stroke="#10B981" strokeWidth={2.5} fill="url(#emerald)" />
-                  <Line type="monotone" dataKey="contributed" stroke="#F59E0B" strokeWidth={2} dot={false} />
+                  <Area type="monotone" dataKey="value" stroke="hsl(var(--emerald))" strokeWidth={2.5} fill="url(#emerald)" />
+                  <Line type="monotone" dataKey="contributed" stroke="hsl(var(--topaz))" strokeWidth={2} dot={false} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>

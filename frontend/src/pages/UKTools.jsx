@@ -71,6 +71,6 @@ export default function UKTools() {
 const Field = ({label, testid, value, onChange}) => (
   <div>
     <label className="label-overline">{label}</label>
-    <input data-testid={testid} type="number" value={value} onChange={(e)=>onChange(e.target.value)} className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
+    <input data-testid={testid} type="number" value={value} onChange={(e)=>onChange(e.target.value)} className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
   </div>
 );

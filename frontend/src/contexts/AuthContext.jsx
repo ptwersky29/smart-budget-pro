@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { api } from "../lib/api";
+import { setToken, clearTokens, isTokenExpired } from "../lib/storage";
 
 const AuthCtx = createContext(null);
 
@@ -18,8 +19,8 @@ export const AuthProvider = ({ children }) => {
     const accessToken = params.get("access_token");
     const refreshToken = params.get("refresh_token");
     if (accessToken) {
-      localStorage.setItem("access_token", accessToken);
-      if (refreshToken) localStorage.setItem("refresh_token", refreshToken);
+      setToken("access_token", accessToken, true);
+      if (refreshToken) setToken("refresh_token", refreshToken, true);
       window.history.replaceState(null, "", window.location.pathname);
       return true;
     }
@@ -50,26 +51,23 @@ export const AuthProvider = ({ children }) => {
 
   const login = useCallback(async (email, password, rememberMe = false) => {
     const { data } = await api.post("/auth/login", { email, password, remember_me: rememberMe });
-    if (data?.access_token) localStorage.setItem("access_token", data.access_token);
-    if (data?.refresh_token) localStorage.setItem("refresh_token", data.refresh_token);
+    if (data?.access_token) setToken("access_token", data.access_token, rememberMe);
+    if (data?.refresh_token) setToken("refresh_token", data.refresh_token, rememberMe);
     setUser(stripTokens(data));
     return data;
   }, [stripTokens]);
 
   const register = useCallback(async (payload) => {
     const { data } = await api.post("/auth/register", payload);
-    if (data?.access_token) localStorage.setItem("access_token", data.access_token);
-    if (data?.refresh_token) localStorage.setItem("refresh_token", data.refresh_token);
+    if (data?.access_token) setToken("access_token", data.access_token, true);
+    if (data?.refresh_token) setToken("refresh_token", data.refresh_token, true);
     setUser(stripTokens(data));
     return data;
   }, [stripTokens]);
 
   const logout = useCallback(async () => {
     try { await api.post("/auth/logout"); } catch { /* server logout best-effort */ }
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("financeai_token");
-    localStorage.removeItem("session_token");
+    clearTokens();
     setUser(false);
   }, []);
 

@@ -23,8 +23,8 @@ const TransactionRow = React.memo(({ t, isSelected, onToggleSelect, onEdit, onDe
         {t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}
       </td>
       <td className="px-6 py-3 text-right whitespace-nowrap">
-        <button onClick={() => onEdit(t)} data-testid={`edit-${t.transaction_id}`} className="text-muted-foreground hover:text-emerald mr-3" title="Edit"><Pencil className="h-4 w-4" /></button>
-        <button onClick={() => onDelete(t.transaction_id)} data-testid={`del-${t.transaction_id}`} className="text-muted-foreground hover:text-ruby" title="Delete"><Trash2 className="h-4 w-4" /></button>
+        <button onClick={() => onEdit(t)} data-testid={`edit-${t.transaction_id}`} className="p-2 text-muted-foreground hover:text-emerald" title="Edit" aria-label="Edit transaction"><Pencil className="h-4 w-4" /></button>
+        <button onClick={() => onDelete(t.transaction_id)} data-testid={`del-${t.transaction_id}`} className="p-2 text-muted-foreground hover:text-ruby" title="Delete" aria-label="Delete transaction"><Trash2 className="h-4 w-4" /></button>
       </td>
     </tr>
   );

@@ -1,8 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
-import { Plus, Trash2, Loader2, Pencil, Search, ArrowUpDown, Sparkles, Filter, ChevronLeft, ChevronRight, X, BarChart3, Star } from "lucide-react";
+import { Plus, Trash2, Loader2, Pencil, Search, ArrowUpDown, Sparkles, Filter, ChevronLeft, ChevronRight, X, BarChart3, Star, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, PageHeader, SectionCard } from "../components/ui/layout";
+import { SkeletonTable } from "../components/ui/Skeleton";
+import { withUndo } from "../lib/undo";
+import ConfirmModal from "../components/ui/ConfirmModal";
 import ComparePeriods from "../components/ComparePeriods";
 import MaaserPanel from "../components/MaaserPanel";
 import TransactionRow from "../components/TransactionRow";
@@ -23,7 +27,7 @@ function firstOfMonth() {
 
 const fmt = (n) => `£${Number(n || 0).toFixed(2)}`;
 
-export default function Transactions() {
+const Transactions = React.memo(function Transactions() {
   const [txs, setTxs] = useState([]);
   const [total, setTotal] = useState(0);
   const [incomeTotal, setIncomeTotal] = useState(0);
@@ -38,18 +42,33 @@ export default function Transactions() {
   const [compareOpen, setCompareOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("ledger");
 
-  const [filters, setFilters] = useState({
-    search: "", category: "", source: "", tx_type: "",
-    date_from: firstOfMonth(), date_to: today(),
-    amount_min: "", amount_max: "",
-    sort: "date", order: "desc",
+  const [searchParams, setSearchParams] = useSearchParams();
+  const defaultFilters = useMemo(() => ({ search: "", category: "", source: "", tx_type: "", date_from: firstOfMonth(), date_to: today(), amount_min: "", amount_max: "", sort: "date", order: "desc" }), []);
+  const [filters, setFilters] = useState(() => {
+    const fromUrl = {};
+    for (const k of Object.keys(defaultFilters)) {
+      fromUrl[k] = searchParams.get(k) || defaultFilters[k];
+    }
+    return fromUrl;
   });
-  const [offset, setOffset] = useState(0);
+  const [offset, setOffset] = useState(() => { const p = searchParams.get("offset"); return p ? parseInt(p, 10) : 0; });
   const [limit] = useState(50);
   const [aiQuery, setAiQuery] = useState("");
   const [aiResults, setAiResults] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [searchInput, setSearchInput] = useState(filters.search);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState("");
+  const [confirmMessage, setConfirmMessage] = useState("");
+  const confirmCb = useRef(null);
+
+  const showConfirm = useCallback((title, message, cb) => {
+    setConfirmTitle(title);
+    setConfirmMessage(message);
+    confirmCb.current = cb;
+    setConfirmOpen(true);
+  }, []);
 
   const debounceRef = useRef(null);
 
@@ -75,6 +94,15 @@ export default function Transactions() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, []);
 
+  useEffect(() => {
+    const params = {};
+    for (const [k, v] of Object.entries(filters)) {
+      if (v && v !== defaultFilters[k]) params[k] = v;
+    }
+    if (offset) params.offset = String(offset);
+    setSearchParams(params, { replace: true });
+  }, [filters, offset]);
+
   const load = useCallback(async () => {
     setLoading(true); setAiResults(null);
     try {
@@ -92,7 +120,7 @@ export default function Transactions() {
       setTotal(data.total);
       setIncomeTotal(data.income_total || 0);
       setExpenseTotal(data.expense_total || 0);
-    } catch (err) { console.error("tx load", err); }
+    } catch (err) { toast.error("Could not load transactions"); }
     finally { setLoading(false); }
   }, [offset, limit, filters]);
 
@@ -119,7 +147,8 @@ export default function Transactions() {
   }, [filters]);
 
   const clearAllFilters = useCallback(() => {
-    setFilters(prev => ({ ...prev, tx_type: "", source: "", category: "", amount_min: "", amount_max: "", date_from: firstOfMonth(), date_to: today() }));
+    setSearchInput("");
+    setFilters(prev => ({ ...prev, search: "", tx_type: "", source: "", category: "", amount_min: "", amount_max: "", date_from: firstOfMonth(), date_to: today() }));
     setOffset(0);
   }, []);
 
@@ -139,12 +168,20 @@ export default function Transactions() {
     try {
       const amt = parseFloat(form.amount);
       const signed = form.is_income ? Math.abs(amt) : -Math.abs(amt);
+      const payload = { description: form.description, amount: signed, category: form.category || undefined, is_income: form.is_income };
       if (editingId) {
-        await api.patch(`/transactions/${editingId}`, { description: form.description, amount: signed, category: form.category || undefined, is_income: form.is_income });
-        toast.success("Transaction updated");
+        const old = txsRef.current.find(t => t.transaction_id === editingId);
+        await api.patch(`/transactions/${editingId}`, payload);
+        toast("Transaction updated", {
+          action: { label: "Undo", onClick: async () => { if (old) { await api.patch(`/transactions/${editingId}`, { description: old.description, amount: old.amount, category: old.category || undefined, is_income: old.is_income }); toast.success("Restored"); await load(); } } },
+          duration: 6000,
+        });
       } else {
-        await api.post("/transactions", { description: form.description, amount: signed, category: form.category || undefined, is_income: form.is_income });
-        toast.success("Transaction added");
+        const { data } = await api.post("/transactions", payload);
+        toast("Transaction added", {
+          action: { label: "Undo", onClick: async () => { await api.delete(`/transactions/${data.transaction_id}`); toast.success("Undone"); await load(); } },
+          duration: 6000,
+        });
       }
       setOpen(false); setEditingId(null); setForm(emptyForm); await load();
     } catch { toast.error(editingId ? "Could not update" : "Could not add"); }
@@ -173,41 +210,80 @@ export default function Transactions() {
     }
   }, [allDisplayedSelected, allDisplayed]);
 
+  const [bulkCat, setBulkCat] = useState("");
+
+  const bulkCategory = useCallback(async () => {
+    if (!bulkCat || selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    const cat = bulkCat;
+    setBulkCat("");
+    withUndo({
+      action: () => api.post("/transactions/bulk-category", { transaction_ids: ids, category: cat }),
+      undo: async () => { await api.post("/transactions/bulk-category", { transaction_ids: ids, category: "" }); await load(); },
+      successMsg: `${ids.length} transaction${ids.length > 1 ? "s" : ""} categorised`,
+      errorMsg: "Could not update categories",
+    });
+    setSelectedIds(new Set());
+    await load();
+  }, [bulkCat, selectedIds, load]);
+
   const bulkDelete = useCallback(async () => {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`Delete ${selectedIds.size} transaction${selectedIds.size > 1 ? "s" : ""}?`)) return;
-    try {
-      const { data } = await api.post("/transactions/bulk-delete", { transaction_ids: Array.from(selectedIds) });
-      toast.success(`Deleted ${data.deleted}`);
-      setSelectedIds(new Set());
-      await load();
-    } catch (e) { toast.error(formatApiError(e?.response?.data?.detail) || "Could not delete"); }
-  }, [selectedIds, load]);
+    showConfirm(
+      `Delete ${selectedIds.size} transaction${selectedIds.size > 1 ? "s" : ""}?`,
+      "This action cannot be undone.",
+      async () => {
+        try {
+          const { data } = await api.post("/transactions/bulk-delete", { transaction_ids: Array.from(selectedIds) });
+          toast.success(`Deleted ${data.deleted}`);
+          setSelectedIds(new Set());
+          await load();
+        } catch (e) { toast.error(formatApiError(e?.response?.data?.detail) || "Could not delete"); }
+      }
+    );
+  }, [selectedIds, load, showConfirm]);
 
   const clearAllMatching = useCallback(async () => {
     const label = filters.source ? `all "${SOURCE_LABELS[filters.source] || filters.source}"` : "all matching";
-    if (!window.confirm(`Delete ${label} (${total})?`)) return;
-    try {
-      const body = {};
-      if (filters.source) body.source = filters.source;
-      if (filters.category) body.category = filters.category;
-      if (filters.tx_type) body.tx_type = filters.tx_type;
-      if (filters.search) body.search = filters.search;
-      if (filters.date_from) body.date_from = filters.date_from;
-      if (filters.date_to) body.date_to = filters.date_to;
-      if (filters.amount_min) body.amount_min = parseFloat(filters.amount_min);
-      if (filters.amount_max) body.amount_max = parseFloat(filters.amount_max);
-      const { data } = await api.post("/transactions/clear", body);
-      toast.success(`Deleted ${data.deleted}`);
-      setSelectedIds(new Set());
-      await load();
-    } catch (e) { toast.error(formatApiError(e?.response?.data?.detail) || "Could not clear"); }
-  }, [filters, total, load]);
+    showConfirm(
+      `Delete ${label} (${total})?`,
+      "This will permanently remove all matching transactions.",
+      async () => {
+        try {
+          const body = {};
+          if (filters.source) body.source = filters.source;
+          if (filters.category) body.category = filters.category;
+          if (filters.tx_type) body.tx_type = filters.tx_type;
+          if (filters.search) body.search = filters.search;
+          if (filters.date_from) body.date_from = filters.date_from;
+          if (filters.date_to) body.date_to = filters.date_to;
+          if (filters.amount_min) body.amount_min = parseFloat(filters.amount_min);
+          if (filters.amount_max) body.amount_max = parseFloat(filters.amount_max);
+          const { data } = await api.post("/transactions/clear", body);
+          toast.success(`Deleted ${data.deleted}`);
+          setSelectedIds(new Set());
+          await load();
+        } catch (e) { toast.error(formatApiError(e?.response?.data?.detail) || "Could not clear"); }
+      }
+    );
+  }, [filters, total, load, showConfirm]);
 
+  const txsRef = useRef(txs);
+  txsRef.current = txs;
   const del = useCallback(async (id) => {
-    try { await api.delete(`/transactions/${id}`); toast.success("Deleted"); await load(); }
-    catch { toast.error("Could not delete"); }
-  }, [load]);
+    const tx = txsRef.current.find(t => t.transaction_id === id);
+    if (!tx) return;
+    setTxs(prev => prev.filter(t => t.transaction_id !== id));
+    withUndo({
+      action: () => api.delete(`/transactions/${id}`),
+      undo: async () => {
+        setTxs(prev => [...prev, tx]);
+        await api.post("/transactions", tx);
+      },
+      successMsg: "Transaction deleted",
+      errorMsg: "Could not delete",
+    });
+  }, []);
 
   const runAiSearch = useCallback(async () => {
     if (!aiQuery.trim()) return;
@@ -232,9 +308,16 @@ export default function Transactions() {
         actions={
           <div className="flex items-center gap-2">
             {someSelected && (
-              <button onClick={bulkDelete} className="btn-pill border border-ruby text-ruby text-sm h-11 px-4">
-                <Trash2 className="h-4 w-4 mr-1.5" /> {selectedIds.size}
-              </button>
+              <>
+                <select value={bulkCat} onChange={e => setBulkCat(e.target.value)} className="control-shell text-sm h-11" aria-label="Set category for selected">
+                  <option value="">Category…</option>
+                  {selectedCats.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                </select>
+                {bulkCat && <button onClick={bulkCategory} className="btn-pill gradient-emerald text-white text-sm h-11 px-4"><Pencil className="h-4 w-4 mr-1.5" /> Apply</button>}
+                <button onClick={bulkDelete} className="btn-pill border border-ruby text-ruby text-sm h-11 px-4">
+                  <Trash2 className="h-4 w-4 mr-1.5" /> {selectedIds.size}
+                </button>
+              </>
             )}
             {(filters.source || filters.category || filters.tx_type || filters.search) && total > 0 && (
               <button onClick={clearAllMatching} className="btn-pill border border-ruby/60 text-ruby/80 text-sm h-11 px-4">
@@ -268,20 +351,20 @@ export default function Transactions() {
       {/* ───── Ledger tab ───── */}
       {activeTab === "ledger" && <>
         {/* Unified filters + summary card */}
-        <div className="rounded-[1.75rem] border border-border bg-card/90 backdrop-blur-xl">
+        <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card">
           {/* Row 1: Search + sort + AI + filters toggle */}
           <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto_auto_auto] gap-3 p-4">
             <label className="flex items-center gap-3 rounded-xl border border-border bg-background/70 px-4 h-11">
               <Search className="h-4 w-4 text-muted-foreground shrink-0" />
-              <input defaultValue={filters.search} onChange={(e) => debouncedSetSearch(e.target.value)}
+              <input value={searchInput} onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
                 placeholder="Search descriptions, merchants, categories..."
                 className="w-full bg-transparent outline-none text-sm" />
-              {filters.search && <button onClick={() => { setFilter("search", ""); }} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>}
+              {filters.search && <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>}
             </label>
 
             <label className="flex items-center gap-2 rounded-xl border border-border bg-background/70 px-4 h-11 text-sm">
               <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-              <select value={`${filters.sort}-${filters.order}`} onChange={(e) => { const [s, o] = e.target.value.split("-"); setFilters(p => ({ ...p, sort: s, order: o })); }}
+              <select aria-label="Sort transactions" value={`${filters.sort}-${filters.order}`} onChange={(e) => { const [s, o] = e.target.value.split("-"); setFilters(p => ({ ...p, sort: s, order: o })); }}
                 className="bg-transparent outline-none">
                 <option value="date-desc">Newest</option>
                 <option value="date-asc">Oldest</option>
@@ -317,26 +400,26 @@ export default function Transactions() {
           {/* Filters panel */}
           {showFilters && (
             <div className="border-t border-border px-4 py-3 space-y-3">
-              <div className="flex flex-wrap gap-3">
-                <select value={filters.tx_type} onChange={(e) => toggleFilter("tx_type", e.target.value)} className="control-shell text-sm h-10 min-w-[120px] flex-1">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                <select value={filters.tx_type} onChange={(e) => toggleFilter("tx_type", e.target.value)} className="control-shell text-sm h-10">
                   <option value="">All types</option><option value="income">Income</option><option value="expense">Expense</option>
                 </select>
-                <select value={filters.source} onChange={(e) => toggleFilter("source", e.target.value)} className="control-shell text-sm h-10 min-w-[120px] flex-1">
+                <select value={filters.source} onChange={(e) => toggleFilter("source", e.target.value)} className="control-shell text-sm h-10">
                   <option value="">All sources</option>
                   {Object.entries(SOURCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>
-                <select value={filters.category} onChange={(e) => toggleFilter("category", e.target.value)} className="control-shell text-sm h-10 min-w-[120px] flex-1">
+                <select value={filters.category} onChange={(e) => toggleFilter("category", e.target.value)} className="control-shell text-sm h-10">
                   <option value="">All categories</option>
                   {selectedCats.map(c => <option key={c.category_id ?? `default-${c.name}`} value={c.name}>{c.name}</option>)}
                 </select>
                 <input type="number" min="0" step="0.01" placeholder="Min £" value={filters.amount_min}
                   onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_min: e.target.value })); }}
-                  className="control-shell text-sm h-10 min-w-[100px] flex-1" />
+                  className="control-shell text-sm h-10" />
                 <input type="number" min="0" step="0.01" placeholder="Max £" value={filters.amount_max}
                   onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_max: e.target.value })); }}
-                  className="control-shell text-sm h-10 min-w-[100px] flex-1" />
-                <input type="date" value={filters.date_from} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_from: e.target.value })); }} className="control-shell text-sm h-10 min-w-[140px] flex-1" />
-                <input type="date" value={filters.date_to} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_to: e.target.value })); }} className="control-shell text-sm h-10 min-w-[140px] flex-1" />
+                  className="control-shell text-sm h-10" />
+                <input type="date" value={filters.date_from} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_from: e.target.value })); }} className="control-shell text-sm h-10" />
+                <input type="date" value={filters.date_to} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_to: e.target.value })); }} className="control-shell text-sm h-10" />
               </div>
 
               {/* AI search inline */}
@@ -385,17 +468,48 @@ export default function Transactions() {
         {/* Transaction table */}
         <SectionCard eyebrow="Ledger" title={`Transactions (${total})`}>
           {loading ? (
-            <div className="p-10 grid place-items-center"><Loader2 className="h-5 w-5 animate-spin text-emerald" /></div>
+            <SkeletonTable rows={5} className="p-4" />
           ) : (aiResults?.transactions || txs).length === 0 ? (
-            <EmptyState
+            <EmptyState icon={Receipt}
               title={filters.search || filters.category || aiResults ? "No matching transactions" : "No transactions yet"}
               description="Try different filters or add your first transaction."
-              className="border-0 bg-transparent shadow-none p-2"
             />
           ) : (
             <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[760px]">
+              {/* Mobile card view */}
+              <div className="block sm:hidden divide-y divide-border">
+                {(aiResults?.transactions || txs).map((t) => (
+                  <div key={t.transaction_id} style={{ contentVisibility: "auto" }} className={`px-4 py-3 space-y-1.5 ${selectedIds.has(t.transaction_id) ? "bg-emerald/5" : ""}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <input type="checkbox" checked={selectedIds.has(t.transaction_id)}
+                          onChange={() => toggleSelect(t.transaction_id)}
+                          className="h-4 w-4 rounded border-border accent-emerald cursor-pointer shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-xs text-muted-foreground">{t.date?.slice(0, 10)}</p>
+                          <p className="font-medium text-sm truncate">{t.description}</p>
+                          {t.normalized_merchant && t.normalized_merchant !== t.description && (
+                            <p className="text-xs text-muted-foreground truncate">{t.normalized_merchant}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        <button onClick={() => openEdit(t)} className="p-2 text-muted-foreground hover:text-emerald" aria-label="Edit transaction"><Pencil className="h-4 w-4" /></button>
+                        <button onClick={() => del(t.transaction_id)} className="p-2 text-muted-foreground hover:text-ruby" aria-label="Delete transaction"><Trash2 className="h-4 w-4" /></button>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between pl-6">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-secondary capitalize">{t.category || "uncategorized"}</span>
+                      <span className={`font-medium tabular-nums text-sm ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}>
+                        {t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Desktop table */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-sm">
                   <thead><tr className="text-left text-xs text-muted-foreground border-b border-border">
                     <th className="px-4 py-3 w-10">
                       <input type="checkbox" checked={allDisplayedSelected} onChange={toggleSelectAll}
@@ -418,12 +532,12 @@ export default function Transactions() {
                   <span className="text-muted-foreground">Showing {offset + 1}–{Math.min(offset + limit, total)} of {total}</span>
                   <div className="flex items-center gap-2">
                     <button onClick={() => setOffset(Math.max(0, offset - limit))} disabled={offset === 0}
-                      className="h-8 w-8 rounded-full grid place-items-center border border-border hover:bg-secondary disabled:opacity-30">
+                      className="h-8 w-8 rounded-full grid place-items-center border border-border hover:bg-secondary disabled:opacity-30" aria-label="Previous page">
                       <ChevronLeft className="h-4 w-4" />
                     </button>
                     <span className="text-muted-foreground min-w-[4rem] text-center">{currentPage} / {totalPages}</span>
                     <button onClick={() => setOffset(Math.min((totalPages - 1) * limit, offset + limit))} disabled={offset + limit >= total}
-                      className="h-8 w-8 rounded-full grid place-items-center border border-border hover:bg-secondary disabled:opacity-30">
+                      className="h-8 w-8 rounded-full grid place-items-center border border-border hover:bg-secondary disabled:opacity-30" aria-label="Next page">
                       <ChevronRight className="h-4 w-4" />
                     </button>
                   </div>
@@ -443,6 +557,14 @@ export default function Transactions() {
         selectedCats={selectedCats} onClose={closeForm} onSubmit={submit} />
 
       <ComparePeriods open={compareOpen} onClose={() => setCompareOpen(false)} />
+
+      <ConfirmModal
+        open={confirmOpen}
+        title={confirmTitle}
+        message={confirmMessage}
+        onConfirm={() => { confirmCb.current?.(); setConfirmOpen(false); }}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
-}
+});

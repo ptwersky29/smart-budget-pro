@@ -1,0 +1,23 @@
+export function getToken(key) {
+  return sessionStorage.getItem(key) || localStorage.getItem(key) || "";
+}
+
+export function setToken(key, value, persistent = true) {
+  if (persistent) localStorage.setItem(key, value);
+  sessionStorage.setItem(key, value);
+}
+
+export function clearTokens() {
+  const keys = ["access_token", "refresh_token", "financeai_token", "session_token"];
+  keys.forEach(k => { localStorage.removeItem(k); sessionStorage.removeItem(k); });
+}
+
+export function isTokenExpired(token) {
+  if (!token) return true;
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.exp * 1000 < Date.now();
+  } catch {
+    return true;
+  }
+}

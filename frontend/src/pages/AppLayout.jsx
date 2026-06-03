@@ -1,6 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { useKeyboardShortcut } from "../hooks/useKeyboardShortcut";
+import KeyboardShortcutsHelp from "../components/KeyboardShortcutsHelp";
 
 import {
   LayoutDashboard, Receipt, PiggyBank, Building2, TrendingUp, Star,
@@ -165,6 +167,30 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
+  const [helpOpen, setHelpOpen] = useState(false);
+  const leaderBuffer = useRef([]);
+
+  useKeyboardShortcut("?", () => setHelpOpen(p => !p));
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.target.closest("input, textarea, select, [contenteditable]")) return;
+      const key = e.key.toLowerCase();
+      if (key === "escape") { setHelpOpen(false); return; }
+      if (key === "g") {
+        leaderBuffer.current = ["g"];
+        setTimeout(() => { leaderBuffer.current = []; }, 800);
+        return;
+      }
+      if (leaderBuffer.current.length === 1 && leaderBuffer.current[0] === "g") {
+        leaderBuffer.current = [];
+        const map = { d: "/dashboard", t: "/transactions", b: "/budgets", s: "/subscriptions", r: "/reports", g: "/settings" };
+        if (map[key]) { e.preventDefault(); navigate(map[key]); }
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [navigate]);
 
   const routeMeta = useMemo(() => getRouteMeta(location.pathname), [location.pathname]);
   const currentSection = useMemo(() => NAV_SECTIONS.find((section) => section.items.some((item) => location.pathname.startsWith(item.to))) || NAV_SECTIONS[0], [location.pathname]);
@@ -195,7 +221,7 @@ export default function AppLayout() {
               <span className="block text-[11px] text-muted-foreground mt-1">Premium money workspace</span>
             </div>
           </Link>
-          <button className="lg:hidden h-9 w-9 rounded-full grid place-items-center hover:bg-secondary" onClick={() => setOpen(false)} data-testid="sidebar-close">
+          <button className="lg:hidden h-9 w-9 rounded-full grid place-items-center hover:bg-secondary" onClick={() => setOpen(false)} data-testid="sidebar-close" aria-label="Close navigation menu">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -213,7 +239,8 @@ export default function AppLayout() {
                       to={to}
                       onClick={() => setOpen(false)}
                       data-testid={`nav-${label.toLowerCase().replace(/\s+/g, "-")}`}
-                      className={`group flex items-center gap-3 rounded-2xl px-3 py-3 transition-all ${
+                      aria-current={active ? "page" : undefined}
+              className={`group flex items-center gap-3 rounded-2xl px-3 py-3 transition-all ${
                         active
                           ? "bg-emerald/10 text-foreground border border-emerald/20 shadow-sm"
                           : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
@@ -256,7 +283,7 @@ export default function AppLayout() {
               <p className="text-sm font-medium truncate">{user?.name || user?.email}</p>
               <p className="text-xs text-muted-foreground capitalize">{user?.tier || "free"} plan · {currentSection.label}</p>
             </div>
-            <button onClick={doLogout} title="Logout" data-testid="logout-button" className="text-muted-foreground hover:text-foreground">
+            <button onClick={doLogout} title="Logout" data-testid="logout-button" className="text-muted-foreground hover:text-foreground" aria-label="Log out">
               <LogOut className="h-4 w-4" />
             </button>
           </div>
@@ -269,7 +296,7 @@ export default function AppLayout() {
         <header className="sticky top-0 z-20 border-b border-border/70 bg-background/80 backdrop-blur-xl">
           <div className="flex items-center justify-between gap-4 px-4 lg:px-8 h-16">
             <div className="flex items-center gap-3 min-w-0">
-              <button className="lg:hidden h-10 w-10 rounded-full grid place-items-center border border-border bg-card/80" onClick={() => setOpen(true)} data-testid="sidebar-open">
+              <button className="lg:hidden h-10 w-10 rounded-full grid place-items-center border border-border bg-card/80" onClick={() => setOpen(true)} data-testid="sidebar-open" aria-label="Open navigation menu">
                 <Menu className="h-5 w-5" />
               </button>
               <div className="min-w-0">
@@ -295,22 +322,22 @@ export default function AppLayout() {
                   Upgrade
                 </Link>
               )}
-              <button onClick={toggleTheme} data-testid="theme-toggle" className="h-10 w-10 grid place-items-center rounded-full border border-border bg-card/80 hover:bg-secondary transition-colors">
+              <button onClick={toggleTheme} data-testid="theme-toggle" className="h-10 w-10 grid place-items-center rounded-full border border-border bg-card/80 hover:bg-secondary transition-colors" aria-label="Toggle theme">
                 {dark ? <Sun className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
               </button>
             </div>
 
             <div className="flex items-center gap-2 lg:hidden">
-              <button onClick={toggleTheme} data-testid="theme-toggle-mobile" className="h-10 w-10 grid place-items-center rounded-full border border-border bg-card/80 hover:bg-secondary transition-colors">
+              <button onClick={toggleTheme} data-testid="theme-toggle-mobile" className="h-10 w-10 grid place-items-center rounded-full border border-border bg-card/80 hover:bg-secondary transition-colors" aria-label="Toggle theme">
                 {dark ? <Sun className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
               </button>
             </div>
           </div>
         </header>
 
-        <main className="p-4 sm:p-5 lg:p-8 max-w-[1680px] mx-auto">
+        <main className="p-4 sm:p-5 lg:p-8 max-w-[1680px] mx-auto animate-[fadeUp_0.35s_ease-out]">
           <div className="space-y-8">
-            <div className="lg:hidden rounded-[1.75rem] border border-border bg-card/90 backdrop-blur-xl p-5 shadow-[0_16px_45px_rgba(15,23,42,0.06)]">
+            <div className="lg:hidden rounded-2xl border border-border bg-card/90 backdrop-blur-xl p-5 shadow-card">
               <p className="label-overline text-emerald">{routeMeta.eyebrow}</p>
               <p className="mt-2 text-2xl tracking-tight font-semibold">{routeMeta.title}</p>
               <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{routeMeta.description}</p>
@@ -323,6 +350,7 @@ export default function AppLayout() {
           </div>
         </main>
       </div>
+      <KeyboardShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }

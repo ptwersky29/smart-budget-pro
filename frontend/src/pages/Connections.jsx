@@ -24,14 +24,20 @@ export default function Connections() {
   const [editingNickname, setEditingNickname] = useState(null);
   const [nicknameValue, setNicknameValue] = useState("");
   const pollingRef = useRef(null);
+  const pollAbortRef = useRef(null);
 
   const load = useCallback(async () => {
+    if (pollAbortRef.current) pollAbortRef.current.abort();
+    const controller = new AbortController();
+    pollAbortRef.current = controller;
     try {
-      const { data } = await api.get("/truelayer/connections");
+      const { data } = await api.get("/truelayer/connections", { signal: controller.signal });
+      if (controller.signal.aborted) return;
       setConns(data.connections);
       setSyncLogs(data.recent_syncs);
       setTotalTx(data.total_transactions);
     } catch (err) {
+      if (err?.name === "CanceledError" || err?.code === "ERR_CANCELED") return;
       if (err.response?.status === 500 && err.response?.data?.detail?.includes("configured")) {
         setNeedsSetup(true);
       }
@@ -85,15 +91,19 @@ export default function Connections() {
       }
     }
     load();
-    // Start polling for live updates
-    if (!pollingRef.current) {
-      pollingRef.current = setInterval(load, 15000); // every 15s
-    }
+    // Start polling for live updates (async-safe: waits for each request to finish)
+    let cancelled = false;
+    const poll = async () => {
+      if (cancelled) return;
+      await load();
+      if (cancelled) return;
+      pollingRef.current = setTimeout(poll, 15000);
+    };
+    poll();
     return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
+      cancelled = true;
+      if (pollingRef.current) { clearTimeout(pollingRef.current); pollingRef.current = null; }
+      if (pollAbortRef.current) { pollAbortRef.current.abort(); pollAbortRef.current = null; }
     };
   }, [params, load, doSync]);
 
@@ -226,7 +236,7 @@ export default function Connections() {
                   type="date"
                   value={importFromDate}
                   onChange={(e) => setImportFromDate(e.target.value)}
-                  className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none"
+                  className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none"
                 />
                 <p className="text-xs text-muted-foreground mt-1">FinanceAI will import transactions from this date when you connect.</p>
               </div>
@@ -255,10 +265,9 @@ export default function Connections() {
         </div>
         {conns.length === 0 ? (
           <div className="p-6">
-            <EmptyState
+            <EmptyState icon={Building2}
               title={needsSetup ? "Banking not configured yet" : "No banks connected yet"}
               description={needsSetup ? "The administrator needs to configure TrueLayer in Settings before you can connect a bank." : "Click Connect Bank above to get started."}
-              className="border-0 bg-transparent shadow-none"
             />
           </div>
         ) : (
@@ -275,7 +284,7 @@ export default function Connections() {
                             type="text"
                             value={nicknameValue}
                             onChange={(e) => setNicknameValue(e.target.value)}
-                            className="h-8 px-3 rounded-xl bg-secondary/50 border border-border focus:border-emerald focus:outline-none text-sm font-medium w-48"
+                            className="h-8 px-3 rounded-xl bg-secondary/50 border border-border focus:border-ring focus:outline-none text-sm font-medium w-48"
                             autoFocus
                           />
                           <button type="submit" className="text-xs text-emerald font-medium">Save</button>

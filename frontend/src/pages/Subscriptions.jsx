@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2, Pencil, RefreshCcw, Sparkles } from "lucide-react";
+import { Loader2, Plus, Trash2, Pencil, RefreshCcw, Sparkles, Bell } from "lucide-react";
 import { EmptyState, PageHeader, SectionCard } from "../components/ui/layout";
 
 const emptyForm = { name: "", amount: "", category: "", frequency: "monthly", merchant: "", notes: "" };
@@ -79,7 +79,8 @@ export default function Subscriptions() {
   };
 
   const del = async (id) => {
-    try { await api.delete(`/subscriptions/${id}`); toast.success("Deleted"); await load(); }
+    const sub = subs.find(s => s.subscription_id === id);
+    try { await api.delete(`/subscriptions/${id}`); toast("Subscription deleted", { action: { label: "Undo", onClick: async () => { await api.post("/subscriptions", { name: sub.name, amount: Math.abs(sub.amount), category: sub.category, frequency: sub.frequency, merchant: sub.merchant, notes: sub.notes }); toast.success("Restored"); await load(); } }, duration: 6000 }); await load(); }
     catch (e) { toast.error(formatApiError(e) || "Could not delete"); }
   };
 
@@ -124,10 +125,40 @@ export default function Subscriptions() {
         {loading ? (
           <div className="p-10 grid place-items-center"><Loader2 className="h-5 w-5 animate-spin text-emerald" /></div>
         ) : subs.length === 0 ? (
-          <EmptyState title="No subscriptions yet" description="Add one manually or run Detect to find recurring payments." className="border-0 bg-transparent shadow-none" />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[600px]">
+            <EmptyState icon={Bell}
+              title="No subscriptions yet"
+              description="Add one manually or run Detect to find recurring payments."
+            />
+        ) : (<>
+          {/* Mobile card view */}
+          <div className="block sm:hidden divide-y divide-border">
+            {subs.map((s) => (
+              <div key={s.subscription_id} className="px-4 py-3 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-sm truncate">{s.name}</p>
+                    {s.merchant && <p className="text-xs text-muted-foreground truncate">{s.merchant}</p>}
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <button onClick={() => openEdit(s)} className="p-2 text-muted-foreground hover:text-emerald" title="Edit"><Pencil className="h-4 w-4" /></button>
+                    <button onClick={() => del(s.subscription_id)} className="p-2 text-muted-foreground hover:text-ruby" title="Delete"><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="tabular-nums font-medium">£{Math.abs(s.amount).toFixed(2)}</span>
+                    <span className="text-xs text-muted-foreground capitalize">/ {s.frequency}</span>
+                  </div>
+                  <button onClick={() => toggleActive(s)} className={`text-xs px-2 py-1 rounded-full ${s.active ? "bg-emerald/10 text-emerald" : "bg-muted text-muted-foreground"}`}>
+                    {s.active ? "Active" : "Paused"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Desktop table */}
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full text-sm">
               <thead><tr className="text-left text-xs text-muted-foreground border-b border-border">
                 <th className="px-6 py-3">Name</th><th className="px-6 py-3">Amount</th><th className="px-6 py-3">Frequency</th><th className="px-6 py-3">Status</th><th className="px-6 py-3 w-24"></th>
               </tr></thead>
@@ -143,15 +174,15 @@ export default function Subscriptions() {
                       </button>
                     </td>
                     <td className="px-6 py-3 text-right whitespace-nowrap">
-                      <button onClick={() => openEdit(s)} className="text-muted-foreground hover:text-emerald mr-3" title="Edit"><Pencil className="h-4 w-4" /></button>
-                      <button onClick={() => del(s.subscription_id)} className="text-muted-foreground hover:text-ruby" title="Delete"><Trash2 className="h-4 w-4" /></button>
+                      <button onClick={() => openEdit(s)} className="p-2 text-muted-foreground hover:text-emerald" title="Edit"><Pencil className="h-4 w-4" /></button>
+                      <button onClick={() => del(s.subscription_id)} className="p-2 text-muted-foreground hover:text-ruby" title="Delete"><Trash2 className="h-4 w-4" /></button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        )}
+        </>)}
       </SectionCard>
 
       {open && (

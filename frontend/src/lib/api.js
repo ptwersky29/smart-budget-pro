@@ -1,4 +1,6 @@
 import axios from "axios";
+import { cacheGet, cacheSet, cacheInvalidate, dedupe } from "./cache";
+import { getToken } from "./storage";
 
 const fallbackBackend =
   typeof window !== "undefined" && window.location.hostname.endsWith(".vercel.app")
@@ -28,7 +30,7 @@ async function _ensureCsrf() {
 const SAFE_METHODS = new Set(["get", "head", "options"]);
 
 api.interceptors.request.use(async (config) => {
-  const token = localStorage.getItem("access_token");
+  const token = getToken("access_token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -42,7 +44,13 @@ api.interceptors.request.use(async (config) => {
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const method = response.config?.method?.toLowerCase();
+    if (method && !SAFE_METHODS.has(method)) {
+      cacheInvalidate(response.config.url);
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config || {};
     const requestUrl = String(originalRequest.url || "");
@@ -89,6 +97,16 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+api.cachedGet = async (url, params = {}, ttl) => {
+  const cached = cacheGet(url, params);
+  if (cached) return cached;
+  const { data } = await dedupe(url, params, () => api.get(url, { params }));
+  cacheSet(url, params, data, ttl);
+  return data;
+};
+
+api.invalidate = (prefix) => cacheInvalidate(prefix);
 
 export function formatApiError(detail) {
   if (detail == null) return "Something went wrong. Please try again.";

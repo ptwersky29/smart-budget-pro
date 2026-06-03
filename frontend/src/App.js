@@ -7,8 +7,7 @@ import { ThemeProvider } from "next-themes";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ConsentBanner from "./components/ConsentBanner";
-import AppLayout from "./pages/AppLayout";
-import AuthCallback from "./pages/AuthCallback";
+import PageLoader from "./components/PageLoader";
 
 const Landing = lazy(() => import("./pages/Landing"));
 const Login = lazy(() => import("./pages/Login"));
@@ -32,27 +31,16 @@ const Pricing = lazy(() => import("./pages/Pricing"));
 const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
 const OnboardingWizard = lazy(() => import("./pages/OnboardingWizard"));
 const Privacy = lazy(() => import("./pages/Privacy"));
-
-function PageLoader() {
-  return (
-    <div className="min-h-screen grid place-items-center bg-background">
-      <div className="flex items-center gap-3 text-muted-foreground">
-        <div className="h-5 w-5 animate-spin rounded-full border-2 border-emerald border-t-transparent" />
-        <span className="text-sm">Loading...</span>
-      </div>
-    </div>
-  );
-}
+const NotFound = lazy(() => import("./pages/NotFound"));
+const AppLayout = lazy(() => import("./pages/AppLayout"));
+const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 
 function AppRouter() {
   const location = useLocation();
   const authHash = location.hash || "";
-  if (authHash.includes("access_token=") || authHash.includes("refresh_token=") || authHash.includes("session_id=")) {
-    return <AuthCallback />;
-  }
   return (
     <Routes>
-      <Route path="/" element={<Landing />} />
+      <Route path="/" element={authHash.includes("access_token=") || authHash.includes("refresh_token=") || authHash.includes("session_id=") ? <AuthCallback /> : <Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -76,6 +64,7 @@ function AppRouter() {
         <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }

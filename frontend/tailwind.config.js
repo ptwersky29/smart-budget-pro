@@ -7,6 +7,15 @@ module.exports = {
   ],
   theme: {
   	extend: {
+  		fontFamily: {
+  			heading: ['Cabinet Grotesk', 'Fraunces', 'ui-sans-serif', 'system-ui'],
+  			body: ['Manrope', 'ui-sans-serif', 'system-ui'],
+  		},
+  		boxShadow: {
+  			card: '0 12px 30px rgba(15,23,42,0.05)',
+  			modal: '0 20px 60px rgba(15,23,42,0.08)',
+  			dropdown: '0 4px 20px rgba(15,23,42,0.06)',
+  		},
   		borderRadius: {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
@@ -46,6 +55,7 @@ module.exports = {
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
   			ring: 'hsl(var(--ring))',
+  			emerald: 'hsl(var(--emerald))',
   			ruby: 'hsl(var(--ruby))',
   			topaz: 'hsl(var(--topaz))',
   			chart: {
@@ -53,7 +63,10 @@ module.exports = {
   				'2': 'hsl(var(--chart-2))',
   				'3': 'hsl(var(--chart-3))',
   				'4': 'hsl(var(--chart-4))',
-  				'5': 'hsl(var(--chart-5))'
+  				'5': 'hsl(var(--chart-5))',
+  				'6': 'hsl(var(--chart-6))',
+  				'7': 'hsl(var(--chart-7))',
+  				'8': 'hsl(var(--chart-8))',
   			}
   		},
   		keyframes: {

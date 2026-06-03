@@ -25,12 +25,14 @@ export default function SMS() {
     try {
       const { data } = await api.get("/sms/senders");
       setSenders(data.senders);
-    } catch { /* not critical */ }
+    } catch { /* senders not critical */ }
   }, []);
 
   const loadInbox = useCallback(async () => {
-    const { data } = await api.get("/sms/inbox");
-    setInbox(data.messages);
+    try {
+      const { data } = await api.get("/sms/inbox");
+      setInbox(data.messages);
+    } catch { toast.error("Could not load SMS inbox"); }
   }, []);
   const loadTw = useCallback(async () => {
     if (user?.role !== "admin") return;
@@ -38,7 +40,7 @@ export default function SMS() {
       const { data } = await api.get("/admin/twilio-config");
       setTw(data);
       setTwForm({ account_sid: data.account_sid || "", auth_token: "", phone_number: data.phone_number || "" });
-    } catch (err) { console.error("twilio config load", err); }
+    } catch (err) { toast.error("Could not load Twilio config"); }
   }, [user?.role]);
   useEffect(() => { loadInbox(); loadTw(); loadSenders(); }, [loadInbox, loadTw, loadSenders]);
 
@@ -66,7 +68,7 @@ export default function SMS() {
       toast.error(formatApiError(e.response?.data?.detail) || "Could not save");
     }
   };
-  const del = async (id) => { await api.delete(`/sms/${id}`); await loadInbox(); };
+  const del = async (id) => { try { await api.delete(`/sms/${id}`); await loadInbox(); } catch { toast.error("Could not delete"); } };
 
   const saveTw = async (e) => {
     e.preventDefault();
@@ -111,7 +113,7 @@ export default function SMS() {
       <SectionCard eyebrow="Your Phone" title={senders.length ? `${senders.length} phone${senders.length !== 1 ? "s" : ""} registered` : "Register your phone"} data-testid="phone-card">
         <p className="text-xs text-muted-foreground mb-4">Register your mobile number so the system recognises your SMS messages and can send automatic replies.</p>
         <form onSubmit={registerPhone} className="flex items-center gap-3 mb-4">
-          <input value={phoneInput} onChange={(e) => setPhoneInput(e.target.value)} placeholder="+447700900123" className="flex-1 h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none font-mono text-sm" />
+          <input value={phoneInput} onChange={(e) => setPhoneInput(e.target.value)} placeholder="+447700900123" className="flex-1 control-shell font-mono text-sm" />
           <button type="submit" disabled={regBusy || !phoneInput.trim()} className="btn-pill gradient-emerald text-white text-sm shrink-0 disabled:opacity-50">
             {regBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Register"}
           </button>
@@ -123,7 +125,7 @@ export default function SMS() {
                 <CheckCircle2 className="h-4 w-4 text-emerald shrink-0" />
                 <span className="text-sm font-mono">{s.phone_number}</span>
                 <span className="text-xs text-muted-foreground">{s.verified_at ? `verified ${s.verified_at.slice(0, 10)}` : "pending"}</span>
-                <button onClick={() => deleteSender(s.id)} className="ml-auto text-muted-foreground hover:text-ruby" title="Remove">
+                <button onClick={() => deleteSender(s.id)} className="ml-auto p-2 text-muted-foreground hover:text-ruby" title="Remove">
                   <Trash2 className="h-4 w-4" />
                 </button>
               </li>
@@ -134,7 +136,7 @@ export default function SMS() {
 
       <SectionCard eyebrow="Parse" title="Paste a transaction SMS" contentClassName="pt-0">
         <div className="flex items-center gap-2 mb-3"><MessageSquare className="h-4 w-4 text-emerald" /><p className="label-overline">Paste a transaction SMS</p></div>
-        <textarea data-testid="sms-text" rows={4} value={text} onChange={(e)=>setText(e.target.value)} placeholder={SAMPLE} className="w-full p-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none text-sm leading-relaxed" />
+        <textarea data-testid="sms-text" rows={4} value={text} onChange={(e)=>setText(e.target.value)} placeholder={SAMPLE} className="w-full p-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none text-sm leading-relaxed" />
         <div className="flex flex-wrap gap-2 mt-3">
           <button onClick={()=>setText(SAMPLE)} data-testid="sms-sample" className="btn-pill border border-border text-sm">Try a sample</button>
           <div className="flex-1" />
@@ -185,7 +187,7 @@ export default function SMS() {
                 </div>
                 <div className="flex items-center gap-1">
                   <button onClick={() => saveExisting(m.sms_id)} data-testid={`save-${m.sms_id}`} className="text-xs px-3 py-1.5 rounded-full bg-emerald text-white">Save</button>
-                  <button onClick={() => del(m.sms_id)} data-testid={`del-${m.sms_id}`} className="text-muted-foreground hover:text-ruby" title="Delete"><Trash2 className="h-4 w-4" /></button>
+                  <button onClick={() => del(m.sms_id)} data-testid={`del-${m.sms_id}`} className="p-2 text-muted-foreground hover:text-ruby" title="Delete"><Trash2 className="h-4 w-4" /></button>
                 </div>
               </li>
             ))}
@@ -200,19 +202,19 @@ export default function SMS() {
           <form onSubmit={saveTw} className="grid sm:grid-cols-2 gap-3">
             <div>
               <label className="label-overline">Account SID</label>
-              <input data-testid="tw-sid" value={twForm.account_sid} onChange={(e)=>setTwForm({...twForm, account_sid:e.target.value})} placeholder="ACxxxxxxxxxxxxxxxx" className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none font-mono text-sm" />
+              <input data-testid="tw-sid" value={twForm.account_sid} onChange={(e)=>setTwForm({...twForm, account_sid:e.target.value})} placeholder="ACxxxxxxxxxxxxxxxx" className="mt-1 w-full control-shell font-mono text-sm" />
             </div>
             <div>
               <label className="label-overline">Auth Token {tw?.has_token && <span className="ml-1 normal-case tracking-normal text-muted-foreground">(set)</span>}</label>
-              <input data-testid="tw-token" type="password" value={twForm.auth_token} onChange={(e)=>setTwForm({...twForm, auth_token:e.target.value})} placeholder={tw?.has_token ? "•••••••••• (unchanged)" : "Paste token"} className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none font-mono text-sm" />
+              <input data-testid="tw-token" type="password" value={twForm.auth_token} onChange={(e)=>setTwForm({...twForm, auth_token:e.target.value})} placeholder={tw?.has_token ? "•••••••••• (unchanged)" : "Paste token"} className="mt-1 w-full control-shell font-mono text-sm" />
             </div>
             <div>
               <label className="label-overline">Twilio phone number</label>
-              <input data-testid="tw-number" value={twForm.phone_number} onChange={(e)=>setTwForm({...twForm, phone_number:e.target.value})} placeholder="+447700900123" className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none font-mono text-sm" />
+              <input data-testid="tw-number" value={twForm.phone_number} onChange={(e)=>setTwForm({...twForm, phone_number:e.target.value})} placeholder="+447700900123" className="mt-1 w-full control-shell font-mono text-sm" />
             </div>
             <div>
               <label className="label-overline">Webhook URL</label>
-              <input readOnly value={tw?.webhook_url || ""} className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/30 text-xs font-mono" />
+              <input readOnly value={tw?.webhook_url || ""} className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/30 text-xs font-mono cursor-not-allowed" />
             </div>
             <button data-testid="tw-save" className="btn-pill gradient-emerald text-white text-sm">Save Twilio settings</button>
           </form>

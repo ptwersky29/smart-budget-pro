@@ -18,7 +18,7 @@ export default function Statements() {
     try {
       const { data } = await api.get("/statements");
       setHistory(data.statements);
-    } catch (err) { console.error("history load", err); }
+    } catch (err) { toast.error("Could not load statement history"); }
   }, []);
 
   useEffect(() => { loadHistory(); }, [loadHistory]);
@@ -109,7 +109,28 @@ export default function Statements() {
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="h-4 w-4 mr-2" /> Save all</>}
             </button>
           </div>
-          <div className="overflow-x-auto">
+          {/* Mobile card view */}
+          <div className="block sm:hidden divide-y divide-border">
+            {current.transactions.map((t, i) => (
+              <div key={`${t.date}-${i}-${t.description}`} className="px-4 py-3 space-y-1.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">{t.date}</p>
+                    <p className="font-medium text-sm truncate max-w-[200px]" title={t.description}>{t.description}</p>
+                  </div>
+                  <span className={`shrink-0 font-medium tabular-nums ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}>
+                    {t.amount > 0 ? "+" : "−"}{current.currency === "USD" ? "$" : "£"}{Math.abs(t.amount).toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-secondary capitalize">{t.category}</span>
+                  <span className="text-xs text-muted-foreground">{Math.round((t.confidence || 0) * 100)}%</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Desktop table */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="text-left text-xs text-muted-foreground border-y border-border bg-secondary/30">
                 <th className="px-6 py-3">Date</th><th className="px-6 py-3">Description</th><th className="px-6 py-3">Category</th><th className="px-6 py-3">Conf.</th><th className="px-6 py-3 text-right">Amount</th>
@@ -150,7 +171,7 @@ export default function Statements() {
                     {s.saved && <span className="text-emerald"> · {s.saved_count} saved <CheckCircle2 className="h-3 w-3 inline" /></span>}
                   </p>
                 </div>
-                <button onClick={() => removeStmt(s.statement_id)} data-testid={`del-stmt-${s.statement_id}`} className="text-muted-foreground hover:text-ruby"><Trash2 className="h-4 w-4" /></button>
+                <button onClick={() => removeStmt(s.statement_id)} data-testid={`del-stmt-${s.statement_id}`} className="p-2 text-muted-foreground hover:text-ruby"><Trash2 className="h-4 w-4" /></button>
               </li>
             ))}
           </ul>

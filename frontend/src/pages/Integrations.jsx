@@ -146,14 +146,14 @@ export default function Integrations() {
             <label className="label-overline">Provider</label>
             <select data-testid="ai-provider" value={aiForm.provider}
                     onChange={(e)=>{ const p = PROVIDERS.find(x=>x.value===e.target.value); setAiForm({...aiForm, provider:e.target.value, model: p?.models[0] || ""}); }}
-                    className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none">
+                    className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none">
               {PROVIDERS.map((p)=><option key={p.value} value={p.value}>{p.label}</option>)}
             </select>
           </div>
           <div>
             <label className="label-overline">Model</label>
             <select data-testid="ai-model" value={aiForm.model} onChange={(e)=>setAiForm({...aiForm, model:e.target.value})}
-                    className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none">
+                    className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none">
               {providerMeta.models.map((m)=><option key={m}>{m}</option>)}
             </select>
           </div>
@@ -290,7 +290,7 @@ const Field = ({ testid, label, value, onChange, type = "text", placeholder, mon
     <label className="label-overline">{label}</label>
     <input data-testid={testid} type={type} required={required} value={value} onChange={(e)=>onChange(e.target.value)}
            placeholder={placeholder}
-           className={`mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none ${mono ? "font-mono text-sm" : ""}`} />
+           className={`mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none ${mono ? "font-mono text-sm" : ""}`} />
   </div>
 );
 

@@ -5,7 +5,7 @@ const emptyForm = { description: "", amount: "", category: "", is_income: false 
 export default function TransactionForm({ open, editingId, form, setForm, selectedCats, onClose, onSubmit }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={onClose} role="dialog" aria-modal="true" aria-label={editingId ? "Edit transaction" : "New transaction"}>
       <div className="page-shell p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-xl tracking-tight font-medium mb-4">{editingId ? "Edit transaction" : "New transaction"}</h3>
         <form onSubmit={onSubmit} className="space-y-3">

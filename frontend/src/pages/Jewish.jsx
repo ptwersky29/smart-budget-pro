@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
-import { Plus, Calendar, Sunrise, MapPin, Pencil, Trash2, Heart } from "lucide-react";
+import { Plus, Calendar, Sunrise, MapPin, Pencil, Trash2, Heart, Star } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "../components/ui/layout";
+import ConfirmModal from "../components/ui/ConfirmModal";
 import MaaserPanel from "../components/MaaserPanel";
 
 const CITIES = ["london","manchester","gateshead","leeds","jerusalem","tel-aviv","new-york","monsey","lakewood","stamford-hill"];
@@ -30,13 +31,20 @@ export default function Jewish() {
   const [upcomingHols, setUpcomingHols] = useState([]);
 
   const [activeTab, setActiveTab] = useState("maaser");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const confirmCb = useRef(null);
+
+  const showConfirm = (cb) => {
+    confirmCb.current = cb;
+    setConfirmOpen(true);
+  };
 
   const loadHolidays = useCallback(async () => {
     try {
       const { data } = await api.get("/jewish/holidays/defaults");
       setHolidays(data.holidays || []);
     } catch (err) {
-      console.error("loadHolidays", err);
+      if (err?.response?.status !== 404) toast.error("Could not load holiday defaults");
     }
   }, []);
 
@@ -45,7 +53,7 @@ export default function Jewish() {
       const { data } = await api.get("/jewish/holiday-budgets");
       setHolidayBudgets(data.budgets || []);
     } catch (err) {
-      console.error("holiday budgets", err);
+      if (err?.response?.status !== 404) toast.error("Could not load holiday budgets");
     }
   }, []);
 
@@ -60,7 +68,7 @@ export default function Jewish() {
       setChasunaSum(items.data);
       setChasunaCategories(cats.data.categories || []);
     } catch (err) {
-      console.error("chasuna", err);
+      toast.error("Could not load chasuna data");
     }
   }, []);
 
@@ -74,7 +82,7 @@ export default function Jewish() {
       setHebDate(today.data);
       setZmanim(zm.data);
       setUpcomingHols(up.data.upcoming || []);
-    } catch (err) { console.error("hebcal load", err); }
+    } catch (err) { toast.error("Could not load Hebrew calendar data"); }
   }, [city]);
 
   useEffect(() => { loadHolidays(); }, [loadHolidays]);
@@ -116,11 +124,12 @@ export default function Jewish() {
   };
 
   const deleteBudgetCategory = async (id) => {
-    if (!window.confirm("Delete this budget category?")) return;
-    try {
-      await api.delete(`/jewish/holiday-budgets/${id}`);
-      await loadHolidayBudgets();
-    } catch (err) { toast.error("Could not delete"); }
+    showConfirm(async () => {
+      try {
+        await api.delete(`/jewish/holiday-budgets/${id}`);
+        await loadHolidayBudgets();
+      } catch (err) { toast.error("Could not delete"); }
+    });
   };
 
   const loadBudgetSummary = async (name) => {
@@ -166,12 +175,13 @@ export default function Jewish() {
   };
 
   const deleteChasuna = async (id) => {
-    if (!window.confirm("Delete this chasuna item?")) return;
-    try {
-      await api.delete(`/jewish/chasuna/${id}`);
-      await loadChasuna();
-      toast.success("Deleted");
-    } catch (err) { toast.error("Could not delete"); }
+    showConfirm(async () => {
+      try {
+        await api.delete(`/jewish/chasuna/${id}`);
+        await loadChasuna();
+        toast.success("Deleted");
+      } catch (err) { toast.error("Could not delete"); }
+    });
   };
 
   const getBudgetForHoliday = (name) => {
@@ -191,10 +201,15 @@ export default function Jewish() {
 
       {/* Tab navigation */}
       <div className="flex gap-2 flex-wrap border-b border-border pb-2">
-        {["maaser", "holidays", "chasuna"].map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`text-sm px-4 py-2 rounded-t-lg transition-colors capitalize ${activeTab === tab ? "bg-card border-b-2 border-emerald font-medium" : "text-muted-foreground hover:text-foreground"}`}>
-            {tab === "maaser" ? "Maaser" : tab === "holidays" ? "Yom Tov Budgets" : "Chasuna Planning"}
+        {[
+          { key: "maaser", label: "Maaser", icon: Star },
+          { key: "holidays", label: "Yom Tov Budgets", icon: Calendar },
+          { key: "chasuna", label: "Chasuna Planning", icon: Heart },
+        ].map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+            className={`inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-t-lg transition-colors capitalize ${activeTab === tab.key ? "bg-card border-b-2 border-emerald font-medium" : "text-muted-foreground hover:text-foreground"}`}>
+            <tab.icon className="h-4 w-4" />
+            {tab.label}
           </button>
         ))}
       </div>
@@ -226,7 +241,7 @@ export default function Jewish() {
               <div className="flex items-center gap-2">
                 <MapPin className="h-3 w-3 text-muted-foreground"/>
                 <select data-testid="zmanim-city" value={city} onChange={(e) => { setCity(e.target.value); localStorage.setItem("zmanim_city", e.target.value); }}
-                        className="h-9 px-3 rounded-full bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none text-xs capitalize">
+                        className="h-9 px-3 rounded-full bg-secondary/50 border border-transparent focus:border-ring focus:outline-none text-xs capitalize">
                   {CITIES.map(c => <option key={c} value={c}>{c.replace("-"," ")}</option>)}
                 </select>
               </div>
@@ -341,8 +356,8 @@ export default function Jewish() {
                         <p className="text-xs text-muted-foreground">Budget: £{cat.budgeted_amount.toFixed(2)} · Actual: £{cat.actual_amount.toFixed(2)}</p>
                       </div>
                       <div className="flex gap-1">
-                        <button onClick={() => setEditingBudget(cat.id)} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
-                        <button onClick={() => deleteBudgetCategory(cat.id)} className="p-1.5 rounded-lg hover:bg-secondary text-ruby"><Trash2 className="h-3.5 w-3.5" /></button>
+                        <button onClick={() => setEditingBudget(cat.id)} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground" aria-label="Edit budget category"><Pencil className="h-3.5 w-3.5" /></button>
+                        <button onClick={() => deleteBudgetCategory(cat.id)} className="p-2 rounded-lg hover:bg-secondary text-ruby" aria-label="Delete budget category"><Trash2 className="h-3.5 w-3.5" /></button>
                       </div>
                     </>
                   )}
@@ -467,8 +482,8 @@ export default function Jewish() {
                   </div>
                 </div>
                 <div className="flex gap-1 ml-3">
-                  <button onClick={() => editChasuna(item)} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
-                  <button onClick={() => deleteChasuna(item.id)} className="p-1.5 rounded-lg hover:bg-secondary text-ruby"><Trash2 className="h-3.5 w-3.5" /></button>
+                  <button onClick={() => editChasuna(item)} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground" aria-label="Edit chasuna item"><Pencil className="h-3.5 w-3.5" /></button>
+                  <button onClick={() => deleteChasuna(item.id)} className="p-2 rounded-lg hover:bg-secondary text-ruby" aria-label="Delete chasuna item"><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
               </div>
             ))}
@@ -477,6 +492,13 @@ export default function Jewish() {
       </div>
     </>}
 
+      <ConfirmModal
+        open={confirmOpen}
+        title="Confirm delete"
+        message="Are you sure you want to delete this item?"
+        onConfirm={() => { confirmCb.current?.(); setConfirmOpen(false); }}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }

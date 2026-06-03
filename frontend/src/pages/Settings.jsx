@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import { Trash2, Plus, Sparkles, Building2, ShieldCheck, Crown, CreditCard, ExternalLink, XCircle } from "lucide-react";
 import { PageHeader } from "../components/ui/layout";
+import ConfirmModal from "../components/ui/ConfirmModal";
 
 const PROVIDERS = ["openai","anthropic","gemini","custom"];
 
@@ -18,6 +19,7 @@ export default function Settings() {
   const [subscription, setSubscription] = useState(null);
   const [portalBusy, setPortalBusy] = useState(false);
   const [cancelBusy, setCancelBusy] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const loadTl = useCallback(async () => {
     if (user?.role !== "admin") return;
@@ -30,7 +32,7 @@ export default function Settings() {
         redirect_uri: data.redirect_uri || "",
         environment: data.environment || "sandbox",
       });
-    } catch (err) { console.error("tl-config load", err); }
+    } catch (err) { toast.error("Could not load TrueLayer config"); }
   }, [user?.role]);
 
   const loadSubscription = useCallback(async () => {
@@ -64,7 +66,11 @@ export default function Settings() {
   };
 
   const cancelSub = async () => {
-    if (!window.confirm("Cancel your subscription? You'll retain Premium access until the end of the billing period.")) return;
+    setConfirmOpen(true);
+  };
+
+  const doCancelSub = async () => {
+    setConfirmOpen(false);
     setCancelBusy(true);
     try {
       await api.post("/billing/cancel");
@@ -162,20 +168,20 @@ export default function Settings() {
           <form onSubmit={saveTl} className="grid sm:grid-cols-2 gap-3">
             <div>
               <label className="label-overline">Client ID</label>
-              <input data-testid="tl-client-id" required value={tlForm.client_id} onChange={(e)=>setTlForm({...tlForm, client_id:e.target.value})} placeholder="sandbox-yourapp-12ab34" className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none font-mono text-sm" />
+              <input data-testid="tl-client-id" required value={tlForm.client_id} onChange={(e)=>setTlForm({...tlForm, client_id:e.target.value})} placeholder="sandbox-yourapp-12ab34" className="mt-1 w-full control-shell font-mono text-sm" />
             </div>
             <div>
               <label className="label-overline">Client Secret {tl?.has_secret && <span className="ml-1 normal-case tracking-normal text-muted-foreground">(leave blank to keep current)</span>}</label>
-              <input data-testid="tl-client-secret" type="password" value={tlForm.client_secret} onChange={(e)=>setTlForm({...tlForm, client_secret:e.target.value})} placeholder={tl?.has_secret ? "•••••••• (unchanged)" : "Paste secret"} className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none font-mono text-sm" />
+              <input data-testid="tl-client-secret" type="password" value={tlForm.client_secret} onChange={(e)=>setTlForm({...tlForm, client_secret:e.target.value})} placeholder={tl?.has_secret ? "•••••••• (unchanged)" : "Paste secret"} className="mt-1 w-full control-shell font-mono text-sm" />
             </div>
             <div className="sm:col-span-2">
               <label className="label-overline">Redirect URI</label>
-              <input data-testid="tl-redirect" value={tlForm.redirect_uri} onChange={(e)=>setTlForm({...tlForm, redirect_uri:e.target.value})} className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none font-mono text-xs" />
+              <input data-testid="tl-redirect" value={tlForm.redirect_uri} onChange={(e)=>setTlForm({...tlForm, redirect_uri:e.target.value})} className="mt-1 w-full control-shell font-mono text-xs" />
               <p className="text-xs text-muted-foreground mt-1">Add this exact URL in TrueLayer Console.</p>
             </div>
             <div>
               <label className="label-overline">Environment</label>
-              <select data-testid="tl-env" value={tlForm.environment} onChange={(e)=>setTlForm({...tlForm, environment:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none">
+              <select data-testid="tl-env" value={tlForm.environment} onChange={(e)=>setTlForm({...tlForm, environment:e.target.value})} className="mt-1 w-full control-shell">
                 <option value="sandbox">Sandbox</option>
                 <option value="live">Live</option>
               </select>
@@ -202,12 +208,12 @@ export default function Settings() {
       <div className="rounded-2xl border border-border bg-card p-6">
         <p className="label-overline">Bring your own AI provider</p>
         <form onSubmit={add} className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-4 items-end">
-          <input data-testid="ai-prov-name" required placeholder="Nickname" value={form.name} onChange={(e)=>setForm({...form, name:e.target.value})} className="h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
-          <select data-testid="ai-prov-provider" value={form.provider} onChange={(e)=>setForm({...form, provider:e.target.value})} className="h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none">
+          <input data-testid="ai-prov-name" required placeholder="Nickname" value={form.name} onChange={(e)=>setForm({...form, name:e.target.value})} className="control-shell" />
+          <select data-testid="ai-prov-provider" value={form.provider} onChange={(e)=>setForm({...form, provider:e.target.value})} className="control-shell">
             {PROVIDERS.map(p=><option key={p}>{p}</option>)}
           </select>
-          <input data-testid="ai-prov-model" required placeholder="Model" value={form.model} onChange={(e)=>setForm({...form, model:e.target.value})} className="h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
-          <input data-testid="ai-prov-key" placeholder="API key" type="password" value={form.api_key} onChange={(e)=>setForm({...form, api_key:e.target.value})} className="h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none" />
+          <input data-testid="ai-prov-model" required placeholder="Model" value={form.model} onChange={(e)=>setForm({...form, model:e.target.value})} className="control-shell" />
+          <input data-testid="ai-prov-key" placeholder="API key" type="password" value={form.api_key} onChange={(e)=>setForm({...form, api_key:e.target.value})} className="control-shell" />
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.is_default} onChange={(e)=>setForm({...form, is_default:e.target.checked})} /> Default</label>
           <button data-testid="ai-prov-add" className="btn-pill gradient-emerald text-white text-sm h-11 col-span-1"><Plus className="h-4 w-4 mr-1" /> Save</button>
         </form>
@@ -219,12 +225,21 @@ export default function Settings() {
                   <div><p className="text-sm font-medium">{p.name} {p.is_default && <span className="text-xs text-emerald"> &middot; default</span>}</p>
                   <p className="text-xs text-muted-foreground">{p.provider} &middot; {p.model}</p></div>
                 </div>
-                <button onClick={()=>del(p.provider_id)} data-testid={`del-prov-${p.provider_id}`} className="text-muted-foreground hover:text-ruby"><Trash2 className="h-4 w-4"/></button>
+                <button onClick={()=>del(p.provider_id)} data-testid={`del-prov-${p.provider_id}`} className="p-2 text-muted-foreground hover:text-ruby"><Trash2 className="h-4 w-4"/></button>
               </div>
             ))
           }
         </div>
       </div>
+
+      <ConfirmModal
+        open={confirmOpen}
+        title="Cancel subscription?"
+        message="You'll retain Premium access until the end of the billing period."
+        confirmLabel="Cancel subscription"
+        onConfirm={doCancelSub}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }
