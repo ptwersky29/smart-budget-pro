@@ -8,7 +8,7 @@ import AIInsightPanel from "../components/AIInsightPanel";
 import { ActionLink, EmptyState, MetricCard, PageHeader, SectionCard } from "../components/ui/layout";
 import Skeleton, { SkeletonCard, SkeletonChart } from "../components/ui/Skeleton";
 
-const PIE_COLORS = Array.from({length: 8}, (_, i) => `var(--chart-${i + 1})`);
+const PIE_COLORS = Array.from({length: 8}, (_, i) => `hsl(var(--chart-${i + 1}))`);
 const TOOLTIP_STYLE = { backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px" };
 
 const Dashboard = React.memo(function Dashboard() {
@@ -141,7 +141,7 @@ const Dashboard = React.memo(function Dashboard() {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={data.categories.slice(0, 6)} dataKey="value" nameKey="name" innerRadius={45} outerRadius={75} paddingAngle={3}>
-                  {data.categories.slice(0, 6).map((c, i) => <Cell key={c.name} style={{ fill: `var(--chart-${(i % 8) + 1})` }} />)}
+                  {data.categories.slice(0, 6).map((c, i) => <Cell key={c.name} fill={PIE_COLORS[i % 8]} />)}
                 </Pie>
                 <Tooltip contentStyle={TOOLTIP_STYLE} />
               </PieChart>
