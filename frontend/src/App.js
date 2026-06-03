@@ -38,9 +38,14 @@ const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 function AppRouter() {
   const location = useLocation();
   const authHash = location.hash || "";
+
+  if (authHash.includes("access_token=") || authHash.includes("refresh_token=") || authHash.includes("session_id=")) {
+    return <AuthCallback />;
+  }
+
   return (
     <Routes>
-      <Route path="/" element={authHash.includes("access_token=") || authHash.includes("refresh_token=") || authHash.includes("session_id=") ? <AuthCallback /> : <Landing />} />
+      <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
