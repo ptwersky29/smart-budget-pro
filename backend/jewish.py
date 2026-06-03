@@ -236,7 +236,9 @@ def build_router() -> APIRouter:
                 )
             )
             ledger = ledger_result.scalars().all()
-            manual_given = sum((e.maaser_paid or e.income_amount or 0) for e in ledger)
+            # Use only maaser_paid — never fall back to income_amount here,
+            # which would count the gross income figure as "given".
+            manual_given = sum((e.maaser_paid or 0) for e in ledger)
             pending_result = await session.execute(
                 select(MaaserLedger).where(
                     MaaserLedger.user_id == user["user_id"],
