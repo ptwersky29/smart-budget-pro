@@ -101,8 +101,7 @@ const Dashboard = React.memo(function Dashboard() {
             </button>
             <ActionLink to="/transactions" label="Add transaction" />
           </>
-});
-
+      }
       />
 
       {empty && (
