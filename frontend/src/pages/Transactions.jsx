@@ -568,3 +568,5 @@ const Transactions = React.memo(function Transactions() {
     </div>
   );
 });
+
+export default Transactions;
