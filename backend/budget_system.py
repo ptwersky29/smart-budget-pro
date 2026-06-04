@@ -144,6 +144,10 @@ class MonthlyReviewIn(BaseModel):
     month: int
 
 
+class DayToDayInitIn(BaseModel):
+    amounts: Optional[dict[str, float]] = None
+
+
 # ── Router factory ───────────────────────────────────────────────────────
 
 def build_router() -> APIRouter:
@@ -1796,5 +1800,84 @@ def build_router() -> APIRouter:
 
             await session.commit()
             return {"patterns_detected": len(created), "created": created}
+
+    # ── DEFAULTS / PRESETS ──────────────────────────────────────────────
+
+    @router.get("/day-to-day/defaults")
+    async def day_to_day_defaults():
+        return {"categories": DEFAULT_DAY_TO_DAY_CATEGORIES}
+
+    @router.post("/day-to-day/init")
+    async def day_to_day_init(
+        payload: DayToDayInitIn,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(BudgetOccasion).where(
+                    BudgetOccasion.user_id == user["user_id"],
+                    BudgetOccasion.budget_type == "day_to_day",
+                    BudgetOccasion.name == "Monthly Living",
+                )
+            )
+            occasion = result.scalar_one_or_none()
+            if not occasion:
+                occasion = BudgetOccasion(
+                    user_id=user["user_id"],
+                    budget_type="day_to_day",
+                    name="Monthly Living",
+                    status="approved",
+                )
+                session.add(occasion)
+                await session.flush()
+
+            created = []
+            for cat_name in DEFAULT_DAY_TO_DAY_CATEGORIES:
+                cat_result = await session.execute(
+                    select(BudgetOccasionCategory).where(
+                        BudgetOccasionCategory.occasion_id == occasion.id,
+                        BudgetOccasionCategory.name == cat_name,
+                    )
+                )
+                existing = cat_result.scalar_one_or_none()
+                if existing:
+                    continue
+
+                amount = 0
+                if payload.amounts and cat_name in payload.amounts:
+                    amount = payload.amounts[cat_name]
+
+                cat = BudgetOccasionCategory(
+                    occasion_id=occasion.id,
+                    name=cat_name,
+                    budgeted_amount=amount,
+                )
+                session.add(cat)
+                created.append({"name": cat_name, "budgeted": amount})
+
+            await session.commit()
+            return {"created_count": len(created), "categories": created}
+
+    @router.get("/presets/other")
+    async def presets_other():
+        return {
+            "examples": [
+                "Car purchase", "Home renovation", "Medical expense",
+                "School fees", "Insurance", "Tax payment", "Furniture",
+                "Garden project", "Pet expenses", "White goods",
+            ],
+            "categories": ["purchase", "repair", "service", "fee", "tax",
+                           "insurance", "medical", "education", "home",
+                           "vehicle", "pet", "other"],
+        }
+
+    @router.get("/presets/holiday")
+    async def presets_holiday():
+        return {
+            "categories": ["flights", "accommodation", "food", "travel",
+                           "attractions", "shopping"],
+        }
 
     return router

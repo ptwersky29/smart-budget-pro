@@ -35,7 +35,9 @@ export default function BudgetSystem() {
   const [dayForm, setDayForm] = useState({ category: "", budgeted_amount: "" });
   const [predictions, setPredictions] = useState([]);
   const [predicting, setPredicting] = useState(false);
-
+  const [defaultCategories, setDefaultCategories] = useState([]);
+  const [initAmounts, setInitAmounts] = useState({});
+  const [initializing, setInitializing] = useState(false);
   // ── Quick transaction ──────────────────────────────────────────────────
   const [quickDesc, setQuickDesc] = useState("");
   const [quickAmount, setQuickAmount] = useState("");
@@ -64,6 +66,7 @@ export default function BudgetSystem() {
   const [holidayEndDate, setHolidayEndDate] = useState("");
   const [estimatingHoliday, setEstimatingHoliday] = useState(false);
   const [holidayEstimate, setHolidayEstimate] = useState(null);
+  const [holidayPresets, setHolidayPresets] = useState([]);
 
   // ── Chasuna (wedding planner, carried over) ───────────────────────────
   const [chasunaItems, setChasunaItems] = useState([]);
@@ -87,6 +90,7 @@ export default function BudgetSystem() {
   const [otherOccasions, setOtherOccasions] = useState([]);
   const [otherForm, setOtherForm] = useState({ name: "", estimated_amount: "", event_date: "", notes: "", categories: "" });
   const [editingOther, setEditingOther] = useState(null);
+  const [otherPresets, setOtherPresets] = useState([]);
 
   // ── Phase 4: Smart Features ──────────────────────────────────────────
   const [healthScore, setHealthScore] = useState(null);
@@ -119,6 +123,16 @@ export default function BudgetSystem() {
     } catch { toast.error("Could not load day-to-day budgets"); }
   }, []);
 
+  const loadDefaults = useCallback(async () => {
+    try {
+      const { data } = await api.get("/budget-system/day-to-day/defaults");
+      setDefaultCategories(data.categories || []);
+      const initial = {};
+      (data.categories || []).forEach(c => { initial[c] = ""; });
+      setInitAmounts(initial);
+    } catch { /* optional */ }
+  }, []);
+
   const loadHolidays = useCallback(async () => {
     try {
       const { data } = await api.get("/jewish/holidays/defaults");
@@ -130,6 +144,13 @@ export default function BudgetSystem() {
     try {
       const { data } = await api.get("/jewish/holiday-budgets");
       setHolidayBudgets(data.budgets || []);
+    } catch { /* optional */ }
+  }, []);
+
+  const loadHolidayPresets = useCallback(async () => {
+    try {
+      const { data } = await api.get("/budget-system/presets/holiday");
+      setHolidayPresets(data.categories || []);
     } catch { /* optional */ }
   }, []);
 
@@ -150,6 +171,13 @@ export default function BudgetSystem() {
     try {
       const { data } = await api.get("/budget-system/other");
       setOtherOccasions(data.occasions || []);
+    } catch { /* optional */ }
+  }, []);
+
+  const loadOtherPresets = useCallback(async () => {
+    try {
+      const { data } = await api.get("/budget-system/presets/other");
+      setOtherPresets(data.examples || []);
     } catch { /* optional */ }
   }, []);
 
@@ -184,15 +212,18 @@ export default function BudgetSystem() {
   useEffect(() => {
     loadOverview();
     loadDayToDay();
+    loadDefaults();
     loadHolidays();
     loadHolidayBudgets();
+    loadHolidayPresets();
     loadChasuna();
     loadOther();
+    loadOtherPresets();
     loadSimcha();
     loadHealthScore();
     loadAlertsData();
     loadUpcomingExpenses();
-  }, [loadOverview, loadDayToDay, loadHolidays, loadHolidayBudgets, loadChasuna, loadOther, loadSimcha, loadHealthScore, loadAlertsData, loadUpcomingExpenses]);
+  }, [loadOverview, loadDayToDay, loadDefaults, loadHolidays, loadHolidayBudgets, loadHolidayPresets, loadChasuna, loadOther, loadOtherPresets, loadSimcha, loadHealthScore, loadAlertsData, loadUpcomingExpenses]);
 
   // ── QUICK TRANSACTION ──────────────────────────────────────────────────
 
@@ -248,6 +279,19 @@ export default function BudgetSystem() {
       loadDayToDay();
       loadOverview();
     } catch { toast.error("Could not add"); }
+  };
+
+  const handleInitDayToDay = async () => {
+    setInitializing(true);
+    try {
+      const amounts = {};
+      Object.entries(initAmounts).forEach(([k, v]) => { if (v) amounts[k] = parseFloat(v) || 0; });
+      await api.post("/budget-system/day-to-day/init", { amounts });
+      toast.success("Default budgets created!");
+      loadDayToDay();
+      loadOverview();
+    } catch { toast.error("Could not create defaults"); }
+    finally { setInitializing(false); }
   };
 
   const deleteDayToDay = async (id, name) => {
@@ -1197,6 +1241,35 @@ export default function BudgetSystem() {
             </form>
           </SectionCard>
 
+          {/* Quick setup */}
+          {defaultCategories.length > 0 && (
+            <SectionCard eyebrow="Quick setup" title="Create all default budgets">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+                {defaultCategories.map(cat => {
+                  const exists = dayOccasions.some(o => o.categories.some(c => c.name === cat));
+                  return (
+                    <div key={cat} className={`rounded-xl border p-3 ${exists ? "border-emerald/30 bg-emerald/[0.04]" : "border-border bg-secondary/20"}`}>
+                      <p className="label-overline capitalize mb-1">{cat}</p>
+                      {exists ? (
+                        <p className="text-xs text-emerald">Already set</p>
+                      ) : (
+                        <input type="number" step="0.01" placeholder="£ monthly"
+                               value={initAmounts[cat] || ""}
+                               onChange={e => setInitAmounts({...initAmounts, [cat]: e.target.value})}
+                               className="w-full control-shell text-sm" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <button onClick={handleInitDayToDay} disabled={initializing}
+                      className="btn-pill gradient-emerald text-white text-sm disabled:opacity-50">
+                {initializing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+                {initializing ? "Creating…" : "Create all"}
+              </button>
+            </SectionCard>
+          )}
+
           {/* AI Prediction */}
           <SectionCard eyebrow="AI Forecast" title="Predicted month-end spending">
             <p className="text-sm text-muted-foreground mb-4">AI analyses your last 3 months to predict each category.</p>
@@ -1354,6 +1427,18 @@ export default function BudgetSystem() {
               </div>
             </div>
 
+            {holidayPresets.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-4">
+                <span className="text-xs text-muted-foreground self-center mr-1">Quick categories:</span>
+                {holidayPresets.map(cat => (
+                  <button key={cat} type="button" onClick={() => setHolidayName(prev => prev || cat + " Trip")}
+                          className="text-xs px-3 py-1.5 rounded-full border border-border hover:border-topaz hover:text-topaz transition-colors capitalize">
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <button onClick={handleHolidayEstimate} disabled={estimatingHoliday || !holidayName.trim() || !holidayStartDate || !holidayEndDate}
                     className="btn-pill gradient-topaz text-white text-sm disabled:opacity-50">
               {estimatingHoliday ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
@@ -1453,7 +1538,7 @@ export default function BudgetSystem() {
                            placeholder="5000" className="mt-1 w-full control-shell" />
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2 mb-2">Sub-category estimates (optional):</p>
+                <p className="text-xs text-muted-foreground mt-2 mb-2">Standard simcha categories (optional):</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                   {SIMCHA_CATS.map(cat => (
                     <div key={cat}>
@@ -1612,7 +1697,10 @@ export default function BudgetSystem() {
                 <label className="label-overline">Name</label>
                 <input required value={otherForm.name}
                        onChange={e => setOtherForm({...otherForm, name: e.target.value})}
-                       placeholder="Car purchase" className="mt-1 w-full control-shell" />
+                       placeholder="Car purchase" list="other-examples" className="mt-1 w-full control-shell" />
+                <datalist id="other-examples">
+                  {otherPresets.map(ex => <option key={ex} value={ex} />)}
+                </datalist>
               </div>
               <div className="flex-1 min-w-[140px]">
                 <label className="label-overline">Budget (£)</label>
