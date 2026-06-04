@@ -811,6 +811,7 @@ export default function BudgetSystem() {
               )}
 
               {/* Summary cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
                 <MetricCard label="Budgeted" value={`£${overview.summary.total_budgeted.toLocaleString()}`} icon={PiggyBank} tone="emerald" />
                 <MetricCard label="Predicted" value={`£${overview.summary.total_forecast.toLocaleString()}`} icon={TrendingUp} tone="topaz" />
                 <MetricCard label="Actual Spend" value={`£${overview.summary.total_actual_spend.toLocaleString()}`} icon={TrendingUp} tone="ruby" />
