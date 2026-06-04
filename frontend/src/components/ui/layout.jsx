@@ -7,8 +7,9 @@ export const PageHeader = React.memo(function PageHeader({ eyebrow, title, descr
     <div {...props} className={`rounded-2xl border border-border bg-card/90 backdrop-blur-xl p-6 lg:p-8 shadow-modal ${className}`}>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl space-y-3">
-          {eyebrow && <p className="label-overline text-emerald">{eyebrow}</p>}
-          <h1 className="text-4xl lg:text-5xl tracking-tight font-semibold leading-[1.05]">{title}</h1>
+          {eyebrow && <p className="label-overline text-emerald" aria-hidden="true">{eyebrow}</p>}
+          {/* Visible display title (decorative) */}
+          <p className="text-4xl lg:text-5xl tracking-tight font-semibold leading-[1.05]" aria-hidden="true">{title}</p>
           {description && <p className="text-sm lg:text-base text-muted-foreground leading-relaxed max-w-2xl">{description}</p>}
           {meta && <div className="flex flex-wrap gap-2 pt-1">{meta}</div>}
         </div>

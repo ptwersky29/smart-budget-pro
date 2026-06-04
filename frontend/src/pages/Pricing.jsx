@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { Check, Loader2, Sparkles } from "lucide-react";
@@ -15,6 +15,8 @@ export default function Pricing() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [busy, setBusy] = useState({ monthly: false, yearly: false });
+
+  useEffect(() => { document.title = "Pricing | FinanceAI"; }, []);
 
   const upgrade = async (packageId) => {
     if (!user) { navigate("/login"); return; }
@@ -36,6 +38,10 @@ export default function Pricing() {
   return (
     <div className="min-h-screen bg-background p-8">
       <div className="max-w-5xl mx-auto pt-12">
+        <Link to="/" className="inline-flex items-center gap-2 mb-8">
+          <div className="w-8 h-8 rounded-xl gradient-emerald grid place-items-center text-white font-bold">£</div>
+          <span className="font-semibold tracking-tight text-lg">FinanceAI</span>
+        </Link>
         <div className="text-center mb-12">
           <p className="label-overline text-emerald">Pricing</p>
           <h1 className="text-5xl tracking-tight font-medium mt-3">Premium when you want it.</h1>

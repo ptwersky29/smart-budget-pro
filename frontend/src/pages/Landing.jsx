@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Sparkles, Building2, MessagesSquare, TrendingUp, ShieldCheck, Star, Check, ArrowRight, Landmark, Menu, X } from "lucide-react";
+import { Sparkles, Building2, MessagesSquare, TrendingUp, ShieldCheck, Star, Check, ArrowRight, Landmark, Menu, X, Sun, MoonStar } from "lucide-react";
+import { useTheme } from "next-themes";
 
 const HERO_IMG = "https://static.prod-images.emergentagent.com/jobs/a8ffc4f3-0824-40c4-a74c-b4e5c8fbcb66/images/9ec1a41a2ae49b3da963b26e9d76ff276824ad745a2dc7b71aee9227d794347c.png";
 
@@ -15,6 +16,9 @@ const FEATURES = [
 
 export default function Landing() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const { theme, setTheme } = useTheme();
+  const dark = theme === "dark";
+  useEffect(() => { document.title = "FinanceAI | Premium AI Personal Finance"; }, []);
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Nav */}
@@ -31,6 +35,9 @@ export default function Landing() {
             <Link to="/login" className="px-4 py-2 hover:text-foreground">Sign in</Link>
             <Link to="/register" data-testid="nav-register" className="btn-pill text-sm gradient-emerald text-white hover:opacity-90">Get started <ArrowRight className="h-4 w-4 ml-1" /></Link>
           </nav>
+          <button onClick={() => setTheme(dark ? "light" : "dark")} className="p-3 text-muted-foreground hover:text-foreground" aria-label="Toggle theme">
+            {dark ? <Sun className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
+          </button>
           <button className="md:hidden p-3 text-foreground" onClick={() => setMobileNavOpen(true)} aria-label="Open navigation menu">
             <Menu className="h-5 w-5" />
           </button>
@@ -92,6 +99,16 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      {/* Social proof */}
+      <div className="max-w-7xl mx-auto px-6 py-12 text-center border-y border-border">
+        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-6">Trusted by users across the UK</p>
+        <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-4 text-sm text-muted-foreground">
+          <span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald" /> 2,400+ UK banks supported</span>
+          <span className="flex items-center gap-2"><Star className="h-4 w-4 text-emerald" /> 14-day free trial</span>
+          <span className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald" /> TLS 1.3 encrypted</span>
+        </div>
+      </div>
 
       {/* Features grid */}
       <section id="features" className="max-w-7xl mx-auto px-6 py-24">

@@ -76,7 +76,27 @@ export default function Reports() {
     } finally { setBusy(null); }
   };
 
-  if (!data) return null;
+  if (!data) return (
+    <div className="space-y-8" data-testid="reports-loading">
+      <div className="animate-pulse space-y-4">
+        <div className="h-4 w-32 rounded bg-secondary" />
+        <div className="h-8 w-64 rounded bg-secondary" />
+        <div className="h-4 w-96 rounded bg-secondary" />
+      </div>
+      <div className="grid lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 rounded-2xl border border-border bg-card p-6 space-y-4">
+          <div className="h-4 w-24 rounded bg-secondary" />
+          <div className="h-16 w-32 rounded bg-secondary" />
+          <div className="h-3 rounded-full bg-secondary" />
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
+          <div className="h-12 rounded bg-secondary" />
+          <div className="h-12 rounded bg-secondary" />
+          <div className="h-12 rounded bg-secondary" />
+        </div>
+      </div>
+    </div>
+  );
   const topSpend = data.categories?.[0];
   const subs = data.categories?.find(c=>c.name==="subscriptions");
 

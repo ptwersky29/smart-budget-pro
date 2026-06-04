@@ -4,8 +4,13 @@ import { Calendar, Sunrise, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "../components/ui/layout";
 import MaaserPanel from "../components/MaaserPanel";
+import Skeleton from "../components/ui/Skeleton";
 
 const CITIES = ["london","manchester","gateshead","leeds","jerusalem","tel-aviv","new-york","monsey","lakewood","stamford-hill"];
+
+function titleCase(s) {
+  return s.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
 
 export default function Jewish() {
   // Hebcal widget state
@@ -42,7 +47,7 @@ export default function Jewish() {
           <div className="flex items-center gap-2 mb-3"><Calendar className="h-4 w-4 text-topaz" /><p className="label-overline">Today's Hebrew date</p></div>
           {hebDate ? (
             <>
-              <p className="text-3xl tracking-tight font-medium text-topaz" dir="rtl" style={{fontFamily:"Fraunces"}}>{hebDate.hebrew_date}</p>
+              <p className="text-3xl tracking-tight font-medium text-topaz" dir="rtl" lang="he" style={{fontFamily:"Fraunces"}}>{hebDate.hebrew_date}</p>
               <p className="text-xs text-muted-foreground mt-2">{hebDate.gregorian_date}</p>
               {hebDate.events?.length > 0 && (
                 <div className="mt-4 space-y-1">
@@ -52,7 +57,7 @@ export default function Jewish() {
                 </div>
               )}
             </>
-          ) : <p className="text-sm text-muted-foreground">Loading…</p>}
+          ) : <div className="space-y-3 animate-pulse"><Skeleton className="h-8 w-48" /><Skeleton className="h-4 w-32" /></div>}
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-6 lg:col-span-2">
@@ -62,7 +67,7 @@ export default function Jewish() {
               <MapPin className="h-3 w-3 text-muted-foreground"/>
               <select data-testid="zmanim-city" value={city} onChange={(e) => { setCity(e.target.value); localStorage.setItem("zmanim_city", e.target.value); }}
                       className="h-10 px-4 rounded-full bg-secondary/50 border border-transparent focus:border-ring focus:outline-none text-xs capitalize">
-                {CITIES.map(c => <option key={c} value={c}>{c.replace("-"," ")}</option>)}
+                {CITIES.map(c => <option key={c} value={c}>{titleCase(c)}</option>)}
               </select>
             </div>
           </div>
@@ -75,7 +80,7 @@ export default function Jewish() {
                 </div>
               ))}
             </div>
-          ) : <p className="text-sm text-muted-foreground">Loading…</p>}
+          ) : <div className="space-y-2 animate-pulse"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-3/4" /><Skeleton className="h-4 w-1/2" /></div>}
         </div>
       </div>
 
@@ -89,7 +94,7 @@ export default function Jewish() {
               <div key={`${h.date}-${h.title}`} className="rounded-xl border border-border p-3 hover:border-topaz transition-colors">
                 <p className="text-xs text-muted-foreground">{h.date}</p>
                 <p className="font-medium mt-1 text-sm">{h.title}</p>
-                {h.hebrew && <p className="text-xs text-topaz mt-1" dir="rtl" style={{fontFamily:"Fraunces"}}>{h.hebrew}</p>}
+                {h.hebrew && <p className="text-xs text-topaz mt-1" dir="rtl" lang="he" style={{fontFamily:"Fraunces"}}>{h.hebrew}</p>}
               </div>
             ))}
           </div>

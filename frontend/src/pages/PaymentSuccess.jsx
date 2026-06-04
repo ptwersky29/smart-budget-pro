@@ -64,7 +64,7 @@ export default function PaymentSuccess() {
               Go to dashboard
             </button>
           </>
-        ) : (
+        ) : status === "failed" ? (
           <>
             <XCircle className="h-10 w-10 text-ruby mx-auto" />
             <h2 className="text-2xl tracking-tight font-medium mt-4">Payment not completed</h2>
@@ -72,6 +72,15 @@ export default function PaymentSuccess() {
             <button onClick={() => navigate("/pricing")}
                     className="btn-pill border border-border mt-6 w-full">
               Back to pricing
+            </button>
+          </>
+        ) : (
+          <>
+            <h2 className="text-2xl tracking-tight font-medium mt-4">No payment found</h2>
+            <p className="text-sm text-muted-foreground mt-2">No pending payment was detected.</p>
+            <button onClick={() => navigate("/pricing")}
+                    className="btn-pill gradient-emerald text-white mt-6 w-full">
+              View pricing
             </button>
           </>
         )}

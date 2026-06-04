@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
@@ -8,6 +8,8 @@ export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
+
+  useEffect(() => { document.title = "Reset Password | FinanceAI"; }, []);
 
   const onSubmit = async (e) => {
     e.preventDefault();

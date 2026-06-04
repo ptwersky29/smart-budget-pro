@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -36,7 +38,7 @@ body {
     --secondary: 220 14% 95%;
     --secondary-foreground: 222 47% 7%;
     --muted: 220 14% 95%;
-    --muted-foreground: 220 9% 46%;
+    --muted-foreground: 220 9% 36%;
     --accent: 158 64% 40%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 72% 51%;
@@ -128,11 +130,21 @@ body {
 .gradient-ruby {
   background: linear-gradient(135deg, hsl(var(--ruby)) 0%, hsl(348 80% 50%) 100%);
 }
+.bg-topaz { background-color: hsl(var(--topaz)); }
+.border-topaz { border-color: hsl(var(--topaz)); }
+.text-topaz { color: hsl(var(--topaz)); }
 .text-emerald { color: hsl(var(--emerald)); }
 .text-topaz { color: hsl(var(--topaz)); }
 .text-ruby { color: hsl(var(--ruby)); }
 .bg-emerald { background-color: hsl(var(--emerald)); }
+.bg-ruby { background-color: hsl(var(--ruby)); }
+.bg-ruby\/5 { background-color: hsl(var(--ruby) / 0.05); }
+.bg-ruby\/10 { background-color: hsl(var(--ruby) / 0.1); }
 .border-emerald { border-color: hsl(var(--emerald)); }
+.border-ruby { border-color: hsl(var(--ruby)); }
+.border-ruby\/20 { border-color: hsl(var(--ruby) / 0.2); }
+.border-ruby\/40 { border-color: hsl(var(--ruby) / 0.4); }
+.border-ruby\/50 { border-color: hsl(var(--ruby) / 0.5); }
 .ring-emerald { --tw-ring-color: hsl(var(--emerald)); }
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -172,6 +184,10 @@ body {
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
+}
+@keyframes routeProgress {
+  from { width: 0%; opacity: 1; }
+  to   { width: 100%; opacity: 0; }
 }
 .fade-up { animation: fadeUp 0.7s ease-out both; }
 .delay-1 { animation-delay: 0.08s; }

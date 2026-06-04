@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "../lib/api";
-import { CheckCircle2, RefreshCw, Star } from "lucide-react";
+import { CheckCircle2, RefreshCw, Star, X } from "lucide-react";
 import { toast } from "sonner";
 import { SectionCard } from "./ui/layout";
 import Skeleton from "./ui/Skeleton";
+import ConfirmModal from "./ui/ConfirmModal";
 
 const EMPTY_SUM = {
   percent: 10, total_income: 0, obligation: 0, given_total: 0,
@@ -17,6 +18,10 @@ export default function MaaserPanel({ refreshKey = 0, onChange }) {
   const [cfg, setCfg] = useState({ enabled: false, percent: 10 });
   const [sum, setSum] = useState(EMPTY_SUM);
   const [busy, setBusy] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [showGiveForm, setShowGiveForm] = useState(false);
+  const [giveAmount, setGiveAmount] = useState("");
+  const [giveRecipient, setGiveRecipient] = useState("");
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -66,7 +71,11 @@ export default function MaaserPanel({ refreshKey = 0, onChange }) {
   };
 
   const reset = async () => {
-    if (!window.confirm("Clear the auto-Maaser audit log? Manual ledger entries are kept.")) return;
+    setConfirmReset(true);
+  };
+
+  const doReset = async () => {
+    setConfirmReset(false);
     setBusy(true);
     try {
       await api.post("/jewish/maaser/reset");
@@ -84,20 +93,22 @@ export default function MaaserPanel({ refreshKey = 0, onChange }) {
       toast.success("Nothing owed — you're up to date!");
       return;
     }
-    const amt = window.prompt(
-      `How much are you giving? (You owe ${fmt(sum.balance_owed)})`,
-      sum.balance_owed.toFixed(2)
-    );
-    if (!amt) return;
-    const num = parseFloat(amt);
+    setGiveAmount(sum.balance_owed.toFixed(2));
+    setGiveRecipient("");
+    setShowGiveForm(true);
+  };
+
+  const submitGive = async () => {
+    const num = parseFloat(giveAmount);
     if (isNaN(num) || num <= 0) {
       toast.error("Enter a valid amount");
       return;
     }
-    const recipient = window.prompt("Recipient? (e.g. local shul, JNF, charity)") || "Tzedakah";
+    const recipient = giveRecipient.trim() || "Tzedakah";
     try {
       await api.post("/jewish/tzedakah", { amount: num, recipient, note: "Maaser given against balance" });
       toast.success("Maaser given");
+      setShowGiveForm(false);
       await load();
       onChange?.();
     } catch (e) {
@@ -201,6 +212,40 @@ export default function MaaserPanel({ refreshKey = 0, onChange }) {
             </button>
           </div>
         </>
+      )}
+
+      <ConfirmModal open={confirmReset} title="Reset Maaser audit"
+        message="Clear the auto-Maaser audit log? Manual ledger entries are kept."
+        onConfirm={doReset} onCancel={() => setConfirmReset(false)} />
+
+      {showGiveForm && (
+        <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={() => setShowGiveForm(false)}>
+          <div className="page-shell p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl tracking-tight font-medium">Give Maaser</h3>
+              <button onClick={() => setShowGiveForm(false)} className="p-3 rounded-lg hover:bg-secondary text-muted-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="label-overline">Amount (£)</label>
+                <input type="number" step="0.01" value={giveAmount} onChange={(e) => setGiveAmount(e.target.value)}
+                  className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
+              </div>
+              <div>
+                <label className="label-overline">Recipient</label>
+                <input value={giveRecipient} onChange={(e) => setGiveRecipient(e.target.value)}
+                  placeholder="e.g. local shul, JNF, charity"
+                  className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
+              </div>
+              <div className="flex gap-3 justify-end pt-2">
+                <button onClick={() => setShowGiveForm(false)} className="btn-pill border border-border text-sm h-11 px-5">Cancel</button>
+                <button onClick={submitGive} className="btn-pill gradient-emerald text-white text-sm h-11 px-5">Give</button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </SectionCard>
   );

@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/ui/layout";
+import ConfirmModal from "../components/ui/ConfirmModal";
 
 const PROVIDERS = [
   { value: "anthropic", label: "Anthropic Claude", models: ["claude-sonnet-4-5-20250929", "claude-opus-4-1-20250805", "claude-3-7-sonnet-20250219"], url: "https://console.anthropic.com/settings/keys" },
@@ -103,10 +104,9 @@ export default function Integrations() {
     finally { setAiBusy(false); }
   };
 
+  const [confirmRemoveAi, setConfirmRemoveAi] = useState(null);
   const removeAi = async (id) => {
-    if (!window.confirm("Remove this AI provider?")) return;
-    try { await api.delete(`/ai/providers/${id}`); toast.success("Removed"); await loadAi(); }
-    catch { toast.error("Could not remove"); }
+    setConfirmRemoveAi(id);
   };
 
   const activeAi = aiProviders.find(p => p.is_default);
@@ -260,6 +260,9 @@ export default function Integrations() {
         <p className="text-sm text-muted-foreground">Real-time prices for 9 stock symbols (VUSA, VWRL, FTSE, S&P 500, NASDAQ) plus crypto via CoinGecko.</p>
       </LinkCard>
     </div>
+      <ConfirmModal open={!!confirmRemoveAi} title="Remove AI provider" message="Are you sure you want to remove this AI provider?"
+        onConfirm={async () => { try { await api.delete(`/ai/providers/${confirmRemoveAi}`); toast.success("Removed"); await loadAi(); } catch { toast.error("Could not remove"); } setConfirmRemoveAi(null); }}
+        onCancel={() => setConfirmRemoveAi(null)} />
   );
 }
 

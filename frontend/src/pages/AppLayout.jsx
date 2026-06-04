@@ -169,9 +169,21 @@ export default function AppLayout() {
   const [open, setOpen] = useState(false);
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
   const [helpOpen, setHelpOpen] = useState(false);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const prevPath = useRef(location.pathname);
   const leaderBuffer = useRef([]);
 
   useKeyboardShortcut("?", () => setHelpOpen(p => !p));
+
+  // Show thin progress bar on route change
+  useEffect(() => {
+    if (prevPath.current !== location.pathname) {
+      setRouteLoading(true);
+      prevPath.current = location.pathname;
+      const t = setTimeout(() => setRouteLoading(false), 400);
+      return () => clearTimeout(t);
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -284,8 +296,9 @@ export default function AppLayout() {
               <p className="text-sm font-medium truncate">{user?.name || user?.email}</p>
               <p className="text-xs text-muted-foreground capitalize">{user?.tier || "free"} plan · {currentSection.label}</p>
             </div>
-            <button onClick={doLogout} title="Logout" data-testid="logout-button" className="p-3 text-muted-foreground hover:text-foreground" aria-label="Log out">
+            <button onClick={doLogout} title="Sign out" data-testid="logout-button" className="flex items-center gap-1.5 p-2 text-muted-foreground hover:text-foreground text-xs" aria-label="Sign out">
               <LogOut className="h-4 w-4" />
+              <span className="hidden xl:inline">Sign out</span>
             </button>
           </div>
         </div>
@@ -295,6 +308,14 @@ export default function AppLayout() {
 
       <div className="relative flex-1 min-w-0">
         <header className="sticky top-0 z-20 border-b border-border/70 bg-background/80 backdrop-blur-xl">
+          {/* Route loading progress bar */}
+          {routeLoading && (
+            <div className="absolute top-0 left-0 right-0 h-0.5 z-50 overflow-hidden">
+              <div className="h-full bg-emerald animate-[routeProgress_0.4s_ease-out_forwards]" />
+            </div>
+          )}
+          {/* Visually hidden page title for screen readers */}
+          <h1 className="sr-only">{routeMeta.title} — FinanceAI</h1>
           <div className="flex items-center justify-between gap-4 px-4 lg:px-8 h-16">
             <div className="flex items-center gap-3 min-w-0">
               <button className="lg:hidden h-11 w-11 rounded-full grid place-items-center border border-border bg-card/80" onClick={() => setOpen(true)} data-testid="sidebar-open" aria-label="Open navigation menu">
@@ -332,6 +353,14 @@ export default function AppLayout() {
               <button onClick={toggleTheme} data-testid="theme-toggle-mobile" className="h-11 w-11 grid place-items-center rounded-full border border-border bg-card/80 hover:bg-secondary transition-colors" aria-label="Toggle theme">
                 {dark ? <Sun className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
               </button>
+              {routeMeta.primary && (
+                <Link
+                  to={routeMeta.primary.to}
+                  className="btn-pill gradient-emerald text-white h-10 px-4 text-xs shadow-md shadow-emerald/15"
+                >
+                  {routeMeta.primary.label}
+                </Link>
+              )}
             </div>
           </div>
         </header>

@@ -1,19 +1,21 @@
 import React, { useState } from "react";
 import { api } from "../lib/api";
-import { Landmark, Calculator } from "lucide-react";
+import { Landmark, Calculator, Loader2 } from "lucide-react";
 import { PageHeader } from "../components/ui/layout";
 
 export default function UKTools() {
-  const [uc, setUc] = useState({ monthly_earnings: 0, children: 0, housing_cost: 0, couple: false, has_disability: false, result: null });
-  const [tax, setTax] = useState({ annual_income: 35000, result: null });
+  const [uc, setUc] = useState({ monthly_earnings: 0, children: 0, housing_cost: 0, couple: false, has_disability: false, result: null, busy: false });
+  const [tax, setTax] = useState({ annual_income: 35000, result: null, busy: false });
 
   const runUC = async () => {
-    const { data } = await api.post("/uk/universal-credit", uc);
-    setUc({ ...uc, result: data });
+    setUc({ ...uc, busy: true });
+    try { const { data } = await api.post("/uk/universal-credit", uc); setUc({ ...uc, result: data, busy: false }); }
+    catch { setUc({ ...uc, busy: false }); }
   };
   const runTax = async () => {
-    const { data } = await api.post("/uk/hmrc-estimate", { annual_income: Number(tax.annual_income) });
-    setTax({ ...tax, result: data });
+    setTax({ ...tax, busy: true });
+    try { const { data } = await api.post("/uk/hmrc-estimate", { annual_income: Number(tax.annual_income) }); setTax({ ...tax, result: data, busy: false }); }
+    catch { setTax({ ...tax, busy: false }); }
   };
 
   return (
@@ -34,7 +36,9 @@ export default function UKTools() {
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={uc.couple} onChange={(e)=>setUc({...uc, couple:e.target.checked})} data-testid="uc-couple"/> Couple</label>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={uc.has_disability} onChange={(e)=>setUc({...uc, has_disability:e.target.checked})} data-testid="uc-disability"/> Disability</label>
           </div>
-          <button onClick={runUC} data-testid="uc-calc" className="btn-pill gradient-emerald text-white mt-4 text-sm">Estimate</button>
+          <button onClick={runUC} disabled={uc.busy} data-testid="uc-calc" className="btn-pill gradient-emerald text-white mt-4 text-sm disabled:opacity-50">
+            {uc.busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Estimate"}
+          </button>
           {uc.result && (
             <div className="mt-6 p-4 rounded-xl bg-secondary/40 space-y-1.5">
               <p className="label-overline">Monthly UC estimate</p>
@@ -49,7 +53,9 @@ export default function UKTools() {
         <div className="rounded-2xl border border-border bg-card p-6">
           <div className="flex items-center gap-2 mb-4"><Calculator className="h-4 w-4 text-emerald" /><p className="label-overline">HMRC tax estimate</p></div>
           <Field label="Annual income (£)" testid="tax-income" value={tax.annual_income} onChange={(v)=>setTax({...tax, annual_income:v})} />
-          <button onClick={runTax} data-testid="tax-calc" className="btn-pill gradient-emerald text-white mt-4 text-sm">Estimate</button>
+          <button onClick={runTax} disabled={tax.busy} data-testid="tax-calc" className="btn-pill gradient-emerald text-white mt-4 text-sm disabled:opacity-50">
+            {tax.busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Estimate"}
+          </button>
           {tax.result && (
             <div className="mt-6 p-4 rounded-xl bg-secondary/40 space-y-1.5">
               <p className="label-overline">Take-home (annual)</p>

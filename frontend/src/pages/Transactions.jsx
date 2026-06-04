@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
-import { Plus, Trash2, Loader2, Pencil, Search, ArrowUpDown, Sparkles, Filter, ChevronLeft, ChevronRight, X, BarChart3, Star, Receipt } from "lucide-react";
+import { Plus, Trash2, Loader2, Pencil, Search, ArrowUpDown, Sparkles, Filter, ChevronLeft, ChevronRight, X, BarChart3, Star, Receipt, Download } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, PageHeader, SectionCard } from "../components/ui/layout";
 import { SkeletonTable } from "../components/ui/Skeleton";
@@ -334,6 +334,28 @@ const Transactions = React.memo(function Transactions() {
 
   const netTotal = incomeTotal - expenseTotal;
 
+  const exportCsv = useCallback(() => {
+    const rows = aiResults?.transactions || txs;
+    if (!rows.length) { toast.info("No transactions to export"); return; }
+    const header = ["Date", "Description", "Category", "Amount", "Source"];
+    const lines = rows.map(t => [
+      t.date?.slice(0, 10) ?? "",
+      `"${(t.description || "").replace(/"/g, '""')}"`,
+      t.category || "",
+      t.amount,
+      t.source || "",
+    ].join(","));
+    const csv = [header.join(","), ...lines].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `financeai-transactions-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${rows.length} transactions`);
+  }, [txs, aiResults]);
+
   return (
     <div className="space-y-6" data-testid="transactions-root">
       <PageHeader
@@ -341,7 +363,7 @@ const Transactions = React.memo(function Transactions() {
         title="Every penny."
         description="Search, sort, and edit your transactions."
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {someSelected && (
               <>
                 <select value={bulkCat} onChange={e => setBulkCat(e.target.value)} className="control-shell text-sm h-11" aria-label="Set category for selected">
@@ -349,18 +371,19 @@ const Transactions = React.memo(function Transactions() {
                   {selectedCats.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
                 </select>
                 {bulkCat && <button onClick={bulkCategory} className="btn-pill gradient-emerald text-white text-sm h-11 px-4"><Pencil className="h-4 w-4 mr-1.5" /> Apply</button>}
-                <button onClick={bulkDelete} className="btn-pill border border-ruby text-ruby text-sm h-11 px-4">
-                  <Trash2 className="h-4 w-4 mr-1.5" /> {selectedIds.size}
+                <button
+                  onClick={bulkDelete}
+                  className="btn-pill border border-ruby/50 text-ruby text-sm h-11 px-4"
+                >
+                  <Trash2 className="h-4 w-4 mr-1.5" /> Delete {selectedIds.size}
                 </button>
               </>
             )}
-            {(filters.source || filters.category || filters.tx_type || filters.search) && total > 0 && (
-              <button onClick={clearAllMatching} className="btn-pill border border-ruby/60 text-ruby/80 text-sm h-11 px-4">
-                <Trash2 className="h-4 w-4 mr-1.5" /> Clear all {total}
-              </button>
-            )}
-            <button onClick={() => setCompareOpen(true)} className="btn-pill border border-topaz text-topaz text-sm h-11 px-4">
-              <BarChart3 className="h-4 w-4 mr-1.5" /> Compare
+            <button onClick={() => setCompareOpen(true)} className="toolbar-chip">
+              <BarChart3 className="h-3.5 w-3.5" /> Compare
+            </button>
+            <button onClick={exportCsv} className="toolbar-chip">
+              <Download className="h-3.5 w-3.5" /> Export CSV
             </button>
             <button onClick={openAdd} data-testid="add-transaction" className="btn-pill gradient-emerald text-white text-sm h-11 px-5">
               <Plus className="h-4 w-4 mr-2" /> Add
@@ -476,6 +499,21 @@ const Transactions = React.memo(function Transactions() {
                       <button onClick={() => { setAiResults(null); setAiQuery(""); }} className="text-xs text-muted-foreground hover:text-foreground">Clear</button>
                     </div>
                   )}
+                </div>
+              )}
+              {/* Destructive: clear all matching — tucked inside filter panel */}
+              {(filters.source || filters.category || filters.tx_type || filters.search) && total > 0 && (
+                <div className="border-t border-border pt-3 flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    {total} transaction{total !== 1 ? "s" : ""} match current filters
+                  </p>
+                  <button
+                    onClick={clearAllMatching}
+                    className="text-xs px-3 py-1.5 rounded-full border border-ruby/40 text-ruby hover:bg-ruby/5 transition-colors"
+                  >
+                    <Trash2 className="h-3 w-3 inline mr-1" />
+                    Delete all {total}
+                  </button>
                 </div>
               )}
             </div>

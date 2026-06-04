@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api, API } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
-import { Loader2, Wallet, ArrowDownRight, ArrowUpRight, HeartPulse, RefreshCw, Download } from "lucide-react";
-import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from "recharts";
+import { Loader2, Wallet, ArrowDownRight, ArrowUpRight, HeartPulse, RefreshCw, Download, Lock } from "lucide-react";
+import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, Legend } from "recharts";
 import { toast } from "sonner";
 import AIInsightPanel from "../components/AIInsightPanel";
 import { ActionLink, EmptyState, MetricCard, PageHeader, SectionCard } from "../components/ui/layout";
@@ -13,6 +13,7 @@ const TOOLTIP_STYLE = { backgroundColor: "hsl(var(--card))", border: "1px solid 
 
 const Dashboard = React.memo(function Dashboard() {
   const { user } = useAuth();
+  useEffect(() => { document.title = "Dashboard | FinanceAI"; }, []);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -20,7 +21,8 @@ const Dashboard = React.memo(function Dashboard() {
 
   const downloadMonth = async () => {
     if (user?.tier !== "premium" && user?.role !== "admin") {
-      toast.error("Premium feature — upgrade for PDF reports."); return;
+      toast.error("PDF reports are a Premium feature. Upgrade to download.");
+      return;
     }
     setPdfBusy(true);
     try {
@@ -95,10 +97,18 @@ const Dashboard = React.memo(function Dashboard() {
             <button onClick={load} disabled={refreshing} data-testid="dashboard-refresh" className="toolbar-chip hover:bg-secondary/70 disabled:opacity-50">
               {refreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} Refresh
             </button>
-            <button onClick={downloadMonth} disabled={pdfBusy} data-testid="download-month-pdf" className="btn-pill border border-border bg-card/80 text-sm h-11 px-5 disabled:opacity-50">
-              {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              <span className="ml-2">Download PDF</span>
-            </button>
+            {user?.tier === "premium" || user?.role === "admin" ? (
+              <button onClick={downloadMonth} disabled={pdfBusy} data-testid="download-month-pdf" className="btn-pill border border-border bg-card/80 text-sm h-11 px-5 disabled:opacity-50">
+                {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                <span className="ml-2">Download PDF</span>
+              </button>
+            ) : (
+              <a href="/pricing" className="btn-pill border border-border bg-card/80 text-sm h-11 px-5 inline-flex items-center gap-2 text-muted-foreground">
+                <Lock className="h-4 w-4" />
+                <span>PDF Report</span>
+                <span className="text-xs px-1.5 py-0.5 rounded-full bg-emerald/10 text-emerald">Premium</span>
+              </a>
+            )}
             <ActionLink to="/transactions" label="Add transaction" />
           </>
       }
@@ -107,9 +117,22 @@ const Dashboard = React.memo(function Dashboard() {
       {empty && (
         <EmptyState
           icon={Wallet}
-          title="No transactions yet"
-          description="Add some demo data to explore the app, or connect a bank to see real activity here."
-          action={<button onClick={seed} data-testid="seed-demo" className="btn-pill gradient-emerald text-white text-sm">Add demo data</button>}
+          title="Welcome to FinanceAI"
+          description="Connect your bank to import transactions automatically, upload a CSV statement, or add your first transaction manually to get started."
+          action={
+            <div className="flex flex-wrap gap-3 justify-center">
+              <ActionLink to="/connections" label="Connect bank" />
+              <ActionLink to="/statements" label="Upload statement" variant="secondary" />
+              <ActionLink to="/transactions" label="Add manually" variant="secondary" />
+              <button
+                onClick={seed}
+                data-testid="seed-demo"
+                className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+              >
+                Explore with sample data
+              </button>
+            </div>
+          }
         />
       )}
 
@@ -129,8 +152,12 @@ const Dashboard = React.memo(function Dashboard() {
                 <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={11} />
                 <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
                 <Tooltip contentStyle={TOOLTIP_STYLE} />
-                <Line type="monotone" dataKey="income" stroke="hsl(var(--emerald))" strokeWidth={2.5} dot={false} />
-                <Line type="monotone" dataKey="spend" stroke="hsl(var(--topaz))" strokeWidth={2.5} dot={false} />
+                <Legend
+                  wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }}
+                  formatter={(value) => value === "income" ? "Income" : "Spending"}
+                />
+                <Line type="monotone" dataKey="income" name="income" stroke="hsl(var(--emerald))" strokeWidth={2.5} dot={false} />
+                <Line type="monotone" dataKey="spend" name="spend" stroke="hsl(var(--topaz))" strokeWidth={2.5} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -143,15 +170,18 @@ const Dashboard = React.memo(function Dashboard() {
                 <Pie data={data.categories.slice(0, 6)} dataKey="value" nameKey="name" innerRadius={45} outerRadius={75} paddingAngle={3}>
                   {data.categories.slice(0, 6).map((c, i) => <Cell key={c.name} fill={PIE_COLORS[i % 8]} />)}
                 </Pie>
-                <Tooltip contentStyle={TOOLTIP_STYLE} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => `£${Number(v).toFixed(2)}`} />
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="space-y-1.5 mt-2">
-            {data.categories.slice(0, 4).map((c, i) => (
-              <div key={c.name} className="flex justify-between text-xs">
-                <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full" style={{background: PIE_COLORS[i]}} />{c.name}</span>
-                <span className="font-medium">£{c.value.toFixed(2)}</span>
+          <div className="space-y-2 mt-2">
+            {data.categories.slice(0, 6).map((c, i) => (
+              <div key={c.name} className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-2 min-w-0">
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PIE_COLORS[i] }} />
+                  <span className="truncate capitalize">{c.name}</span>
+                </span>
+                <span className="font-medium tabular-nums ml-2">£{c.value.toFixed(2)}</span>
               </div>
             ))}
           </div>

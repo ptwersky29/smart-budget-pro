@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Home, ArrowLeft } from "lucide-react";
 
 export default function NotFound() {
+  useEffect(() => { document.title = "404 | FinanceAI"; }, []);
   return (
     <div className="min-h-screen grid place-items-center p-4">
       <div className="text-center max-w-md">
