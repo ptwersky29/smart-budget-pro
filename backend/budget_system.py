@@ -11,7 +11,7 @@ from sqlalchemy import select, func, and_
 
 from db import (
     BudgetOccasion, BudgetOccasionCategory, AISuggestion,
-    Transaction, get_session_maker,
+    Transaction, HolidayBudget, RecurringTransaction, get_session_maker,
 )
 from auth import get_current_user
 from llm import call_llm, track_ai_usage, parse_json
@@ -98,6 +98,21 @@ class ApproveIn(BaseModel):
     date: Optional[str] = None
 
 
+class YomTovAutoCreateIn(BaseModel):
+    holiday_names: list[str]
+
+
+class YomTovEstimateIn(BaseModel):
+    holiday_name: str
+
+
+class HolidayEstimateIn(BaseModel):
+    name: str
+    destination: Optional[str] = None
+    start_date: str
+    end_date: str
+
+
 # ── Router factory ───────────────────────────────────────────────────────
 
 def build_router() -> APIRouter:
@@ -165,19 +180,84 @@ def build_router() -> APIRouter:
             income_total, expense_total = tx_result.one()
             expense_total = abs(expense_total)
 
-            # 3. Other budget types aggregated
+            # 3. Yom Tov — from holiday_budgets where start/end overlaps the month
+            yom_tov_result = await session.execute(
+                select(HolidayBudget).where(
+                    HolidayBudget.user_id == user["user_id"],
+                    HolidayBudget.start_date <= end_dt,
+                    HolidayBudget.end_date >= start_dt,
+                ).order_by(HolidayBudget.holiday_name)
+            )
+            holiday_budgets = yom_tov_result.scalars().all()
+            yom_tov_by_holiday = {}
+            yom_tov_total_budgeted = 0
+            yom_tov_total_actual = 0
+            for hb in holiday_budgets:
+                if hb.holiday_name not in yom_tov_by_holiday:
+                    yom_tov_by_holiday[hb.holiday_name] = {
+                        "name": hb.holiday_name,
+                        "categories": [],
+                        "total_budgeted": 0,
+                        "total_actual": 0,
+                    }
+                yom_tov_by_holiday[hb.holiday_name]["categories"].append({
+                    "name": hb.category,
+                    "budgeted": round(hb.budgeted_amount, 2),
+                    "actual": round(hb.actual_amount, 2),
+                })
+                yom_tov_by_holiday[hb.holiday_name]["total_budgeted"] += hb.budgeted_amount
+                yom_tov_by_holiday[hb.holiday_name]["total_actual"] += hb.actual_amount
+                yom_tov_total_budgeted += hb.budgeted_amount
+                yom_tov_total_actual += hb.actual_amount
+
+            # 4. Holiday occasions (budget_type=holiday) in this month
+            holiday_occ_result = await session.execute(
+                select(BudgetOccasion).where(
+                    BudgetOccasion.user_id == user["user_id"],
+                    BudgetOccasion.budget_type == "holiday",
+                    BudgetOccasion.status == "approved",
+                    BudgetOccasion.event_date >= start_dt,
+                    BudgetOccasion.event_date <= end_dt,
+                ).order_by(BudgetOccasion.event_date)
+            )
+            holiday_occasions = holiday_occ_result.scalars().all()
+            holiday_occ_list = []
+            holiday_total_budgeted = 0
+            holiday_total_actual = 0
+            for ho in holiday_occasions:
+                cat_result = await session.execute(
+                    select(BudgetOccasionCategory).where(
+                        BudgetOccasionCategory.occasion_id == ho.id,
+                    )
+                )
+                cats = cat_result.scalars().all()
+                holiday_occ_list.append({
+                    "id": ho.id,
+                    "name": ho.name,
+                    "date": ho.event_date.isoformat() if ho.event_date else None,
+                    "estimated_amount": round(ho.estimated_amount, 2),
+                    "categories": [{
+                        "name": c.name,
+                        "budgeted": round(c.budgeted_amount, 2),
+                        "actual": round(c.actual_amount, 2),
+                    } for c in cats],
+                })
+                holiday_total_budgeted += ho.estimated_amount
+                holiday_total_actual += sum(c.actual_amount for c in cats)
+
+            # 5. Other budget types aggregated (simcha + other)
             other_result = await session.execute(
                 select(
                     func.coalesce(func.sum(BudgetOccasion.estimated_amount), 0),
                 ).where(
                     BudgetOccasion.user_id == user["user_id"],
-                    BudgetOccasion.budget_type.in_(["yom_tov", "holiday", "simcha", "other"]),
+                    BudgetOccasion.budget_type.in_(["simcha", "other"]),
                     BudgetOccasion.status == "approved",
                 )
             )
             other_budgeted = other_result.scalar() or 0
 
-            # 4. Income for projected balance
+            # 6. Income for projected balance
             all_income_result = await session.execute(
                 select(func.coalesce(func.sum(Transaction.amount).filter(Transaction.amount > 0), 0))
                 .where(
@@ -188,16 +268,17 @@ def build_router() -> APIRouter:
             )
             month_income = all_income_result.scalar() or 0
 
-            total_budget = total_budgeted + other_budgeted
-            remaining_budget = total_budget - expense_total
-            projected_balance = month_income - total_forecast
+            all_budgeted = total_budgeted + yom_tov_total_budgeted + holiday_total_budgeted + other_budgeted
+            all_forecast = total_forecast + yom_tov_total_budgeted + holiday_total_budgeted + other_budgeted
+            remaining_budget = all_budgeted - expense_total
+            projected_balance = month_income - (expense_total + yom_tov_total_actual + holiday_total_actual)
 
             return {
                 "month": start_dt.strftime("%Y-%m"),
                 "summary": {
-                    "total_budgeted": round(total_budget, 2),
+                    "total_budgeted": round(all_budgeted, 2),
                     "total_actual_spend": round(expense_total, 2),
-                    "total_forecast": round(total_forecast + other_budgeted, 2),
+                    "total_forecast": round(all_forecast, 2),
                     "remaining_budget": round(remaining_budget, 2),
                     "projected_month_end": round(projected_balance, 2),
                 },
@@ -208,6 +289,16 @@ def build_router() -> APIRouter:
                         "actual": round(total_actual, 2),
                         "forecast": round(total_forecast, 2),
                     },
+                },
+                "yom_tov": {
+                    "occasions": list(yom_tov_by_holiday.values()),
+                    "total_budgeted": round(yom_tov_total_budgeted, 2),
+                    "total_actual": round(yom_tov_total_actual, 2),
+                },
+                "holidays": {
+                    "occasions": holiday_occ_list,
+                    "total_budgeted": round(holiday_total_budgeted, 2),
+                    "total_actual": round(holiday_total_actual, 2),
                 },
                 "ai_forecast": None,
             }
@@ -634,6 +725,288 @@ def build_router() -> APIRouter:
                     "cash_flow_stability": round(stability_score, 1),
                 },
                 "max_score": 100,
+            }
+
+    # ── YOM TOV AUTO-CREATE ─────────────────────────────────────────────
+
+    @router.post("/yom-tov/auto-create")
+    async def yom_tov_auto_create(
+        payload: YomTovAutoCreateIn,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
+        sm = request.app.state.db
+        async with sm() as session:
+            created = []
+            for holiday_name in payload.holiday_names:
+                # Check if occasion already exists
+                result = await session.execute(
+                    select(BudgetOccasion).where(
+                        BudgetOccasion.user_id == user["user_id"],
+                        BudgetOccasion.budget_type == "yom_tov",
+                        BudgetOccasion.name == holiday_name,
+                    )
+                )
+                occ = result.scalar_one_or_none()
+                if occ:
+                    created.append({"name": holiday_name, "id": occ.id, "status": "existing"})
+                    continue
+
+                # Get existing holiday_budget data for this holiday
+                hb_result = await session.execute(
+                    select(HolidayBudget).where(
+                        HolidayBudget.user_id == user["user_id"],
+                        HolidayBudget.holiday_name == holiday_name,
+                    )
+                )
+                hb_rows = hb_result.scalars().all()
+
+                start_date = None
+                end_date = None
+                estimated_amount = 0
+                if hb_rows:
+                    start_date = hb_rows[0].start_date
+                    end_date = hb_rows[0].end_date
+                    for hb in hb_rows:
+                        estimated_amount += hb.budgeted_amount
+
+                new_occ = BudgetOccasion(
+                    user_id=user["user_id"],
+                    budget_type="yom_tov",
+                    name=holiday_name,
+                    event_date=start_date or datetime.now(timezone.utc),
+                    estimated_amount=estimated_amount,
+                    status="approved",
+                )
+                session.add(new_occ)
+                await session.flush()
+
+                # Copy holiday_budget categories into BudgetOccasionCategory
+                for hb in hb_rows:
+                    cat = BudgetOccasionCategory(
+                        occasion_id=new_occ.id,
+                        name=hb.category,
+                        budgeted_amount=hb.budgeted_amount,
+                        actual_amount=hb.actual_amount,
+                    )
+                    session.add(cat)
+
+                created.append({"name": holiday_name, "id": new_occ.id, "status": "created"})
+
+            await session.commit()
+            return {"created": created, "count": len(created)}
+
+    # ── YOM TOV AI ESTIMATE ─────────────────────────────────────────────
+
+    @router.post("/yom-tov/estimate")
+    async def yom_tov_estimate(
+        payload: YomTovEstimateIn,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
+        sm = request.app.state.db
+        async with sm() as session:
+            await _enforce_free_limit(session, user)
+
+            # Get holiday date range from holiday_budgets
+            hb_result = await session.execute(
+                select(HolidayBudget).where(
+                    HolidayBudget.user_id == user["user_id"],
+                    HolidayBudget.holiday_name == payload.holiday_name,
+                )
+            )
+            hb_rows = hb_result.scalars().all()
+            if not hb_rows:
+                raise HTTPException(404, f"No budget data for {payload.holiday_name}")
+
+            start_dt = hb_rows[0].start_date
+            end_dt = hb_rows[0].end_date
+
+            # Get transactions from previous year around same dates
+            if start_dt and end_dt:
+                prev_start = start_dt - timedelta(days=365)
+                prev_end = end_dt - timedelta(days=365)
+                tx_result = await session.execute(
+                    select(Transaction).where(
+                        Transaction.user_id == user["user_id"],
+                        Transaction.date >= prev_start,
+                        Transaction.date <= prev_end,
+                        Transaction.amount < 0,
+                    ).order_by(Transaction.amount)
+                )
+                historical_txs = tx_result.scalars().all()
+            else:
+                historical_txs = []
+
+            if not historical_txs:
+                # No historical data — use existing holiday_budgets as-is
+                return {
+                    "holiday": payload.holiday_name,
+                    "estimates": [{"category": hb.category, "estimated": round(hb.budgeted_amount, 2)} for hb in hb_rows],
+                    "source": "budget_data",
+                }
+
+            from collections import Counter
+            cat_totals = Counter()
+            for t in historical_txs:
+                cat_totals[t.category or "uncategorized"] += abs(t.amount)
+            tx_summary = "\n".join(f"- {cat}: £{amt:.0f}" for cat, amt in cat_totals.most_common(10))
+
+            system_prompt = "You estimate holiday spending per category. Output valid JSON only."
+            user_prompt = (
+                f"Estimate spending for {payload.holiday_name} based on last year's transactions "
+                f"in the same date range ({prev_start.date()} to {prev_end.date()}).\n\n"
+                f"Last year's spending:\n{tx_summary}\n\n"
+                f"Output JSON format:\n"
+                f'{{"estimates": [{{"category": "food", "estimated_amount": 300.0, "rationale": "..."}}]}}'
+            )
+
+            try:
+                raw, provider, model, pt, ct, cost = await call_llm(
+                    system_prompt, user_prompt,
+                    json_mode=True, temperature=0.1, max_tokens=1024,
+                )
+                await _track_usage(session, user["user_id"], provider, model, pt, ct, cost)
+                data = parse_json(raw)
+                estimates = data.get("estimates", [])
+            except Exception as e:
+                logger.warning("AI Yom Tov estimate failed: %s", e)
+                estimates = [{"category": hb.category, "estimated": round(hb.budgeted_amount, 2)} for hb in hb_rows]
+
+            # Update BudgetOccasionCategory forecast amounts
+            occ_result = await session.execute(
+                select(BudgetOccasion).where(
+                    BudgetOccasion.user_id == user["user_id"],
+                    BudgetOccasion.budget_type == "yom_tov",
+                    BudgetOccasion.name == payload.holiday_name,
+                )
+            )
+            occ = occ_result.scalar_one_or_none()
+            if occ:
+                for est in estimates:
+                    cat_result = await session.execute(
+                        select(BudgetOccasionCategory).where(
+                            BudgetOccasionCategory.occasion_id == occ.id,
+                            BudgetOccasionCategory.name == est["category"],
+                        )
+                    )
+                    cat = cat_result.scalar_one_or_none()
+                    if cat:
+                        cat.forecast_amount = est.get("estimated", est.get("estimated_amount", 0))
+                await session.commit()
+
+            return {
+                "holiday": payload.holiday_name,
+                "estimates": estimates,
+                "source": "ai",
+            }
+
+    # ── HOLIDAY AI ESTIMATE ─────────────────────────────────────────────
+
+    @router.post("/holiday/estimate")
+    async def holiday_estimate(
+        payload: HolidayEstimateIn,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
+        sm = request.app.state.db
+        async with sm() as session:
+            await _enforce_free_limit(session, user)
+
+            # Get previous holiday spending for user
+            tx_result = await session.execute(
+                select(Transaction).where(
+                    Transaction.user_id == user["user_id"],
+                    Transaction.amount < 0,
+                    Transaction.category.in_(["flights", "accommodation", "food", "travel", "attractions", "shopping"]),
+                ).order_by(Transaction.date.desc()).limit(100)
+            )
+            past_txs = tx_result.scalars().all()
+
+            from collections import Counter
+            cat_totals = Counter()
+            for t in past_txs:
+                cat_totals[t.category or "travel"] += abs(t.amount)
+            tx_summary = "\n".join(f"- {cat}: £{amt:.0f} total" for cat, amt in cat_totals.most_common(10))
+
+            system_prompt = "You estimate holiday/vacation costs per category. Output valid JSON only."
+            user_prompt = (
+                f"Estimate total cost for this holiday:\n"
+                f"Name: {payload.name}\n"
+                f"Destination: {payload.destination or 'Unknown'}\n"
+                f"Date range: {payload.start_date} to {payload.end_date}\n\n"
+                f"User's past travel-related spending:\n{tx_summary if past_txs else 'No historical travel data'}\n\n"
+                f"Output JSON format:\n"
+                f'{{"total_estimated": 2500.0, '
+                f'"categories": ['
+                f'{{"name": "flights", "estimated": 500.0, "rationale": "..."}},'
+                f'{{"name": "accommodation", "estimated": 800.0, ...}},'
+                f'{{"name": "food", "estimated": 400.0, ...}},'
+                f'{{"name": "travel", "estimated": 200.0, ...}},'
+                f'{{"name": "attractions", "estimated": 300.0, ...}},'
+                f'{{"name": "shopping", "estimated": 300.0, ...}}'
+                f"]}}"
+            )
+
+            try:
+                raw, provider, model, pt, ct, cost = await call_llm(
+                    system_prompt, user_prompt,
+                    json_mode=True, temperature=0.1, max_tokens=1024,
+                )
+                await _track_usage(session, user["user_id"], provider, model, pt, ct, cost)
+                data = parse_json(raw)
+                categories = data.get("categories", [])
+                total_estimated = data.get("total_estimated", 0)
+            except Exception as e:
+                logger.warning("AI Holiday estimate failed: %s", e)
+                categories = [
+                    {"name": "flights", "estimated": 0},
+                    {"name": "accommodation", "estimated": 0},
+                    {"name": "food", "estimated": 0},
+                    {"name": "travel", "estimated": 0},
+                    {"name": "attractions", "estimated": 0},
+                    {"name": "shopping", "estimated": 0},
+                ]
+                total_estimated = 0
+
+            # Create BudgetOccasion + categories
+            try:
+                sd = datetime.fromisoformat(payload.start_date)
+                ed = datetime.fromisoformat(payload.end_date)
+            except Exception:
+                sd = datetime.now(timezone.utc)
+                ed = sd + timedelta(days=7)
+
+            occ = BudgetOccasion(
+                user_id=user["user_id"],
+                budget_type="holiday",
+                name=payload.name,
+                event_date=sd,
+                estimated_amount=total_estimated,
+                status="approved",
+            )
+            session.add(occ)
+            await session.flush()
+
+            for cat in categories:
+                cat_name = cat.get("name", "other").lower().strip()
+                cat_est = cat.get("estimated", 0)
+                cat_obj = BudgetOccasionCategory(
+                    occasion_id=occ.id,
+                    name=cat_name,
+                    budgeted_amount=cat_est,
+                    forecast_amount=cat_est,
+                )
+                session.add(cat_obj)
+
+            await session.commit()
+            await session.refresh(occ)
+
+            return {
+                "id": occ.id,
+                "name": payload.name,
+                "total_estimated": round(total_estimated, 2),
+                "categories": categories,
             }
 
     return router
