@@ -229,16 +229,18 @@ def build_router() -> APIRouter:
                 if amt < 0 and cat == "tzedakah":
                     tx_given += -amt
             obligation = round(total_income * percent / 100, 2)
+            # Get ALL ledger entries (both manual and auto-accrued where transaction exists)
+            # We'll count maaser_paid from manual entries (where maaser_paid > 0)
             ledger_result = await session.execute(
                 select(MaaserLedger).where(
                     MaaserLedger.user_id == user["user_id"],
-                    MaaserLedger.transaction_id.is_(None),
                 )
             )
             ledger = ledger_result.scalars().all()
             # Use only maaser_paid — never fall back to income_amount here,
             # which would count the gross income figure as "given".
-            manual_given = sum((e.maaser_paid or 0) for e in ledger)
+            # maaser_paid > 0 indicates a manual entry that was explicitly given
+            manual_given = sum((e.maaser_paid or 0) for e in ledger if e.maaser_paid and e.maaser_paid > 0)
             pending_result = await session.execute(
                 select(MaaserLedger).where(
                     MaaserLedger.user_id == user["user_id"],

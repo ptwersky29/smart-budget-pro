@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { useTheme } from "next-themes";
 import { useKeyboardShortcut } from "../hooks/useKeyboardShortcut";
 import KeyboardShortcutsHelp from "../components/KeyboardShortcutsHelp";
 import QuickAddWidget from "../components/QuickAddWidget";
@@ -166,12 +167,13 @@ export default function AppLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const [open, setOpen] = useState(false);
-  const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
   const [helpOpen, setHelpOpen] = useState(false);
   const [routeLoading, setRouteLoading] = useState(false);
   const prevPath = useRef(location.pathname);
   const leaderBuffer = useRef([]);
+  const dark = resolvedTheme === "dark";
 
   useKeyboardShortcut("?", () => setHelpOpen(p => !p));
 
@@ -209,8 +211,7 @@ export default function AppLayout() {
   const currentSection = useMemo(() => NAV_SECTIONS.find((section) => section.items.some((item) => location.pathname.startsWith(item.to))) || NAV_SECTIONS[0], [location.pathname]);
 
   const toggleTheme = () => {
-    document.documentElement.classList.toggle("dark");
-    setDark(document.documentElement.classList.contains("dark"));
+    setTheme(resolvedTheme === "dark" ? "light" : "dark");
   };
 
   const doLogout = async () => {

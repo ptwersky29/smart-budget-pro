@@ -37,10 +37,10 @@ export const SectionCard = React.memo(function SectionCard({ eyebrow, title, des
   );
 });
 
-export const MetricCard = React.memo(function MetricCard({ label, value, icon: Icon, tone = "emerald", detail, className = "", ...props }) {
+export const MetricCard = React.memo(function MetricCard({ label, value, icon: Icon, tone = "emerald", detail, testid, className = "", ...props }) {
   const toneClasses = tone === "ruby" ? "text-ruby bg-ruby/10" : tone === "topaz" ? "text-topaz bg-topaz/10" : "text-emerald bg-emerald/10";
   return (
-    <div {...props} className={`rounded-[1.5rem] border border-border bg-card/90 backdrop-blur-xl p-5 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${className}`}>
+    <div {...props} data-testid={testid} className={`rounded-[1.5rem] border border-border bg-card/90 backdrop-blur-xl p-5 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${className}`}>
       <div className="flex items-center justify-between gap-3">
         <p className="label-overline">{label}</p>
         {Icon && <span className={`grid h-9 w-9 place-items-center rounded-full ${toneClasses}`}><Icon className="h-4 w-4" /></span>}
