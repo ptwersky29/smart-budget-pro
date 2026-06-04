@@ -259,11 +259,11 @@ export default function Integrations() {
                 navigate={navigate}>
         <p className="text-sm text-muted-foreground">Real-time prices for 9 stock symbols (VUSA, VWRL, FTSE, S&P 500, NASDAQ) plus crypto via CoinGecko.</p>
       </LinkCard>
+
+      <ConfirmModal open={!!confirmRemoveAi} title="Remove AI provider" message="Are you sure you want to remove this AI provider?"
+        onConfirm={async () => { try { await api.delete(`/ai/providers/${confirmRemoveAi}`); toast.success("Removed"); await loadAi(); } catch { toast.error("Could not remove"); } setConfirmRemoveAi(null); }}
+        onCancel={() => setConfirmRemoveAi(null)} />
     </div>
-    <ConfirmModal open={!!confirmRemoveAi} title="Remove AI provider" message="Are you sure you want to remove this AI provider?"
-      onConfirm={async () => { try { await api.delete(`/ai/providers/${confirmRemoveAi}`); toast.success("Removed"); await loadAi(); } catch { toast.error("Could not remove"); } setConfirmRemoveAi(null); }}
-      onCancel={() => setConfirmRemoveAi(null)} />
-  </div>
   );
 }
 
