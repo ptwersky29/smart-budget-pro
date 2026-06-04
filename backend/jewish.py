@@ -220,27 +220,35 @@ def build_router() -> APIRouter:
             )
             txs = tx_result.scalars().all()
             total_income = 0.0
-            tx_given = 0.0
             for t in txs:
                 amt = float(t.amount or 0)
                 cat = (t.category or "").lower()
                 if amt > 0 or cat in INCOME_CATEGORIES:
                     total_income += abs(amt)
-                if amt < 0 and cat == "tzedakah":
-                    tx_given += -amt
             obligation = round(total_income * percent / 100, 2)
-            # Get ALL ledger entries (both manual and auto-accrued where transaction exists)
-            # We'll count maaser_paid from manual entries (where maaser_paid > 0)
+            # Get ALL ledger entries
             ledger_result = await session.execute(
                 select(MaaserLedger).where(
                     MaaserLedger.user_id == user["user_id"],
                 )
             )
             ledger = ledger_result.scalars().all()
-            # Use only maaser_paid — never fall back to income_amount here,
-            # which would count the gross income figure as "given".
-            # maaser_paid > 0 indicates a manual entry that was explicitly given
+            
+            # Build a set of transaction_ids that have ledger entries
+            ledger_tx_ids = {e.transaction_id for e in ledger if e.transaction_id}
+            
+            # Count tx_given ONLY for tzedakah transactions without ledger entries
+            # (to avoid double-counting with manual_given)
+            tx_given = 0.0
+            for t in txs:
+                amt = float(t.amount or 0)
+                cat = (t.category or "").lower()
+                if amt < 0 and cat == "tzedakah" and t.transaction_id not in ledger_tx_ids:
+                    tx_given += -amt
+            
+            # Count maaser_paid from ledger entries (these are the recordings)
             manual_given = sum((e.maaser_paid or 0) for e in ledger if e.maaser_paid and e.maaser_paid > 0)
+            
             pending_result = await session.execute(
                 select(MaaserLedger).where(
                     MaaserLedger.user_id == user["user_id"],
