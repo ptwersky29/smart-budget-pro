@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from sqlalchemy import select, and_
 from db import User, Transaction, MaaserLedger, HolidayBudget, Budget
-from security import get_current_user
+from auth import get_current_user
 from maaser import INCOME_CATEGORIES
 
 logger = logging.getLogger("jewish_reports")

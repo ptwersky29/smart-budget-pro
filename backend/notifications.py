@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from sqlalchemy import select, and_, desc
 
 from db import Notification, User
-from security import get_current_user
+from auth import get_current_user
 
 logger = logging.getLogger("notifications")
 
