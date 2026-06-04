@@ -829,6 +829,57 @@ class SupportTicket(Base, TimestampMixin):
 
 # ── Phase 9: Analytics ───────────────────────────────────────────────────
 
+# ── Budget System (Phase 1) ──────────────────────────────────────────────
+
+BUDGET_TYPES = {"day_to_day", "yom_tov", "holiday", "simcha", "other"}
+OCCASION_STATUSES = {"draft", "approved", "archived"}
+SUGGESTION_STATUSES = {"pending", "approved", "rejected"}
+
+
+class BudgetOccasion(Base, TimestampMixin):
+    """An occasion within a budget type (e.g. 'Monthly Living' under day_to_day, 'Pesach 2026' under yom_tov)."""
+    __tablename__ = "budget_occasions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
+    budget_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    event_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    estimated_amount: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), default=0)
+    status: Mapped[str] = mapped_column(String(16), default="approved")
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    __table_args__ = (
+        Index("idx_budget_occasions_user_type", "user_id", "budget_type"),
+    )
+
+
+class BudgetOccasionCategory(Base, TimestampMixin):
+    """A category line-item within a budget occasion (e.g. 'Groceries' under 'Monthly Living')."""
+    __tablename__ = "budget_occasion_categories"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    occasion_id: Mapped[int] = mapped_column(Integer, ForeignKey("budget_occasions.id"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    budgeted_amount: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), default=0)
+    actual_amount: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), default=0)
+    forecast_amount: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), default=0)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
+class AISuggestion(Base, TimestampMixin):
+    """AI-generated suggestions awaiting user approval."""
+    __tablename__ = "ai_suggestions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
+    suggestion_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    data: Mapped[dict] = mapped_column(JSON, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    applied_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class AnalyticsEvent(Base, TimestampMixin):
     __tablename__ = "analytics_events"
 

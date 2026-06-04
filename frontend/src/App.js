@@ -16,7 +16,7 @@ const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Transactions = lazy(() => import("./pages/Transactions"));
-const Budgets = lazy(() => import("./pages/Budgets"));
+const Budgets = lazy(() => import("./pages/BudgetSystem"));
 const Connections = lazy(() => import("./pages/Connections"));
 const Investments = lazy(() => import("./pages/Investments"));
 const Jewish = lazy(() => import("./pages/Jewish"));
