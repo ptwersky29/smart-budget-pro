@@ -138,6 +138,11 @@ class OtherIn(BaseModel):
     categories: list[OtherCategoryIn] = []
 
 
+class MonthlyReviewIn(BaseModel):
+    year: int
+    month: int
+
+
 # ── Router factory ───────────────────────────────────────────────────────
 
 def build_router() -> APIRouter:
@@ -1403,5 +1408,375 @@ def build_router() -> APIRouter:
             await session.delete(occ)
             await session.commit()
             return {"ok": True}
+
+    # ── SMART ALERTS ──────────────────────────────────────────────────────
+
+    @router.get("/alerts")
+    async def smart_alerts(request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            now = datetime.now(timezone.utc)
+            start_dt, end_dt = _current_month_range()
+            alerts = []
+
+            # 1. Budget overruns (actual > budgeted * 1.2)
+            occ_result = await session.execute(
+                select(BudgetOccasion).where(
+                    BudgetOccasion.user_id == user["user_id"],
+                    BudgetOccasion.status == "approved",
+                )
+            )
+            for occ in occ_result.scalars().all():
+                cat_result = await session.execute(
+                    select(BudgetOccasionCategory).where(
+                        BudgetOccasionCategory.occasion_id == occ.id,
+                    )
+                )
+                for cat in cat_result.scalars().all():
+                    if cat.actual_amount > 0 and cat.budgeted_amount > 0 and cat.actual_amount > cat.budgeted_amount * 1.2:
+                        alerts.append({
+                            "type": "overrun",
+                            "severity": "warning" if cat.actual_amount <= cat.budgeted_amount * 1.5 else "critical",
+                            "message": f"{cat.name} in {occ.name} is £{cat.actual_amount - cat.budgeted_amount:.0f} over budget",
+                            "category": cat.name, "occasion": occ.name,
+                            "budgeted": round(cat.budgeted_amount, 2),
+                            "actual": round(cat.actual_amount, 2),
+                        })
+
+            # 2. Unusual spending (last 30 days vs previous 30 days)
+            period_end = now
+            period_start = now - timedelta(days=30)
+            prev_end = period_start
+            prev_start = prev_end - timedelta(days=30)
+
+            cur_tx = await session.execute(
+                select(Transaction.category, func.coalesce(func.sum(Transaction.amount), 0))
+                .where(Transaction.user_id == user["user_id"], Transaction.amount < 0,
+                       Transaction.date >= period_start, Transaction.date <= period_end)
+                .group_by(Transaction.category)
+            )
+            cur_spend = {r.category: abs(r[1]) for r in cur_tx.all()}
+
+            prev_tx = await session.execute(
+                select(Transaction.category, func.coalesce(func.sum(Transaction.amount), 0))
+                .where(Transaction.user_id == user["user_id"], Transaction.amount < 0,
+                       Transaction.date >= prev_start, Transaction.date <= prev_end)
+                .group_by(Transaction.category)
+            )
+            prev_spend = {r.category: abs(r[1]) for r in prev_tx.all()}
+
+            for cat, cur in cur_spend.items():
+                prev = prev_spend.get(cat, 0)
+                if prev > 0 and cur > prev * 1.3 and cur > 50:
+                    alerts.append({
+                        "type": "unusual_spending",
+                        "severity": "info",
+                        "message": f"{cat.title()} spending {((cur/prev)-1)*100:.0f}% higher than last month",
+                        "category": cat, "current": round(cur, 2), "previous": round(prev, 2),
+                    })
+
+            # 3. Upcoming due within 7 days
+            week_end = now + timedelta(days=7)
+            rec_result = await session.execute(
+                select(RecurringTransaction).where(
+                    RecurringTransaction.user_id == user["user_id"],
+                    RecurringTransaction.active == True,
+                    RecurringTransaction.next_date >= now,
+                    RecurringTransaction.next_date <= week_end,
+                )
+            )
+            for rec in rec_result.scalars().all():
+                alerts.append({
+                    "type": "upcoming_due", "severity": "info",
+                    "message": f"£{abs(rec.amount):.0f} due for {rec.description} on {rec.next_date.strftime('%d %b')}",
+                    "name": rec.description, "amount": round(abs(rec.amount), 2),
+                    "due_date": rec.next_date.isoformat(), "frequency": rec.frequency,
+                })
+
+            occ_result2 = await session.execute(
+                select(BudgetOccasion).where(
+                    BudgetOccasion.user_id == user["user_id"],
+                    BudgetOccasion.status == "approved",
+                    BudgetOccasion.estimated_amount > 0,
+                    BudgetOccasion.event_date >= now,
+                    BudgetOccasion.event_date <= week_end,
+                )
+            )
+            for occ in occ_result2.scalars().all():
+                alerts.append({
+                    "type": "upcoming_due", "severity": "info",
+                    "message": f"£{occ.estimated_amount:.0f} estimated for {occ.name} on {occ.event_date.strftime('%d %b')}",
+                    "name": occ.name, "amount": round(occ.estimated_amount, 2),
+                    "due_date": occ.event_date.isoformat(),
+                })
+
+            alerts.sort(key=lambda a: {"critical": 0, "warning": 1, "info": 2}.get(a.get("severity"), 3))
+            return {"alerts": alerts}
+
+    # ── MONTHLY REVIEW ────────────────────────────────────────────────────
+
+    @router.post("/monthly-review")
+    async def monthly_review(
+        payload: MonthlyReviewIn,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
+        sm = request.app.state.db
+        async with sm() as session:
+            start_dt, end_dt = _month_start_end(f"{payload.year}-{payload.month:02d}")
+
+            # Previous month
+            prev_month = payload.month - 1
+            prev_year = payload.year
+            if prev_month == 0:
+                prev_month = 12
+                prev_year -= 1
+            prev_start, prev_end = _month_start_end(f"{prev_year}-{prev_month:02d}")
+
+            # Current month income/expenses
+            tx_result = await session.execute(
+                select(
+                    func.coalesce(func.sum(Transaction.amount).filter(Transaction.amount > 0), 0),
+                    func.coalesce(func.sum(Transaction.amount).filter(Transaction.amount < 0), 0),
+                ).where(
+                    Transaction.user_id == user["user_id"],
+                    Transaction.date >= start_dt, Transaction.date <= end_dt,
+                )
+            )
+            income, expenses = tx_result.one()
+            expenses = abs(expenses)
+
+            # Previous month income/expenses
+            prev_tx = await session.execute(
+                select(
+                    func.coalesce(func.sum(Transaction.amount).filter(Transaction.amount > 0), 0),
+                    func.coalesce(func.sum(Transaction.amount).filter(Transaction.amount < 0), 0),
+                ).where(
+                    Transaction.user_id == user["user_id"],
+                    Transaction.date >= prev_start, Transaction.date <= prev_end,
+                )
+            )
+            prev_income, prev_expenses = prev_tx.one()
+            prev_expenses = abs(prev_expenses)
+
+            # Budget occasions + categories
+            occ_result = await session.execute(
+                select(BudgetOccasion).where(
+                    BudgetOccasion.user_id == user["user_id"],
+                    BudgetOccasion.status == "approved",
+                )
+            )
+            total_budgeted = 0
+            total_actual = 0
+            by_type = {}
+            overspends = []
+            for occ in occ_result.scalars().all():
+                btype = occ.budget_type
+                if btype not in by_type:
+                    by_type[btype] = {"budgeted": 0, "actual": 0, "name": btype.replace("_", " ").title()}
+                cat_result = await session.execute(
+                    select(BudgetOccasionCategory).where(
+                        BudgetOccasionCategory.occasion_id == occ.id,
+                    )
+                )
+                for cat in cat_result.scalars().all():
+                    by_type[btype]["budgeted"] += cat.budgeted_amount
+                    by_type[btype]["actual"] += cat.actual_amount
+                    total_budgeted += cat.budgeted_amount
+                    total_actual += cat.actual_amount
+                    if cat.actual_amount > cat.budgeted_amount > 0:
+                        overspends.append({
+                            "category": cat.name, "occasion": occ.name, "type": btype,
+                            "budgeted": round(cat.budgeted_amount, 2),
+                            "actual": round(cat.actual_amount, 2),
+                            "over_by": round(cat.actual_amount - cat.budgeted_amount, 2),
+                        })
+
+            overspends.sort(key=lambda x: x["over_by"], reverse=True)
+            savings_rate = ((income - expenses) / income * 100) if income > 0 else 0
+
+            # Health score (reuse logic inline)
+            occ_result2 = await session.execute(
+                select(BudgetOccasion).where(
+                    BudgetOccasion.user_id == user["user_id"],
+                    BudgetOccasion.status == "approved",
+                )
+            )
+            h_total_budgeted = 0
+            h_total_actual = 0
+            for occ in occ_result2.scalars().all():
+                cat_result = await session.execute(
+                    select(BudgetOccasionCategory).where(
+                        BudgetOccasionCategory.occasion_id == occ.id,
+                    )
+                )
+                for cat in cat_result.scalars().all():
+                    h_total_budgeted += cat.budgeted_amount
+                    h_total_actual += cat.actual_amount
+
+            if h_total_budgeted > 0:
+                adherence_pct = min(100, (h_total_actual / h_total_budgeted) * 100)
+                adherence_score = max(0, 40 - (adherence_pct - 80) * 0.5) if adherence_pct > 80 else 40
+            else:
+                adherence_score = 0
+            savings_score = min(30, max(0, savings_rate * 2)) if income > 0 else 0
+
+            if income > 0 and expenses > 0:
+                stability_score = 20 if (income > expenses) else 10
+                budget_count = sum(1 for _ in occ_result2.scalars().all())
+                stability_score += 10 if budget_count > 0 else 0
+            else:
+                stability_score = 0
+
+            health_score = min(100, round(adherence_score + savings_score + stability_score))
+
+            return {
+                "month": f"{payload.year}-{payload.month:02d}",
+                "income": round(income, 2), "expenses": round(expenses, 2),
+                "saved": round(income - expenses, 2), "savings_rate": round(savings_rate, 1),
+                "total_budgeted": round(total_budgeted, 2),
+                "total_actual_budget_categories": round(total_actual, 2),
+                "health_score": health_score,
+                "health_breakdown": {
+                    "budget_adherence": round(adherence_score, 1),
+                    "savings_rate": round(savings_score, 1),
+                    "cash_flow_stability": round(stability_score, 1),
+                },
+                "by_type": {k: {**v, "budgeted": round(v["budgeted"], 2), "actual": round(v["actual"], 2)}
+                           for k, v in by_type.items()},
+                "top_overspends": overspends[:5],
+                "previous_month": {
+                    "income": round(prev_income, 2), "expenses": round(prev_expenses, 2),
+                    "month": f"{prev_year}-{prev_month:02d}",
+                },
+            }
+
+    # ── DETECT PATTERNS ──────────────────────────────────────────────────
+
+    @router.post("/detect-patterns")
+    async def detect_patterns(request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            now = datetime.now(timezone.utc)
+            two_years_ago = now - timedelta(days=730)
+
+            tx_result = await session.execute(
+                select(Transaction).where(
+                    Transaction.user_id == user["user_id"],
+                    Transaction.amount < 0,
+                    Transaction.date >= two_years_ago,
+                    Transaction.recurring_id.is_(None),
+                ).order_by(Transaction.date)
+            )
+            all_txs = tx_result.scalars().all()
+
+            patterns = []
+            seen_tx_ids = set()
+
+            for i, tx in enumerate(all_txs):
+                if tx.transaction_id in seen_tx_ids:
+                    continue
+                tx_amt = abs(tx.amount)
+                if tx_amt < 10:
+                    continue
+                tx_month = tx.date.month
+                tx_desc = (tx.normalized_merchant or tx.description or "").lower().strip()[:25]
+                if not tx_desc:
+                    continue
+
+                matches = []
+                for j, other in enumerate(all_txs):
+                    if i == j or other.transaction_id in seen_tx_ids:
+                        continue
+                    o_amt = abs(other.amount)
+                    o_month = other.date.month
+                    o_desc = (other.normalized_merchant or other.description or "").lower().strip()[:25]
+
+                    # Same or adjacent month (Dec-Jan wrap)
+                    month_diff = abs(tx_month - o_month)
+                    if month_diff > 1 and month_diff != 11:
+                        continue
+
+                    # Similar amount ±20%
+                    if o_amt < tx_amt * 0.8 or o_amt > tx_amt * 1.2:
+                        continue
+
+                    # Same category
+                    if tx.category != other.category:
+                        continue
+
+                    # Description similarity (simple prefix match)
+                    common = sum(1 for a, b in zip(tx_desc, o_desc) if a == b)
+                    if len(tx_desc) < 5 or common / len(tx_desc) < 0.6:
+                        continue
+
+                    # Different year
+                    if other.date.year == tx.date.year:
+                        continue
+
+                    matches.append(other)
+                    seen_tx_ids.add(other.transaction_id)
+
+                if matches:
+                    seen_tx_ids.add(tx.transaction_id)
+                    all_matches = [tx] + matches
+                    avg_amt = sum(abs(m.amount) for m in all_matches) / len(all_matches)
+                    years = set(m.date.year for m in all_matches)
+                    freq = "yearly" if len(years) == len(all_matches) else "semi_annual"
+
+                    # Skip if a RecurringTransaction already exists for this pattern
+                    existing = await session.execute(
+                        select(RecurringTransaction).where(
+                            RecurringTransaction.user_id == user["user_id"],
+                            RecurringTransaction.category == tx.category,
+                            RecurringTransaction.description.ilike(f"%{tx_desc[:15]}%"),
+                        )
+                    )
+                    if existing.scalar_one_or_none():
+                        continue
+
+                    patterns.append({
+                        "description": tx_desc,
+                        "category": tx.category,
+                        "estimated_amount": round(avg_amt, 2),
+                        "frequency": freq,
+                        "month": tx_month,
+                        "matches_found": len(all_matches),
+                        "examples": [round(abs(m.amount), 2) for m in all_matches[:3]],
+                    })
+
+            # Auto-create RecurringTransaction records for detected patterns
+            created = []
+            for pat in patterns:
+                # Next occurrence: same month next year (or later this year)
+                next_month = pat["month"]
+                next_year = now.year
+                if next_month > now.month:
+                    pass  # later this year
+                elif next_month == now.month:
+                    next_year = now.year if now.day <= 15 else now.year + 1
+                else:
+                    next_year = now.year + 1
+
+                try:
+                    next_date = datetime(next_year, next_month, 1, tzinfo=timezone.utc)
+                except Exception:
+                    next_date = now + timedelta(days=30)
+
+                rec = RecurringTransaction(
+                    user_id=user["user_id"],
+                    description=pat["description"],
+                    amount=-pat["estimated_amount"],
+                    category=pat["category"],
+                    frequency=pat["frequency"],
+                    next_date=next_date,
+                    active=True,
+                )
+                session.add(rec)
+                await session.flush()
+                created.append({**pat, "recurring_id": rec.id, "next_date": next_date.isoformat()})
+
+            await session.commit()
+            return {"patterns_detected": len(created), "created": created}
 
     return router

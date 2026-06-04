@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { api } from "../lib/api";
 import {
   Plus, Trash2, Pencil, X, Check, Loader2, PiggyBank, Calendar, Heart, Star, Plane,
-  Package, Wand2, Sparkles, TrendingUp, AlertTriangle,
+  Package, Wand2, Sparkles, TrendingUp, AlertTriangle, Gauge, CalendarDays,
 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, MetricCard, PageHeader, SectionCard } from "../components/ui/layout";
@@ -13,6 +13,12 @@ const DAY_TO_DAY_CATS = ["groceries","household","fuel","school","utilities","tr
 
 const CATS = ["groceries","dining","transport","utilities","subscriptions","tzedakah","rent","salary","income","shopping","health","entertainment","insurance","education","transfer","cash","tax","fees","mortgage","uncategorized"];
 const DEFAULT_SIMCHA_CATEGORIES = ["hall","catering","music","clothing","gifts","photography"];
+const MONTHS = [
+  {value:1,label:"January"},{value:2,label:"February"},{value:3,label:"March"},
+  {value:4,label:"April"},{value:5,label:"May"},{value:6,label:"June"},
+  {value:7,label:"July"},{value:8,label:"August"},{value:9,label:"September"},
+  {value:10,label:"October"},{value:11,label:"November"},{value:12,label:"December"},
+];
 
 export default function BudgetSystem() {
   const [activeTab, setActiveTab] = useState("this-month");
@@ -82,6 +88,20 @@ export default function BudgetSystem() {
   const [otherForm, setOtherForm] = useState({ name: "", estimated_amount: "", event_date: "", notes: "", categories: "" });
   const [editingOther, setEditingOther] = useState(null);
 
+  // ── Phase 4: Smart Features ──────────────────────────────────────────
+  const [healthScore, setHealthScore] = useState(null);
+  const [alerts, setAlerts] = useState([]);
+  const [upcomingExpenses, setUpcomingExpenses] = useState([]);
+  const [detectingPatterns, setDetectingPatterns] = useState(false);
+  const [patternsDetected, setPatternsDetected] = useState(null);
+
+  const now = new Date();
+  const [reviewYear, setReviewYear] = useState(now.getFullYear());
+  const [reviewMonth, setReviewMonth] = useState(now.getMonth() + 1);
+  const [reviewData, setReviewData] = useState(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewNarrative, setReviewNarrative] = useState(null);
+
   // ── LOADERS ────────────────────────────────────────────────────────────
 
   const loadOverview = useCallback(async () => {
@@ -140,6 +160,27 @@ export default function BudgetSystem() {
     } catch { /* optional */ }
   }, []);
 
+  const loadHealthScore = useCallback(async () => {
+    try {
+      const { data } = await api.get("/budget-system/health-score");
+      setHealthScore(data);
+    } catch { /* optional */ }
+  }, []);
+
+  const loadAlertsData = useCallback(async () => {
+    try {
+      const { data } = await api.get("/budget-system/alerts");
+      setAlerts(data.alerts || []);
+    } catch { /* optional */ }
+  }, []);
+
+  const loadUpcomingExpenses = useCallback(async () => {
+    try {
+      const { data } = await api.get("/budget-system/upcoming");
+      setUpcomingExpenses(data.upcoming || []);
+    } catch { /* optional */ }
+  }, []);
+
   useEffect(() => {
     loadOverview();
     loadDayToDay();
@@ -148,7 +189,10 @@ export default function BudgetSystem() {
     loadChasuna();
     loadOther();
     loadSimcha();
-  }, [loadOverview, loadDayToDay, loadHolidays, loadHolidayBudgets, loadChasuna, loadOther, loadSimcha]);
+    loadHealthScore();
+    loadAlertsData();
+    loadUpcomingExpenses();
+  }, [loadOverview, loadDayToDay, loadHolidays, loadHolidayBudgets, loadChasuna, loadOther, loadSimcha, loadHealthScore, loadAlertsData, loadUpcomingExpenses]);
 
   // ── QUICK TRANSACTION ──────────────────────────────────────────────────
 
@@ -509,6 +553,41 @@ export default function BudgetSystem() {
     } catch { toast.error("Could not update"); }
   };
 
+  // ── Phase 4: Monthly Review ─────────────────────────────────────────-
+
+  const handleGenerateReview = async () => {
+    setReviewLoading(true);
+    setReviewData(null);
+    setReviewNarrative(null);
+    try {
+      const { data } = await api.post("/budget-system/monthly-review", { year: reviewYear, month: reviewMonth });
+      setReviewData(data);
+      // Also fetch AI narrative
+      try {
+        const { data: narrativeData } = await api.post("/ai/insights/report", { year: reviewYear, month: reviewMonth });
+        setReviewNarrative(narrativeData);
+      } catch { /* narrative is optional */ }
+      toast.success("Review generated");
+    } catch (err) { toast.error(err.response?.data?.detail || "Could not generate review"); }
+    finally { setReviewLoading(false); }
+  };
+
+  const handleDetectPatterns = async () => {
+    setDetectingPatterns(true);
+    setPatternsDetected(null);
+    try {
+      const { data } = await api.post("/budget-system/detect-patterns");
+      setPatternsDetected(data);
+      if (data.patterns_detected > 0) {
+        toast.success(`Detected ${data.patterns_detected} recurring patterns`);
+        loadUpcomingExpenses();
+      } else {
+        toast.info("No new patterns found");
+      }
+    } catch (err) { toast.error(err.response?.data?.detail || "Pattern detection failed"); }
+    finally { setDetectingPatterns(false); }
+  };
+
   // ── HOLIDAY DETAIL RENDERER (carried over) ─────────────────────────────
 
   const renderHolidayDetail = () => {
@@ -586,6 +665,7 @@ export default function BudgetSystem() {
 
   const tabs = [
     { key: "this-month", label: "This Month", icon: Sparkles },
+    { key: "monthly-review", label: "Monthly Review", icon: CalendarDays },
     { key: "day-to-day", label: "Day-to-Day", icon: PiggyBank },
     { key: "yomtov", label: "Yom Tov", icon: Star },
     { key: "holiday", label: "Holiday", icon: Plane },
@@ -681,8 +761,56 @@ export default function BudgetSystem() {
             </div>
           ) : overview ? (
             <>
+              {/* Health Score */}
+              {healthScore && (
+                <div className="rounded-2xl border border-border bg-card p-6 flex items-center gap-6 flex-wrap">
+                  <div className="flex items-center gap-4">
+                    <div className="relative w-20 h-20">
+                      <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                        <circle cx="18" cy="18" r="15.5" fill="none" stroke="hsl(var(--secondary))" strokeWidth="3" />
+                        <circle cx="18" cy="18" r="15.5" fill="none" stroke={
+                          healthScore.score >= 70 ? "hsl(var(--emerald))" : healthScore.score >= 40 ? "hsl(var(--topaz))" : "hsl(var(--ruby))"
+                        } strokeWidth="3" strokeDasharray={`${healthScore.score * 0.31} 31`} strokeLinecap="round" />
+                      </svg>
+                      <span className="absolute inset-0 flex items-center justify-center text-lg font-semibold">{healthScore.score}</span>
+                    </div>
+                    <div>
+                      <p className="label-overline">Budget Health Score</p>
+                      <p className="text-sm text-muted-foreground">
+                        {healthScore.score >= 70 ? "Great shape" : healthScore.score >= 40 ? "Needs attention" : "Critical"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex-1 grid grid-cols-3 gap-4 min-w-[200px]">
+                    {Object.entries(healthScore.breakdown || {}).map(([key, val]) => (
+                      <div key={key}>
+                        <p className="text-xs text-muted-foreground capitalize">{key.replace(/_/g, " ")}</p>
+                        <p className="text-lg font-semibold">{val}/{key === "budget_adherence" ? 40 : key === "savings_rate" ? 30 : 30}</p>
+                        <div className="w-full h-1.5 bg-secondary rounded-full mt-1 overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-ruby via-topaz to-emerald rounded-full transition-all"
+                               style={{ width: `${(val / (key === "budget_adherence" ? 40 : 30)) * 100}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Smart Alerts */}
+              {alerts.filter(a => a.severity !== "info").length > 0 && (
+                <div className="space-y-2">
+                  {alerts.filter(a => a.severity !== "info").slice(0, 4).map((a, i) => (
+                    <div key={i} className={`flex items-center gap-3 px-5 py-3 rounded-xl text-sm ${
+                      a.severity === "critical" ? "bg-ruby/10 border border-ruby/30 text-ruby" : "bg-topaz/10 border border-topaz/30 text-topaz"
+                    }`}>
+                      <AlertTriangle className="h-4 w-4 shrink-0" />
+                      <span>{a.message}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Summary cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
                 <MetricCard label="Budgeted" value={`£${overview.summary.total_budgeted.toLocaleString()}`} icon={PiggyBank} tone="emerald" />
                 <MetricCard label="Predicted" value={`£${overview.summary.total_forecast.toLocaleString()}`} icon={TrendingUp} tone="topaz" />
                 <MetricCard label="Actual Spend" value={`£${overview.summary.total_actual_spend.toLocaleString()}`} icon={TrendingUp} tone="ruby" />
@@ -832,9 +960,214 @@ export default function BudgetSystem() {
                   </div>
                 </SectionCard>
               )}
+
+              {/* Upcoming Expenses */}
+              {upcomingExpenses.length > 0 && (
+                <SectionCard eyebrow="Upcoming" title="Known expenses ahead" contentClassName="p-0">
+                  <div className="divide-y divide-border">
+                    {(() => {
+                      const now2 = new Date();
+                      const in7 = new Date(now2.getTime() + 7 * 86400000);
+                      const in30 = new Date(now2.getTime() + 30 * 86400000);
+                      const groups = [
+                        { label: "Next 7 days", items: upcomingExpenses.filter(e => e.date && new Date(e.date) <= in7) },
+                        { label: "Next 30 days", items: upcomingExpenses.filter(e => e.date && new Date(e.date) > in7 && new Date(e.date) <= in30) },
+                        { label: "Next 90 days", items: upcomingExpenses.filter(e => !e.date || new Date(e.date) > in30) },
+                      ];
+                      return groups.map(group => group.items.length > 0 && (
+                        <div key={group.label} className="px-6 py-3">
+                          <p className="text-xs text-muted-foreground font-medium mb-2">{group.label}</p>
+                          {group.items.map((e, i) => (
+                            <div key={i} className="flex items-center justify-between py-1.5 text-sm">
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span>{e.name}</span>
+                                {e.frequency && <span className="text-xs text-muted-foreground">({e.frequency})</span>}
+                              </div>
+                              <span className="font-medium tabular-nums">£{e.estimated_amount?.toFixed(0)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                  <div className="px-6 py-4 border-t border-border">
+                    <button onClick={handleDetectPatterns} disabled={detectingPatterns}
+                            className="btn-pill border border-topaz text-topaz text-sm">
+                      {detectingPatterns ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                      {detectingPatterns ? "Scanning…" : "Detect recurring patterns"}
+                    </button>
+                    {patternsDetected && (
+                      <span className="ml-3 text-xs text-muted-foreground">
+                        {patternsDetected.patterns_detected > 0
+                          ? `${patternsDetected.patterns_detected} patterns found and added to recurring`
+                          : "No new patterns found"}
+                      </span>
+                    )}
+                  </div>
+                </SectionCard>
+              )}
             </>
           ) : (
             <EmptyState icon={Sparkles} title="No budget data" description="Add day-to-day budgets to see your overview." />
+          )}
+        </div>
+      )}
+
+      {/* ── TAB: MONTHLY REVIEW (Phase 4) ──────────────────────────────── */}
+      {activeTab === "monthly-review" && (
+        <div className="space-y-6 animate-[fadeUp_0.3s_ease-out]">
+          <SectionCard eyebrow="Review" title="Monthly budget review">
+            <div className="flex flex-wrap gap-3 items-end">
+              <div>
+                <label className="label-overline">Year</label>
+                <select value={reviewYear} onChange={e => setReviewYear(parseInt(e.target.value))}
+                        className="mt-1 control-shell">
+                  {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="label-overline">Month</label>
+                <select value={reviewMonth} onChange={e => setReviewMonth(parseInt(e.target.value))}
+                        className="mt-1 control-shell">
+                  {MONTHS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+              </div>
+              <button onClick={handleGenerateReview} disabled={reviewLoading}
+                      className="btn-pill gradient-emerald text-white text-sm disabled:opacity-50">
+                {reviewLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                {reviewLoading ? "Loading…" : "Generate Review"}
+              </button>
+            </div>
+          </SectionCard>
+
+          {reviewData && (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                <MetricCard label="Income" value={`£${reviewData.income.toLocaleString()}`} icon={TrendingUp} tone="emerald" />
+                <MetricCard label="Spent" value={`£${reviewData.expenses.toLocaleString()}`} icon={TrendingUp} tone="ruby" />
+                <MetricCard label="Saved" value={`£${reviewData.saved.toLocaleString()}`} icon={PiggyBank} tone={reviewData.saved > 0 ? "emerald" : "ruby"} />
+                <MetricCard label="Health Score" value={`${reviewData.health_score}/100`} icon={Gauge} tone={reviewData.health_score >= 70 ? "emerald" : reviewData.health_score >= 40 ? "topaz" : "ruby"} />
+                <MetricCard label="Savings Rate" value={`${reviewData.savings_rate}%`} icon={TrendingUp} tone={reviewData.savings_rate > 0 ? "emerald" : "ruby"} />
+              </div>
+
+              {reviewData.health_breakdown && (
+                <SectionCard eyebrow="Health Score" title="Budget health breakdown">
+                  <div className="grid sm:grid-cols-3 gap-4">
+                    {Object.entries(reviewData.health_breakdown).map(([key, val]) => {
+                      const maxVal = key === "budget_adherence" ? 40 : 30;
+                      return (
+                        <div key={key} className="rounded-xl bg-secondary/20 p-4">
+                          <p className="text-xs text-muted-foreground capitalize mb-1">{key.replace(/_/g, " ")}</p>
+                          <p className="text-2xl font-semibold">{val}/{maxVal}</p>
+                          <div className="w-full h-2 bg-secondary rounded-full mt-2 overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-ruby via-topaz to-emerald rounded-full transition-all"
+                                 style={{ width: `${(val / maxVal) * 100}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </SectionCard>
+              )}
+
+              <SectionCard eyebrow="Budget vs Actual" title="By category type" contentClassName="p-0">
+                <div className="divide-y divide-border">
+                  {Object.entries(reviewData.by_type || {}).map(([key, bt]) => {
+                    const diff = bt.budgeted - bt.actual;
+                    return (
+                      <div key={key} className="flex items-center justify-between px-6 py-4">
+                        <p className="font-medium capitalize">{bt.name}</p>
+                        <div className="flex items-center gap-4 text-sm tabular-nums">
+                          <span>£{bt.budgeted.toFixed(0)}</span>
+                          <span className="text-muted-foreground">→</span>
+                          <span className={bt.actual > bt.budgeted ? "text-ruby" : "text-emerald"}>£{bt.actual.toFixed(0)}</span>
+                          <span className={`text-xs font-medium ${diff >= 0 ? "text-emerald" : "text-ruby"}`}>
+                            {diff >= 0 ? "+" : ""}£{diff.toFixed(0)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </SectionCard>
+
+              {reviewData.top_overspends?.length > 0 && (
+                <SectionCard eyebrow="Overspends" title="Categories over budget" contentClassName="p-0">
+                  <div className="divide-y divide-border">
+                    {reviewData.top_overspends.map((os, i) => (
+                      <div key={i} className="flex items-center justify-between px-6 py-3">
+                        <div>
+                          <p className="text-sm font-medium capitalize">{os.category}</p>
+                          <p className="text-xs text-muted-foreground">{os.occasion} · {os.type.replace("_", " ")}</p>
+                        </div>
+                        <div className="text-right text-sm tabular-nums">
+                          <p className="text-ruby">£{os.over_by.toFixed(0)} over</p>
+                          <p className="text-xs text-muted-foreground">Budget: £{os.budgeted.toFixed(0)}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </SectionCard>
+              )}
+
+              {reviewData.previous_month && (
+                <SectionCard eyebrow="Month over Month" title="Comparison with previous month">
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="rounded-xl bg-secondary/20 p-4">
+                      <p className="text-xs text-muted-foreground">Income</p>
+                      <p className="text-lg font-semibold text-emerald">£{reviewData.income.toFixed(0)}</p>
+                      {reviewData.income > 0 && reviewData.previous_month.income > 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {reviewData.income > reviewData.previous_month.income ? "↑" : "↓"} vs {reviewData.previous_month.month}
+                        </p>
+                      )}
+                    </div>
+                    <div className="rounded-xl bg-secondary/20 p-4">
+                      <p className="text-xs text-muted-foreground">Spending</p>
+                      <p className="text-lg font-semibold text-ruby">£{reviewData.expenses.toFixed(0)}</p>
+                      {reviewData.expenses > 0 && reviewData.previous_month.expenses > 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {reviewData.expenses < reviewData.previous_month.expenses ? "↓" : "↑"} vs {reviewData.previous_month.month}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </SectionCard>
+              )}
+
+              {reviewNarrative && (
+                <SectionCard eyebrow="AI Review" title="Monthly analysis">
+                  <div className="p-4 rounded-xl bg-secondary/20 border border-border">
+                    {reviewNarrative.narrative && (
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{reviewNarrative.narrative}</p>
+                    )}
+                    {reviewNarrative.highlights?.length > 0 && (
+                      <div className="mt-4 space-y-2">
+                        <p className="label-overline">Highlights</p>
+                        {reviewNarrative.highlights.map((h, i) => (
+                          <div key={i} className="flex items-start gap-2 text-sm">
+                            <span className={h.type === "positive" ? "text-emerald" : h.type === "negative" ? "text-ruby" : "text-topaz"}>
+                              {h.type === "positive" ? "✓" : h.type === "negative" ? "⚠" : "ℹ"}
+                            </span>
+                            <span>{h.message}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {reviewNarrative.month_grade && (
+                      <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-topaz/10 border border-topaz/30">
+                        <span className="text-sm font-medium">Grade: {reviewNarrative.month_grade}</span>
+                      </div>
+                    )}
+                  </div>
+                </SectionCard>
+              )}
+            </>
+          )}
+
+          {!reviewData && !reviewLoading && (
+            <EmptyState icon={CalendarDays} title="No review yet" description="Select a month and generate your budget review." />
           )}
         </div>
       )}
