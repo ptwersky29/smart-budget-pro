@@ -4,6 +4,8 @@ import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "next-themes";
 import { useKeyboardShortcut } from "../hooks/useKeyboardShortcut";
 import KeyboardShortcutsHelp from "../components/KeyboardShortcutsHelp";
+import CommandPalette from "../components/CommandPalette";
+import NotificationCenter from "../components/NotificationCenter";
 import QuickAddWidget from "../components/QuickAddWidget";
 
 import {
@@ -170,12 +172,25 @@ export default function AppLayout() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [open, setOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
   const [routeLoading, setRouteLoading] = useState(false);
   const prevPath = useRef(location.pathname);
   const leaderBuffer = useRef([]);
   const dark = resolvedTheme === "dark";
 
   useKeyboardShortcut("?", () => setHelpOpen(p => !p));
+
+  // Handle Cmd+K or Ctrl+K for command palette
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setCommandOpen(p => !p);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Show thin progress bar on route change
   useEffect(() => {
@@ -345,6 +360,7 @@ export default function AppLayout() {
                   Upgrade
                 </Link>
               )}
+              <NotificationCenter />
               <button onClick={toggleTheme} data-testid="theme-toggle" className="h-11 w-11 grid place-items-center rounded-full border border-border bg-card/80 hover:bg-secondary transition-colors" aria-label="Toggle theme">
                 {dark ? <Sun className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
               </button>
@@ -381,6 +397,7 @@ export default function AppLayout() {
           </div>
         </main>
       </div>
+      <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
       <KeyboardShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
       <QuickAddWidget />
     </div>

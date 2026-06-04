@@ -890,3 +890,17 @@ class AnalyticsEvent(Base, TimestampMixin):
     value: Mapped[float] = mapped_column(Numeric(12, 2, asdecimal=False), default=0)
     event_meta: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     ip_address: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+# ── Notifications ─────────────────────────────────────────────────────────
+
+class Notification(Base, TimestampMixin):
+    """User notifications for alerts, reminders, and system messages."""
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(256), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    type: Mapped[str] = mapped_column(String(32), default="info")  # info, success, warning, error
+    read: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    read_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
