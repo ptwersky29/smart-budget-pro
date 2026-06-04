@@ -39,6 +39,9 @@ const Transactions = React.memo(function Transactions() {
   const [selectedCats, setSelectedCats] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
   const [showAiSearch, setShowAiSearch] = useState(false);
+  const [classifying, setClassifying] = useState(false);
+  const [classification, setClassification] = useState(null);
+  const [saveAsRecurring, setSaveAsRecurring] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("ledger");
 
@@ -161,31 +164,63 @@ const Transactions = React.memo(function Transactions() {
     setForm({ description: t.description || "", amount: String(Math.abs(t.amount)), category: t.category || "", is_income: t.amount > 0 });
     setOpen(true);
   }, []);
-  const closeForm = useCallback(() => { setOpen(false); setEditingId(null); setForm(emptyForm); }, []);
+  const closeForm = useCallback(() => { setOpen(false); setEditingId(null); setForm(emptyForm); setClassification(null); setSaveAsRecurring(false); }, []);
+
+  const handleClassify = useCallback(async ({ description, amount }) => {
+    if (!description.trim() || !amount) return;
+    setClassifying(true);
+    setClassification(null);
+    try {
+      const { data } = await api.post("/budget-system/classify", { description: description.trim(), amount });
+      setClassification(data);
+      // Pre-fill category if not already set
+      if (data.category && !form.category) {
+        setForm(prev => ({ ...prev, category: data.category }));
+      }
+      if (data.recurring) setSaveAsRecurring(true);
+    } catch { toast.error("Classification failed"); }
+    finally { setClassifying(false); }
+  }, [form.category]);
 
   const submit = useCallback(async (e) => {
     e.preventDefault();
     try {
       const amt = parseFloat(form.amount);
       const signed = form.is_income ? Math.abs(amt) : -Math.abs(amt);
-      const payload = { description: form.description, amount: signed, category: form.category || undefined, is_income: form.is_income };
       if (editingId) {
+        const payload = { description: form.description, amount: signed, category: form.category || undefined, is_income: form.is_income };
         const old = txsRef.current.find(t => t.transaction_id === editingId);
         await api.patch(`/transactions/${editingId}`, payload);
         toast("Transaction updated", {
           action: { label: "Undo", onClick: async () => { if (old) { await api.patch(`/transactions/${editingId}`, { description: old.description, amount: old.amount, category: old.category || undefined, is_income: old.is_income }); toast.success("Restored"); await load(); } } },
           duration: 6000,
         });
+      } else if (classification) {
+        // Use AI-approved classification
+        await api.post("/budget-system/approve", {
+          description: form.description.trim(),
+          amount: signed,
+          budget_type: classification.budget_type || "day_to_day",
+          occasion: classification.occasion || "Monthly Living",
+          category: form.category || classification.category || "uncategorized",
+          suggestion_id: classification.suggestion_id,
+          save_as_recurring: saveAsRecurring,
+        });
+        toast.success("Transaction added");
       } else {
+        // Standard add
+        const payload = { description: form.description, amount: signed, category: form.category || undefined, is_income: form.is_income };
         const { data } = await api.post("/transactions", payload);
         toast("Transaction added", {
           action: { label: "Undo", onClick: async () => { await api.delete(`/transactions/${data.transaction_id}`); toast.success("Undone"); await load(); } },
           duration: 6000,
         });
       }
-      setOpen(false); setEditingId(null); setForm(emptyForm); await load();
+      setOpen(false); setEditingId(null); setForm(emptyForm); setClassification(null); setSaveAsRecurring(false); await load();
     } catch { toast.error(editingId ? "Could not update" : "Could not add"); }
-  }, [editingId, form, load]);
+  }, [editingId, form, load, classification, saveAsRecurring]);
+
+  const clearClassification = useCallback(() => { setClassification(null); setSaveAsRecurring(false); }, []);
 
   const allDisplayed = aiResults?.transactions || txs;
   const someSelected = selectedIds.size > 0;
@@ -554,7 +589,10 @@ const Transactions = React.memo(function Transactions() {
       </>}
 
       <TransactionForm open={open} editingId={editingId} form={form} setForm={setForm}
-        selectedCats={selectedCats} onClose={closeForm} onSubmit={submit} />
+        selectedCats={selectedCats} onClose={closeForm} onSubmit={submit}
+        onClassify={handleClassify} classifying={classifying} classification={classification}
+        onClearClassification={clearClassification}
+        saveAsRecurring={saveAsRecurring} setSaveAsRecurring={setSaveAsRecurring} />
 
       <ComparePeriods open={compareOpen} onClose={() => setCompareOpen(false)} />
 

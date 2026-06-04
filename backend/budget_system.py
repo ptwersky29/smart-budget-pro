@@ -96,6 +96,7 @@ class ApproveIn(BaseModel):
     occasion: str
     category: str
     date: Optional[str] = None
+    save_as_recurring: Optional[bool] = False
 
 
 class YomTovAutoCreateIn(BaseModel):
@@ -697,6 +698,23 @@ def build_router() -> APIRouter:
                     sug.status = "approved"
                     sug.applied_at = datetime.now(timezone.utc)
                     await session.commit()
+
+            # Create RecurringTransaction if requested
+            if payload.save_as_recurring:
+                try:
+                    rec_tx = RecurringTransaction(
+                        user_id=user["user_id"],
+                        description=payload.description.strip(),
+                        amount=-abs(payload.amount) if payload.amount > 0 else payload.amount,
+                        category=payload.category.lower().strip(),
+                        frequency="monthly",
+                        next_date=datetime.fromisoformat(payload.date) if payload.date else datetime.now(timezone.utc),
+                        active=True,
+                    )
+                    session.add(rec_tx)
+                    await session.commit()
+                except Exception:
+                    pass
 
             return _tx_to_dict(tx)
 

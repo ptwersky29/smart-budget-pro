@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useKeyboardShortcut } from "../hooks/useKeyboardShortcut";
 import KeyboardShortcutsHelp from "../components/KeyboardShortcutsHelp";
+import QuickAddWidget from "../components/QuickAddWidget";
 
 import {
   LayoutDashboard, Receipt, PiggyBank, Building2, TrendingUp, Star,
@@ -351,6 +352,7 @@ export default function AppLayout() {
         </main>
       </div>
       <KeyboardShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <QuickAddWidget />
     </div>
   );
 }
