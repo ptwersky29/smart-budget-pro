@@ -36,6 +36,7 @@ import statements
 import integrations
 import hebcal
 import jewish
+import jewish_reports
 import investments
 import uk_tools
 import gdpr
@@ -170,6 +171,7 @@ api.include_router(statements.build_router())
 api.include_router(integrations.build_router())
 api.include_router(hebcal.build_router())
 api.include_router(jewish.build_router())
+api.include_router(jewish_reports.router)
 api.include_router(investments.build_router())
 api.include_router(uk_tools.build_router())
 api.include_router(gdpr.build_router())
