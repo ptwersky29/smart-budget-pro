@@ -61,7 +61,7 @@ export default function Jewish() {
             <div className="flex items-center gap-2">
               <MapPin className="h-3 w-3 text-muted-foreground"/>
               <select data-testid="zmanim-city" value={city} onChange={(e) => { setCity(e.target.value); localStorage.setItem("zmanim_city", e.target.value); }}
-                      className="h-9 px-3 rounded-full bg-secondary/50 border border-transparent focus:border-ring focus:outline-none text-xs capitalize">
+                      className="h-10 px-4 rounded-full bg-secondary/50 border border-transparent focus:border-ring focus:outline-none text-xs capitalize">
                 {CITIES.map(c => <option key={c} value={c}>{c.replace("-"," ")}</option>)}
               </select>
             </div>

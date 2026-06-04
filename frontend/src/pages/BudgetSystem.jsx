@@ -21,7 +21,7 @@ const MONTHS = [
 ];
 
 export default function BudgetSystem() {
-  const [activeTab, setActiveTab] = useState("this-month");
+  const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
 
   // Confirm modal
@@ -708,13 +708,10 @@ export default function BudgetSystem() {
   // ── TABS ───────────────────────────────────────────────────────────────
 
   const tabs = [
-    { key: "this-month", label: "This Month", icon: Sparkles },
+    { key: "overview", label: "Overview", icon: Sparkles },
+    { key: "budgets", label: "Budgets", icon: PiggyBank },
+    { key: "events", label: "Events", icon: Star },
     { key: "monthly-review", label: "Monthly Review", icon: CalendarDays },
-    { key: "day-to-day", label: "Day-to-Day", icon: PiggyBank },
-    { key: "yomtov", label: "Yom Tov", icon: Star },
-    { key: "holiday", label: "Holiday", icon: Plane },
-    { key: "simcha", label: "Simcha", icon: Heart },
-    { key: "other", label: "Other", icon: Package },
   ];
 
   // ── RENDER ─────────────────────────────────────────────────────────────
@@ -724,7 +721,7 @@ export default function BudgetSystem() {
       <PageHeader
         eyebrow="Money"
         title="Budgets & Planning"
-        description="Master dashboard, day-to-day budgets, Yom Tov, holidays, Simchas, and other expenses."
+        description="Overview, budgets, events, and monthly review."
       />
 
       {/* Quick transaction bar */}
@@ -796,8 +793,8 @@ export default function BudgetSystem() {
         ))}
       </div>
 
-      {/* ── TAB: THIS MONTH (Master Dashboard) ──────────────────────────── */}
-      {activeTab === "this-month" && (
+      {/* ── TAB: OVERVIEW (Master Dashboard) ──────────────────────────── */}
+      {activeTab === "overview" && (
         <div className="space-y-6 animate-[fadeUp_0.3s_ease-out]">
           {loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -825,7 +822,7 @@ export default function BudgetSystem() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex-1 grid grid-cols-3 gap-4 min-w-[200px]">
+                  <div className="flex-1 grid grid-cols-3 gap-4 min-w-0">
                     {Object.entries(healthScore.breakdown || {}).map(([key, val]) => (
                       <div key={key}>
                         <p className="text-xs text-muted-foreground capitalize">{key.replace(/_/g, " ")}</p>
@@ -1217,33 +1214,13 @@ export default function BudgetSystem() {
         </div>
       )}
 
-      {/* ── TAB: DAY-TO-DAY ─────────────────────────────────────────────── */}
-      {activeTab === "day-to-day" && (
+      {/* ── TAB: BUDGETS (Day-to-Day + Simcha + Other merged) ───────────── */}
+      {activeTab === "budgets" && (
         <div className="space-y-6 animate-[fadeUp_0.3s_ease-out]">
-          <SectionCard eyebrow="Create" title="Day-to-day budget category">
-            <form onSubmit={createDayToDay} className="flex flex-wrap gap-3 items-end">
-              <div className="flex-1 min-w-[160px]">
-                <label className="label-overline">Category</label>
-                <input list="dd-cats" required value={dayForm.category}
-                       onChange={e => setDayForm({...dayForm, category: e.target.value})}
-                       placeholder="groceries" className="mt-1 w-full control-shell" />
-                <datalist id="dd-cats">{DAY_TO_DAY_CATS.map(c => <option key={c} value={c} />)}</datalist>
-              </div>
-              <div className="flex-1 min-w-[140px]">
-                <label className="label-overline">Monthly budget (£)</label>
-                <input required type="number" step="0.01" value={dayForm.budgeted_amount}
-                       onChange={e => setDayForm({...dayForm, budgeted_amount: e.target.value})}
-                       placeholder="300" className="mt-1 w-full control-shell" />
-              </div>
-              <button className="btn-pill gradient-emerald text-white text-sm">
-                <Plus className="h-4 w-4 mr-2" /> Add
-              </button>
-            </form>
-          </SectionCard>
 
-          {/* Quick setup */}
-          {defaultCategories.length > 0 && (
-            <SectionCard eyebrow="Quick setup" title="Create all default budgets">
+          {/* ── Day-to-Day ───────────────────────────────────────────── */}
+          <SectionCard eyebrow="Day-to-Day" title="Quick setup">
+            {defaultCategories.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
                 {defaultCategories.map(cat => {
                   const exists = dayOccasions.some(o => o.categories.some(c => c.name === cat));
@@ -1262,58 +1239,55 @@ export default function BudgetSystem() {
                   );
                 })}
               </div>
+            )}
+            <div className="flex flex-wrap gap-2">
               <button onClick={handleInitDayToDay} disabled={initializing}
                       className="btn-pill gradient-emerald text-white text-sm disabled:opacity-50">
                 {initializing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
                 {initializing ? "Creating…" : "Create all"}
               </button>
-            </SectionCard>
-          )}
-
-          {/* AI Prediction */}
-          <SectionCard eyebrow="AI Forecast" title="Predicted month-end spending">
-            <p className="text-sm text-muted-foreground mb-4">AI analyses your last 3 months to predict each category.</p>
-            <button onClick={handlePredict} disabled={predicting} className="btn-pill border border-topaz text-topaz text-sm">
-              {predicting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
-              {predicting ? "Predicting…" : "Run prediction"}
-            </button>
-            {predictions.length > 0 && (
-              <div className="mt-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {predictions.map((p, i) => (
-                  <div key={i} className="rounded-xl border border-border bg-secondary/20 p-4">
-                    <p className="text-sm font-medium capitalize">{p.category}</p>
-                    <p className="text-2xl font-semibold text-emerald mt-1">£{p.predicted_monthly?.toFixed(0)}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Confidence: {Math.round((p.confidence || 0) * 100)}%
-                    </p>
-                    {p.rationale && <p className="text-xs text-muted-foreground mt-2">{p.rationale}</p>}
-                  </div>
-                ))}
-              </div>
-            )}
+              <button onClick={handlePredict} disabled={predicting} className="btn-pill border border-topaz text-topaz text-sm">
+                {predicting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                {predicting ? "Predicting…" : "AI Forecast"}
+              </button>
+            </div>
           </SectionCard>
 
-          {/* Category list */}
-          <div className="space-y-3">
+          {predictions.length > 0 && (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {predictions.map((p, i) => (
+                <div key={i} className="rounded-xl border border-border bg-secondary/20 p-4">
+                  <p className="text-sm font-medium capitalize">{p.category}</p>
+                  <p className="text-2xl font-semibold text-emerald mt-1">£{p.predicted_monthly?.toFixed(0)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Confidence: {Math.round((p.confidence || 0) * 100)}%</p>
+                  {p.rationale && <p className="text-xs text-muted-foreground mt-2">{p.rationale}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Day-to-Day category list */}
+          <div className="space-y-2">
+            <p className="label-overline">Monthly Budget Categories</p>
             {dayOccasions.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">No budgets yet. Add a category above.</p>
+              <p className="text-sm text-muted-foreground text-center py-4">No budgets yet. Use Quick setup above.</p>
             ) : (
               dayOccasions.map(occ => (
                 <div key={occ.id}>
-                  <p className="label-overline mb-2">{occ.name}</p>
+                  <p className="text-xs font-medium text-muted-foreground mb-1 capitalize">{occ.name}</p>
                   {occ.categories.map(cat => (
-                    <div key={cat.id} className="flex items-center justify-between py-3 px-4 rounded-xl border border-border mb-2 bg-card">
+                    <div key={cat.id} className="flex items-center justify-between py-2.5 px-4 rounded-xl border border-border mb-1.5 bg-card">
                       <div>
-                        <p className="font-medium capitalize">{cat.name}</p>
+                        <p className="font-medium capitalize text-sm">{cat.name}</p>
                         <p className="text-xs text-muted-foreground">
                           Budget: £{cat.budgeted.toFixed(0)} · Actual: £{cat.actual.toFixed(0)} · Forecast: £{cat.forecast.toFixed(0)}
                         </p>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3">
                         <span className={`text-sm font-medium ${cat.difference >= 0 ? "text-emerald" : "text-ruby"}`}>
                           {cat.difference >= 0 ? "+" : ""}£{cat.difference.toFixed(0)}
                         </span>
-                        <button onClick={() => deleteDayToDay(cat.id, cat.name)} className="p-2 rounded-lg hover:bg-secondary text-ruby">
+                        <button onClick={() => deleteDayToDay(cat.id, cat.name)} className="p-1.5 rounded-lg hover:bg-secondary text-ruby">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
@@ -1323,187 +1297,10 @@ export default function BudgetSystem() {
               ))
             )}
           </div>
-        </div>
-      )}
 
-      {/* ── TAB: YOM TOV (Phase 2 enhanced) ─────────────────────────────── */}
-      {activeTab === "yomtov" && (
-        <div className="space-y-6 animate-[fadeUp_0.3s_ease-out]">
-          {/* Auto-create button */}
-          <div className="rounded-2xl border border-border bg-card p-6">
-            <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-topaz" />
-                <p className="label-overline">Yom Tov Budgets</p>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={handleAutoCreateYomTov} disabled={autoCreating}
-                        className={`btn-pill text-sm ${autoCreateResult ? "gradient-emerald text-white" : "border border-topaz text-topaz"}`}>
-                  {autoCreating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Star className="h-4 w-4 mr-1" />}
-                  {autoCreating ? "Creating…" : autoCreateResult ? "Re-create" : "Auto-create upcoming"}
-                </button>
-              </div>
-            </div>
+          <hr className="border-border" />
 
-            {autoCreateResult && (
-              <div className="mb-4 p-3 rounded-xl bg-emerald/5 border border-emerald/20 text-sm">
-                <p className="font-medium text-emerald">{autoCreateResult.count} Yom Tov budgets created</p>
-              </div>
-            )}
-
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {jewishHolidays.map(h => (
-                <div key={h.holiday} className="rounded-xl border border-border p-4 hover:border-topaz transition-colors cursor-pointer" onClick={() => viewHoliday(h.holiday)}>
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium">{h.holiday}</p>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs px-2 py-1 rounded-full bg-secondary">{h.month}</span>
-                    </div>
-                  </div>
-                  <p className="text-2xl tracking-tight font-medium text-topaz mt-2">+{h.uplift_pct}% uplift</p>
-                  <div className="flex items-center justify-between mt-3">
-                    <button className="text-xs px-3 py-1 rounded-full border border-border hover:border-topaz hover:text-topaz">
-                      {selectedHoliday === h.holiday ? "Close" : "Budget"}
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); handleEstimateYomTov(h.holiday); }}
-                            disabled={estimatingYomTov === h.holiday}
-                            className="text-xs px-3 py-1 rounded-full border border-border hover:border-emerald hover:text-emerald">
-                      {estimatingYomTov === h.holiday ? <Loader2 className="h-3 w-3 animate-spin inline mr-1" /> : <Sparkles className="h-3 w-3 inline mr-1" />}
-                      AI Estimate
-                    </button>
-                  </div>
-                  {yomTovEstimates[h.holiday]?.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-border space-y-1">
-                      {yomTovEstimates[h.holiday].map((est, i) => (
-                        <div key={i} className="flex justify-between text-xs">
-                          <span className="capitalize text-muted-foreground">{est.category}</span>
-                          <span className="font-medium">£{est.estimated?.toFixed?.(0) || est.estimated_amount?.toFixed?.(0) || "0"}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-          {renderHolidayDetail()}
-        </div>
-      )}
-
-      {/* ── TAB: HOLIDAY (Phase 2 enhanced) ──────────────────────────────── */}
-      {activeTab === "holiday" && (
-        <div className="space-y-6 animate-[fadeUp_0.3s_ease-out]">
-          {/* AI-powered holiday planner */}
-          <div className="rounded-2xl border-2 border-topaz/20 bg-card p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Plane className="h-5 w-5 text-topaz" />
-              <p className="label-overline">Plan a holiday</p>
-            </div>
-
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-              <div>
-                <label className="label-overline">Holiday name</label>
-                <input placeholder="Summer Trip 2026" value={holidayName}
-                       onChange={e => setHolidayName(e.target.value)}
-                       className="mt-1 w-full control-shell" />
-              </div>
-              <div>
-                <label className="label-overline">Destination</label>
-                <input placeholder="Spain, Italy, …" value={holidayDestination}
-                       onChange={e => setHolidayDestination(e.target.value)}
-                       className="mt-1 w-full control-shell" />
-              </div>
-              <div>
-                <label className="label-overline">Start date</label>
-                <input type="date" value={holidayStartDate}
-                       onChange={e => setHolidayStartDate(e.target.value)}
-                       className="mt-1 w-full control-shell" />
-              </div>
-              <div>
-                <label className="label-overline">End date</label>
-                <input type="date" value={holidayEndDate}
-                       onChange={e => setHolidayEndDate(e.target.value)}
-                       className="mt-1 w-full control-shell" />
-              </div>
-            </div>
-
-            {holidayPresets.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-4">
-                <span className="text-xs text-muted-foreground self-center mr-1">Quick categories:</span>
-                {holidayPresets.map(cat => (
-                  <button key={cat} type="button" onClick={() => setHolidayName(prev => prev || cat + " Trip")}
-                          className="text-xs px-3 py-1.5 rounded-full border border-border hover:border-topaz hover:text-topaz transition-colors capitalize">
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <button onClick={handleHolidayEstimate} disabled={estimatingHoliday || !holidayName.trim() || !holidayStartDate || !holidayEndDate}
-                    className="btn-pill gradient-topaz text-white text-sm disabled:opacity-50">
-              {estimatingHoliday ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
-              {estimatingHoliday ? "Estimating…" : "AI — Estimate & Create"}
-            </button>
-          </div>
-
-          {/* AI estimate result */}
-          {holidayEstimate && (
-            <div className="rounded-2xl border border-border bg-card p-6 animate-[fadeUp_0.3s_ease-out]">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Plane className="h-4 w-4 text-topaz" />
-                  <p className="font-medium">{holidayEstimate.name}</p>
-                  <span className="text-2xl font-semibold text-topaz">£{holidayEstimate.total_estimated?.toFixed(0)}</span>
-                </div>
-                <button onClick={clearHolidayEstimate} className="text-xs px-3 py-1 rounded-full border border-border">Clear</button>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                {holidayEstimate.categories?.map((cat, i) => (
-                  <div key={i} className="rounded-xl bg-secondary/20 p-3">
-                    <p className="text-xs text-muted-foreground capitalize">{cat.name}</p>
-                    <p className="text-lg font-semibold mt-1">£{cat.estimated?.toFixed(0)}</p>
-                    {cat.rationale && <p className="text-xs text-muted-foreground mt-1">{cat.rationale}</p>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Existing holiday budgets */}
-          <div className="rounded-2xl border border-border bg-card p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <p className="label-overline">Existing Holiday Budgets</p>
-            </div>
-            <div className="flex gap-2 mb-6">
-              <input placeholder="Legacy holiday name" value={newSecularHoliday}
-                     onChange={e => setNewSecularHoliday(e.target.value)}
-                     className="h-10 flex-1 max-w-sm px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-topaz focus:outline-none text-sm" />
-              <button onClick={addSecularHoliday} className="btn-pill border border-emerald text-emerald text-sm">
-                <Plus className="h-4 w-4 mr-1" /> Add Legacy
-              </button>
-            </div>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {secularHolidaysList.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 col-span-full">No custom holidays yet.</p>
-              ) : secularHolidaysList.map(hName => (
-                <div key={hName} className="rounded-xl border border-border p-4 hover:border-topaz transition-colors cursor-pointer" onClick={() => viewHoliday(hName)}>
-                  <p className="font-medium">{hName}</p>
-                  <button className="mt-3 text-xs px-3 py-1 rounded-full border border-border hover:border-topaz hover:text-topaz">
-                    {selectedHoliday === hName ? "Close" : "Budget"}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-          {renderHolidayDetail()}
-        </div>
-      )}
-
-      {/* ── TAB: SIMCHA (Phase 3 enhanced) ──────────────────────────────── */}
-      {activeTab === "simcha" && (
-        <div className="space-y-6 animate-[fadeUp_0.3s_ease-out]">
-
-          {/* Other Simcha creator */}
+          {/* ── Simcha ──────────────────────────────────────────────── */}
           <div className="rounded-2xl border-2 border-ruby/20 bg-card p-6">
             <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
               <div className="flex items-center gap-2">
@@ -1515,7 +1312,6 @@ export default function BudgetSystem() {
                 <Plus className="h-4 w-4 mr-1" /> New simcha
               </button>
             </div>
-
             {showSimchaForm && (
               <form onSubmit={createSimcha} className="mb-6 p-4 rounded-xl bg-secondary/20 border border-border space-y-3">
                 <div className="grid sm:grid-cols-3 gap-3">
@@ -1558,12 +1354,11 @@ export default function BudgetSystem() {
                 </div>
               </form>
             )}
-
             {simchaOccasions.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No other simcha occasions yet.</p>
+              <p className="text-sm text-muted-foreground text-center py-3">No simcha occasions yet.</p>
             ) : (
               <div className="space-y-2">
-                <p className="label-overline">Other Simcha Occasions</p>
+                <p className="label-overline">Simcha Occasions</p>
                 {simchaOccasions.map(occ => (
                   <div key={occ.id} className="flex items-center justify-between py-3 px-4 rounded-xl bg-secondary/20 border border-border">
                     <div className="flex-1 min-w-0">
@@ -1593,7 +1388,255 @@ export default function BudgetSystem() {
             )}
           </div>
 
-          {/* Chasuna (wedding) section — preserved */}
+          <hr className="border-border" />
+
+          {/* ── Other ───────────────────────────────────────────────── */}
+          <div className="rounded-2xl border-2 border-topaz/20 bg-card p-6">
+            <p className="label-overline mb-4">One-time expense</p>
+            <form onSubmit={createOther} className="flex flex-wrap gap-3 items-end">
+              <div className="flex-1 min-w-[160px]">
+                <label className="label-overline">Name</label>
+                <input required value={otherForm.name}
+                       onChange={e => setOtherForm({...otherForm, name: e.target.value})}
+                       placeholder="Car purchase" list="other-examples-bud" className="mt-1 w-full control-shell" />
+                <datalist id="other-examples-bud">
+                  {otherPresets.map(ex => <option key={ex} value={ex} />)}
+                </datalist>
+              </div>
+              <div className="flex-1 min-w-[140px]">
+                <label className="label-overline">Budget (£)</label>
+                <input required type="number" step="0.01" value={otherForm.estimated_amount}
+                       onChange={e => setOtherForm({...otherForm, estimated_amount: e.target.value})}
+                       placeholder="5000" className="mt-1 w-full control-shell" />
+              </div>
+              <div className="flex-1 min-w-[140px]">
+                <label className="label-overline">Date</label>
+                <input type="date" value={otherForm.event_date}
+                       onChange={e => setOtherForm({...otherForm, event_date: e.target.value})}
+                       className="mt-1 w-full control-shell" />
+              </div>
+              <div className="w-full sm:w-auto">
+                <label className="label-overline">Categories (comma-sep)</label>
+                <input value={otherForm.categories}
+                       onChange={e => setOtherForm({...otherForm, categories: e.target.value})}
+                       placeholder="venue, catering" className="mt-1 w-full control-shell" />
+              </div>
+              <div className="w-full">
+                <label className="label-overline">Notes</label>
+                <textarea value={otherForm.notes}
+                  onChange={e => setOtherForm({...otherForm, notes: e.target.value})}
+                  placeholder="Optional details" className="mt-1 w-full control-shell resize-none h-20" />
+              </div>
+              <div className="flex gap-2 w-full">
+                <button className="btn-pill gradient-emerald text-white text-sm">
+                  <Plus className="h-4 w-4 mr-2" /> Add
+                </button>
+                {editingOther && (
+                  <button type="button" onClick={() => { setEditingOther(null); setOtherForm({ name: "", estimated_amount: "", event_date: "", notes: "", categories: "" }); }}
+                          className="text-xs px-4 py-2 rounded-full border border-border">Cancel</button>
+                )}
+              </div>
+            </form>
+          </div>
+
+          {/* Other list */}
+          <div className="space-y-2">
+            <p className="label-overline">Saved one-time budgets</p>
+            {otherOccasions.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No other budgets yet.</p>
+            ) : (
+              otherOccasions.map(occ => (
+                <div key={occ.id} className="flex items-center justify-between py-3 px-4 rounded-xl border border-border bg-card">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium">{occ.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      £{occ.estimated_amount?.toFixed(0) || "0"}
+                      {occ.event_date && <> · {occ.event_date.slice(0, 10)}</>}
+                      {occ.notes && <> · {occ.notes}</>}
+                    </p>
+                    {occ.categories?.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {occ.categories.map(c => (
+                          <span key={c.name} className="text-xs px-2 py-0.5 rounded-full bg-secondary/40 capitalize">
+                            {c.name}: £{c.budgeted?.toFixed(0)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-1 ml-3">
+                    <button onClick={() => { setEditingOther(occ.id); setOtherForm({ name: occ.name, estimated_amount: String(occ.estimated_amount || ""), event_date: occ.event_date ? occ.event_date.slice(0, 10) : "", notes: occ.notes || "", categories: (occ.categories || []).map(c => c.name).join(", ") }); }}
+                            className="p-2 rounded-lg hover:bg-secondary text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => deleteOther(occ.id)} className="p-2 rounded-lg hover:bg-secondary text-ruby"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: EVENTS (Yom Tov + Holiday merged) ──────────────────────── */}
+      {activeTab === "events" && (
+        <div className="space-y-6 animate-[fadeUp_0.3s_ease-out]">
+
+          {/* ── Yom Tov ─────────────────────────────────────────────── */}
+          <div className="rounded-2xl border border-border bg-card p-6">
+            <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-topaz" />
+                <p className="label-overline">Yom Tov Budgets</p>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={handleAutoCreateYomTov} disabled={autoCreating}
+                        className={`btn-pill text-sm ${autoCreateResult ? "gradient-emerald text-white" : "border border-topaz text-topaz"}`}>
+                  {autoCreating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Star className="h-4 w-4 mr-1" />}
+                  {autoCreating ? "Creating…" : autoCreateResult ? "Re-create" : "Auto-create upcoming"}
+                </button>
+              </div>
+            </div>
+            {autoCreateResult && (
+              <div className="mb-4 p-3 rounded-xl bg-emerald/5 border border-emerald/20 text-sm">
+                <p className="font-medium text-emerald">{autoCreateResult.count} Yom Tov budgets created</p>
+              </div>
+            )}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {jewishHolidays.map(h => (
+                <div key={h.holiday} className="rounded-xl border border-border p-4 hover:border-topaz transition-colors cursor-pointer" onClick={() => viewHoliday(h.holiday)}>
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium">{h.holiday}</p>
+                    <span className="text-xs px-2 py-1 rounded-full bg-secondary">{h.month}</span>
+                  </div>
+                  <p className="text-2xl tracking-tight font-medium text-topaz mt-2">+{h.uplift_pct}% uplift</p>
+                  <div className="flex items-center justify-between mt-3">
+                    <button className="text-xs px-3 py-1 rounded-full border border-border hover:border-topaz hover:text-topaz">
+                      {selectedHoliday === h.holiday ? "Close" : "Budget"}
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); handleEstimateYomTov(h.holiday); }}
+                            disabled={estimatingYomTov === h.holiday}
+                            className="text-xs px-3 py-1 rounded-full border border-border hover:border-emerald hover:text-emerald">
+                      {estimatingYomTov === h.holiday ? <Loader2 className="h-3 w-3 animate-spin inline mr-1" /> : <Sparkles className="h-3 w-3 inline mr-1" />}
+                      AI Estimate
+                    </button>
+                  </div>
+                  {yomTovEstimates[h.holiday]?.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-border space-y-1">
+                      {yomTovEstimates[h.holiday].map((est, i) => (
+                        <div key={i} className="flex justify-between text-xs">
+                          <span className="capitalize text-muted-foreground">{est.category}</span>
+                          <span className="font-medium">£{est.estimated?.toFixed?.(0) || est.estimated_amount?.toFixed?.(0) || "0"}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <hr className="border-border" />
+
+          {/* ── Holiday (secular) ────────────────────────────────────── */}
+          <div className="rounded-2xl border-2 border-topaz/20 bg-card p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Plane className="h-5 w-5 text-topaz" />
+              <p className="label-overline">Plan a holiday</p>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+              <div>
+                <label className="label-overline">Holiday name</label>
+                <input placeholder="Summer Trip 2026" value={holidayName}
+                       onChange={e => setHolidayName(e.target.value)}
+                       className="mt-1 w-full control-shell" />
+              </div>
+              <div>
+                <label className="label-overline">Destination</label>
+                <input placeholder="Spain, Italy, …" value={holidayDestination}
+                       onChange={e => setHolidayDestination(e.target.value)}
+                       className="mt-1 w-full control-shell" />
+              </div>
+              <div>
+                <label className="label-overline">Start date</label>
+                <input type="date" value={holidayStartDate}
+                       onChange={e => setHolidayStartDate(e.target.value)}
+                       className="mt-1 w-full control-shell" />
+              </div>
+              <div>
+                <label className="label-overline">End date</label>
+                <input type="date" value={holidayEndDate}
+                       onChange={e => setHolidayEndDate(e.target.value)}
+                       className="mt-1 w-full control-shell" />
+              </div>
+            </div>
+            {holidayPresets.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-4">
+                <span className="text-xs text-muted-foreground self-center mr-1">Quick categories:</span>
+                {holidayPresets.map(cat => (
+                  <button key={cat} type="button" onClick={() => setHolidayName(prev => prev || cat + " Trip")}
+                          className="text-xs px-3 py-1.5 rounded-full border border-border hover:border-topaz hover:text-topaz transition-colors capitalize">
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button onClick={handleHolidayEstimate} disabled={estimatingHoliday || !holidayName.trim() || !holidayStartDate || !holidayEndDate}
+                    className="btn-pill gradient-topaz text-white text-sm disabled:opacity-50">
+              {estimatingHoliday ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
+              {estimatingHoliday ? "Estimating…" : "AI — Estimate & Create"}
+            </button>
+          </div>
+
+          {holidayEstimate && (
+            <div className="rounded-2xl border border-border bg-card p-6 animate-[fadeUp_0.3s_ease-out]">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Plane className="h-4 w-4 text-topaz" />
+                  <p className="font-medium">{holidayEstimate.name}</p>
+                  <span className="text-2xl font-semibold text-topaz">£{holidayEstimate.total_estimated?.toFixed(0)}</span>
+                </div>
+                <button onClick={clearHolidayEstimate} className="text-xs px-3 py-1 rounded-full border border-border">Clear</button>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                {holidayEstimate.categories?.map((cat, i) => (
+                  <div key={i} className="rounded-xl bg-secondary/20 p-3">
+                    <p className="text-xs text-muted-foreground capitalize">{cat.name}</p>
+                    <p className="text-lg font-semibold mt-1">£{cat.estimated?.toFixed(0)}</p>
+                    {cat.rationale && <p className="text-xs text-muted-foreground mt-1">{cat.rationale}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-2xl border border-border bg-card p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <p className="label-overline">Existing Holiday Budgets</p>
+            </div>
+            <div className="flex gap-2 mb-6">
+              <input placeholder="Legacy holiday name" value={newSecularHoliday}
+                     onChange={e => setNewSecularHoliday(e.target.value)}
+                     className="h-10 flex-1 max-w-sm px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-topaz focus:outline-none text-sm" />
+              <button onClick={addSecularHoliday} className="btn-pill border border-emerald text-emerald text-sm">
+                <Plus className="h-4 w-4 mr-1" /> Add Legacy
+              </button>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {secularHolidaysList.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 col-span-full">No custom holidays yet.</p>
+              ) : secularHolidaysList.map(hName => (
+                <div key={hName} className="rounded-xl border border-border p-4 hover:border-topaz transition-colors cursor-pointer" onClick={() => viewHoliday(hName)}>
+                  <p className="font-medium">{hName}</p>
+                  <button className="mt-3 text-xs px-3 py-1 rounded-full border border-border hover:border-topaz hover:text-topaz">
+                    {selectedHoliday === hName ? "Close" : "Budget"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {renderHolidayDetail()}
+
+          {/* ── Wedding Planner ───────────────────────────────────────── */}
           <div className="rounded-2xl border-2 border-topaz/30 bg-card p-6">
             <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
               <div className="flex items-center gap-2">
@@ -1683,92 +1726,6 @@ export default function BudgetSystem() {
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── TAB: OTHER (Phase 3) ────────────────────────────────────────── */}
-      {activeTab === "other" && (
-        <div className="space-y-6 animate-[fadeUp_0.3s_ease-out]">
-          <SectionCard eyebrow="Create" title="One-time expense">
-            <form onSubmit={createOther} className="flex flex-wrap gap-3 items-end">
-              <div className="flex-1 min-w-[160px]">
-                <label className="label-overline">Name</label>
-                <input required value={otherForm.name}
-                       onChange={e => setOtherForm({...otherForm, name: e.target.value})}
-                       placeholder="Car purchase" list="other-examples" className="mt-1 w-full control-shell" />
-                <datalist id="other-examples">
-                  {otherPresets.map(ex => <option key={ex} value={ex} />)}
-                </datalist>
-              </div>
-              <div className="flex-1 min-w-[140px]">
-                <label className="label-overline">Budget (£)</label>
-                <input required type="number" step="0.01" value={otherForm.estimated_amount}
-                       onChange={e => setOtherForm({...otherForm, estimated_amount: e.target.value})}
-                       placeholder="5000" className="mt-1 w-full control-shell" />
-              </div>
-              <div className="flex-1 min-w-[140px]">
-                <label className="label-overline">Date</label>
-                <input type="date" value={otherForm.event_date}
-                       onChange={e => setOtherForm({...otherForm, event_date: e.target.value})}
-                       className="mt-1 w-full control-shell" />
-              </div>
-              <div className="w-full sm:w-auto">
-                <label className="label-overline">Categories (comma-separated, optional)</label>
-                <input value={otherForm.categories}
-                       onChange={e => setOtherForm({...otherForm, categories: e.target.value})}
-                       placeholder="venue, catering, decor" className="mt-1 w-full control-shell" />
-              </div>
-              <div className="w-full">
-                <label className="label-overline">Notes</label>
-                <textarea value={otherForm.notes}
-                  onChange={e => setOtherForm({...otherForm, notes: e.target.value})}
-                  placeholder="Optional details about this expense" className="mt-1 w-full control-shell resize-none h-20" />
-              </div>
-              <div className="flex gap-2 w-full">
-                <button className="btn-pill gradient-emerald text-white text-sm">
-                  <Plus className="h-4 w-4 mr-2" /> Add
-                </button>
-                {editingOther && (
-                  <button type="button" onClick={() => { setEditingOther(null); setOtherForm({ name: "", estimated_amount: "", event_date: "", notes: "", categories: "" }); }}
-                          className="text-xs px-4 py-2 rounded-full border border-border">Cancel</button>
-                )}
-              </div>
-            </form>
-          </SectionCard>
-
-          <div className="space-y-3">
-            <p className="label-overline">Saved one-time budgets</p>
-            {otherOccasions.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">No other budgets yet.</p>
-            ) : (
-              otherOccasions.map(occ => (
-                <div key={occ.id} className="flex items-center justify-between py-3 px-4 rounded-xl border border-border bg-card">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium">{occ.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      £{occ.estimated_amount?.toFixed(0) || "0"}
-                      {occ.event_date && <> · {occ.event_date.slice(0, 10)}</>}
-                      {occ.notes && <> · {occ.notes}</>}
-                    </p>
-                    {occ.categories?.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {occ.categories.map(c => (
-                          <span key={c.name} className="text-xs px-2 py-0.5 rounded-full bg-secondary/40 capitalize">
-                            {c.name}: £{c.budgeted?.toFixed(0)}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex gap-1 ml-3">
-                    <button onClick={() => { setEditingOther(occ.id); setOtherForm({ name: occ.name, estimated_amount: String(occ.estimated_amount || ""), event_date: occ.event_date ? occ.event_date.slice(0, 10) : "", notes: occ.notes || "", categories: (occ.categories || []).map(c => c.name).join(", ") }); }}
-                            className="p-2 rounded-lg hover:bg-secondary text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
-                    <button onClick={() => deleteOther(occ.id)} className="p-2 rounded-lg hover:bg-secondary text-ruby"><Trash2 className="h-3.5 w-3.5" /></button>
-                  </div>
-                </div>
-              ))
             )}
           </div>
         </div>

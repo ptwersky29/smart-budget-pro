@@ -222,7 +222,7 @@ export default function AppLayout() {
               <span className="block text-[11px] text-muted-foreground mt-1">Premium money workspace</span>
             </div>
           </Link>
-          <button className="lg:hidden h-9 w-9 rounded-full grid place-items-center hover:bg-secondary" onClick={() => setOpen(false)} data-testid="sidebar-close" aria-label="Close navigation menu">
+          <button className="lg:hidden h-11 w-11 rounded-full grid place-items-center hover:bg-secondary" onClick={() => setOpen(false)} data-testid="sidebar-close" aria-label="Close navigation menu">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -247,7 +247,7 @@ export default function AppLayout() {
                           : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
                       }`}
                     >
-                      <span className={`grid h-9 w-9 place-items-center rounded-xl border transition-colors ${
+                      <span className={`grid h-10 w-10 place-items-center rounded-xl border transition-colors ${
                         active ? "border-emerald/20 bg-emerald/15 text-emerald" : "border-transparent bg-secondary/60"
                       }`}>
                         <Icon className="h-4 w-4" />
@@ -284,7 +284,7 @@ export default function AppLayout() {
               <p className="text-sm font-medium truncate">{user?.name || user?.email}</p>
               <p className="text-xs text-muted-foreground capitalize">{user?.tier || "free"} plan · {currentSection.label}</p>
             </div>
-            <button onClick={doLogout} title="Logout" data-testid="logout-button" className="text-muted-foreground hover:text-foreground" aria-label="Log out">
+            <button onClick={doLogout} title="Logout" data-testid="logout-button" className="p-3 text-muted-foreground hover:text-foreground" aria-label="Log out">
               <LogOut className="h-4 w-4" />
             </button>
           </div>
@@ -297,7 +297,7 @@ export default function AppLayout() {
         <header className="sticky top-0 z-20 border-b border-border/70 bg-background/80 backdrop-blur-xl">
           <div className="flex items-center justify-between gap-4 px-4 lg:px-8 h-16">
             <div className="flex items-center gap-3 min-w-0">
-              <button className="lg:hidden h-10 w-10 rounded-full grid place-items-center border border-border bg-card/80" onClick={() => setOpen(true)} data-testid="sidebar-open" aria-label="Open navigation menu">
+              <button className="lg:hidden h-11 w-11 rounded-full grid place-items-center border border-border bg-card/80" onClick={() => setOpen(true)} data-testid="sidebar-open" aria-label="Open navigation menu">
                 <Menu className="h-5 w-5" />
               </button>
               <div className="min-w-0">
@@ -323,13 +323,13 @@ export default function AppLayout() {
                   Upgrade
                 </Link>
               )}
-              <button onClick={toggleTheme} data-testid="theme-toggle" className="h-10 w-10 grid place-items-center rounded-full border border-border bg-card/80 hover:bg-secondary transition-colors" aria-label="Toggle theme">
+              <button onClick={toggleTheme} data-testid="theme-toggle" className="h-11 w-11 grid place-items-center rounded-full border border-border bg-card/80 hover:bg-secondary transition-colors" aria-label="Toggle theme">
                 {dark ? <Sun className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
               </button>
             </div>
 
             <div className="flex items-center gap-2 lg:hidden">
-              <button onClick={toggleTheme} data-testid="theme-toggle-mobile" className="h-10 w-10 grid place-items-center rounded-full border border-border bg-card/80 hover:bg-secondary transition-colors" aria-label="Toggle theme">
+              <button onClick={toggleTheme} data-testid="theme-toggle-mobile" className="h-11 w-11 grid place-items-center rounded-full border border-border bg-card/80 hover:bg-secondary transition-colors" aria-label="Toggle theme">
                 {dark ? <Sun className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
               </button>
             </div>

@@ -54,8 +54,8 @@ export default function Pricing() {
                     className="btn-pill border border-border mt-8 w-full">{user ? "Go to dashboard" : "Start free"}</button>
           </div>
 
-          <div className="rounded-3xl border-2 border-emerald bg-card p-8 relative scale-105">
-            <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-xs px-4 py-1 rounded-full gradient-emerald text-white flex items-center gap-1 whitespace-nowrap">
+          <div className="rounded-3xl border-2 border-emerald bg-card p-8 relative">
+            <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-xs px-3 py-1 rounded-full gradient-emerald text-white flex items-center gap-1 whitespace-nowrap">
               <Sparkles className="h-3 w-3"/> Most popular
             </span>
             <p className="label-overline text-emerald">Premium Monthly</p>

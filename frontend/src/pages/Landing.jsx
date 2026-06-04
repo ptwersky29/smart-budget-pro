@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { Sparkles, Building2, MessagesSquare, TrendingUp, ShieldCheck, Star, Check, ArrowRight, Landmark } from "lucide-react";
+import { Sparkles, Building2, MessagesSquare, TrendingUp, ShieldCheck, Star, Check, ArrowRight, Landmark, Menu, X } from "lucide-react";
 
 const HERO_IMG = "https://static.prod-images.emergentagent.com/jobs/a8ffc4f3-0824-40c4-a74c-b4e5c8fbcb66/images/9ec1a41a2ae49b3da963b26e9d76ff276824ad745a2dc7b71aee9227d794347c.png";
 
@@ -14,6 +14,7 @@ const FEATURES = [
 ];
 
 export default function Landing() {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Nav */}
@@ -27,20 +28,43 @@ export default function Landing() {
             <a href="#features" className="hover:text-foreground">Features</a>
             <a href="#pricing" className="hover:text-foreground">Pricing</a>
             <a href="#jewish" className="hover:text-foreground">Jewish Tools</a>
-          </nav>
-          <div className="flex items-center gap-3">
-            <Link to="/login" className="text-sm hover:text-emerald" data-testid="nav-login">Sign in</Link>
+            <Link to="/login" className="px-4 py-2 hover:text-foreground">Sign in</Link>
             <Link to="/register" data-testid="nav-register" className="btn-pill text-sm gradient-emerald text-white hover:opacity-90">Get started <ArrowRight className="h-4 w-4 ml-1" /></Link>
-          </div>
+          </nav>
+          <button className="md:hidden p-3 text-foreground" onClick={() => setMobileNavOpen(true)} aria-label="Open navigation menu">
+            <Menu className="h-5 w-5" />
+          </button>
         </div>
       </header>
+
+      {mobileNavOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMobileNavOpen(false)} />
+          <div className="fixed top-0 right-0 h-full w-3/4 max-w-sm bg-card border-l border-border p-6 shadow-2xl animate-[fadeUp_0.2s_ease-out]">
+            <div className="flex items-center justify-between mb-8">
+              <span className="font-semibold tracking-tight text-lg">FinanceAI</span>
+              <button className="p-3" onClick={() => setMobileNavOpen(false)} aria-label="Close navigation menu">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <nav className="flex flex-col gap-2">
+              <a href="#features" onClick={() => setMobileNavOpen(false)} className="px-4 py-4 rounded-xl text-foreground hover:bg-secondary text-base font-medium">Features</a>
+              <a href="#pricing" onClick={() => setMobileNavOpen(false)} className="px-4 py-4 rounded-xl text-foreground hover:bg-secondary text-base font-medium">Pricing</a>
+              <a href="#jewish" onClick={() => setMobileNavOpen(false)} className="px-4 py-4 rounded-xl text-foreground hover:bg-secondary text-base font-medium">Jewish Tools</a>
+              <hr className="my-2 border-border" />
+              <Link to="/login" onClick={() => setMobileNavOpen(false)} className="px-4 py-4 rounded-xl text-foreground hover:bg-secondary text-base font-medium">Sign in</Link>
+              <Link to="/register" onClick={() => setMobileNavOpen(false)} className="btn-pill gradient-emerald text-white text-center mt-2 py-4">Get started <ArrowRight className="h-4 w-4 ml-1 inline" /></Link>
+            </nav>
+          </div>
+        </div>
+      )}
 
       {/* Hero */}
       <section className="relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 pt-20 pb-32 grid lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-7 space-y-8 fade-up">
             <span className="inline-flex items-center gap-2 label-overline text-emerald"><span className="w-1.5 h-1.5 rounded-full bg-emerald"></span> Premium AI Personal Finance</span>
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl tracking-tight leading-[0.95] font-medium">
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl tracking-tight leading-[0.95] font-medium break-words">
               Your money,<br />reading <span className="italic text-emerald" style={{fontFamily:'Fraunces'}}>your mind.</span>
             </h1>
             <p className="text-lg text-muted-foreground max-w-xl leading-relaxed">

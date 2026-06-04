@@ -73,7 +73,7 @@ export default function ComparePeriods({ open, onClose }) {
             <BarChart3 className="h-5 w-5 text-topaz" />
             <h3 className="text-xl tracking-tight font-medium">Compare Periods</h3>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="p-3 rounded-lg hover:bg-secondary text-muted-foreground"><X className="h-4 w-4" /></button>
         </div>
 
         {/* Date range inputs */}

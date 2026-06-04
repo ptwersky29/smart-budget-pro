@@ -125,7 +125,7 @@ export default function SMS() {
                 <CheckCircle2 className="h-4 w-4 text-emerald shrink-0" />
                 <span className="text-sm font-mono">{s.phone_number}</span>
                 <span className="text-xs text-muted-foreground">{s.verified_at ? `verified ${s.verified_at.slice(0, 10)}` : "pending"}</span>
-                <button onClick={() => deleteSender(s.id)} className="ml-auto p-2 text-muted-foreground hover:text-ruby" title="Remove">
+                <button onClick={() => deleteSender(s.id)} className="ml-auto p-3 text-muted-foreground hover:text-ruby" title="Remove">
                   <Trash2 className="h-4 w-4" />
                 </button>
               </li>
@@ -186,8 +186,8 @@ export default function SMS() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => saveExisting(m.sms_id)} data-testid={`save-${m.sms_id}`} className="text-xs px-3 py-1.5 rounded-full bg-emerald text-white">Save</button>
-                  <button onClick={() => del(m.sms_id)} data-testid={`del-${m.sms_id}`} className="p-2 text-muted-foreground hover:text-ruby" title="Delete"><Trash2 className="h-4 w-4" /></button>
+                  <button onClick={() => saveExisting(m.sms_id)} data-testid={`save-${m.sms_id}`} className="text-xs px-4 py-2.5 rounded-full bg-emerald text-white">Save</button>
+                  <button onClick={() => del(m.sms_id)} data-testid={`del-${m.sms_id}`} className="p-3 text-muted-foreground hover:text-ruby" title="Delete"><Trash2 className="h-4 w-4" /></button>
                 </div>
               </li>
             ))}

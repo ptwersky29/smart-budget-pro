@@ -36,7 +36,7 @@ export default function ForgotPassword() {
               If an account exists for <strong>{email}</strong>, you'll receive a password reset link shortly.
             </p>
             <p className="text-xs text-muted-foreground mt-6">
-              Didn't receive it? <button onClick={() => setSent(false)} className="text-emerald hover:underline bg-transparent border-0 p-0 cursor-pointer">Try again</button>
+              Didn't receive it? <button onClick={() => setSent(false)} className="text-emerald hover:underline bg-transparent border-0 px-4 py-2 cursor-pointer">Try again</button>
             </p>
           </div>
         ) : (

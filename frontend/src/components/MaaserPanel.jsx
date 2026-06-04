@@ -178,24 +178,24 @@ export default function MaaserPanel({ refreshKey = 0, onChange }) {
                 onClick={giveFromBalance}
                 data-testid="maaser-give"
                 disabled={busy}
-                className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-emerald text-white hover:opacity-90 disabled:opacity-50"
+                className="inline-flex items-center gap-1 text-sm px-4 py-2.5 rounded-full bg-emerald text-white hover:opacity-90 disabled:opacity-50"
               >
-                <CheckCircle2 className="h-3 w-3" /> Give {fmt(sum.balance_owed)}
+                <CheckCircle2 className="h-3.5 w-3.5" /> Give {fmt(sum.balance_owed)}
               </button>
             )}
             <button
               onClick={recalc}
               disabled={busy}
               data-testid="maaser-recalc"
-              className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full border border-border hover:border-emerald hover:text-emerald disabled:opacity-50"
+              className="inline-flex items-center gap-2 text-sm px-4 py-2.5 rounded-full border border-border hover:border-emerald hover:text-emerald disabled:opacity-50"
             >
-              <RefreshCw className={`h-3 w-3 ${busy ? "animate-spin" : ""}`} /> Recalculate
+              <RefreshCw className={`h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`} /> Recalculate
             </button>
             <button
               onClick={reset}
               disabled={busy}
               data-testid="maaser-reset"
-              className="text-xs px-3 py-1.5 rounded-full border border-border hover:border-ruby hover:text-ruby disabled:opacity-50"
+              className="text-sm px-4 py-2.5 rounded-full border border-border hover:border-ruby hover:text-ruby disabled:opacity-50"
             >
               Reset audit
             </button>

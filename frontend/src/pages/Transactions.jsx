@@ -567,12 +567,12 @@ const Transactions = React.memo(function Transactions() {
                   <span className="text-muted-foreground">Showing {offset + 1}–{Math.min(offset + limit, total)} of {total}</span>
                   <div className="flex items-center gap-2">
                     <button onClick={() => setOffset(Math.max(0, offset - limit))} disabled={offset === 0}
-                      className="h-8 w-8 rounded-full grid place-items-center border border-border hover:bg-secondary disabled:opacity-30" aria-label="Previous page">
+                      className="h-10 w-10 rounded-full grid place-items-center border border-border hover:bg-secondary disabled:opacity-30" aria-label="Previous page">
                       <ChevronLeft className="h-4 w-4" />
                     </button>
                     <span className="text-muted-foreground min-w-[4rem] text-center">{currentPage} / {totalPages}</span>
                     <button onClick={() => setOffset(Math.min((totalPages - 1) * limit, offset + limit))} disabled={offset + limit >= total}
-                      className="h-8 w-8 rounded-full grid place-items-center border border-border hover:bg-secondary disabled:opacity-30" aria-label="Next page">
+                      className="h-10 w-10 rounded-full grid place-items-center border border-border hover:bg-secondary disabled:opacity-30" aria-label="Next page">
                       <ChevronRight className="h-4 w-4" />
                     </button>
                   </div>

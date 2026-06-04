@@ -174,7 +174,7 @@ export default function Subscriptions() {
                     <td className="px-6 py-3 tabular-nums">£{Math.abs(s.amount).toFixed(2)}</td>
                     <td className="px-6 py-3 text-xs capitalize">{s.frequency}</td>
                     <td className="px-6 py-3">
-                      <button onClick={() => toggleActive(s)} className={`text-xs px-2 py-1 rounded-full ${s.active ? "bg-emerald/10 text-emerald" : "bg-muted text-muted-foreground"}`}>
+                  <button onClick={() => toggleActive(s)} className={`text-xs px-3 py-2 rounded-full ${s.active ? "bg-emerald/10 text-emerald" : "bg-muted text-muted-foreground"}`}>
                         {s.active ? "Active" : "Paused"}
                       </button>
                     </td>

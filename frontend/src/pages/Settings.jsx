@@ -225,7 +225,7 @@ export default function Settings() {
                   <div><p className="text-sm font-medium">{p.name} {p.is_default && <span className="text-xs text-emerald"> &middot; default</span>}</p>
                   <p className="text-xs text-muted-foreground">{p.provider} &middot; {p.model}</p></div>
                 </div>
-                <button onClick={()=>del(p.provider_id)} data-testid={`del-prov-${p.provider_id}`} className="p-2 text-muted-foreground hover:text-ruby"><Trash2 className="h-4 w-4"/></button>
+                <button onClick={()=>del(p.provider_id)} data-testid={`del-prov-${p.provider_id}`} className="p-3 text-muted-foreground hover:text-ruby"><Trash2 className="h-4 w-4"/></button>
               </div>
             ))
           }

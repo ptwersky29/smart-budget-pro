@@ -136,7 +136,7 @@ export default function Integrations() {
                   <p className="text-xs text-muted-foreground truncate">{p.provider} · {p.model}</p>
                 </div>
                 {p.is_default && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald/10 text-emerald">Default</span>}
-                <button onClick={()=>removeAi(p.provider_id)} data-testid={`ai-remove-${p.provider_id}`} className="text-muted-foreground hover:text-ruby"><Trash2 className="h-4 w-4"/></button>
+                <button onClick={()=>removeAi(p.provider_id)} data-testid={`ai-remove-${p.provider_id}`} className="p-2 text-muted-foreground hover:text-ruby"><Trash2 className="h-4 w-4"/></button>
               </div>
             ))}
           </div>

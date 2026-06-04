@@ -230,7 +230,7 @@ export default function Connections() {
                 <p className="text-sm text-muted-foreground">Securely link your UK bank account — read-only access</p>
               </div>
             </div>
-            <div className="flex flex-col gap-3 min-w-[260px]">
+            <div className="flex flex-col gap-3 min-w-0 max-w-full">
               <div>
                 <label className="label-overline">Import start date</label>
                 <input

@@ -73,7 +73,7 @@ export default function QuickAddWidget() {
 
       {/* Quick form */}
       {open && (
-        <div className="fixed bottom-6 right-6 z-50 w-80 sm:w-96 animate-[fadeUp_0.2s_ease-out]" ref={ref}>
+        <div className="fixed bottom-6 right-6 z-50 w-[calc(100vw-2rem)] sm:w-96 animate-[fadeUp_0.2s_ease-out]" ref={ref}>
           <div className="rounded-2xl border-2 border-emerald/30 bg-card p-4 shadow-xl shadow-emerald/10">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">

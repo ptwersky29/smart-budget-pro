@@ -81,7 +81,7 @@ export default function ConsentBanner() {
           </button>
           <button
             onClick={() => setVisible(false)}
-            className="p-2 hover:bg-secondary rounded-lg text-muted-foreground"
+            className="p-3 hover:bg-secondary rounded-lg text-muted-foreground"
             aria-label="Close"
           >
             <X className="h-4 w-4" />

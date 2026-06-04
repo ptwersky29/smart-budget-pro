@@ -71,7 +71,7 @@ export default function Investments() {
       <div className="rounded-2xl border border-border bg-card p-6" data-testid="live-prices">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2"><TrendingUp className="h-4 w-4 text-emerald" /><p className="label-overline">Live crypto prices</p></div>
-          <button onClick={loadPrices} disabled={pricesBusy} data-testid="prices-refresh" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 disabled:opacity-50">
+          <button onClick={loadPrices} disabled={pricesBusy} data-testid="prices-refresh" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 p-2 disabled:opacity-50">
             {pricesBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Refresh
             {priceTs && <span className="ml-1">· {new Date(priceTs * 1000).toLocaleTimeString()}</span>}
           </button>
@@ -98,7 +98,7 @@ export default function Investments() {
       <div className="rounded-2xl border border-border bg-card p-6" data-testid="live-stocks">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2"><TrendingUp className="h-4 w-4 text-topaz" /><p className="label-overline">Live ETFs & indices</p></div>
-          <button onClick={loadStocks} disabled={stocksBusy} data-testid="stocks-refresh" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 disabled:opacity-50">
+          <button onClick={loadStocks} disabled={stocksBusy} data-testid="stocks-refresh" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 p-2 disabled:opacity-50">
             {stocksBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Refresh
           </button>
         </div>

@@ -118,7 +118,7 @@ export default function Statements() {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="text-xs text-muted-foreground">{t.date}</p>
-                    <p className="font-medium text-sm truncate max-w-[200px]" title={t.description}>{t.description}</p>
+                    <p className="font-medium text-sm truncate max-w-[40vw]" title={t.description}>{t.description}</p>
                   </div>
                   <span className={`shrink-0 font-medium tabular-nums ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}>
                     {t.amount > 0 ? "+" : "−"}{current.currency === "USD" ? "$" : "£"}{Math.abs(t.amount).toFixed(2)}
