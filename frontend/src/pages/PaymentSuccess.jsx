@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { CheckCircle2, XCircle } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
+import Skeleton from "../components/ui/Skeleton";
 
 export default function PaymentSuccess() {
   const [params] = useSearchParams();
@@ -45,12 +46,12 @@ export default function PaymentSuccess() {
     <div className="min-h-screen grid place-items-center bg-background p-8">
       <div className="rounded-3xl border border-border bg-card p-10 max-w-md w-full text-center">
         {status === "loading" || status === "pending" ? (
-          <>
-            <Loader2 className="h-10 w-10 animate-spin text-emerald mx-auto" />
-            <h2 className="text-2xl tracking-tight font-medium mt-4">
-              {status === "pending" ? "Verifying payment…" : "Loading…"}
-            </h2>
-          </>
+          <div className="space-y-4">
+            <Skeleton className="h-10 w-10 rounded-full mx-auto" />
+            <Skeleton className="h-8 w-48 mx-auto" />
+            <Skeleton className="h-4 w-64 mx-auto" />
+            <Skeleton className="h-12 w-full mt-6" />
+          </div>
         ) : status === "success" ? (
           <>
             <CheckCircle2 className="h-12 w-12 text-emerald mx-auto" />

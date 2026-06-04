@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { Building2, Loader2, CheckCircle2, XCircle, RefreshCcw, Trash2, ArrowRight, AlertCircle, Clock, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, MetricCard, PageHeader, SectionCard } from "../components/ui/layout";
+import Skeleton from "../components/ui/Skeleton";
 
 export default function Connections() {
   const [params] = useSearchParams();
@@ -211,10 +212,10 @@ export default function Connections() {
 
       {initialSync && (
         <div className="rounded-2xl border border-emerald/40 bg-emerald/5 p-5 flex items-center gap-4">
-          <Loader2 className="h-5 w-5 animate-spin text-emerald shrink-0" />
-          <div>
-            <p className="font-medium text-sm text-emerald">{initialSyncPhase}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Your bank transactions are being imported in the background. This may take a minute.</p>
+          <Skeleton className="h-10 w-10 rounded-full shrink-0" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-48" />
+            <Skeleton className="h-3 w-72" />
           </div>
         </div>
       )}

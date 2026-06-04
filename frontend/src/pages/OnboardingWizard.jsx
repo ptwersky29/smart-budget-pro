@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
-import { Loader2, Check, ArrowRight, Banknote, Receipt, Target, Zap } from "lucide-react";
+import { Check, ArrowRight, Banknote, Receipt, Target, Zap } from "lucide-react";
+import Skeleton from "../components/ui/Skeleton";
 
 const STEPS = [
   { id: "connect_bank", label: "Connect your bank", icon: Banknote, desc: "Link your bank account via TrueLayer to auto-import transactions." },
@@ -57,8 +58,15 @@ export default function OnboardingWizard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen grid place-items-center bg-background">
-        <Loader2 className="h-6 w-6 animate-spin text-emerald" />
+      <div className="min-h-screen bg-background p-8 space-y-8">
+        <Skeleton className="h-6 w-64" />
+        <div className="max-w-xl mx-auto space-y-6">
+          <Skeleton className="h-48" />
+          <div className="flex gap-3">
+            <Skeleton className="h-12 w-32" />
+            <Skeleton className="h-12 w-24" />
+          </div>
+        </div>
       </div>
     );
   }

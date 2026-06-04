@@ -3,6 +3,7 @@ import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
 import { Loader2, Plus, Trash2, Pencil, RefreshCcw, Sparkles, Bell } from "lucide-react";
 import { EmptyState, PageHeader, SectionCard } from "../components/ui/layout";
+import Skeleton from "../components/ui/Skeleton";
 
 const emptyForm = { name: "", amount: "", category: "", frequency: "monthly", merchant: "", notes: "" };
 
@@ -123,7 +124,11 @@ export default function Subscriptions() {
 
       <SectionCard eyebrow="Managed" title={`${subs.length} subscription${subs.length !== 1 ? "s" : ""}`}>
         {loading ? (
-          <div className="p-10 grid place-items-center"><Loader2 className="h-5 w-5 animate-spin text-emerald" /></div>
+          <div className="space-y-3 p-4">
+            <Skeleton className="h-14" />
+            <Skeleton className="h-14" />
+            <Skeleton className="h-14" />
+          </div>
         ) : subs.length === 0 ? (
             <EmptyState icon={Bell}
               title="No subscriptions yet"

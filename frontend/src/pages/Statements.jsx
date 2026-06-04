@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import { Upload, FileText, Loader2, Sparkles, CheckCircle2, Trash2, ArrowDownRight, ArrowUpRight, Save } from "lucide-react";
 import { PageHeader, SectionCard } from "../components/ui/layout";
+import Skeleton from "../components/ui/Skeleton";
 
 export default function Statements() {
   const { user } = useAuth();
@@ -84,9 +85,10 @@ export default function Statements() {
         <input ref={fileRef} type="file" accept=".csv,.pdf,application/pdf,text/csv" className="hidden"
                onChange={(e) => onFile(e.target.files?.[0])} data-testid="statement-file-input" />
         {busy ? (
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="h-8 w-8 animate-spin text-emerald" />
-            <p className="text-sm text-muted-foreground">AI is reading your statement…</p>
+          <div className="space-y-4">
+            <Skeleton className="h-14 w-14 rounded-2xl mx-auto" />
+            <Skeleton className="h-5 w-48 mx-auto" />
+            <Skeleton className="h-4 w-72 mx-auto" />
           </div>
         ) : (
           <div className="flex flex-col items-center gap-3">

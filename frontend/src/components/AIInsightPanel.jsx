@@ -3,6 +3,7 @@ import { api } from "../lib/api";
 import { Sparkles, Loader2, TrendingUp, TrendingDown, AlertCircle, Wallet, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { SectionCard } from "./ui/layout";
+import Skeleton from "./ui/Skeleton";
 
 const ICONS = {
   "trending-up": TrendingUp,
@@ -59,9 +60,11 @@ export default function AIInsightPanel({ title = "AI Insights", subtitle, endpoi
         </p>
       )}
       {busy && !data && (
-        <div className="mt-6 flex items-center gap-3 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin text-emerald" />
-          Analysing your finances with Claude Sonnet 4.5…
+        <div className="mt-6 space-y-3">
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
+          <Skeleton className="h-4 w-2/3" />
+          <Skeleton className="h-4 w-5/6" />
         </div>
       )}
       {data && (render ? render(data) : <DefaultInsights data={data} />)}

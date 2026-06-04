@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "../lib/api";
-import { CheckCircle2, RefreshCw, Loader2, Star } from "lucide-react";
+import { CheckCircle2, RefreshCw, Star } from "lucide-react";
 import { toast } from "sonner";
 import { SectionCard } from "./ui/layout";
+import Skeleton from "./ui/Skeleton";
 
 const EMPTY_SUM = {
   percent: 10, total_income: 0, obligation: 0, given_total: 0,
@@ -149,8 +150,8 @@ export default function MaaserPanel({ refreshKey = 0, onChange }) {
       }
     >
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading maaser summary…
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[1,2,3,4].map(i => <Skeleton key={i} className="h-24" />)}
         </div>
       ) : (
         <>

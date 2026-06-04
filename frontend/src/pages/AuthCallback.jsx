@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
-import { Loader2 } from "lucide-react";
+import Skeleton from "../components/ui/Skeleton";
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -57,9 +57,14 @@ export default function AuthCallback() {
   }, [navigate, setUser]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
-      <Loader2 className="h-8 w-8 animate-spin text-emerald" />
-      <p className="text-muted-foreground">Verifying your session…</p>
+    <div className="min-h-screen bg-background p-6 space-y-6">
+      <Skeleton className="h-4 w-48" />
+      <div className="grid grid-cols-3 gap-4">
+        <Skeleton className="h-32" />
+        <Skeleton className="h-32" />
+        <Skeleton className="h-32" />
+      </div>
+      <Skeleton className="h-64" />
     </div>
   );
 }
