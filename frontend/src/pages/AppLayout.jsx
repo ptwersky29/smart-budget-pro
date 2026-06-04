@@ -6,6 +6,7 @@ import { useKeyboardShortcut } from "../hooks/useKeyboardShortcut";
 import KeyboardShortcutsHelp from "../components/KeyboardShortcutsHelp";
 import CommandPalette from "../components/CommandPalette";
 import NotificationCenter from "../components/NotificationCenter";
+import AccessibilityOverlay from "../components/AccessibilityOverlay";
 import QuickAddWidget from "../components/QuickAddWidget";
 
 import {
@@ -399,6 +400,7 @@ export default function AppLayout() {
       </div>
       <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
       <KeyboardShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <AccessibilityOverlay />
       <QuickAddWidget />
     </div>
   );
