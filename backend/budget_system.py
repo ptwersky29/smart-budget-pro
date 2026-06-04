@@ -113,6 +113,31 @@ class HolidayEstimateIn(BaseModel):
     end_date: str
 
 
+class SimchaCategoryIn(BaseModel):
+    name: str
+    budgeted_amount: float = 0
+
+
+class SimchaIn(BaseModel):
+    name: str
+    event_date: Optional[str] = None
+    estimated_amount: Optional[float] = 0
+    categories: list[SimchaCategoryIn] = []
+
+
+class OtherCategoryIn(BaseModel):
+    name: str
+    budgeted_amount: float = 0
+
+
+class OtherIn(BaseModel):
+    name: str
+    event_date: Optional[str] = None
+    estimated_amount: Optional[float] = 0
+    notes: Optional[str] = None
+    categories: list[OtherCategoryIn] = []
+
+
 # ── Router factory ───────────────────────────────────────────────────────
 
 def build_router() -> APIRouter:
@@ -245,19 +270,78 @@ def build_router() -> APIRouter:
                 holiday_total_budgeted += ho.estimated_amount
                 holiday_total_actual += sum(c.actual_amount for c in cats)
 
-            # 5. Other budget types aggregated (simcha + other)
-            other_result = await session.execute(
-                select(
-                    func.coalesce(func.sum(BudgetOccasion.estimated_amount), 0),
-                ).where(
+            # 5. Simcha occasions
+            simcha_result = await session.execute(
+                select(BudgetOccasion).where(
                     BudgetOccasion.user_id == user["user_id"],
-                    BudgetOccasion.budget_type.in_(["simcha", "other"]),
+                    BudgetOccasion.budget_type == "simcha",
                     BudgetOccasion.status == "approved",
-                )
+                    BudgetOccasion.event_date >= start_dt,
+                    BudgetOccasion.event_date <= end_dt,
+                ).order_by(BudgetOccasion.event_date)
             )
-            other_budgeted = other_result.scalar() or 0
+            simcha_occasions = simcha_result.scalars().all()
+            simcha_occ_list = []
+            simcha_total_budgeted = 0
+            simcha_total_actual = 0
+            for so in simcha_occasions:
+                cat_result = await session.execute(
+                    select(BudgetOccasionCategory).where(
+                        BudgetOccasionCategory.occasion_id == so.id,
+                    )
+                )
+                cats = cat_result.scalars().all()
+                simcha_occ_list.append({
+                    "id": so.id,
+                    "name": so.name,
+                    "date": so.event_date.isoformat() if so.event_date else None,
+                    "estimated_amount": round(so.estimated_amount, 2),
+                    "categories": [{
+                        "name": c.name,
+                        "budgeted": round(c.budgeted_amount, 2),
+                        "actual": round(c.actual_amount, 2),
+                    } for c in cats],
+                })
+                simcha_total_budgeted += so.estimated_amount
+                simcha_total_actual += sum(c.actual_amount for c in cats)
 
-            # 6. Income for projected balance
+            # 6. Other occasions
+            other_result = await session.execute(
+                select(BudgetOccasion).where(
+                    BudgetOccasion.user_id == user["user_id"],
+                    BudgetOccasion.budget_type == "other",
+                    BudgetOccasion.status == "approved",
+                    BudgetOccasion.event_date >= start_dt,
+                    BudgetOccasion.event_date <= end_dt,
+                ).order_by(BudgetOccasion.event_date)
+            )
+            other_occasions = other_result.scalars().all()
+            other_occ_list = []
+            other_total_budgeted = 0
+            other_total_actual = 0
+            for oo in other_occasions:
+                cat_result = await session.execute(
+                    select(BudgetOccasionCategory).where(
+                        BudgetOccasionCategory.occasion_id == oo.id,
+                    )
+                )
+                cats = cat_result.scalars().all()
+                other_occ_list.append({
+                    "id": oo.id,
+                    "name": oo.name,
+                    "date": oo.event_date.isoformat() if oo.event_date else None,
+                    "estimated_amount": round(oo.estimated_amount, 2),
+                    "notes": oo.notes,
+                    "categories": [{
+                        "name": c.name,
+                        "budgeted": round(c.budgeted_amount, 2),
+                        "actual": round(c.actual_amount, 2),
+                    } for c in cats],
+                })
+                other_total_budgeted += oo.estimated_amount
+                other_total_actual += sum(c.actual_amount for c in cats)
+
+            # 7. Income for projected balance
             all_income_result = await session.execute(
                 select(func.coalesce(func.sum(Transaction.amount).filter(Transaction.amount > 0), 0))
                 .where(
@@ -268,10 +352,10 @@ def build_router() -> APIRouter:
             )
             month_income = all_income_result.scalar() or 0
 
-            all_budgeted = total_budgeted + yom_tov_total_budgeted + holiday_total_budgeted + other_budgeted
-            all_forecast = total_forecast + yom_tov_total_budgeted + holiday_total_budgeted + other_budgeted
+            all_budgeted = total_budgeted + yom_tov_total_budgeted + holiday_total_budgeted + simcha_total_budgeted + other_total_budgeted
+            all_forecast = total_forecast + yom_tov_total_budgeted + holiday_total_budgeted + simcha_total_budgeted + other_total_budgeted
             remaining_budget = all_budgeted - expense_total
-            projected_balance = month_income - (expense_total + yom_tov_total_actual + holiday_total_actual)
+            projected_balance = month_income - (expense_total + yom_tov_total_actual + holiday_total_actual + simcha_total_actual + other_total_actual)
 
             return {
                 "month": start_dt.strftime("%Y-%m"),
@@ -299,6 +383,16 @@ def build_router() -> APIRouter:
                     "occasions": holiday_occ_list,
                     "total_budgeted": round(holiday_total_budgeted, 2),
                     "total_actual": round(holiday_total_actual, 2),
+                },
+                "simcha": {
+                    "occasions": simcha_occ_list,
+                    "total_budgeted": round(simcha_total_budgeted, 2),
+                    "total_actual": round(simcha_total_actual, 2),
+                },
+                "other": {
+                    "occasions": other_occ_list,
+                    "total_budgeted": round(other_total_budgeted, 2),
+                    "total_actual": round(other_total_actual, 2),
                 },
                 "ai_forecast": None,
             }
@@ -1008,5 +1102,306 @@ def build_router() -> APIRouter:
                 "total_estimated": round(total_estimated, 2),
                 "categories": categories,
             }
+
+    # ── SIMCHA ─────────────────────────────────────────────────────────────
+
+    @router.get("/simcha")
+    async def list_simcha(request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(BudgetOccasion).where(
+                    BudgetOccasion.user_id == user["user_id"],
+                    BudgetOccasion.budget_type == "simcha",
+                ).order_by(BudgetOccasion.event_date.desc().nullslast())
+            )
+            occasions = result.scalars().all()
+            out = []
+            for occ in occasions:
+                cat_result = await session.execute(
+                    select(BudgetOccasionCategory).where(
+                        BudgetOccasionCategory.occasion_id == occ.id
+                    ).order_by(BudgetOccasionCategory.name)
+                )
+                cats = cat_result.scalars().all()
+                out.append({
+                    "id": occ.id,
+                    "name": occ.name,
+                    "event_date": occ.event_date.isoformat() if occ.event_date else None,
+                    "estimated_amount": round(occ.estimated_amount, 2),
+                    "notes": occ.notes,
+                    "categories": [{
+                        "id": c.id,
+                        "name": c.name,
+                        "budgeted": round(c.budgeted_amount, 2),
+                        "actual": round(c.actual_amount, 2),
+                    } for c in cats],
+                })
+            return {"occasions": out}
+
+    @router.post("/simcha")
+    async def create_simcha(
+        payload: SimchaIn,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
+        sm = request.app.state.db
+        async with sm() as session:
+            event_date = None
+            if payload.event_date:
+                try:
+                    event_date = datetime.fromisoformat(payload.event_date)
+                except Exception:
+                    pass
+
+            occ = BudgetOccasion(
+                user_id=user["user_id"],
+                budget_type="simcha",
+                name=payload.name.strip(),
+                event_date=event_date,
+                estimated_amount=payload.estimated_amount or 0,
+                status="approved",
+            )
+            session.add(occ)
+            await session.flush()
+
+            for cat in payload.categories:
+                cat_obj = BudgetOccasionCategory(
+                    occasion_id=occ.id,
+                    name=cat.name.lower().strip(),
+                    budgeted_amount=cat.budgeted_amount,
+                )
+                session.add(cat_obj)
+
+            await session.commit()
+            await session.refresh(occ)
+            return {"id": occ.id, "name": occ.name, "estimated_amount": round(occ.estimated_amount, 2)}
+
+    @router.put("/simcha/{occ_id}")
+    async def update_simcha(
+        occ_id: int,
+        payload: SimchaIn,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(BudgetOccasion).where(
+                    BudgetOccasion.id == occ_id,
+                    BudgetOccasion.user_id == user["user_id"],
+                    BudgetOccasion.budget_type == "simcha",
+                )
+            )
+            occ = result.scalar_one_or_none()
+            if not occ:
+                raise HTTPException(404, "Simcha occasion not found")
+
+            if payload.name:
+                occ.name = payload.name.strip()
+            if payload.event_date:
+                try:
+                    occ.event_date = datetime.fromisoformat(payload.event_date)
+                except Exception:
+                    pass
+            occ.estimated_amount = payload.estimated_amount or 0
+
+            cat_result = await session.execute(
+                select(BudgetOccasionCategory).where(
+                    BudgetOccasionCategory.occasion_id == occ.id,
+                )
+            )
+            for old_cat in cat_result.scalars().all():
+                await session.delete(old_cat)
+
+            for cat in payload.categories:
+                cat_obj = BudgetOccasionCategory(
+                    occasion_id=occ.id,
+                    name=cat.name.lower().strip(),
+                    budgeted_amount=cat.budgeted_amount,
+                )
+                session.add(cat_obj)
+
+            await session.commit()
+            return {"ok": True}
+
+    @router.delete("/simcha/{occ_id}")
+    async def delete_simcha(occ_id: int, request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(BudgetOccasion).where(
+                    BudgetOccasion.id == occ_id,
+                    BudgetOccasion.user_id == user["user_id"],
+                    BudgetOccasion.budget_type == "simcha",
+                )
+            )
+            occ = result.scalar_one_or_none()
+            if not occ:
+                raise HTTPException(404, "Simcha occasion not found")
+
+            cat_result = await session.execute(
+                select(BudgetOccasionCategory).where(
+                    BudgetOccasionCategory.occasion_id == occ.id,
+                )
+            )
+            for cat in cat_result.scalars().all():
+                await session.delete(cat)
+
+            await session.delete(occ)
+            await session.commit()
+            return {"ok": True}
+
+    # ── OTHER BUDGET ─────────────────────────────────────────────────────
+
+    @router.get("/other")
+    async def list_other(request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(BudgetOccasion).where(
+                    BudgetOccasion.user_id == user["user_id"],
+                    BudgetOccasion.budget_type == "other",
+                ).order_by(BudgetOccasion.event_date.desc().nullslast())
+            )
+            occasions = result.scalars().all()
+            out = []
+            for occ in occasions:
+                cat_result = await session.execute(
+                    select(BudgetOccasionCategory).where(
+                        BudgetOccasionCategory.occasion_id == occ.id
+                    ).order_by(BudgetOccasionCategory.name)
+                )
+                cats = cat_result.scalars().all()
+                out.append({
+                    "id": occ.id,
+                    "name": occ.name,
+                    "event_date": occ.event_date.isoformat() if occ.event_date else None,
+                    "estimated_amount": round(occ.estimated_amount, 2),
+                    "notes": occ.notes,
+                    "categories": [{
+                        "id": c.id,
+                        "name": c.name,
+                        "budgeted": round(c.budgeted_amount, 2),
+                        "actual": round(c.actual_amount, 2),
+                    } for c in cats],
+                })
+            return {"occasions": out}
+
+    @router.post("/other")
+    async def create_other(
+        payload: OtherIn,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
+        sm = request.app.state.db
+        async with sm() as session:
+            event_date = None
+            if payload.event_date:
+                try:
+                    event_date = datetime.fromisoformat(payload.event_date)
+                except Exception:
+                    pass
+
+            occ = BudgetOccasion(
+                user_id=user["user_id"],
+                budget_type="other",
+                name=payload.name.strip(),
+                event_date=event_date,
+                estimated_amount=payload.estimated_amount or 0,
+                notes=payload.notes,
+                status="approved",
+            )
+            session.add(occ)
+            await session.flush()
+
+            for cat in payload.categories:
+                cat_obj = BudgetOccasionCategory(
+                    occasion_id=occ.id,
+                    name=cat.name.lower().strip(),
+                    budgeted_amount=cat.budgeted_amount,
+                )
+                session.add(cat_obj)
+
+            await session.commit()
+            await session.refresh(occ)
+            return {"id": occ.id, "name": occ.name, "estimated_amount": round(occ.estimated_amount, 2), "notes": occ.notes}
+
+    @router.put("/other/{occ_id}")
+    async def update_other(
+        occ_id: int,
+        payload: OtherIn,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(BudgetOccasion).where(
+                    BudgetOccasion.id == occ_id,
+                    BudgetOccasion.user_id == user["user_id"],
+                    BudgetOccasion.budget_type == "other",
+                )
+            )
+            occ = result.scalar_one_or_none()
+            if not occ:
+                raise HTTPException(404, "Other budget not found")
+
+            if payload.name:
+                occ.name = payload.name.strip()
+            if payload.event_date:
+                try:
+                    occ.event_date = datetime.fromisoformat(payload.event_date)
+                except Exception:
+                    pass
+            occ.estimated_amount = payload.estimated_amount or 0
+            if payload.notes is not None:
+                occ.notes = payload.notes
+
+            cat_result = await session.execute(
+                select(BudgetOccasionCategory).where(
+                    BudgetOccasionCategory.occasion_id == occ.id,
+                )
+            )
+            for old_cat in cat_result.scalars().all():
+                await session.delete(old_cat)
+
+            for cat in payload.categories:
+                cat_obj = BudgetOccasionCategory(
+                    occasion_id=occ.id,
+                    name=cat.name.lower().strip(),
+                    budgeted_amount=cat.budgeted_amount,
+                )
+                session.add(cat_obj)
+
+            await session.commit()
+            return {"ok": True}
+
+    @router.delete("/other/{occ_id}")
+    async def delete_other(occ_id: int, request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(BudgetOccasion).where(
+                    BudgetOccasion.id == occ_id,
+                    BudgetOccasion.user_id == user["user_id"],
+                    BudgetOccasion.budget_type == "other",
+                )
+            )
+            occ = result.scalar_one_or_none()
+            if not occ:
+                raise HTTPException(404, "Other budget not found")
+
+            cat_result = await session.execute(
+                select(BudgetOccasionCategory).where(
+                    BudgetOccasionCategory.occasion_id == occ.id,
+                )
+            )
+            for cat in cat_result.scalars().all():
+                await session.delete(cat)
+
+            await session.delete(occ)
+            await session.commit()
+            return {"ok": True}
 
     return router

@@ -12,6 +12,7 @@ import ConfirmModal from "../components/ui/ConfirmModal";
 const DAY_TO_DAY_CATS = ["groceries","household","fuel","school","utilities","transport","dining","health","entertainment","clothing","personal","other"];
 
 const CATS = ["groceries","dining","transport","utilities","subscriptions","tzedakah","rent","salary","income","shopping","health","entertainment","insurance","education","transfer","cash","tax","fees","mortgage","uncategorized"];
+const DEFAULT_SIMCHA_CATEGORIES = ["hall","catering","music","clothing","gifts","photography"];
 
 export default function BudgetSystem() {
   const [activeTab, setActiveTab] = useState("this-month");
@@ -35,7 +36,7 @@ export default function BudgetSystem() {
   const [classification, setClassification] = useState(null);
   const [classifying, setClassifying] = useState(false);
 
-  // ── Yom Tov / Holiday / Simcha (carried over from old Budgets) ─────────
+  // ── Yom Tov / Holiday (carried over) ────────────────────────────────────
   const [jewishHolidays, setJewishHolidays] = useState([]);
   const [holidayBudgets, setHolidayBudgets] = useState([]);
   const [selectedHoliday, setSelectedHoliday] = useState(null);
@@ -57,6 +58,8 @@ export default function BudgetSystem() {
   const [holidayEndDate, setHolidayEndDate] = useState("");
   const [estimatingHoliday, setEstimatingHoliday] = useState(false);
   const [holidayEstimate, setHolidayEstimate] = useState(null);
+
+  // ── Chasuna (wedding planner, carried over) ───────────────────────────
   const [chasunaItems, setChasunaItems] = useState([]);
   const [chasunaSum, setChasunaSum] = useState(null);
   const [chasunaForm, setChasunaForm] = useState({ category: "", description: "", estimated_cost: "", vendor: "", due_date: "" });
@@ -64,9 +67,19 @@ export default function BudgetSystem() {
   const [showChasunaForm, setShowChasunaForm] = useState(false);
   const [chasunaCategories, setChasunaCategories] = useState([]);
 
-  // ── Other budget ───────────────────────────────────────────────────────
+  // ── Simcha (Phase 3) ──────────────────────────────────────────────────
+  const [simchaOccasions, setSimchaOccasions] = useState([]);
+  const [simchaForm, setSimchaForm] = useState({
+    name: "", event_date: "", estimated_amount: "",
+    cat_hall: "", cat_catering: "", cat_music: "", cat_clothing: "",
+    cat_gifts: "", cat_photography: "",
+  });
+  const [editingSimcha, setEditingSimcha] = useState(null);
+  const [showSimchaForm, setShowSimchaForm] = useState(false);
+
+  // ── Other budget (Phase 3) ───────────────────────────────────────────
   const [otherOccasions, setOtherOccasions] = useState([]);
-  const [otherForm, setOtherForm] = useState({ name: "", estimated_amount: "", event_date: "", notes: "" });
+  const [otherForm, setOtherForm] = useState({ name: "", estimated_amount: "", event_date: "", notes: "", categories: "" });
   const [editingOther, setEditingOther] = useState(null);
 
   // ── LOADERS ────────────────────────────────────────────────────────────
@@ -114,8 +127,17 @@ export default function BudgetSystem() {
   }, []);
 
   const loadOther = useCallback(async () => {
-    // Phase 1: no dedicated "other" endpoint yet — stub
-    setOtherOccasions([]);
+    try {
+      const { data } = await api.get("/budget-system/other");
+      setOtherOccasions(data.occasions || []);
+    } catch { /* optional */ }
+  }, []);
+
+  const loadSimcha = useCallback(async () => {
+    try {
+      const { data } = await api.get("/budget-system/simcha");
+      setSimchaOccasions(data.occasions || []);
+    } catch { /* optional */ }
   }, []);
 
   useEffect(() => {
@@ -125,7 +147,8 @@ export default function BudgetSystem() {
     loadHolidayBudgets();
     loadChasuna();
     loadOther();
-  }, [loadOverview, loadDayToDay, loadHolidays, loadHolidayBudgets, loadChasuna, loadOther]);
+    loadSimcha();
+  }, [loadOverview, loadDayToDay, loadHolidays, loadHolidayBudgets, loadChasuna, loadOther, loadSimcha]);
 
   // ── QUICK TRANSACTION ──────────────────────────────────────────────────
 
@@ -373,17 +396,93 @@ export default function BudgetSystem() {
     });
   };
 
-  // ── OTHER BUDGET ───────────────────────────────────────────────────────
+  // ── SIMCHA (Phase 3) ──────────────────────────────────────────────────
+
+  const SIMCHA_CATS = DEFAULT_SIMCHA_CATEGORIES;
+
+  const createSimcha = async (e) => {
+    e.preventDefault();
+    try {
+      const cats = SIMCHA_CATS
+        .filter(cat => parseFloat(simchaForm[`cat_${cat}`]) > 0)
+        .map(cat => ({ name: cat, budgeted_amount: parseFloat(simchaForm[`cat_${cat}`]) }));
+      const payload = {
+        name: simchaForm.name.trim(),
+        event_date: simchaForm.event_date || null,
+        estimated_amount: parseFloat(simchaForm.estimated_amount) || 0,
+        categories: cats,
+      };
+      if (editingSimcha) {
+        await api.put(`/budget-system/simcha/${editingSimcha}`, payload);
+        setEditingSimcha(null);
+        toast.success("Updated");
+      } else {
+        await api.post("/budget-system/simcha", payload);
+        toast.success("Simcha created");
+      }
+      setSimchaForm({ name: "", event_date: "", estimated_amount: "",
+        cat_hall: "", cat_catering: "", cat_music: "", cat_clothing: "",
+        cat_gifts: "", cat_photography: "",
+      });
+      setShowSimchaForm(false);
+      loadSimcha();
+      loadOverview();
+    } catch { toast.error("Could not save simcha"); }
+  };
+
+  const editSimcha = (occ) => {
+    setEditingSimcha(occ.id);
+    const catMap = {};
+    (occ.categories || []).forEach(c => { catMap[`cat_${c.name}`] = String(c.budgeted); });
+    setSimchaForm({
+      name: occ.name,
+      event_date: occ.event_date ? occ.event_date.slice(0, 10) : "",
+      estimated_amount: String(occ.estimated_amount || ""),
+      cat_hall: catMap.cat_hall || "",
+      cat_catering: catMap.cat_catering || "",
+      cat_music: catMap.cat_music || "",
+      cat_clothing: catMap.cat_clothing || "",
+      cat_gifts: catMap.cat_gifts || "",
+      cat_photography: catMap.cat_photography || "",
+    });
+    setShowSimchaForm(true);
+  };
+
+  const deleteSimcha = async (id) => {
+    showConfirm(async () => {
+      try {
+        await api.delete(`/budget-system/simcha/${id}`);
+        toast.success("Simcha deleted");
+        loadSimcha();
+        loadOverview();
+      } catch { toast.error("Could not delete"); }
+    });
+  };
+
+  // ── OTHER BUDGET (Phase 3) ────────────────────────────────────────────
 
   const createOther = async (e) => {
     e.preventDefault();
     try {
-      await api.post("/budget-system/day-to-day", {
-        category: otherForm.name.toLowerCase().replace(/\s+/g, "_"),
-        budgeted_amount: parseFloat(otherForm.estimated_amount) || 0,
-      });
-      toast.success("Budget added");
-      setOtherForm({ name: "", estimated_amount: "", event_date: "", notes: "" });
+      const cats = otherForm.categories
+        ? otherForm.categories.split(",").map(s => s.trim()).filter(Boolean).map(name => ({ name, budgeted_amount: 0 }))
+        : [];
+      const payload = {
+        name: otherForm.name.trim(),
+        event_date: otherForm.event_date || null,
+        estimated_amount: parseFloat(otherForm.estimated_amount) || 0,
+        notes: otherForm.notes || null,
+        categories: cats,
+      };
+      if (editingOther) {
+        await api.put(`/budget-system/other/${editingOther}`, payload);
+        setEditingOther(null);
+        toast.success("Updated");
+      } else {
+        await api.post("/budget-system/other", payload);
+        toast.success("Budget added");
+      }
+      setOtherForm({ name: "", estimated_amount: "", event_date: "", notes: "", categories: "" });
       loadOther();
       loadOverview();
     } catch { toast.error("Could not add"); }
@@ -392,12 +491,22 @@ export default function BudgetSystem() {
   const deleteOther = async (id) => {
     showConfirm(async () => {
       try {
-        await api.delete(`/budget-system/day-to-day/${id}`);
+        await api.delete(`/budget-system/other/${id}`);
         toast.success("Removed");
         loadOther();
         loadOverview();
       } catch { toast.error("Could not delete"); }
     });
+  };
+
+  const updateOther = async (id, data) => {
+    try {
+      await api.put(`/budget-system/other/${id}`, data);
+      setEditingOther(null);
+      toast.success("Updated");
+      loadOther();
+      loadOverview();
+    } catch { toast.error("Could not update"); }
   };
 
   // ── HOLIDAY DETAIL RENDERER (carried over) ─────────────────────────────
@@ -645,6 +754,62 @@ export default function BudgetSystem() {
                 <SectionCard eyebrow="Holidays" title="Active this month" contentClassName="p-0">
                   <div className="divide-y divide-border">
                     {overview.holidays.occasions.map(occ => (
+                      <div key={occ.id || occ.name} className="px-6 py-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">{occ.name}</p>
+                            {occ.date && <p className="text-xs text-muted-foreground">{occ.date.slice(0, 10)}</p>}
+                          </div>
+                          <span className="text-sm font-medium">£{occ.estimated_amount?.toFixed(0)}</span>
+                        </div>
+                        {occ.categories?.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {occ.categories.map(cat => (
+                              <span key={cat.name} className="text-xs px-2 py-1 rounded-full bg-secondary/50 capitalize">
+                                {cat.name}: £{cat.budgeted?.toFixed(0)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </SectionCard>
+              )}
+
+              {/* Simcha section */}
+              {overview.simcha?.occasions?.length > 0 && (
+                <SectionCard eyebrow="Simcha" title="Active this month" contentClassName="p-0">
+                  <div className="divide-y divide-border">
+                    {overview.simcha.occasions.map(occ => (
+                      <div key={occ.id || occ.name} className="px-6 py-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">{occ.name}</p>
+                            {occ.date && <p className="text-xs text-muted-foreground">{occ.date.slice(0, 10)}</p>}
+                          </div>
+                          <span className="text-sm font-medium">£{occ.estimated_amount?.toFixed(0)}</span>
+                        </div>
+                        {occ.categories?.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {occ.categories.map(cat => (
+                              <span key={cat.name} className="text-xs px-2 py-1 rounded-full bg-secondary/50 capitalize">
+                                {cat.name}: £{cat.budgeted?.toFixed(0)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </SectionCard>
+              )}
+
+              {/* Other section */}
+              {overview.other?.occasions?.length > 0 && (
+                <SectionCard eyebrow="Other" title="Active this month" contentClassName="p-0">
+                  <div className="divide-y divide-border">
+                    {overview.other.occasions.map(occ => (
                       <div key={occ.id || occ.name} className="px-6 py-4">
                         <div className="flex items-center justify-between">
                           <div>
@@ -915,14 +1080,106 @@ export default function BudgetSystem() {
         </div>
       )}
 
-      {/* ── TAB: SIMCHA (carried over) ──────────────────────────────────── */}
+      {/* ── TAB: SIMCHA (Phase 3 enhanced) ──────────────────────────────── */}
       {activeTab === "simcha" && (
         <div className="space-y-6 animate-[fadeUp_0.3s_ease-out]">
-          <div className="rounded-2xl border-2 border-topaz/30 bg-card p-6">
+
+          {/* Other Simcha creator */}
+          <div className="rounded-2xl border-2 border-ruby/20 bg-card p-6">
             <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
               <div className="flex items-center gap-2">
                 <Heart className="h-5 w-5 text-ruby" />
                 <p className="text-lg tracking-tight font-medium">Simcha Planner</p>
+              </div>
+              <button onClick={() => { setShowSimchaForm(!showSimchaForm); setEditingSimcha(null); setSimchaForm({ name: "", event_date: "", estimated_amount: "", cat_hall: "", cat_catering: "", cat_music: "", cat_clothing: "", cat_gifts: "", cat_photography: "" }); }}
+                      className="btn-pill gradient-topaz text-white text-sm">
+                <Plus className="h-4 w-4 mr-1" /> New simcha
+              </button>
+            </div>
+
+            {showSimchaForm && (
+              <form onSubmit={createSimcha} className="mb-6 p-4 rounded-xl bg-secondary/20 border border-border space-y-3">
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="label-overline">Event name</label>
+                    <input required placeholder="Bar Mitzvah, Bris, ..." value={simchaForm.name}
+                           onChange={e => setSimchaForm({...simchaForm, name: e.target.value})}
+                           className="mt-1 w-full control-shell" />
+                  </div>
+                  <div>
+                    <label className="label-overline">Event date</label>
+                    <input type="date" value={simchaForm.event_date}
+                           onChange={e => setSimchaForm({...simchaForm, event_date: e.target.value})}
+                           className="mt-1 w-full control-shell" />
+                  </div>
+                  <div>
+                    <label className="label-overline">Total budget (£)</label>
+                    <input type="number" value={simchaForm.estimated_amount}
+                           onChange={e => setSimchaForm({...simchaForm, estimated_amount: e.target.value})}
+                           placeholder="5000" className="mt-1 w-full control-shell" />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2 mb-2">Sub-category estimates (optional):</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                  {SIMCHA_CATS.map(cat => (
+                    <div key={cat}>
+                      <label className="label-overline capitalize">{cat}</label>
+                      <input type="number" placeholder="£" value={simchaForm[`cat_${cat}`] || ""}
+                             onChange={e => setSimchaForm({...simchaForm, [`cat_${cat}`]: e.target.value})}
+                             className="mt-1 w-full control-shell" />
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <button type="submit" className="btn-pill gradient-emerald text-white text-sm">
+                    {editingSimcha ? "Update" : "Create simcha"}
+                  </button>
+                  <button type="button" onClick={() => { setShowSimchaForm(false); setEditingSimcha(null); }}
+                          className="text-xs px-4 py-2 rounded-full border border-border">Cancel</button>
+                </div>
+              </form>
+            )}
+
+            {simchaOccasions.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No other simcha occasions yet.</p>
+            ) : (
+              <div className="space-y-2">
+                <p className="label-overline">Other Simcha Occasions</p>
+                {simchaOccasions.map(occ => (
+                  <div key={occ.id} className="flex items-center justify-between py-3 px-4 rounded-xl bg-secondary/20 border border-border">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium">{occ.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        £{occ.estimated_amount?.toFixed(0)}
+                        {occ.event_date && <> · {occ.event_date.slice(0, 10)}</>}
+                        {occ.notes && <> · {occ.notes}</>}
+                      </p>
+                      {occ.categories?.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {occ.categories.map(c => (
+                            <span key={c.name} className="text-xs px-2 py-0.5 rounded-full bg-secondary/40 capitalize">
+                              {c.name}: £{c.budgeted?.toFixed(0)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-1 ml-3">
+                      <button onClick={() => editSimcha(occ)} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => deleteSimcha(occ.id)} className="p-2 rounded-lg hover:bg-secondary text-ruby"><Trash2 className="h-3.5 w-3.5" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Chasuna (wedding) section — preserved */}
+          <div className="rounded-2xl border-2 border-topaz/30 bg-card p-6">
+            <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                <Heart className="h-5 w-5 text-ruby" />
+                <p className="text-lg tracking-tight font-medium">Chasuna / Wedding Planner</p>
               </div>
               <button onClick={() => { setShowChasunaForm(!showChasunaForm); setEditingChasuna(null); setChasunaForm({ category: "", description: "", estimated_cost: "", vendor: "", due_date: "" }); }}
                       className="btn-pill gradient-topaz text-white text-sm">
@@ -1012,7 +1269,7 @@ export default function BudgetSystem() {
         </div>
       )}
 
-      {/* ── TAB: OTHER ──────────────────────────────────────────────────── */}
+      {/* ── TAB: OTHER (Phase 3) ────────────────────────────────────────── */}
       {activeTab === "other" && (
         <div className="space-y-6 animate-[fadeUp_0.3s_ease-out]">
           <SectionCard eyebrow="Create" title="One-time expense">
@@ -1035,25 +1292,59 @@ export default function BudgetSystem() {
                        onChange={e => setOtherForm({...otherForm, event_date: e.target.value})}
                        className="mt-1 w-full control-shell" />
               </div>
-              <button className="btn-pill gradient-emerald text-white text-sm">
-                <Plus className="h-4 w-4 mr-2" /> Add
-              </button>
+              <div className="w-full sm:w-auto">
+                <label className="label-overline">Categories (comma-separated, optional)</label>
+                <input value={otherForm.categories}
+                       onChange={e => setOtherForm({...otherForm, categories: e.target.value})}
+                       placeholder="venue, catering, decor" className="mt-1 w-full control-shell" />
+              </div>
+              <div className="w-full">
+                <label className="label-overline">Notes</label>
+                <textarea value={otherForm.notes}
+                  onChange={e => setOtherForm({...otherForm, notes: e.target.value})}
+                  placeholder="Optional details about this expense" className="mt-1 w-full control-shell resize-none h-20" />
+              </div>
+              <div className="flex gap-2 w-full">
+                <button className="btn-pill gradient-emerald text-white text-sm">
+                  <Plus className="h-4 w-4 mr-2" /> Add
+                </button>
+                {editingOther && (
+                  <button type="button" onClick={() => { setEditingOther(null); setOtherForm({ name: "", estimated_amount: "", event_date: "", notes: "", categories: "" }); }}
+                          className="text-xs px-4 py-2 rounded-full border border-border">Cancel</button>
+                )}
+              </div>
             </form>
           </SectionCard>
 
           <div className="space-y-3">
+            <p className="label-overline">Saved one-time budgets</p>
             {otherOccasions.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">No other budgets yet.</p>
             ) : (
               otherOccasions.map(occ => (
                 <div key={occ.id} className="flex items-center justify-between py-3 px-4 rounded-xl border border-border bg-card">
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <p className="font-medium">{occ.name}</p>
-                    <p className="text-xs text-muted-foreground">£{occ.estimated_amount?.toFixed(0) || "0"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      £{occ.estimated_amount?.toFixed(0) || "0"}
+                      {occ.event_date && <> · {occ.event_date.slice(0, 10)}</>}
+                      {occ.notes && <> · {occ.notes}</>}
+                    </p>
+                    {occ.categories?.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {occ.categories.map(c => (
+                          <span key={c.name} className="text-xs px-2 py-0.5 rounded-full bg-secondary/40 capitalize">
+                            {c.name}: £{c.budgeted?.toFixed(0)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <button onClick={() => deleteOther(occ.id)} className="p-2 rounded-lg hover:bg-secondary text-ruby">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="flex gap-1 ml-3">
+                    <button onClick={() => { setEditingOther(occ.id); setOtherForm({ name: occ.name, estimated_amount: String(occ.estimated_amount || ""), event_date: occ.event_date ? occ.event_date.slice(0, 10) : "", notes: occ.notes || "", categories: (occ.categories || []).map(c => c.name).join(", ") }); }}
+                            className="p-2 rounded-lg hover:bg-secondary text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => deleteOther(occ.id)} className="p-2 rounded-lg hover:bg-secondary text-ruby"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </div>
                 </div>
               ))
             )}
