@@ -13,7 +13,7 @@ import TransactionRow from "../components/TransactionRow";
 import TransactionForm from "../components/TransactionForm";
 
 const SOURCE_LABELS = { manual: "Manual", truelayer: "Bank", csv: "CSV", pdf: "PDF", statement: "Statement", sms: "SMS" };
-const emptyForm = { description: "", amount: "", category: "", is_income: false };
+const emptyForm = { description: "", amount: "", category: "", is_income: false, budget_type: "", occasion: "", merchant: "" };
 
 function today() {
   const d = new Date();
@@ -161,7 +161,7 @@ const Transactions = React.memo(function Transactions() {
   const openAdd = useCallback(() => { setEditingId(null); setForm(emptyForm); setOpen(true); }, []);
   const openEdit = useCallback((t) => {
     setEditingId(t.transaction_id);
-    setForm({ description: t.description || "", amount: String(Math.abs(t.amount)), category: t.category || "", is_income: t.amount > 0 });
+    setForm({ description: t.description || "", amount: String(Math.abs(t.amount)), category: t.category || "", is_income: t.amount > 0, budget_type: "", occasion: "", merchant: "" });
     setOpen(true);
   }, []);
   const closeForm = useCallback(() => { setOpen(false); setEditingId(null); setForm(emptyForm); setClassification(null); setSaveAsRecurring(false); }, []);
@@ -195,15 +195,15 @@ const Transactions = React.memo(function Transactions() {
           action: { label: "Undo", onClick: async () => { if (old) { await api.patch(`/transactions/${editingId}`, { description: old.description, amount: old.amount, category: old.category || undefined, is_income: old.is_income }); toast.success("Restored"); await load(); } } },
           duration: 6000,
         });
-      } else if (classification) {
-        // Use AI-approved classification
+      } else if (classification || form.budget_type) {
+        // Use AI or manual classification
         await api.post("/budget-system/approve", {
           description: form.description.trim(),
           amount: signed,
-          budget_type: classification.budget_type || "day_to_day",
-          occasion: classification.occasion || "Monthly Living",
-          category: form.category || classification.category || "uncategorized",
-          suggestion_id: classification.suggestion_id,
+          budget_type: form.budget_type || classification?.budget_type || "day_to_day",
+          occasion: form.occasion || classification?.occasion || "Monthly Living",
+          category: form.category || classification?.category || "uncategorized",
+          suggestion_id: classification?.suggestion_id || null,
           save_as_recurring: saveAsRecurring,
         });
         toast.success("Transaction added");

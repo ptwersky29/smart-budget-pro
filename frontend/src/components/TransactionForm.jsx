@@ -1,16 +1,19 @@
-import React from "react";
-import { Sparkles, Loader2, Check, X } from "lucide-react";
+import React, { useState } from "react";
+import { Sparkles, Loader2, X, ChevronDown, ChevronUp } from "lucide-react";
 
-const emptyForm = { description: "", amount: "", category: "", is_income: false };
+const emptyForm = { description: "", amount: "", category: "", is_income: false, budget_type: "", occasion: "", merchant: "" };
+const BUDGET_TYPES = ["day_to_day", "yom_tov", "holiday", "simcha", "other"];
 
 export default function TransactionForm({
   open, editingId, form, setForm, selectedCats, onClose, onSubmit,
   onClassify, classifying, classification, onClearClassification,
   saveAsRecurring, setSaveAsRecurring,
 }) {
+  const [showMore, setShowMore] = useState(false);
   if (!open) return null;
 
   const canClassify = form.description.trim() && form.amount && !editingId && !classifying;
+  const hasManualFields = form.budget_type || form.occasion || form.merchant;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={onClose} role="dialog" aria-modal="true" aria-label={editingId ? "Edit transaction" : "New transaction"}>
@@ -46,7 +49,7 @@ export default function TransactionForm({
             </div>
           )}
 
-          {/* Classification result */}
+          {/* AI Classification result */}
           {classification && (
             <div className="rounded-xl border-2 border-emerald/20 bg-emerald/5 p-3 text-sm space-y-2 animate-[fadeUp_0.2s_ease-out]">
               <div className="flex items-center gap-2">
@@ -70,6 +73,32 @@ export default function TransactionForm({
                   Save as recurring transaction
                 </label>
               )}
+            </div>
+          )}
+
+          {/* Manual classification toggle */}
+          {!editingId && (
+            <button type="button" onClick={() => setShowMore(!showMore)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground pt-1">
+              {showMore ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              {hasManualFields ? "Classification fields set" : "More options"}
+            </button>
+          )}
+
+          {showMore && !editingId && (
+            <div className="space-y-2 p-3 rounded-xl bg-secondary/20 border border-border animate-[fadeUp_0.2s_ease-out]">
+              <p className="text-xs text-muted-foreground">Manual classification (overrides AI)</p>
+              <select value={form.budget_type} onChange={(e) => setForm({ ...form, budget_type: e.target.value })}
+                className="w-full control-shell text-sm">
+                <option value="">Budget type…</option>
+                {BUDGET_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
+              </select>
+              <input placeholder="Occasion (e.g. Pesach 2026)" value={form.occasion}
+                onChange={(e) => setForm({ ...form, occasion: e.target.value })}
+                className="w-full control-shell text-sm" />
+              <input placeholder="Merchant (e.g. Tesco)" value={form.merchant}
+                onChange={(e) => setForm({ ...form, merchant: e.target.value })}
+                className="w-full control-shell text-sm" />
             </div>
           )}
 
