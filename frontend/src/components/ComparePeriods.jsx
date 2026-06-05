@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { api, formatApiError } from "../lib/api";
 import { BarChart3, Loader2, X, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 
 const fmt = (n) => `£${Number(n || 0).toFixed(2)}`;
 
@@ -67,7 +69,7 @@ export default function ComparePeriods({ open, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={onClose} role="dialog" aria-modal="true" aria-label="Compare periods">
-      <div className="page-shell p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <BarChart3 className="h-5 w-5 text-topaz" />
@@ -83,13 +85,13 @@ export default function ComparePeriods({ open, onClose }) {
             <div className="space-y-2">
               <div>
                 <label className="text-xs text-muted-foreground">From</label>
-                <input type="date" value={aFrom} onChange={(e) => setAFrom(e.target.value)}
-                  className="w-full control-shell text-sm h-10 mt-1" />
+                <Input type="date" value={aFrom} onChange={(e) => setAFrom(e.target.value)}
+                  className="w-full" />
               </div>
               <div>
                 <label className="text-xs text-muted-foreground">To</label>
-                <input type="date" value={aTo} onChange={(e) => setATo(e.target.value)}
-                  className="w-full control-shell text-sm h-10 mt-1" />
+                <Input type="date" value={aTo} onChange={(e) => setATo(e.target.value)}
+                  className="w-full" />
               </div>
             </div>
           </div>
@@ -98,23 +100,22 @@ export default function ComparePeriods({ open, onClose }) {
             <div className="space-y-2">
               <div>
                 <label className="text-xs text-muted-foreground">From</label>
-                <input type="date" value={bFrom} onChange={(e) => setBFrom(e.target.value)}
-                  className="w-full control-shell text-sm h-10 mt-1" />
+                <Input type="date" value={bFrom} onChange={(e) => setBFrom(e.target.value)}
+                  className="w-full" />
               </div>
               <div>
                 <label className="text-xs text-muted-foreground">To</label>
-                <input type="date" value={bTo} onChange={(e) => setBTo(e.target.value)}
-                  className="w-full control-shell text-sm h-10 mt-1" />
+                <Input type="date" value={bTo} onChange={(e) => setBTo(e.target.value)}
+                  className="w-full" />
               </div>
             </div>
           </div>
         </div>
 
-        <button onClick={compare} disabled={loading}
-          className="btn-pill gradient-topaz text-white text-sm w-full h-11 disabled:opacity-50">
+        <Button variant="warning" size="pill" onClick={compare} disabled={loading}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <BarChart3 className="h-4 w-4 mr-2" />}
           {loading ? "Comparing…" : "Compare"}
-        </button>
+        </Button>
 
         {/* Results */}
         {result && (

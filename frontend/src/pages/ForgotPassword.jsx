@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
 import { Loader2, ArrowLeft, Mail, CheckCircle2 } from "lucide-react";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -48,12 +50,12 @@ export default function ForgotPassword() {
             <form onSubmit={onSubmit} className="space-y-4 mt-8">
               <div>
                 <label className="label-overline">Email</label>
-                <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-                       placeholder="you@example.com" className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
+                <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+                       placeholder="you@example.com" className="mt-1 w-full" />
               </div>
-              <button disabled={busy} className="btn-pill w-full gradient-emerald text-white disabled:opacity-50">
+              <Button disabled={busy} variant="primary" size="pill" className="w-full">
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send reset link"}
-              </button>
+              </Button>
             </form>
           </>
         )}

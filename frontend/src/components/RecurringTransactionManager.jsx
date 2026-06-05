@@ -3,6 +3,8 @@ import { api } from "../lib/api";
 import { toast } from "sonner";
 import { Plus, Edit2, Trash2, Loader2, Calendar, DollarSign, Tag, AlertCircle } from "lucide-react";
 import ConfirmModal from "./ui/ConfirmModal";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 
 /**
  * Recurring Transaction Manager
@@ -137,16 +139,16 @@ export default function RecurringTransactionManager() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Recurring Transactions</h3>
-        <button
+        <Button
+          variant="primary" size="pillSm"
           onClick={() => {
             resetForm();
             setShowForm(true);
           }}
-          className="btn-pill gradient-emerald text-white h-10 px-4 text-sm flex items-center gap-2"
         >
           <Plus className="h-4 w-4" />
           Add recurring
-        </button>
+        </Button>
       </div>
 
       {/* Recurring Items List */}
@@ -224,7 +226,7 @@ export default function RecurringTransactionManager() {
 
       {showForm && (
         <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={() => !busy && setShowForm(false)}>
-          <div className="page-shell p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+          <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-semibold mb-4">
               {editingId ? "Edit recurring transaction" : "New recurring transaction"}
             </h2>
@@ -232,12 +234,12 @@ export default function RecurringTransactionManager() {
             <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="space-y-4">
               <div>
                 <label className="label-overline">Description *</label>
-                <input
+                <Input
                   type="text"
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   placeholder="e.g., Monthly rent"
-                  className="mt-1 w-full control-shell"
+                  className="mt-1 w-full"
                   required
                 />
               </div>
@@ -245,14 +247,14 @@ export default function RecurringTransactionManager() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="label-overline">Amount (£) *</label>
-                  <input
+                  <Input
                     type="number"
                     step="0.01"
                     min="0"
                     value={form.amount}
                     onChange={(e) => setForm({ ...form, amount: e.target.value })}
                     placeholder="0.00"
-                    className="mt-1 w-full control-shell"
+                    className="mt-1 w-full"
                     required
                   />
                 </div>
@@ -261,7 +263,7 @@ export default function RecurringTransactionManager() {
                   <select
                     value={form.frequency}
                     onChange={(e) => setForm({ ...form, frequency: e.target.value })}
-                    className="mt-1 w-full control-shell"
+                    className="h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors w-full"
                   >
                     {FREQUENCIES.map((f) => (
                       <option key={f.value} value={f.value}>{f.label}</option>
@@ -275,7 +277,7 @@ export default function RecurringTransactionManager() {
                 <select
                   value={form.category}
                   onChange={(e) => setForm({ ...form, category: e.target.value })}
-                  className="mt-1 w-full control-shell"
+                  className="h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors w-full"
                   required
                 >
                   <option value="">Select category…</option>
@@ -287,11 +289,11 @@ export default function RecurringTransactionManager() {
 
               <div>
                 <label className="label-overline">Next Date</label>
-                <input
+                <Input
                   type="date"
                   value={form.next_date}
                   onChange={(e) => setForm({ ...form, next_date: e.target.value })}
-                  className="mt-1 w-full control-shell"
+                  className="mt-1 w-full"
                 />
               </div>
 
@@ -314,21 +316,21 @@ export default function RecurringTransactionManager() {
               </label>
 
               <div className="flex gap-3 pt-4">
-                <button
+                <Button
+                  variant="outlinePill" size="pill"
                   type="button"
                   onClick={() => setShowForm(false)}
                   disabled={busy}
-                  className="flex-1 btn-pill border border-border disabled:opacity-50"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="primary" size="pill"
                   type="submit"
                   disabled={busy}
-                  className="flex-1 btn-pill gradient-emerald text-white disabled:opacity-50"
                 >
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-                </button>
+                </Button>
               </div>
             </form>
           </div>

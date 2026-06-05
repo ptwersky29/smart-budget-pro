@@ -29,6 +29,8 @@ import ComparePeriods from "../components/ComparePeriods";
 import MaaserPanel from "../components/MaaserPanel";
 import TransactionRow from "../components/TransactionRow";
 import TransactionForm from "../components/TransactionForm";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 
 const SOURCE_LABELS = { manual: "Manual", truelayer: "Bank", csv: "CSV", pdf: "PDF", statement: "Statement", sms: "SMS" };
 const emptyForm = { description: "", amount: "", category: "", is_income: false, budget_type: "", occasion: "", merchant: "" };
@@ -379,8 +381,10 @@ const Transactions = React.memo(function Transactions() {
           <div className="flex items-center gap-2">
             {someSelected && (
               <DropdownMenu>
-                <DropdownMenuTrigger className="btn-pill border border-ruby/50 text-ruby text-sm h-11 px-4">
-                  <Trash2 className="h-4 w-4 mr-1.5" /> Bulk ({selectedIds.size})
+                <DropdownMenuTrigger asChild>
+                  <Button variant="danger" size="pill">
+                    <Trash2 className="h-4 w-4" /> Bulk ({selectedIds.size})
+                  </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   <DropdownMenuSub>
@@ -399,8 +403,10 @@ const Transactions = React.memo(function Transactions() {
               </DropdownMenu>
             )}
             <DropdownMenu>
-              <DropdownMenuTrigger className="toolbar-chip">
-                <MoreHorizontal className="h-3.5 w-3.5 mr-1" /> Actions
+              <DropdownMenuTrigger asChild>
+                <Button variant="chip">
+                  <MoreHorizontal className="h-3.5 w-3.5" /> Actions
+                </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem onClick={openAdd} data-testid="add-transaction">
@@ -459,10 +465,10 @@ const Transactions = React.memo(function Transactions() {
 
             <Sheet>
               <SheetTrigger asChild>
-                <button className={`btn-pill border text-sm h-11 px-4 ${activeFilters.length > 0 ? "border-emerald text-emerald" : "border-border"}`}>
-                  <Filter className="h-4 w-4 mr-2" /> Filters
+                <Button variant="outlinePill" size="pill" className={activeFilters.length > 0 ? "border-emerald text-emerald" : ""}>
+                  <Filter className="h-4 w-4" /> Filters
                   {activeFilters.length > 0 && <span className="ml-1">({activeFilters.length})</span>}
-                </button>
+                </Button>
               </SheetTrigger>
               <SheetContent side="right" className="w-full sm:max-w-md">
                 <SheetHeader>
@@ -471,38 +477,37 @@ const Transactions = React.memo(function Transactions() {
                 </SheetHeader>
                 <div className="mt-6 space-y-5">
                   <div className="grid grid-cols-2 gap-3">
-                    <select value={filters.tx_type} onChange={(e) => toggleFilter("tx_type", e.target.value)} className="control-shell text-sm h-10">
+                    <select value={filters.tx_type} onChange={(e) => toggleFilter("tx_type", e.target.value)} className="h-10 px-4 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors">
                       <option value="">All types</option><option value="income">Income</option><option value="expense">Expense</option>
                     </select>
-                    <select value={filters.source} onChange={(e) => toggleFilter("source", e.target.value)} className="control-shell text-sm h-10">
+                    <select value={filters.source} onChange={(e) => toggleFilter("source", e.target.value)} className="h-10 px-4 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors">
                       <option value="">All sources</option>
                       {Object.entries(SOURCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
-                    <select value={filters.category} onChange={(e) => toggleFilter("category", e.target.value)} className="control-shell text-sm h-10">
+                    <select value={filters.category} onChange={(e) => toggleFilter("category", e.target.value)} className="h-10 px-4 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors">
                       <option value="">All categories</option>
                       {selectedCats.map(c => <option key={c.category_id ?? `default-${c.name}`} value={c.name}>{c.name}</option>)}
                     </select>
-                    <input type="number" min="0" step="0.01" placeholder="Min £" value={filters.amount_min}
+                    <Input type="number" min="0" step="0.01" placeholder="Min £" value={filters.amount_min}
                       onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_min: e.target.value })); }}
-                      className="control-shell text-sm h-10" />
-                    <input type="number" min="0" step="0.01" placeholder="Max £" value={filters.amount_max}
+                      className="text-sm h-10" />
+                    <Input type="number" min="0" step="0.01" placeholder="Max £" value={filters.amount_max}
                       onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_max: e.target.value })); }}
-                      className="control-shell text-sm h-10" />
-                    <input type="date" value={filters.date_from} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_from: e.target.value })); }} className="control-shell text-sm h-10" />
-                    <input type="date" value={filters.date_to} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_to: e.target.value })); }} className="control-shell text-sm h-10" />
+                      className="text-sm h-10" />
+                    <Input type="date" value={filters.date_from} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_from: e.target.value })); }} className="text-sm h-10" />
+                    <Input type="date" value={filters.date_to} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_to: e.target.value })); }} className="text-sm h-10" />
                   </div>
 
                   <div className="border-t border-border pt-4 space-y-3">
                     <p className="text-xs font-medium text-muted-foreground">AI search</p>
                     <div className="flex items-center gap-2">
-                      <input value={aiQuery} onChange={(e) => setAiQuery(e.target.value)}
+                      <Input value={aiQuery} onChange={(e) => setAiQuery(e.target.value)}
                         placeholder="e.g. 'grocery spending last month'"
-                        className="flex-1 control-shell text-sm h-10" onKeyDown={(e) => e.key === "Enter" && runAiSearch()} />
-                      <button onClick={runAiSearch} disabled={aiLoading || !aiQuery.trim()}
-                        className="btn-pill border border-emerald text-emerald text-sm h-10 disabled:opacity-50">
+                        className="flex-1 text-sm h-10" onKeyDown={(e) => e.key === "Enter" && runAiSearch()} />
+                      <Button onClick={runAiSearch} disabled={aiLoading || !aiQuery.trim()} variant="outlinePill" size="pillSm">
                         {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                        <span className="ml-1.5">Search</span>
-                      </button>
+                        Search
+                      </Button>
                     </div>
                     {aiResults && (
                       <div className="rounded-xl border border-emerald/30 bg-emerald/5 p-3 text-sm">

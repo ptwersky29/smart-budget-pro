@@ -5,6 +5,8 @@ import {
   Package, Wand2, Sparkles, TrendingUp, AlertTriangle, Gauge, CalendarDays,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 import { EmptyState, MetricCard, PageHeader, SectionCard } from "../components/ui/layout";
 import { SkeletonCard } from "../components/ui/Skeleton";
 import ConfirmModal from "../components/ui/ConfirmModal";
@@ -662,9 +664,9 @@ export default function BudgetSystem() {
           <input placeholder="Budget £" type="number" value={holidayForm.budgeted_amount}
                  onChange={e => setHolidayForm({...holidayForm, budgeted_amount: e.target.value})}
                  className="h-10 w-28 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-topaz focus:outline-none text-sm" />
-          <button onClick={saveBudgetCategory} className="btn-pill gradient-topaz text-white text-sm">
-            <Plus className="h-4 w-4 mr-1" /> Add
-          </button>
+          <Button variant="warning" size="pillSm" onClick={saveBudgetCategory}>
+            <Plus className="h-4 w-4" /> Add
+          </Button>
         </div>
         {holidayBudgets.filter(b => b.holiday_name === selectedHoliday).length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">No categories added yet.</p>
@@ -735,11 +737,10 @@ export default function BudgetSystem() {
         <input placeholder="Amount" type="number" value={quickAmount}
                onChange={e => setQuickAmount(e.target.value)}
                className="h-10 w-28 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none text-sm" />
-        <button onClick={handleClassify} disabled={classifying || !quickDesc.trim() || !quickAmount}
-                className="btn-pill gradient-emerald text-white text-sm disabled:opacity-50">
-          {classifying ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Wand2 className="h-4 w-4 mr-1" />}
+        <Button variant="primary" size="pillSm" onClick={handleClassify} disabled={classifying || !quickDesc.trim() || !quickAmount}>
+          {classifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
           Classify
-        </button>
+        </Button>
       </div>
 
       {/* AI Classification result */}
@@ -771,9 +772,9 @@ export default function BudgetSystem() {
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleApprove} className="btn-pill gradient-emerald text-white text-sm">
-              <Check className="h-4 w-4 mr-1" /> Approve & Add
-            </button>
+            <Button variant="primary" size="pillSm" onClick={handleApprove}>
+              <Check className="h-4 w-4" /> Approve & Add
+            </Button>
             <button onClick={cancelClassification} className="text-sm px-4 py-2 rounded-full border border-border">
               Cancel
             </button>
@@ -1035,11 +1036,10 @@ export default function BudgetSystem() {
                     })()}
                   </div>
                   <div className="px-6 py-4 border-t border-border">
-                    <button onClick={handleDetectPatterns} disabled={detectingPatterns}
-                            className="btn-pill border border-topaz text-topaz text-sm">
-                      {detectingPatterns ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                    <Button variant="outlinePill" size="pillSm" className="border-topaz text-topaz" onClick={handleDetectPatterns} disabled={detectingPatterns}>
+                      {detectingPatterns ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                       {detectingPatterns ? "Scanning…" : "Detect recurring patterns"}
-                    </button>
+                    </Button>
                     {patternsDetected && (
                       <span className="ml-3 text-xs text-muted-foreground">
                         {patternsDetected.patterns_detected > 0
@@ -1065,22 +1065,21 @@ export default function BudgetSystem() {
               <div>
                 <label className="label-overline">Year</label>
                 <select value={reviewYear} onChange={e => setReviewYear(parseInt(e.target.value))}
-                        className="mt-1 control-shell">
+                        className="mt-1 flex h-11 w-full rounded-xl bg-secondary/50 border border-transparent px-4 text-sm transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none">
                   {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
               </div>
               <div>
                 <label className="label-overline">Month</label>
                 <select value={reviewMonth} onChange={e => setReviewMonth(parseInt(e.target.value))}
-                        className="mt-1 control-shell">
+                        className="mt-1 flex h-11 w-full rounded-xl bg-secondary/50 border border-transparent px-4 text-sm transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none">
                   {MONTHS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select>
               </div>
-              <button onClick={handleGenerateReview} disabled={reviewLoading}
-                      className="btn-pill gradient-emerald text-white text-sm disabled:opacity-50">
-                {reviewLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
+              <Button variant="primary" size="pillSm" onClick={handleGenerateReview} disabled={reviewLoading}>
+                {reviewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                 {reviewLoading ? "Loading…" : "Generate Review"}
-              </button>
+              </Button>
             </div>
           </SectionCard>
 
@@ -1231,10 +1230,9 @@ export default function BudgetSystem() {
                       {exists ? (
                         <p className="text-xs text-emerald">Already set</p>
                       ) : (
-                        <input type="number" step="0.01" placeholder="£ monthly"
+                        <Input type="number" step="0.01" placeholder="£ monthly"
                                value={initAmounts[cat] || ""}
-                               onChange={e => setInitAmounts({...initAmounts, [cat]: e.target.value})}
-                               className="w-full control-shell text-sm" />
+                               onChange={e => setInitAmounts({...initAmounts, [cat]: e.target.value})} />
                       )}
                     </div>
                   );
@@ -1242,15 +1240,14 @@ export default function BudgetSystem() {
               </div>
             )}
             <div className="flex flex-wrap gap-2">
-              <button onClick={handleInitDayToDay} disabled={initializing}
-                      className="btn-pill gradient-emerald text-white text-sm disabled:opacity-50">
-                {initializing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+              <Button variant="primary" size="pillSm" onClick={handleInitDayToDay} disabled={initializing}>
+                {initializing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                 {initializing ? "Creating…" : "Create all"}
-              </button>
-              <button onClick={handlePredict} disabled={predicting} className="btn-pill border border-topaz text-topaz text-sm">
-                {predicting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
+              </Button>
+              <Button variant="outlinePill" size="pillSm" className="border-topaz text-topaz" onClick={handlePredict} disabled={predicting}>
+                {predicting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                 {predicting ? "Predicting…" : "AI Forecast"}
-              </button>
+              </Button>
             </div>
           </SectionCard>
 
@@ -1308,31 +1305,30 @@ export default function BudgetSystem() {
                 <Heart className="h-5 w-5 text-ruby" />
                 <p className="text-lg tracking-tight font-medium">Simcha Planner</p>
               </div>
-              <button onClick={() => { setShowSimchaForm(!showSimchaForm); setEditingSimcha(null); setSimchaForm({ name: "", event_date: "", estimated_amount: "", cat_hall: "", cat_catering: "", cat_music: "", cat_clothing: "", cat_gifts: "", cat_photography: "" }); }}
-                      className="btn-pill gradient-topaz text-white text-sm">
-                <Plus className="h-4 w-4 mr-1" /> New simcha
-              </button>
+              <Button variant="warning" size="pillSm" onClick={() => { setShowSimchaForm(!showSimchaForm); setEditingSimcha(null); setSimchaForm({ name: "", event_date: "", estimated_amount: "", cat_hall: "", cat_catering: "", cat_music: "", cat_clothing: "", cat_gifts: "", cat_photography: "" }); }}>
+                <Plus className="h-4 w-4" /> New simcha
+              </Button>
             </div>
             {showSimchaForm && (
               <form onSubmit={createSimcha} className="mb-6 p-4 rounded-xl bg-secondary/20 border border-border space-y-3">
                 <div className="grid sm:grid-cols-3 gap-3">
                   <div>
                     <label className="label-overline">Event name</label>
-                    <input required placeholder="Bar Mitzvah, Bris, ..." value={simchaForm.name}
+                    <Input required placeholder="Bar Mitzvah, Bris, ..." value={simchaForm.name}
                            onChange={e => setSimchaForm({...simchaForm, name: e.target.value})}
-                           className="mt-1 w-full control-shell" />
+                           className="mt-1" />
                   </div>
                   <div>
                     <label className="label-overline">Event date</label>
-                    <input type="date" value={simchaForm.event_date}
+                    <Input type="date" value={simchaForm.event_date}
                            onChange={e => setSimchaForm({...simchaForm, event_date: e.target.value})}
-                           className="mt-1 w-full control-shell" />
+                           className="mt-1" />
                   </div>
                   <div>
                     <label className="label-overline">Total budget (£)</label>
-                    <input type="number" value={simchaForm.estimated_amount}
+                    <Input type="number" value={simchaForm.estimated_amount}
                            onChange={e => setSimchaForm({...simchaForm, estimated_amount: e.target.value})}
-                           placeholder="5000" className="mt-1 w-full control-shell" />
+                           placeholder="5000" className="mt-1" />
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2 mb-2">Standard simcha categories (optional):</p>
@@ -1340,16 +1336,16 @@ export default function BudgetSystem() {
                   {SIMCHA_CATS.map(cat => (
                     <div key={cat}>
                       <label className="label-overline capitalize">{cat}</label>
-                      <input type="number" placeholder="£" value={simchaForm[`cat_${cat}`] || ""}
+                      <Input type="number" placeholder="£" value={simchaForm[`cat_${cat}`] || ""}
                              onChange={e => setSimchaForm({...simchaForm, [`cat_${cat}`]: e.target.value})}
-                             className="mt-1 w-full control-shell" />
+                             className="mt-1" />
                     </div>
                   ))}
                 </div>
                 <div className="flex gap-2 mt-4">
-                  <button type="submit" className="btn-pill gradient-emerald text-white text-sm">
-                    {editingSimcha ? "Update" : "Create simcha"}
-                  </button>
+                <Button variant="primary" size="pillSm" type="submit">
+                  {editingSimcha ? "Update" : "Create simcha"}
+                </Button>
                   <button type="button" onClick={() => { setShowSimchaForm(false); setEditingSimcha(null); }}
                           className="text-xs px-4 py-2 rounded-full border border-border">Cancel</button>
                 </div>
@@ -1397,41 +1393,41 @@ export default function BudgetSystem() {
             <form onSubmit={createOther} className="flex flex-wrap gap-3 items-end">
               <div className="flex-1 min-w-[160px]">
                 <label className="label-overline">Name</label>
-                <input required value={otherForm.name}
+                <Input required value={otherForm.name}
                        onChange={e => setOtherForm({...otherForm, name: e.target.value})}
-                       placeholder="Car purchase" list="other-examples-bud" className="mt-1 w-full control-shell" />
+                       placeholder="Car purchase" list="other-examples-bud" className="mt-1" />
                 <datalist id="other-examples-bud">
                   {otherPresets.map(ex => <option key={ex} value={ex} />)}
                 </datalist>
               </div>
               <div className="flex-1 min-w-[140px]">
                 <label className="label-overline">Budget (£)</label>
-                <input required type="number" step="0.01" value={otherForm.estimated_amount}
+                <Input required type="number" step="0.01" value={otherForm.estimated_amount}
                        onChange={e => setOtherForm({...otherForm, estimated_amount: e.target.value})}
-                       placeholder="5000" className="mt-1 w-full control-shell" />
+                       placeholder="5000" className="mt-1" />
               </div>
               <div className="flex-1 min-w-[140px]">
                 <label className="label-overline">Date</label>
-                <input type="date" value={otherForm.event_date}
+                <Input type="date" value={otherForm.event_date}
                        onChange={e => setOtherForm({...otherForm, event_date: e.target.value})}
-                       className="mt-1 w-full control-shell" />
+                       className="mt-1" />
               </div>
               <div className="w-full sm:w-auto">
                 <label className="label-overline">Categories (comma-sep)</label>
-                <input value={otherForm.categories}
+                <Input value={otherForm.categories}
                        onChange={e => setOtherForm({...otherForm, categories: e.target.value})}
-                       placeholder="venue, catering" className="mt-1 w-full control-shell" />
+                       placeholder="venue, catering" className="mt-1" />
               </div>
               <div className="w-full">
                 <label className="label-overline">Notes</label>
                 <textarea value={otherForm.notes}
                   onChange={e => setOtherForm({...otherForm, notes: e.target.value})}
-                  placeholder="Optional details" className="mt-1 w-full control-shell resize-none h-20" />
+                  placeholder="Optional details" className="mt-1 flex h-20 w-full rounded-xl bg-secondary/50 border border-transparent px-4 py-2 text-sm transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none resize-none" />
               </div>
               <div className="flex gap-2 w-full">
-                <button className="btn-pill gradient-emerald text-white text-sm">
-                  <Plus className="h-4 w-4 mr-2" /> Add
-                </button>
+                <Button variant="primary" size="pillSm" type="submit">
+                  <Plus className="h-4 w-4" /> Add
+                </Button>
                 {editingOther && (
                   <button type="button" onClick={() => { setEditingOther(null); setOtherForm({ name: "", estimated_amount: "", event_date: "", notes: "", categories: "" }); }}
                           className="text-xs px-4 py-2 rounded-full border border-border">Cancel</button>
@@ -1489,11 +1485,11 @@ export default function BudgetSystem() {
                 <p className="label-overline">Yom Tov Budgets</p>
               </div>
               <div className="flex gap-2">
-                <button onClick={handleAutoCreateYomTov} disabled={autoCreating}
-                        className={`btn-pill text-sm ${autoCreateResult ? "gradient-emerald text-white" : "border border-topaz text-topaz"}`}>
-                  {autoCreating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Star className="h-4 w-4 mr-1" />}
+                <Button size="pillSm" onClick={handleAutoCreateYomTov} disabled={autoCreating}
+                        className={autoCreateResult ? "gradient-emerald text-white" : "border border-topaz text-topaz"}>
+                  {autoCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Star className="h-4 w-4" />}
                   {autoCreating ? "Creating…" : autoCreateResult ? "Re-create" : "Auto-create upcoming"}
-                </button>
+                </Button>
               </div>
             </div>
             {autoCreateResult && (
@@ -1546,27 +1542,27 @@ export default function BudgetSystem() {
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
               <div>
                 <label className="label-overline">Holiday name</label>
-                <input placeholder="Summer Trip 2026" value={holidayName}
+                <Input placeholder="Summer Trip 2026" value={holidayName}
                        onChange={e => setHolidayName(e.target.value)}
-                       className="mt-1 w-full control-shell" />
+                       className="mt-1" />
               </div>
               <div>
                 <label className="label-overline">Destination</label>
-                <input placeholder="Spain, Italy, …" value={holidayDestination}
+                <Input placeholder="Spain, Italy, …" value={holidayDestination}
                        onChange={e => setHolidayDestination(e.target.value)}
-                       className="mt-1 w-full control-shell" />
+                       className="mt-1" />
               </div>
               <div>
                 <label className="label-overline">Start date</label>
-                <input type="date" value={holidayStartDate}
+                <Input type="date" value={holidayStartDate}
                        onChange={e => setHolidayStartDate(e.target.value)}
-                       className="mt-1 w-full control-shell" />
+                       className="mt-1" />
               </div>
               <div>
                 <label className="label-overline">End date</label>
-                <input type="date" value={holidayEndDate}
+                <Input type="date" value={holidayEndDate}
                        onChange={e => setHolidayEndDate(e.target.value)}
-                       className="mt-1 w-full control-shell" />
+                       className="mt-1" />
               </div>
             </div>
             {holidayPresets.length > 0 && (
@@ -1580,11 +1576,10 @@ export default function BudgetSystem() {
                 ))}
               </div>
             )}
-            <button onClick={handleHolidayEstimate} disabled={estimatingHoliday || !holidayName.trim() || !holidayStartDate || !holidayEndDate}
-                    className="btn-pill gradient-topaz text-white text-sm disabled:opacity-50">
-              {estimatingHoliday ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
+            <Button variant="warning" size="pillSm" onClick={handleHolidayEstimate} disabled={estimatingHoliday || !holidayName.trim() || !holidayStartDate || !holidayEndDate}>
+              {estimatingHoliday ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
               {estimatingHoliday ? "Estimating…" : "AI — Estimate & Create"}
-            </button>
+            </Button>
           </div>
 
           {holidayEstimate && (
@@ -1617,9 +1612,9 @@ export default function BudgetSystem() {
               <input placeholder="Legacy holiday name" value={newSecularHoliday}
                      onChange={e => setNewSecularHoliday(e.target.value)}
                      className="h-10 flex-1 max-w-sm px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-topaz focus:outline-none text-sm" />
-              <button onClick={addSecularHoliday} className="btn-pill border border-emerald text-emerald text-sm">
-                <Plus className="h-4 w-4 mr-1" /> Add Legacy
-              </button>
+              <Button variant="outlinePill" size="pillSm" className="border-emerald text-emerald" onClick={addSecularHoliday}>
+                <Plus className="h-4 w-4" /> Add Legacy
+              </Button>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {secularHolidaysList.length === 0 ? (
@@ -1644,10 +1639,9 @@ export default function BudgetSystem() {
                 <Heart className="h-5 w-5 text-ruby" />
                 <p className="text-lg tracking-tight font-medium">Chasuna / Wedding Planner</p>
               </div>
-              <button onClick={() => { setShowChasunaForm(!showChasunaForm); setEditingChasuna(null); setChasunaForm({ category: "", description: "", estimated_cost: "", vendor: "", due_date: "" }); }}
-                      className="btn-pill gradient-topaz text-white text-sm">
-                <Plus className="h-4 w-4 mr-1" /> Add item
-              </button>
+              <Button variant="warning" size="pillSm" onClick={() => { setShowChasunaForm(!showChasunaForm); setEditingChasuna(null); setChasunaForm({ category: "", description: "", estimated_cost: "", vendor: "", due_date: "" }); }}>
+                <Plus className="h-4 w-4" /> Add item
+              </Button>
             </div>
             {chasunaSum && (
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
@@ -1692,9 +1686,9 @@ export default function BudgetSystem() {
                          className="h-10 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-topaz focus:outline-none text-sm" />
                 </div>
                 <div className="flex gap-2">
-                  <button type="submit" className="btn-pill gradient-emerald text-white text-sm">
+                  <Button variant="primary" size="pillSm" type="submit">
                     {editingChasuna ? "Update" : "Add to plan"}
-                  </button>
+                  </Button>
                   <button type="button" onClick={() => { setShowChasunaForm(false); setEditingChasuna(null); }}
                           className="text-xs px-4 py-2 rounded-full border border-border">Cancel</button>
                 </div>

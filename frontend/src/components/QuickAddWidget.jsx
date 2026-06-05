@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Plus, Loader2, Sparkles, Check, X } from "lucide-react";
+import { Button } from "../components/ui/button";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 
@@ -95,12 +96,12 @@ export default function QuickAddWidget() {
                 onKeyDown={handleKeyDown}
                 className="w-full h-10 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none text-sm" />
 
-              <button onClick={classification ? handleApprove : handleClassify}
+              <Button variant="primary" size="pill" onClick={classification ? handleApprove : handleClassify}
                 disabled={classifying || !desc.trim() || !amount}
-                className="btn-pill gradient-emerald text-white text-sm w-full disabled:opacity-50">
+                className="w-full">
                 {classifying ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
                 {classifying ? "Classifying…" : classification ? "Approve & Add" : "Classify"}
-              </button>
+              </Button>
             </div>
 
             {classification && (

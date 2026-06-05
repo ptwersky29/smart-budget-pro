@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { PageHeader, SectionCard } from "../components/ui/layout";
 import ConfirmModal from "../components/ui/ConfirmModal";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 import IntegrationsPage from "./Integrations";
 import SMSPage from "./SMS";
 
@@ -208,30 +210,34 @@ export default function Settings() {
 
                 <div className="flex flex-wrap gap-3 pt-1">
                   {subscription.is_premium && !subscription.is_admin && (
-                    <button
+                    <Button
+                      variant="outlinePill"
+                      size="pill"
                       onClick={openPortal}
                       disabled={portalBusy}
-                      className="btn-pill border border-border text-sm h-10 px-4 inline-flex items-center gap-2 disabled:opacity-50"
                     >
                       <CreditCard className="h-4 w-4" />
                       {portalBusy ? "Opening…" : "Manage billing"}
                       <ExternalLink className="h-3 w-3" />
-                    </button>
+                    </Button>
                   )}
                   {subscription.is_premium && !subscription.cancel_at_period_end && !subscription.is_admin && (
-                    <button
+                    <Button
+                      variant="danger"
+                      size="pill"
                       onClick={() => setConfirmOpen(true)}
                       disabled={cancelBusy}
-                      className="btn-pill border border-ruby/40 text-ruby text-sm h-10 px-4 inline-flex items-center gap-2 disabled:opacity-50"
                     >
                       <XCircle className="h-4 w-4" />
                       {cancelBusy ? "…" : "Cancel subscription"}
-                    </button>
+                    </Button>
                   )}
                   {!subscription.is_premium && !subscription.on_trial && (
-                    <a href="/pricing" className="btn-pill gradient-emerald text-white text-sm h-10 px-5 inline-flex items-center gap-2">
-                      <Crown className="h-4 w-4" /> Upgrade to Premium — £5/mo
-                    </a>
+                    <Button asChild variant="primary" size="pill">
+                      <a href="/pricing">
+                        <Crown className="h-4 w-4" /> Upgrade to Premium — £5/mo
+                      </a>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -276,13 +282,13 @@ export default function Settings() {
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <div>
                   <label className="label-overline">Nickname *</label>
-                  <input
+                  <Input
                     data-testid="ai-prov-name"
                     required
                     placeholder="My OpenAI key"
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className="mt-1 w-full control-shell"
+                    className="mt-1 w-full"
                   />
                 </div>
                 <div>
@@ -291,31 +297,31 @@ export default function Settings() {
                     data-testid="ai-prov-provider"
                     value={form.provider}
                     onChange={(e) => setForm({ ...form, provider: e.target.value })}
-                    className="mt-1 w-full control-shell"
+                    className="mt-1 w-full h-11 rounded-xl bg-secondary/50 border border-transparent px-4 text-sm transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none"
                   >
                     {PROVIDERS.map((p) => <option key={p}>{p}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="label-overline">Model *</label>
-                  <input
+                  <Input
                     data-testid="ai-prov-model"
                     required
                     placeholder="gpt-4o"
                     value={form.model}
                     onChange={(e) => setForm({ ...form, model: e.target.value })}
-                    className="mt-1 w-full control-shell"
+                    className="mt-1 w-full"
                   />
                 </div>
                 <div>
                   <label className="label-overline">API Key</label>
-                  <input
+                  <Input
                     data-testid="ai-prov-key"
                     placeholder="sk-…"
                     type="password"
                     value={form.api_key}
                     onChange={(e) => setForm({ ...form, api_key: e.target.value })}
-                    className="mt-1 w-full control-shell"
+                    className="mt-1 w-full"
                   />
                 </div>
                 <div className="flex items-end pb-1">
@@ -331,9 +337,9 @@ export default function Settings() {
                 </div>
               </div>
               <div>
-                <button data-testid="ai-prov-add" className="btn-pill gradient-emerald text-white text-sm h-10 px-5">
-                  <Plus className="h-4 w-4 mr-1" /> Save provider
-                </button>
+                <Button data-testid="ai-prov-add" variant="primary" size="pill">
+                  <Plus className="h-4 w-4" /> Save provider
+                </Button>
               </div>
             </form>
 
@@ -392,13 +398,13 @@ export default function Settings() {
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
                   <label className="label-overline">Client ID</label>
-                  <input
+                  <Input
                     data-testid="tl-client-id"
                     required
                     value={tlForm.client_id}
                     onChange={(e) => setTlForm({ ...tlForm, client_id: e.target.value })}
                     placeholder="sandbox-yourapp-12ab34"
-                    className="mt-1 w-full control-shell font-mono text-sm"
+                    className="mt-1 w-full font-mono text-sm"
                   />
                 </div>
                 <div>
@@ -406,22 +412,22 @@ export default function Settings() {
                     Client Secret
                     {tl?.has_secret && <span className="ml-1 normal-case tracking-normal text-muted-foreground font-normal">(leave blank to keep current)</span>}
                   </label>
-                  <input
+                  <Input
                     data-testid="tl-client-secret"
                     type="password"
                     value={tlForm.client_secret}
                     onChange={(e) => setTlForm({ ...tlForm, client_secret: e.target.value })}
                     placeholder={tl?.has_secret ? "•••••••• (unchanged)" : "Paste secret"}
-                    className="mt-1 w-full control-shell font-mono text-sm"
+                    className="mt-1 w-full font-mono text-sm"
                   />
                 </div>
                 <div className="sm:col-span-2">
                   <label className="label-overline">Redirect URI</label>
-                  <input
+                  <Input
                     data-testid="tl-redirect"
                     value={tlForm.redirect_uri}
                     onChange={(e) => setTlForm({ ...tlForm, redirect_uri: e.target.value })}
-                    className="mt-1 w-full control-shell font-mono text-xs"
+                    className="mt-1 w-full font-mono text-xs"
                   />
                   <p className="text-xs text-muted-foreground mt-1">Add this exact URL in TrueLayer Console → Allowed redirect URIs.</p>
                 </div>
@@ -431,7 +437,7 @@ export default function Settings() {
                     data-testid="tl-env"
                     value={tlForm.environment}
                     onChange={(e) => setTlForm({ ...tlForm, environment: e.target.value })}
-                    className="mt-1 w-full control-shell"
+                    className="mt-1 w-full h-11 rounded-xl bg-secondary/50 border border-transparent px-4 text-sm transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none"
                   >
                     <option value="sandbox">Sandbox</option>
                     <option value="live">Live</option>
@@ -439,9 +445,9 @@ export default function Settings() {
                 </div>
               </div>
               <div className="flex items-center gap-4 pt-1">
-                <button data-testid="tl-save" disabled={tlBusy} className="btn-pill gradient-emerald text-white text-sm disabled:opacity-50">
+                <Button data-testid="tl-save" variant="primary" size="pill" disabled={tlBusy}>
                   {tlBusy ? "Saving…" : "Save credentials"}
-                </button>
+                </Button>
                 <a href="https://console.truelayer.com" target="_blank" rel="noreferrer" className="text-sm text-emerald hover:underline inline-flex items-center gap-1">
                   Open TrueLayer Console <ExternalLink className="h-3 w-3" />
                 </a>

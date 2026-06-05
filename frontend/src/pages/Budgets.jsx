@@ -16,6 +16,8 @@ import {
   CollapsibleTrigger,
   CollapsibleContent,
 } from "../components/ui/collapsible";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 
 export default function Budgets() {
   const [budgets, setBudgets] = useState([]);
@@ -151,22 +153,22 @@ export default function Budgets() {
             <form onSubmit={handleCreate} className="flex flex-wrap gap-3 items-end">
               <div className="flex-1 min-w-[200px]">
                 <label className="label-overline">Category</label>
-                <input list="budget-categories" value={form.category}
+                <Input list="budget-categories" value={form.category}
                   onChange={(e) => setForm({ ...form, category: e.target.value })}
-                  placeholder="e.g., groceries" className="mt-1 w-full control-shell" required />
+                  placeholder="e.g., groceries" className="mt-1 w-full" required />
                 <datalist id="budget-categories">
                   {CATEGORY_OPTIONS.map(cat => <option key={cat} value={cat} />)}
                 </datalist>
               </div>
               <div className="flex-1 min-w-[140px]">
                 <label className="label-overline">Monthly limit (£)</label>
-                <input type="number" step="0.01" min="0" value={form.limit}
+                <Input type="number" step="0.01" min="0" value={form.limit}
                   onChange={(e) => setForm({ ...form, limit: e.target.value })}
-                  placeholder="e.g., 300" className="mt-1 w-full control-shell" required />
+                  placeholder="e.g., 300" className="mt-1 w-full" required />
               </div>
-              <button type="submit" className="btn-pill gradient-emerald text-white text-sm h-[42px]">
-                <Plus className="h-4 w-4 mr-2" /> Add Budget
-              </button>
+              <Button type="submit" variant="primary" size="pill">
+                <Plus className="h-4 w-4" /> Add Budget
+              </Button>
             </form>
           </div>
         </CollapsibleContent>
@@ -198,15 +200,15 @@ export default function Budgets() {
                     <div className="space-y-3">
                       <div>
                         <label className="label-overline">Category</label>
-                        <input list="budget-categories" value={form.category}
+                        <Input list="budget-categories" value={form.category}
                           onChange={(e) => setForm({ ...form, category: e.target.value })}
-                          className="mt-1 w-full control-shell" />
+                          className="mt-1 w-full" />
                       </div>
                       <div>
                         <label className="label-overline">Monthly limit (£)</label>
-                        <input type="number" step="0.01" min="0" value={form.limit}
+                        <Input type="number" step="0.01" min="0" value={form.limit}
                           onChange={(e) => setForm({ ...form, limit: e.target.value })}
-                          className="mt-1 w-full control-shell" />
+                          className="mt-1 w-full" />
                       </div>
                       <div className="flex gap-2">
                         <button onClick={() => handleUpdate(budget.budget_id)}

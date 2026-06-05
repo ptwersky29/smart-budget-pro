@@ -18,6 +18,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "../components/ui/dropdown-menu";
+import { Button } from "../components/ui/button";
 
 const TOOLTIP_STYLE = { backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px" };
 
@@ -104,7 +105,7 @@ const Dashboard = React.memo(function Dashboard() {
     <div className="grid place-items-center min-h-[60vh] text-center p-8">
       <div>
         <p className="text-lg font-medium text-muted-foreground">Could not load dashboard</p>
-        <button onClick={() => loadAll()} className="mt-4 btn-pill border border-emerald text-emerald text-sm">Try again</button>
+        <Button onClick={() => loadAll()} variant="outlinePill" size="pillSm" className="mt-4">Try again</Button>
       </div>
     </div>
   );
@@ -122,8 +123,10 @@ const Dashboard = React.memo(function Dashboard() {
           </h1>
         </div>
         <DropdownMenu>
-          <DropdownMenuTrigger className="toolbar-chip">
-            <MoreHorizontal className="h-3.5 w-3.5 mr-1" /> Actions
+          <DropdownMenuTrigger asChild>
+            <Button variant="chip">
+              <MoreHorizontal className="h-3.5 w-3.5" /> Actions
+            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => loadAll(true)}>
@@ -146,9 +149,15 @@ const Dashboard = React.memo(function Dashboard() {
           description="Connect your bank to import transactions automatically, upload a CSV statement, or add your first transaction manually to get started."
           action={
             <div className="flex flex-wrap gap-3 justify-center">
-              <Link to="/import" className="btn-pill gradient-emerald text-white text-sm h-11 px-5">Connect bank <ArrowRight className="ml-2 h-4 w-4" /></Link>
-              <Link to="/import" className="btn-pill border border-border text-sm h-11 px-5">Upload statement</Link>
-              <Link to="/transactions" className="btn-pill border border-border text-sm h-11 px-5">Add manually</Link>
+              <Button variant="primary" size="pill" asChild>
+                <Link to="/import">Connect bank <ArrowRight className="h-4 w-4" /></Link>
+              </Button>
+              <Button variant="outlinePill" size="pill" asChild>
+                <Link to="/import">Upload statement</Link>
+              </Button>
+              <Button variant="outlinePill" size="pill" asChild>
+                <Link to="/transactions">Add manually</Link>
+              </Button>
               <button onClick={seed} className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2">Explore with sample data</button>
             </div>
           }

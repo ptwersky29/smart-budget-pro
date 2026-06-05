@@ -4,6 +4,7 @@ import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, Area, Area
 import { TrendingUp, Loader2, ArrowUpRight, ArrowDownRight, RefreshCw, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import AIInsightPanel from "../components/AIInsightPanel";
+import { Button } from "../components/ui/button";
 import { PageHeader } from "../components/ui/layout";
 
 const SYMBOLS = ["VUSA","VWRL","VUKE","VFEM","IWDA","EQQQ","ISF","IUSA","VHVG","SP500","FTSE","NASDAQ","BRK.B","BTC","ETH"];
@@ -142,9 +143,9 @@ export default function Investments() {
           <label className="label-overline">Years</label>
           <input data-testid="inv-years" type="number" value={form.years} onChange={(e)=>setForm({...form, years:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
         </div>
-        <button data-testid="inv-run" disabled={busy} className="btn-pill gradient-emerald text-white text-sm h-11 disabled:opacity-50">
+        <Button data-testid="inv-run" variant="primary" size="pill" disabled={busy}>
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Forecast"}
-        </button>
+        </Button>
       </form>
 
       {result && (

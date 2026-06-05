@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { Check, Loader2, Sparkles } from "lucide-react";
+import { Button } from "../components/ui/button";
 import { toast } from "sonner";
 
 const FEATURES_FREE = ["Manual transactions","5 AI messages/day","Basic reports","CSV uploads"];
@@ -56,8 +57,7 @@ export default function Pricing() {
                 <li key={t} className="flex items-center gap-2"><Check className="h-4 w-4 text-muted-foreground"/>{t}</li>
               ))}
             </ul>
-            <button onClick={() => navigate(user ? "/dashboard" : "/register")} data-testid="free-cta"
-                    className="btn-pill border border-border mt-8 w-full">{user ? "Go to dashboard" : "Start free"}</button>
+            <Button variant="outlinePill" size="pill" onClick={() => navigate(user ? "/dashboard" : "/register")} data-testid="free-cta" className="mt-8 w-full">{user ? "Go to dashboard" : "Start free"}</Button>
           </div>
 
           <div className="rounded-3xl border-2 border-emerald bg-card p-8 relative">
@@ -72,12 +72,11 @@ export default function Pricing() {
               ))}
             </ul>
             {user?.tier === "premium" ? (
-              <div className="btn-pill bg-secondary text-foreground mt-8 w-full opacity-70">You're on Premium &check;</div>
+              <div className="rounded-full px-6 py-3 mt-8 w-full bg-secondary text-foreground opacity-70 text-center text-sm font-medium">You're on Premium &check;</div>
             ) : (
-              <button onClick={() => upgrade("premium_monthly")} disabled={busy.monthly} data-testid="upgrade-monthly"
-                      className="btn-pill gradient-emerald text-white mt-8 w-full disabled:opacity-50">
+              <Button variant="primary" size="pill" onClick={() => upgrade("premium_monthly")} disabled={busy.monthly} data-testid="upgrade-monthly" className="mt-8 w-full">
                 {busy.monthly ? <Loader2 className="h-4 w-4 animate-spin" /> : "Start 14-day trial"}
-              </button>
+              </Button>
             )}
           </div>
 
@@ -91,12 +90,11 @@ export default function Pricing() {
               ))}
             </ul>
             {user?.tier === "premium" ? (
-              <div className="btn-pill bg-secondary text-foreground mt-8 w-full opacity-70">You're on Premium &check;</div>
+              <div className="rounded-full px-6 py-3 mt-8 w-full bg-secondary text-foreground opacity-70 text-center text-sm font-medium">You're on Premium &check;</div>
             ) : (
-              <button onClick={() => upgrade("premium_yearly")} disabled={busy.yearly} data-testid="upgrade-yearly"
-                      className="btn-pill gradient-emerald text-white mt-8 w-full disabled:opacity-50">
+              <Button variant="primary" size="pill" onClick={() => upgrade("premium_yearly")} disabled={busy.yearly} data-testid="upgrade-yearly" className="mt-8 w-full">
                 {busy.yearly ? <Loader2 className="h-4 w-4 animate-spin" /> : "Start 14-day trial"}
-              </button>
+              </Button>
             )}
           </div>
         </div>

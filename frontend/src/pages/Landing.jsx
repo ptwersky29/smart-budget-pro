@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Sparkles, Building2, MessagesSquare, TrendingUp, ShieldCheck, Star, Check, ArrowRight, Landmark, Menu, X, Sun, MoonStar } from "lucide-react";
 import { useTheme } from "next-themes";
+import { Button } from "../components/ui/button";
 
 const HERO_IMG = "https://static.prod-images.emergentagent.com/jobs/a8ffc4f3-0824-40c4-a74c-b4e5c8fbcb66/images/9ec1a41a2ae49b3da963b26e9d76ff276824ad745a2dc7b71aee9227d794347c.png";
 
@@ -33,7 +34,9 @@ export default function Landing() {
             <a href="#pricing" className="hover:text-foreground">Pricing</a>
             <a href="#jewish" className="hover:text-foreground">Jewish Tools</a>
             <Link to="/login" className="px-4 py-2 hover:text-foreground">Sign in</Link>
-            <Link to="/register" data-testid="nav-register" className="btn-pill text-sm gradient-emerald text-white hover:opacity-90">Get started <ArrowRight className="h-4 w-4 ml-1" /></Link>
+            <Button variant="primary" size="pill" asChild>
+              <Link to="/register" data-testid="nav-register">Get started <ArrowRight className="h-4 w-4" /></Link>
+            </Button>
           </nav>
           <button onClick={() => setTheme(dark ? "light" : "dark")} className="p-3 text-muted-foreground hover:text-foreground" aria-label="Toggle theme">
             {dark ? <Sun className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
@@ -60,7 +63,9 @@ export default function Landing() {
               <a href="#jewish" onClick={() => setMobileNavOpen(false)} className="px-4 py-4 rounded-xl text-foreground hover:bg-secondary text-base font-medium">Jewish Tools</a>
               <hr className="my-2 border-border" />
               <Link to="/login" onClick={() => setMobileNavOpen(false)} className="px-4 py-4 rounded-xl text-foreground hover:bg-secondary text-base font-medium">Sign in</Link>
-              <Link to="/register" onClick={() => setMobileNavOpen(false)} className="btn-pill gradient-emerald text-white text-center mt-2 py-4">Get started <ArrowRight className="h-4 w-4 ml-1 inline" /></Link>
+              <Button variant="primary" size="pill" asChild className="mt-2 w-full">
+                <Link to="/register" onClick={() => setMobileNavOpen(false)}>Get started <ArrowRight className="h-4 w-4" /></Link>
+              </Button>
             </nav>
           </div>
         </div>
@@ -78,8 +83,12 @@ export default function Landing() {
               FinanceAI sees every penny you spend, every bracha you make, every bill you forgot — and quietly keeps your budget, your forecasts, and your maaser in line.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Link to="/register" data-testid="hero-cta-start" className="btn-pill gradient-emerald text-white hover:opacity-90">Start free <ArrowRight className="h-4 w-4 ml-2" /></Link>
-              <Link to="/pricing" data-testid="hero-cta-pricing" className="btn-pill border border-border hover:bg-secondary">See pricing</Link>
+              <Button variant="primary" size="pill" asChild>
+                <Link to="/register" data-testid="hero-cta-start">Start free <ArrowRight className="h-4 w-4" /></Link>
+              </Button>
+              <Button variant="outlinePill" size="pill" asChild>
+                <Link to="/pricing" data-testid="hero-cta-pricing">See pricing</Link>
+              </Button>
             </div>
             <div className="flex gap-8 pt-6 border-t border-border">
               <div><p className="text-2xl font-medium tracking-tight">£5</p><p className="text-xs text-muted-foreground uppercase tracking-wider">per month, premium</p></div>
@@ -176,7 +185,9 @@ export default function Landing() {
                 <li key={t} className="flex items-center gap-2"><Check className="h-4 w-4 text-muted-foreground" /> {t}</li>
               ))}
             </ul>
-            <Link to="/register" data-testid="pricing-free" className="btn-pill border border-border mt-8 w-full">Start free</Link>
+            <Button variant="outlinePill" size="pill" asChild className="mt-8 w-full">
+              <Link to="/register" data-testid="pricing-free">Start free</Link>
+            </Button>
           </div>
           <div className="rounded-3xl border-2 border-emerald p-8 bg-card relative overflow-hidden">
             <span className="absolute top-4 right-4 text-xs px-3 py-1 rounded-full gradient-emerald text-white">Most popular</span>
@@ -188,7 +199,9 @@ export default function Landing() {
                 <li key={t} className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald" /> {t}</li>
               ))}
             </ul>
-            <Link to="/pricing" data-testid="pricing-premium" className="btn-pill gradient-emerald text-white mt-8 w-full">Upgrade to Premium</Link>
+            <Button variant="primary" size="pill" asChild className="mt-8 w-full">
+              <Link to="/pricing" data-testid="pricing-premium">Upgrade to Premium</Link>
+            </Button>
           </div>
         </div>
       </section>

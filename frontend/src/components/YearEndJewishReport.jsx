@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { Download, Loader2, TrendingDown, TrendingUp, CheckCircle2, AlertCircle } from "lucide-react";
+import { Button } from "../components/ui/button";
 
 /**
  * Year-End Jewish Finance Report Component
@@ -79,14 +80,14 @@ export default function YearEndJewishReport({ year }) {
             Generated {new Date(report.generated_at).toLocaleDateString()}
           </p>
         </div>
-        <button
+        <Button
+          variant="primary" size="pill"
           onClick={handleDownloadPDF}
           disabled={downloading}
-          className="btn-pill gradient-emerald text-white h-11 px-4 flex items-center gap-2 disabled:opacity-50"
         >
           {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
           Download PDF
-        </button>
+        </Button>
       </div>
 
       {/* Maaser Section */}

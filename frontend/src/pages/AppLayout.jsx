@@ -8,6 +8,7 @@ import CommandPalette from "../components/CommandPalette";
 import NotificationCenter from "../components/NotificationCenter";
 import AccessibilityOverlay from "../components/AccessibilityOverlay";
 import QuickAddWidget from "../components/QuickAddWidget";
+import { Button } from "../components/ui/button";
 
 import {
   LayoutDashboard, Receipt, PiggyBank, Building2, TrendingUp, Star,
@@ -314,14 +315,14 @@ export default function AppLayout() {
 
             <div className="hidden lg:flex items-center gap-2">
               {routeMeta.secondary && (
-                <Link to={routeMeta.secondary.to} className="toolbar-chip hover:bg-secondary/70 transition-colors">
-                  {routeMeta.secondary.label}
-                </Link>
+                <Button asChild variant="chip">
+                  <Link to={routeMeta.secondary.to}>{routeMeta.secondary.label}</Link>
+                </Button>
               )}
               {routeMeta.primary && (
-                <Link to={routeMeta.primary.to} className="btn-pill gradient-emerald text-white h-10 px-4 text-sm shadow-lg shadow-emerald/15">
-                  {routeMeta.primary.label}
-                </Link>
+                <Button asChild variant="primary" size="pill">
+                  <Link to={routeMeta.primary.to}>{routeMeta.primary.label}</Link>
+                </Button>
               )}
               {user?.tier !== "premium" && user?.role !== "admin" && (
                 <Link to="/pricing" data-testid="topbar-upgrade" className="hidden xl:inline-flex items-center gap-2 px-4 h-10 rounded-full border border-emerald/20 bg-emerald/10 text-emerald text-sm font-medium hover:bg-emerald/15 transition-colors">
@@ -340,12 +341,9 @@ export default function AppLayout() {
                 {dark ? <Sun className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
               </button>
               {routeMeta.primary && (
-                <Link
-                  to={routeMeta.primary.to}
-                  className="btn-pill gradient-emerald text-white h-10 px-4 text-xs shadow-md shadow-emerald/15"
-                >
-                  {routeMeta.primary.label}
-                </Link>
+                <Button asChild variant="primary" size="pill" className="text-xs">
+                  <Link to={routeMeta.primary.to}>{routeMeta.primary.label}</Link>
+                </Button>
               )}
             </div>
           </div>
@@ -358,8 +356,8 @@ export default function AppLayout() {
               <p className="mt-2 text-2xl tracking-tight font-semibold">{routeMeta.title}</p>
               <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{routeMeta.description}</p>
               <div className="mt-4 flex flex-wrap gap-2">
-                {routeMeta.secondary && <Link to={routeMeta.secondary.to} className="toolbar-chip">{routeMeta.secondary.label}</Link>}
-                {routeMeta.primary && <Link to={routeMeta.primary.to} className="btn-pill gradient-emerald text-white h-10 px-4 text-sm">{routeMeta.primary.label}</Link>}
+                {routeMeta.secondary && <Button asChild variant="chip"><Link to={routeMeta.secondary.to}>{routeMeta.secondary.label}</Link></Button>}
+                {routeMeta.primary && <Button asChild variant="primary" size="pill"><Link to={routeMeta.primary.to}>{routeMeta.primary.label}</Link></Button>}
               </div>
             </div>
             <Outlet />

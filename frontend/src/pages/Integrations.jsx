@@ -6,6 +6,7 @@ import {
   CreditCard, Calendar, MessageSquare, TrendingUp, ArrowRight, Building2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Button } from "../components/ui/button";
 import { PageHeader } from "../components/ui/layout";
 import ConfirmModal from "../components/ui/ConfirmModal";
 
@@ -169,9 +170,9 @@ export default function Integrations({ embedded }) {
               <input type="checkbox" checked={aiForm.is_default} onChange={(e)=>setAiForm({...aiForm, is_default:e.target.checked})}/>
               Set as default for all AI insights
             </label>
-            <button data-testid="ai-save" disabled={aiBusy} className="btn-pill gradient-emerald text-white text-sm disabled:opacity-50 ml-auto">
+            <Button variant="primary" size="pill" data-testid="ai-save" disabled={aiBusy} className="ml-auto">
               {aiBusy ? <Loader2 className="h-4 w-4 animate-spin"/> : "Save provider"}
-            </button>
+            </Button>
             <a href={providerMeta.url} target="_blank" rel="noreferrer" className="text-sm text-emerald hover:underline inline-flex items-center gap-1">
               Get a key <ExternalLink className="h-3 w-3"/>
             </a>
@@ -212,8 +213,8 @@ export default function Integrations({ embedded }) {
             <p className="text-xs text-muted-foreground">Twilio Console → your number → A MESSAGE COMES IN → HTTP POST.</p>
           </div>
           <div className="sm:col-span-2 flex flex-wrap gap-2 items-center">
-            <button data-testid="tw-save" disabled={twBusy} className="btn-pill gradient-emerald text-white text-sm disabled:opacity-50">{twBusy ? <Loader2 className="h-4 w-4 animate-spin"/> : "Save"}</button>
-            <button type="button" onClick={testTw} disabled={twBusy} data-testid="tw-test" className="btn-pill border border-border text-sm disabled:opacity-50">Test connection</button>
+            <Button variant="primary" size="pill" data-testid="tw-save" disabled={twBusy}>{twBusy ? <Loader2 className="h-4 w-4 animate-spin"/> : "Save"}</Button>
+            <Button type="button" onClick={testTw} disabled={twBusy} data-testid="tw-test" variant="outlinePill" size="pill">Test connection</Button>
             <a href="https://www.twilio.com/console" target="_blank" rel="noreferrer" className="text-sm text-emerald hover:underline inline-flex items-center gap-1">Open Twilio Console <ExternalLink className="h-3 w-3"/></a>
           </div>
         </form>

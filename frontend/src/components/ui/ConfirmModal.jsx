@@ -1,4 +1,5 @@
 import React from "react";
+import { Button } from "./button";
 import { X, AlertTriangle } from "lucide-react";
 
 export default function ConfirmModal({ open, title, message, confirmLabel = "Delete", cancelLabel = "Cancel", variant = "danger", onConfirm, onCancel }) {
@@ -10,7 +11,7 @@ export default function ConfirmModal({ open, title, message, confirmLabel = "Del
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={onCancel}>
-      <div className="page-shell p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="confirm-title">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <AlertTriangle className="h-5 w-5 text-ruby" />
@@ -22,8 +23,8 @@ export default function ConfirmModal({ open, title, message, confirmLabel = "Del
         </div>
         <p className="text-sm text-muted-foreground leading-relaxed mb-6">{message}</p>
         <div className="flex gap-3 justify-end">
-          <button onClick={onCancel} className="btn-pill border border-border text-sm h-11 px-5">{cancelLabel}</button>
-          <button onClick={onConfirm} className={`btn-pill text-sm h-11 px-5 ${btnVariant}`}>{confirmLabel}</button>
+          <Button variant="outlinePill" size="pill" onClick={onCancel}>{cancelLabel}</Button>
+          <Button onClick={onConfirm} className={btnVariant} size="pill">{confirmLabel}</Button>
         </div>
       </div>
     </div>

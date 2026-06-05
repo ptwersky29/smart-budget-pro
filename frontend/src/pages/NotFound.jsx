@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Home, ArrowLeft } from "lucide-react";
+import { Button } from "../components/ui/button";
 
 export default function NotFound() {
   useEffect(() => { document.title = "404 | FinanceAI"; }, []);
@@ -13,8 +14,8 @@ export default function NotFound() {
           The page you're looking for doesn't exist or has been moved.
         </p>
         <div className="mt-8 flex items-center justify-center gap-3">
-          <Link to="/" className="btn-pill gradient-emerald text-white text-sm h-11 px-6"><Home className="h-4 w-4 mr-2" />Go home</Link>
-          <button onClick={() => window.history.back()} className="btn-pill border border-border text-muted-foreground text-sm h-11 px-6 hover:bg-secondary/60"><ArrowLeft className="h-4 w-4 mr-2" />Go back</button>
+          <Button variant="primary" size="pill" asChild><Link to="/"><Home className="h-4 w-4 mr-2" />Go home</Link></Button>
+          <Button variant="outlinePill" size="pill" onClick={() => window.history.back()}><ArrowLeft className="h-4 w-4 mr-2" />Go back</Button>
         </div>
       </div>
     </div>

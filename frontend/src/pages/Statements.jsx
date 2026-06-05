@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { Upload, FileText, Loader2, Sparkles, CheckCircle2, Trash2, ArrowDownRight, ArrowUpRight, Save } from "lucide-react";
 import { PageHeader, SectionCard } from "../components/ui/layout";
 import Skeleton from "../components/ui/Skeleton";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 
 export default function Statements() {
   useEffect(() => { document.title = "Statements | FinanceAI"; }, []);
@@ -72,7 +74,7 @@ export default function Statements() {
         eyebrow="Money"
         title="Drop a statement. AI reads it."
         description="Upload a CSV or PDF bank statement — the system extracts each transaction so you can review and save it in one click."
-        meta={user?.tier !== "premium" && user?.role !== "admin" ? [<span key="limit" className="toolbar-chip">Free tier · 1 upload/day</span>] : null}
+          meta={user?.tier !== "premium" && user?.role !== "admin" ? [<span key="limit" className="rounded-full border border-border bg-card/80 px-3 py-1.5 text-xs font-medium text-muted-foreground">Free tier · 1 upload/day</span>] : null}
       />
 
       <div
@@ -108,9 +110,9 @@ export default function Statements() {
               <p className="text-xl tracking-tight font-medium mt-1">{current.transaction_count} transaction{current.transaction_count !== 1 ? "s" : ""} from {current.filename}</p>
               <p className="text-xs text-muted-foreground mt-1">Review below, then save all to your account.</p>
             </div>
-            <button onClick={saveAll} disabled={saving} data-testid="save-all-button" className="btn-pill gradient-emerald text-white text-sm disabled:opacity-50">
+            <Button onClick={saveAll} disabled={saving} data-testid="save-all-button" variant="primary" size="pill">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="h-4 w-4 mr-2" /> Save all</>}
-            </button>
+            </Button>
           </div>
           {/* Mobile card view */}
           <div className="block sm:hidden divide-y divide-border">

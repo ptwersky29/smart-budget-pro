@@ -5,6 +5,8 @@ import { Building2, Loader2, CheckCircle2, XCircle, RefreshCcw, Trash2, ArrowRig
 import { toast } from "sonner";
 import { EmptyState, MetricCard, PageHeader, SectionCard } from "../components/ui/layout";
 import Skeleton from "../components/ui/Skeleton";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 
 export default function Connections() {
   useEffect(() => { document.title = "Bank Connections | FinanceAI"; }, []);
@@ -197,7 +199,9 @@ export default function Connections() {
             <p className="font-medium text-sm">Banking not yet available</p>
             <p className="text-xs text-muted-foreground mt-0.5">The administrator needs to configure TrueLayer in Settings before you can connect a bank.</p>
           </div>
-          <a href="/settings" className="btn-pill border border-topaz text-topaz text-sm hover:bg-topaz/10">Admin settings</a>
+          <Button variant="outlinePill" size="pillSm" className="border-topaz text-topaz hover:bg-topaz/10" asChild>
+            <a href="/settings">Admin settings</a>
+          </Button>
         </div>
       )}
 
@@ -244,11 +248,11 @@ export default function Connections() {
               </div>
               <div className="flex gap-2 justify-end">
               {status === "failed" && (
-                <button onClick={connect} data-testid="retry-connect" className="btn-pill border border-border text-sm">Retry</button>
+                <Button onClick={connect} data-testid="retry-connect" variant="outlinePill" size="pill">Retry</Button>
               )}
-              <button onClick={connect} disabled={status === "connecting" || status === "redirecting" || initialSync} data-testid="connect-bank-button" className="btn-pill gradient-emerald text-white text-sm disabled:opacity-50">
+              <Button onClick={connect} disabled={status === "connecting" || status === "redirecting" || initialSync} data-testid="connect-bank-button" variant="primary" size="pill">
                 {status === "connecting" || status === "redirecting" ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Working…</> : <>Connect Bank <ArrowRight className="h-4 w-4 ml-2" /></>}
-              </button>
+              </Button>
               </div>
             </div>
           </div>
@@ -259,10 +263,10 @@ export default function Connections() {
       <SectionCard eyebrow="Linked accounts" title={`${conns.length} connection${conns.length !== 1 ? "s" : ""}`} contentClassName="p-0">
         <div className="p-6 border-b border-border/70 flex items-center justify-between flex-wrap gap-3">
           {conns.length > 0 && (
-            <button onClick={doSync} disabled={syncing || initialSync} data-testid="sync-now" className="btn-pill border border-border text-sm disabled:opacity-50">
+            <Button onClick={doSync} disabled={syncing || initialSync} data-testid="sync-now" variant="outlinePill" size="pill">
               {syncing || initialSync ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCcw className="h-4 w-4 mr-2" />}
               {syncing || initialSync ? "Syncing…" : "Sync now"}
-            </button>
+            </Button>
           )}
         </div>
         {conns.length === 0 ? (
@@ -316,9 +320,9 @@ export default function Connections() {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {c.status === "reconnect_required" && (
-                    <button onClick={() => reconnectConn(c.connection_id)} data-testid={`reconnect-${c.connection_id}`} className="btn-pill border border-ruby text-ruby text-xs whitespace-nowrap">
+                    <Button onClick={() => reconnectConn(c.connection_id)} data-testid={`reconnect-${c.connection_id}`} variant="danger" size="pill" className="text-xs whitespace-nowrap">
                       Reconnect
-                    </button>
+                    </Button>
                   )}
                   <button onClick={() => removeConn(c.connection_id)} data-testid={`remove-${c.connection_id}`} className="h-9 w-9 rounded-full grid place-items-center hover:bg-secondary text-ruby" title="Remove connection"><Trash2 className="h-4 w-4" /></button>
                 </div>

@@ -4,6 +4,7 @@ import { Building2, Loader2, Upload, RefreshCcw, Trash2, CheckCircle2, XCircle, 
 import { toast } from "sonner";
 import { EmptyState, PageHeader, SectionCard } from "../components/ui/layout";
 import Skeleton from "../components/ui/Skeleton";
+import { Button } from "../components/ui/button";
 
 export default function BankStatements() {
   useEffect(() => { document.title = "Bank & Statements | FinanceAI"; }, []);
@@ -103,11 +104,10 @@ export default function BankStatements() {
         title="Import your data."
         description="Connect your bank, upload statements, and keep everything in sync."
         actions={
-          <button onClick={doSync} disabled={syncing || conns.length === 0}
-            className="btn-pill border border-emerald text-emerald text-sm h-11 px-4 disabled:opacity-50">
-            {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCcw className="h-4 w-4 mr-2" />}
+          <Button variant="outlinePill" size="pill" onClick={doSync} disabled={syncing || conns.length === 0}>
+            {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
             Sync now
-          </button>
+          </Button>
         }
       />
 
@@ -139,10 +139,9 @@ export default function BankStatements() {
         {/* Bank Connections */}
         <SectionCard contentClassName="p-0">
           <div className="p-5 border-b border-border/70 flex items-center gap-3 flex-wrap">
-            <button onClick={connect} disabled={status === "connecting" || status === "redirecting"}
-              className="btn-pill gradient-emerald text-white text-sm disabled:opacity-50">
-              {status === "connecting" || status === "redirecting" ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Working…</> : <>Connect Bank <ArrowRight className="h-4 w-4 ml-2" /></>}
-            </button>
+          <Button variant="primary" size="pill" onClick={connect} disabled={status === "connecting" || status === "redirecting"}>
+            {status === "connecting" || status === "redirecting" ? <><Loader2 className="h-4 w-4 animate-spin" /> Working…</> : <>Connect Bank <ArrowRight className="h-4 w-4" /></>}
+          </Button>
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
               From
               <input type="date" value={importFromDate} onChange={(e) => setImportFromDate(e.target.value)}
@@ -166,12 +165,12 @@ export default function BankStatements() {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {c.status === "reconnect_required" && (
-                      <button onClick={async () => {
+                      <Button variant="danger" size="pillSm" onClick={async () => {
                         try {
                           const { data } = await api.post(`/truelayer/reconnect/${c.connection_id}`);
                           setTimeout(() => { window.location.href = data.auth_url; }, 600);
                         } catch { toast.error("Reconnect failed"); }
-                      }} className="btn-pill border border-ruby text-ruby text-xs">Reconnect</button>
+                      }}>Reconnect</Button>
                     )}
                     <button onClick={() => removeConn(c.connection_id)} className="h-9 w-9 rounded-full grid place-items-center hover:bg-secondary text-ruby"><Trash2 className="h-4 w-4" /></button>
                   </div>
@@ -196,11 +195,10 @@ export default function BankStatements() {
             <p className="text-xs text-muted-foreground mt-1">or click to browse — max 5 MB</p>
             <input ref={fileRef} type="file" accept=".csv,.pdf" onChange={(e) => { handleUpload(e.target.files[0]); e.target.value = ""; }}
               className="hidden" />
-            <button onClick={() => fileRef.current?.click()} disabled={uploadBusy}
-              className="mt-4 btn-pill border border-emerald text-emerald text-sm disabled:opacity-50">
-              {uploadBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+            <Button variant="outlinePill" size="pill" onClick={() => fileRef.current?.click()} disabled={uploadBusy} className="mt-4">
+              {uploadBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
               {uploadBusy ? "Processing…" : "Choose file"}
-            </button>
+            </Button>
           </div>
           {uploadHistory.length > 0 ? (
             <div className="divide-y divide-border text-sm max-h-48 overflow-auto">

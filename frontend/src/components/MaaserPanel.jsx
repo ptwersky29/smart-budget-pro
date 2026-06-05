@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { SectionCard } from "./ui/layout";
 import Skeleton from "./ui/Skeleton";
 import ConfirmModal from "./ui/ConfirmModal";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 
 const EMPTY_SUM = {
   percent: 10, total_income: 0, obligation: 0, given_total: 0,
@@ -128,7 +130,7 @@ export default function MaaserPanel({ refreshKey = 0, onChange }) {
       description="Auto-Maaser accrues 10% of every income transaction, then subtracts everything you've given in the tzedakah category to show your true balance."
       actions={
         <div className="flex items-center gap-2">
-          <input
+          <Input
             data-testid="maaser-pct"
             type="number"
             min={0}
@@ -137,7 +139,7 @@ export default function MaaserPanel({ refreshKey = 0, onChange }) {
             value={cfg.percent}
             onChange={(e) => setCfg({ ...cfg, percent: parseFloat(e.target.value) || 0 })}
             onBlur={() => saveCfg(cfg)}
-            className="h-10 w-20 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none text-center font-mono"
+            className="w-20 text-center font-mono"
             title="Maaser percent"
           />
           <label className="inline-flex items-center gap-2 cursor-pointer">
@@ -220,7 +222,7 @@ export default function MaaserPanel({ refreshKey = 0, onChange }) {
 
       {showGiveForm && (
         <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={() => setShowGiveForm(false)}>
-          <div className="page-shell p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+          <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl tracking-tight font-medium">Give Maaser</h3>
               <button onClick={() => setShowGiveForm(false)} className="p-3 rounded-lg hover:bg-secondary text-muted-foreground">
@@ -230,18 +232,18 @@ export default function MaaserPanel({ refreshKey = 0, onChange }) {
             <div className="space-y-4">
               <div>
                 <label className="label-overline">Amount (£)</label>
-                <input type="number" step="0.01" value={giveAmount} onChange={(e) => setGiveAmount(e.target.value)}
-                  className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
+            <Input type="number" step="0.01" value={giveAmount} onChange={(e) => setGiveAmount(e.target.value)}
+              className="mt-1 w-full" />
               </div>
               <div>
                 <label className="label-overline">Recipient</label>
-                <input value={giveRecipient} onChange={(e) => setGiveRecipient(e.target.value)}
-                  placeholder="e.g. local shul, JNF, charity"
-                  className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
+            <Input value={giveRecipient} onChange={(e) => setGiveRecipient(e.target.value)}
+              placeholder="e.g. local shul, JNF, charity"
+              className="mt-1 w-full" />
               </div>
               <div className="flex gap-3 justify-end pt-2">
-                <button onClick={() => setShowGiveForm(false)} className="btn-pill border border-border text-sm h-11 px-5">Cancel</button>
-                <button onClick={submitGive} className="btn-pill gradient-emerald text-white text-sm h-11 px-5">Give</button>
+                <Button variant="outlinePill" size="pill" onClick={() => setShowGiveForm(false)}>Cancel</Button>
+                <Button variant="primary" size="pill" onClick={submitGive}>Give</Button>
               </div>
             </div>
           </div>

@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
 import { Sparkles, Loader2, X, ChevronDown, ChevronUp } from "lucide-react";
 
 const emptyForm = { description: "", amount: "", category: "", is_income: false, budget_type: "", occasion: "", merchant: "" };
@@ -17,16 +19,14 @@ export default function TransactionForm({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={onClose} role="dialog" aria-modal="true" aria-label={editingId ? "Edit transaction" : "New transaction"}>
-      <div className="page-shell p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+      <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-xl tracking-tight font-medium mb-4">{editingId ? "Edit transaction" : "New transaction"}</h3>
         <form onSubmit={onSubmit} className="space-y-3">
-          <input data-testid="tx-desc" required placeholder="Description" value={form.description}
-            onChange={(e) => { setForm({ ...form, description: e.target.value }); if (onClearClassification) onClearClassification(); }}
-            className="w-full control-shell" />
-          <input data-testid="tx-amount" required type="number" step="0.01" placeholder="Amount (£)" value={form.amount}
-            onChange={(e) => { setForm({ ...form, amount: e.target.value }); if (onClearClassification) onClearClassification(); }}
-            className="w-full control-shell" />
-          <select data-testid="tx-category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full control-shell">
+          <Input data-testid="tx-desc" required placeholder="Description" value={form.description}
+            onChange={(e) => { setForm({ ...form, description: e.target.value }); if (onClearClassification) onClearClassification(); }} />
+          <Input data-testid="tx-amount" required type="number" step="0.01" placeholder="Amount (£)" value={form.amount}
+            onChange={(e) => { setForm({ ...form, amount: e.target.value }); if (onClearClassification) onClearClassification(); }} />
+          <select data-testid="tx-category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="flex h-11 w-full rounded-xl bg-secondary/50 border border-transparent px-4 text-sm transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50">
             <option value="">Auto-categorise</option>
             {selectedCats.map(c => <option key={c.category_id ?? `default-${c.name}`} value={c.name}>{c.name}</option>)}
           </select>
@@ -35,16 +35,15 @@ export default function TransactionForm({
           {/* Classify button */}
           {!editingId && (
             <div className="flex gap-2">
-              <button type="button" onClick={() => onClassify({ description: form.description, amount: parseFloat(form.amount) })}
-                disabled={!canClassify}
-                className="btn-pill border border-emerald text-emerald text-sm h-10 flex-1 disabled:opacity-40">
-                {classifying ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
+              <Button variant="outlinePill" size="pillSm" className="border-emerald text-emerald flex-1" onClick={() => onClassify({ description: form.description, amount: parseFloat(form.amount) })}
+                disabled={!canClassify}>
+                {classifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                 {classifying ? "Classifying…" : "Classify with AI"}
-              </button>
+              </Button>
               {classification && (
-                <button type="button" onClick={onClearClassification} className="btn-pill border border-border text-sm h-10 px-3">
+                <Button variant="outlinePill" size="pillSm" onClick={onClearClassification}>
                   <X className="h-4 w-4" />
-                </button>
+                </Button>
               )}
             </div>
           )}
@@ -89,22 +88,20 @@ export default function TransactionForm({
             <div className="space-y-2 p-3 rounded-xl bg-secondary/20 border border-border animate-[fadeUp_0.2s_ease-out]">
               <p className="text-xs text-muted-foreground">Manual classification (overrides AI)</p>
               <select value={form.budget_type} onChange={(e) => setForm({ ...form, budget_type: e.target.value })}
-                className="w-full control-shell text-sm">
+                className="flex h-11 w-full rounded-xl bg-secondary/50 border border-transparent px-4 text-sm transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50">
                 <option value="">Budget type…</option>
                 {BUDGET_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
               </select>
-              <input placeholder="Occasion (e.g. Pesach 2026)" value={form.occasion}
-                onChange={(e) => setForm({ ...form, occasion: e.target.value })}
-                className="w-full control-shell text-sm" />
-              <input placeholder="Merchant (e.g. Tesco)" value={form.merchant}
-                onChange={(e) => setForm({ ...form, merchant: e.target.value })}
-                className="w-full control-shell text-sm" />
+              <Input placeholder="Occasion (e.g. Pesach 2026)" value={form.occasion}
+                onChange={(e) => setForm({ ...form, occasion: e.target.value })} />
+              <Input placeholder="Merchant (e.g. Tesco)" value={form.merchant}
+                onChange={(e) => setForm({ ...form, merchant: e.target.value })} />
             </div>
           )}
 
           <div className="flex gap-2 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 h-11 rounded-full border border-border hover:bg-secondary/50 text-sm">Cancel</button>
-            <button data-testid="tx-submit" className="btn-pill flex-1 gradient-emerald text-white">{editingId ? "Save changes" : "Add"}</button>
+            <Button variant="outlinePill" className="flex-1" onClick={onClose}>Cancel</Button>
+            <Button variant="primary" className="flex-1" data-testid="tx-submit">{editingId ? "Save changes" : "Add"}</Button>
           </div>
         </form>
       </div>

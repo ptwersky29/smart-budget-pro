@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 import { Loader2, Lock, CheckCircle2 } from "lucide-react";
 
 export default function ResetPassword() {
@@ -42,7 +44,7 @@ export default function ResetPassword() {
           <Lock className="h-12 w-12 text-ruby mx-auto mb-4" />
           <h1 className="text-2xl tracking-tight font-medium">Invalid reset link</h1>
           <p className="text-sm text-muted-foreground mt-2">This link is missing a reset token.</p>
-          <Link to="/forgot-password" className="btn-pill border border-border mt-6 inline-block">Request new link</Link>
+          <Button variant="outlinePill" asChild className="mt-6"><Link to="/forgot-password">Request new link</Link></Button>
         </div>
       </div>
     );
@@ -64,19 +66,19 @@ export default function ResetPassword() {
             <form onSubmit={onSubmit} className="space-y-4 mt-8">
               <div>
                 <label className="label-overline">New password</label>
-                <input type="password" required minLength={8} value={password}
+                <Input type="password" required minLength={8} value={password}
                        onChange={(e) => setPassword(e.target.value)}
-                       placeholder="At least 8 characters" className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
+                       placeholder="At least 8 characters" className="mt-1" />
               </div>
               <div>
                 <label className="label-overline">Confirm password</label>
-                <input type="password" required minLength={8} value={confirm}
+                <Input type="password" required minLength={8} value={confirm}
                        onChange={(e) => setConfirm(e.target.value)}
-                       placeholder="Repeat password" className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
+                       placeholder="Repeat password" className="mt-1" />
               </div>
-              <button disabled={busy} className="btn-pill w-full gradient-emerald text-white disabled:opacity-50">
+              <Button variant="primary" className="w-full" disabled={busy}>
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Reset password"}
-              </button>
+              </Button>
             </form>
             <p className="text-xs text-muted-foreground mt-6 text-center">
               Remember your password? <Link to="/login" className="text-emerald hover:underline">Sign in</Link>

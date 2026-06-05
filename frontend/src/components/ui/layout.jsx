@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
+import { Button } from "./button";
 
 export const PageHeader = React.memo(function PageHeader({ eyebrow, title, description, actions, meta, className = "", ...props }) {
   return (
@@ -8,7 +9,6 @@ export const PageHeader = React.memo(function PageHeader({ eyebrow, title, descr
       <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl space-y-3">
           {eyebrow && <p className="label-overline text-emerald" aria-hidden="true">{eyebrow}</p>}
-          {/* Visible display title (decorative) */}
           <p className="text-4xl lg:text-5xl tracking-tight font-semibold leading-[1.05]" aria-hidden="true">{title}</p>
           {description && <p className="text-sm lg:text-base text-muted-foreground leading-relaxed max-w-2xl">{description}</p>}
           {meta && <div className="flex flex-wrap gap-2 pt-1">{meta}</div>}
@@ -63,16 +63,12 @@ export const EmptyState = React.memo(function EmptyState({ icon: Icon, title, de
 });
 
 export function ActionLink({ to, label, variant = "primary", icon: Icon = ArrowRight, className = "" }) {
-  const styles = variant === "secondary"
-    ? "border border-border text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-    : "gradient-emerald text-white hover:opacity-95";
   return (
-    <Link
-      to={to}
-      className={`btn-pill h-11 px-5 text-sm ${styles} ${className}`}
-    >
-      {label}
-      <Icon className="ml-2 h-4 w-4" />
+    <Link to={to} className={className}>
+      <Button variant={variant === "secondary" ? "outlinePill" : "primary"} size="pill">
+        {label}
+        <Icon className="ml-2 h-4 w-4" />
+      </Button>
     </Link>
   );
 }

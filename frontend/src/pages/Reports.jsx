@@ -12,6 +12,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "../components/ui/dropdown-menu";
+import { Button } from "../components/ui/button";
 
 const ICONS = {
   alert: AlertCircle, sparkle: Sparkles,
@@ -123,9 +124,11 @@ export default function Reports() {
                 className="h-10 px-3 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:outline-none" />
             </div>
             <DropdownMenu>
-              <DropdownMenuTrigger className={`btn-pill h-11 px-4 text-sm ${isPremium ? "gradient-emerald text-white" : "border border-border bg-card/80 text-muted-foreground"}`}>
-                {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-                Download <ChevronDown className="h-3.5 w-3.5 ml-1" />
+              <DropdownMenuTrigger asChild>
+                <Button variant={isPremium ? "primary" : "outlinePill"} size="pill">
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  Download <ChevronDown className="h-3.5 w-3.5" />
+                </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => download("monthly")} disabled={busy === "monthly"}>

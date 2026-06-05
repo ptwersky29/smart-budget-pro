@@ -4,6 +4,7 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Design Tokens ─── */
 :root {
   --font-heading: "Cabinet Grotesk", "Fraunces", ui-sans-serif, system-ui;
   --font-body: "Manrope", ui-sans-serif, system-ui;
@@ -25,6 +26,7 @@ body {
     hsl(var(--background));
 }
 
+/* ─── CSS Variable Palette ─── */
 @layer base {
   :root {
     --background: 220 18% 97%;
@@ -93,13 +95,14 @@ body {
   }
 }
 
+/* ─── Base Resets ─── */
 @layer base {
   * { @apply border-border; }
   body { @apply bg-background text-foreground; }
   h1, h2, h3, h4, h5 { font-family: var(--font-heading); letter-spacing: -0.02em; }
 }
 
-/* Utility classes */
+/* ─── Glass / Backdrop Utilities ─── */
 .glass {
   background: hsl(var(--card) / 0.7);
   backdrop-filter: saturate(150%) blur(20px);
@@ -110,6 +113,12 @@ body {
   background: rgba(11, 15, 25, 0.7);
   backdrop-filter: blur(24px) saturate(180%);
 }
+.grain {
+  background-image: radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 3px 3px;
+}
+
+/* ─── Typography Utilities ─── */
 .label-overline {
   text-transform: uppercase;
   letter-spacing: 0.2em;
@@ -117,10 +126,8 @@ body {
   font-weight: 600;
   color: hsl(var(--muted-foreground));
 }
-.grain {
-  background-image: radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px);
-  background-size: 3px 3px;
-}
+
+/* ─── Gradient Presets ─── */
 .gradient-emerald {
   background: linear-gradient(135deg, hsl(var(--emerald)) 0%, hsl(173 80% 40%) 100%);
 }
@@ -130,30 +137,8 @@ body {
 .gradient-ruby {
   background: linear-gradient(135deg, hsl(var(--ruby)) 0%, hsl(348 80% 50%) 100%);
 }
-.bg-topaz { background-color: hsl(var(--topaz)); }
-.border-topaz { border-color: hsl(var(--topaz)); }
-.text-topaz { color: hsl(var(--topaz)); }
-.text-emerald { color: hsl(var(--emerald)); }
-.text-topaz { color: hsl(var(--topaz)); }
-.text-ruby { color: hsl(var(--ruby)); }
-.bg-emerald { background-color: hsl(var(--emerald)); }
-.bg-ruby { background-color: hsl(var(--ruby)); }
-.bg-ruby\/5 { background-color: hsl(var(--ruby) / 0.05); }
-.bg-ruby\/10 { background-color: hsl(var(--ruby) / 0.1); }
-.border-emerald { border-color: hsl(var(--emerald)); }
-.border-ruby { border-color: hsl(var(--ruby)); }
-.border-ruby\/20 { border-color: hsl(var(--ruby) / 0.2); }
-.border-ruby\/40 { border-color: hsl(var(--ruby) / 0.4); }
-.border-ruby\/50 { border-color: hsl(var(--ruby) / 0.5); }
-.ring-emerald { --tw-ring-color: hsl(var(--emerald)); }
 
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { scrollbar-width: none; }
-
-.btn-pill {
-  @apply inline-flex items-center justify-center rounded-full px-6 py-3 font-semibold transition-all duration-200 ease-out active:scale-[0.97];
-}
-
+/* ─── Layout Shells ─── */
 .app-shell {
   background:
     radial-gradient(circle at top left, rgba(16, 185, 129, 0.08), transparent 26%),
@@ -161,26 +146,11 @@ body {
     linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 100%);
 }
 
-.page-title {
-  @apply text-4xl lg:text-5xl tracking-tight font-semibold leading-[1.05];
-}
+/* ─── Scrollbar ─── */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
 
-.page-shell {
-  @apply rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal;
-}
-
-.section-shell {
-  @apply rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card;
-}
-
-.control-shell {
-  @apply h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors;
-}
-
-.toolbar-chip {
-  @apply inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-all duration-200 active:scale-[0.96];
-}
-
+/* ─── Animations ─── */
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
@@ -196,27 +166,28 @@ body {
 .delay-4 { animation-delay: 0.32s; }
 .delay-5 { animation-delay: 0.40s; }
 
+/* ─── Accessibility & Reduced Motion ─── */
 @layer base {
-    a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
-      outline: 2px solid hsl(var(--ring) / 0.4);
-      outline-offset: 2px;
-      border-radius: var(--radius);
+  a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid hsl(var(--ring) / 0.4);
+    outline-offset: 2px;
+    border-radius: var(--radius);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
     }
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-        scroll-behavior: auto !important;
-      }
-    }
-    [data-debug-wrapper="true"] { display: contents !important; }
-    [data-debug-wrapper="true"] > * {
-        margin-left: inherit; margin-right: inherit; margin-top: inherit; margin-bottom: inherit;
-        padding-left: inherit; padding-right: inherit; padding-top: inherit; padding-bottom: inherit;
-        column-gap: inherit; row-gap: inherit; gap: inherit;
-        border-left-width: inherit; border-right-width: inherit; border-top-width: inherit; border-bottom-width: inherit;
-        border-left-style: inherit; border-right-style: inherit; border-top-style: inherit; border-bottom-style: inherit;
-        border-left-color: inherit; border-right-color: inherit; border-top-color: inherit; border-bottom-color: inherit;
-    }
+  }
+  [data-debug-wrapper="true"] { display: contents !important; }
+  [data-debug-wrapper="true"] > * {
+    margin-left: inherit; margin-right: inherit; margin-top: inherit; margin-bottom: inherit;
+    padding-left: inherit; padding-right: inherit; padding-top: inherit; padding-bottom: inherit;
+    column-gap: inherit; row-gap: inherit; gap: inherit;
+    border-left-width: inherit; border-right-width: inherit; border-top-width: inherit; border-bottom-width: inherit;
+    border-left-style: inherit; border-right-style: inherit; border-top-style: inherit; border-bottom-style: inherit;
+    border-left-color: inherit; border-right-color: inherit; border-top-color: inherit; border-bottom-color: inherit;
+  }
 }

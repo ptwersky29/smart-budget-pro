@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Volume2, Eye, Type, X } from "lucide-react";
+import { Input } from "../components/ui/input";
 
 /**
  * Accessibility Overlay Component
@@ -116,7 +117,7 @@ export default function AccessibilityOverlay() {
               <select
                 value={textSize}
                 onChange={(e) => setTextSize(e.target.value)}
-                className="mt-2 w-full control-shell text-sm"
+                className="mt-2 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors text-sm"
                 aria-label="Adjust text size"
               >
                 <option value="small">Small (87.5%)</option>

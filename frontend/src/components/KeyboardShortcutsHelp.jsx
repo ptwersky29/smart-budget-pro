@@ -1,4 +1,5 @@
 import React from "react";
+import { Button } from "./ui/button";
 
 const SHORTCUTS = [
   { keys: "g then d", desc: "Go to Dashboard" },
@@ -26,7 +27,7 @@ export default function KeyboardShortcutsHelp({ open, onClose }) {
             </div>
           ))}
         </div>
-        <button onClick={onClose} className="mt-5 w-full btn-pill gradient-topaz text-white text-sm">Got it</button>
+        <Button variant="warning" className="w-full mt-5" onClick={onClose}>Got it</Button>
       </div>
     </div>
   );

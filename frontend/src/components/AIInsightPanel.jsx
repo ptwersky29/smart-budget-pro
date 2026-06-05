@@ -4,6 +4,7 @@ import { Sparkles, Loader2, TrendingUp, TrendingDown, AlertCircle, Wallet, Refre
 import { toast } from "sonner";
 import { SectionCard } from "./ui/layout";
 import Skeleton from "./ui/Skeleton";
+import { Button } from "../components/ui/button";
 
 const ICONS = {
   "trending-up": TrendingUp,
@@ -46,11 +47,10 @@ export default function AIInsightPanel({ title = "AI Insights", subtitle, endpoi
       eyebrow={title}
       title={subtitle}
       actions={
-        <button onClick={generate} disabled={busy} data-testid="ai-generate"
-                className="inline-flex items-center gap-2 h-10 px-4 rounded-full border border-border bg-background/70 hover:bg-secondary/70 disabled:opacity-50 text-xs font-medium">
+        <Button variant="outlinePill" size="pillSm" onClick={generate} disabled={busy} data-testid="ai-generate">
           {busy ? <Loader2 className="h-3 w-3 animate-spin"/> : <RefreshCw className="h-3 w-3"/>}
           {data ? "Regenerate" : "Generate"}
-        </button>
+        </Button>
       }
       data-testid="ai-insight-panel"
     >

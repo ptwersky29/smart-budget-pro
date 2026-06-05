@@ -9,6 +9,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "../components/ui/dropdown-menu";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 import Skeleton from "../components/ui/Skeleton";
 import RecurringTransactionManager from "../components/RecurringTransactionManager";
 
@@ -103,8 +105,10 @@ export default function Subscriptions() {
         description={`${subs.filter((s) => s.active).length} active — £${monthlyTotal.toFixed(2)} / mo`}
         actions={
           <DropdownMenu>
-            <DropdownMenuTrigger className="btn-pill gradient-emerald text-white text-sm h-11 px-5">
-              <Plus className="h-4 w-4 mr-2" /> Add <ChevronDown className="h-3.5 w-3.5 ml-1" />
+            <DropdownMenuTrigger asChild>
+              <Button variant="primary" size="pill">
+                <Plus className="h-4 w-4" /> Add <ChevronDown className="h-3.5 w-3.5" />
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={openAdd}>
@@ -130,7 +134,7 @@ export default function Subscriptions() {
                     <p className="font-medium">{item.normalized_merchant || item.description}</p>
                     <p className="text-xs text-muted-foreground">£{item.amount.toFixed(2)} / {item.frequency} &middot; {item.occurrences} occurrences</p>
                   </div>
-                  <button onClick={() => addFromDetected(item)} className="btn-pill border border-emerald text-emerald text-xs">Save</button>
+                  <Button variant="outlinePill" size="pillSm" onClick={() => addFromDetected(item)}>Save</Button>
                 </div>
               ))}
             </div>
@@ -209,22 +213,22 @@ export default function Subscriptions() {
 
       {open && (
         <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={() => setOpen(false)}>
-          <div className="page-shell p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+          <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-xl tracking-tight font-medium mb-4">{editingId ? "Edit subscription" : "New subscription"}</h3>
             <form onSubmit={submit} className="space-y-3">
-              <input required placeholder="Name (e.g. Netflix)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full control-shell" />
-              <input required type="number" step="0.01" placeholder="Amount (£)" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="w-full control-shell" />
-              <input placeholder="Merchant (optional)" value={form.merchant} onChange={(e) => setForm({ ...form, merchant: e.target.value })} className="w-full control-shell" />
+              <Input required placeholder="Name (e.g. Netflix)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full" />
+              <Input required type="number" step="0.01" placeholder="Amount (£)" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="w-full" />
+              <Input placeholder="Merchant (optional)" value={form.merchant} onChange={(e) => setForm({ ...form, merchant: e.target.value })} className="w-full" />
               <div className="grid grid-cols-2 gap-2">
-                <select value={form.frequency} onChange={(e) => setForm({ ...form, frequency: e.target.value })} className="control-shell">
+                <select value={form.frequency} onChange={(e) => setForm({ ...form, frequency: e.target.value })} className="h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors w-full">
                   <option value="monthly">Monthly</option><option value="yearly">Yearly</option><option value="weekly">Weekly</option>
                 </select>
-                <input placeholder="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="control-shell" />
+                <Input placeholder="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full" />
               </div>
-              <textarea placeholder="Notes (optional)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full control-shell" rows={2} />
+              <textarea placeholder="Notes (optional)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full rounded-xl bg-secondary/50 border border-transparent px-4 py-3 text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors resize-none" rows={2} />
               <div className="flex gap-2 pt-2">
-                <button type="button" onClick={() => setOpen(false)} className="flex-1 h-11 rounded-full border border-border hover:bg-secondary/50 text-sm">Cancel</button>
-                <button className="btn-pill flex-1 gradient-emerald text-white">{editingId ? "Save" : "Add"}</button>
+                <Button variant="outlinePill" size="pill" className="flex-1" onClick={() => setOpen(false)}>Cancel</Button>
+                <Button variant="primary" size="pill" className="flex-1">{editingId ? "Save" : "Add"}</Button>
               </div>
             </form>
           </div>

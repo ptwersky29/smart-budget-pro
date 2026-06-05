@@ -4,6 +4,8 @@ import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
 import { Check, ArrowRight, Banknote, Receipt, Target, Zap, Loader2, Upload, PenLine, Building2, BarChart3 } from "lucide-react";
 import Skeleton from "../components/ui/Skeleton";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 
 const STEPS = [
   {
@@ -118,24 +120,24 @@ function StepTransaction({ onDone }) {
     <form onSubmit={submit} className="space-y-4 mt-6">
       <div>
         <label className="label-overline">Description *</label>
-        <input
+        <Input
           value={form.description}
           onChange={(e) => { setForm({ ...form, description: e.target.value }); setError((p) => ({ ...p, description: "" })); }}
           placeholder="e.g. Tesco groceries"
-          className={`mt-1 w-full control-shell ${error.description ? "border-ruby" : ""}`}
+          className={`mt-1 w-full ${error.description ? "border-ruby" : ""}`}
         />
         {error.description && <p className="text-xs text-ruby mt-1">{error.description}</p>}
       </div>
       <div>
         <label className="label-overline">Amount (£) *</label>
-        <input
+        <Input
           type="number"
           step="0.01"
           min="0.01"
           value={form.amount}
           onChange={(e) => { setForm({ ...form, amount: e.target.value }); setError((p) => ({ ...p, amount: "" })); }}
           placeholder="0.00"
-          className={`mt-1 w-full control-shell ${error.amount ? "border-ruby" : ""}`}
+          className={`mt-1 w-full ${error.amount ? "border-ruby" : ""}`}
         />
         {error.amount && <p className="text-xs text-ruby mt-1">{error.amount}</p>}
       </div>
@@ -148,9 +150,9 @@ function StepTransaction({ onDone }) {
         />
         This is income (salary, payment received, etc.)
       </label>
-      <button disabled={busy} className="btn-pill w-full gradient-emerald text-white mt-2 disabled:opacity-50">
+      <Button disabled={busy} variant="primary" size="pill" className="w-full mt-2">
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Save transaction <ArrowRight className="h-4 w-4 ml-1" /></>}
-      </button>
+      </Button>
     </form>
   );
 }
@@ -204,30 +206,30 @@ function StepBudget({ onDone }) {
             </button>
           ))}
         </div>
-        <input
+        <Input
           value={form.category}
           onChange={(e) => { setForm({ ...form, category: e.target.value }); setError((p) => ({ ...p, category: "" })); }}
           placeholder="or type your own"
-          className={`mt-2 w-full control-shell ${error.category ? "border-ruby" : ""}`}
+          className={`mt-2 w-full ${error.category ? "border-ruby" : ""}`}
         />
         {error.category && <p className="text-xs text-ruby mt-1">{error.category}</p>}
       </div>
       <div>
         <label className="label-overline">Monthly limit (£) *</label>
-        <input
+        <Input
           type="number"
           step="1"
           min="1"
           value={form.limit}
           onChange={(e) => { setForm({ ...form, limit: e.target.value }); setError((p) => ({ ...p, limit: "" })); }}
           placeholder="e.g. 300"
-          className={`mt-1 w-full control-shell ${error.limit ? "border-ruby" : ""}`}
+          className={`mt-1 w-full ${error.limit ? "border-ruby" : ""}`}
         />
         {error.limit && <p className="text-xs text-ruby mt-1">{error.limit}</p>}
       </div>
-      <button disabled={busy} className="btn-pill w-full gradient-emerald text-white disabled:opacity-50">
+      <Button disabled={busy} variant="primary" size="pill" className="w-full">
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Create budget <ArrowRight className="h-4 w-4 ml-1" /></>}
-      </button>
+      </Button>
     </form>
   );
 }
@@ -255,9 +257,9 @@ function StepAI({ onFinish }) {
           </div>
         ))}
       </div>
-      <button onClick={onFinish} className="btn-pill w-full gradient-emerald text-white mt-2">
+      <Button onClick={onFinish} variant="primary" size="pill" className="w-full mt-2">
         Go to dashboard <ArrowRight className="h-4 w-4 ml-1" />
-      </button>
+      </Button>
     </div>
   );
 }

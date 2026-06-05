@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { X } from "lucide-react";
+import { Button } from "../components/ui/button";
 
 export default function ConsentBanner() {
   const [visible, setVisible] = useState(false);
@@ -65,20 +66,12 @@ export default function ConsentBanner() {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={decline}
-            disabled={busy}
-            className="btn-pill border border-border text-sm disabled:opacity-50"
-          >
+          <Button variant="outlinePill" size="pill" onClick={decline} disabled={busy}>
             Decline
-          </button>
-          <button
-            onClick={acceptAll}
-            disabled={busy}
-            className="btn-pill gradient-emerald text-white text-sm disabled:opacity-50"
-          >
+          </Button>
+          <Button variant="primary" size="pill" onClick={acceptAll} disabled={busy}>
             Accept
-          </button>
+          </Button>
           <button
             onClick={() => setVisible(false)}
             className="p-3 hover:bg-secondary rounded-lg text-muted-foreground"

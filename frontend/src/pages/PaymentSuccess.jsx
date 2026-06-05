@@ -4,6 +4,7 @@ import { CheckCircle2, XCircle } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import Skeleton from "../components/ui/Skeleton";
+import { Button } from "../components/ui/button";
 
 export default function PaymentSuccess() {
   const [params] = useSearchParams();
@@ -59,29 +60,26 @@ export default function PaymentSuccess() {
             <p className="text-sm text-muted-foreground mt-2">
               Unlimited AI, bank sync, premium reports — all unlocked.
             </p>
-            <button onClick={() => navigate("/dashboard")} data-testid="goto-dashboard"
-                    className="btn-pill gradient-emerald text-white mt-8 w-full">
+            <Button variant="primary" size="pill" onClick={() => navigate("/dashboard")} data-testid="goto-dashboard" className="mt-8 w-full">
               Go to dashboard
-            </button>
+            </Button>
           </>
         ) : status === "failed" ? (
           <>
             <XCircle className="h-10 w-10 text-ruby mx-auto" />
             <h2 className="text-2xl tracking-tight font-medium mt-4">Payment not completed</h2>
             <p className="text-sm text-muted-foreground mt-2">The transaction did not complete.</p>
-            <button onClick={() => navigate("/pricing")}
-                    className="btn-pill border border-border mt-6 w-full">
+            <Button variant="outlinePill" size="pill" onClick={() => navigate("/pricing")} className="mt-6 w-full">
               Back to pricing
-            </button>
+            </Button>
           </>
         ) : (
           <>
             <h2 className="text-2xl tracking-tight font-medium mt-4">No payment found</h2>
             <p className="text-sm text-muted-foreground mt-2">No pending payment was detected.</p>
-            <button onClick={() => navigate("/pricing")}
-                    className="btn-pill gradient-emerald text-white mt-6 w-full">
+            <Button variant="primary" size="pill" onClick={() => navigate("/pricing")} className="mt-6 w-full">
               View pricing
-            </button>
+            </Button>
           </>
         )}
       </div>
