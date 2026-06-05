@@ -77,7 +77,7 @@ export default function AccessibilityOverlay() {
       {/* Accessibility Settings Button */}
       <button
         onClick={() => setOpen(!open)}
-        className="fixed bottom-4 right-4 z-40 h-12 w-12 rounded-full bg-sky border-2 border-sky/40 text-white grid place-items-center hover:bg-sky/90 transition-colors shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky"
+        className="fixed bottom-4 left-4 z-40 h-12 w-12 rounded-full bg-sky border-2 border-sky/40 text-white grid place-items-center hover:bg-sky/90 transition-colors shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky"
         aria-label="Open accessibility settings"
         aria-expanded={open}
         aria-controls="a11y-menu"
@@ -89,7 +89,7 @@ export default function AccessibilityOverlay() {
       {open && (
         <div
           id="a11y-menu"
-          className="fixed bottom-16 right-4 z-50 rounded-2xl border-2 border-sky/30 bg-card shadow-xl p-5 w-72"
+          className="fixed bottom-16 left-4 z-50 rounded-2xl border-2 border-sky/30 bg-card shadow-xl p-5 w-72"
           role="dialog"
           aria-labelledby="a11y-title"
         >

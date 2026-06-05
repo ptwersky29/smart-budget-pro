@@ -7,6 +7,7 @@ import { EmptyState, MetricCard, PageHeader, SectionCard } from "../components/u
 import Skeleton from "../components/ui/Skeleton";
 
 export default function Connections() {
+  useEffect(() => { document.title = "Bank Connections | FinanceAI"; }, []);
   const [params] = useSearchParams();
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState(null);

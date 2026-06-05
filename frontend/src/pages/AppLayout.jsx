@@ -11,7 +11,7 @@ import QuickAddWidget from "../components/QuickAddWidget";
 
 import {
   LayoutDashboard, Receipt, PiggyBank, Building2, TrendingUp, Star,
-  Landmark, FileText, Settings, LogOut, Menu, X, MoonStar, Sun, MessageSquare, Upload, Plug, Crown, ArrowRight, RefreshCcw
+  Landmark, FileText, Settings, LogOut, Menu, X, MoonStar, Sun, Crown, ArrowRight, RefreshCcw
 } from "lucide-react";
 
 const NAV_SECTIONS = [
@@ -23,33 +23,25 @@ const NAV_SECTIONS = [
     ],
   },
   {
-    label: "Money",
+    label: "Finance",
     items: [
       { to: "/transactions", label: "Transactions", icon: Receipt },
       { to: "/budgets", label: "Budgets", icon: PiggyBank },
       { to: "/subscriptions", label: "Subscriptions", icon: RefreshCcw },
-      { to: "/statements", label: "Statements", icon: Upload },
     ],
   },
   {
-    label: "Accounts",
+    label: "Connect",
     items: [
-      { to: "/connections", label: "Bank Connections", icon: Building2 },
-      { to: "/sms", label: "SMS Finance", icon: MessageSquare },
-      { to: "/integrations", label: "Integrations", icon: Plug },
-    ],
-  },
-  {
-    label: "Tools",
-    items: [
+      { to: "/import", label: "Bank & Statements", icon: Building2 },
       { to: "/investments", label: "Investments", icon: TrendingUp },
+    ],
+  },
+  {
+    label: "More",
+    items: [
       { to: "/jewish", label: "Jewish Tools", icon: Star },
       { to: "/uk-tools", label: "UK Benefits", icon: Landmark },
-    ],
-  },
-  {
-    label: "System",
-    items: [
       { to: "/settings", label: "Settings", icon: Settings },
     ],
   },
@@ -62,11 +54,11 @@ const ROUTE_META = [
     title: "Dashboard",
     description: "A clean snapshot of your money, cash flow, and what needs attention next.",
     primary: { label: "Add transaction", to: "/transactions" },
-    secondary: { label: "Connect bank", to: "/connections" },
+    secondary: { label: "Import data", to: "/import" },
   },
   {
     paths: ["/transactions"],
-    eyebrow: "Money",
+    eyebrow: "Finance",
     title: "Transactions",
     description: "Search, edit, and organize every transaction in one place.",
     primary: { label: "Add transaction", to: "/transactions" },
@@ -74,55 +66,31 @@ const ROUTE_META = [
   },
   {
     paths: ["/budgets"],
-    eyebrow: "Money",
+    eyebrow: "Finance",
     title: "Budgets",
     description: "Set simple limits, track progress, and keep spending easy to understand.",
     primary: { label: "Add budget", to: "/budgets" },
     secondary: { label: "View reports", to: "/reports" },
   },
   {
-    paths: ["/connections"],
-    eyebrow: "Accounts",
-    title: "Bank Connections",
-    description: "Connect banks, set an import start date, and keep sync status visible.",
-    primary: { label: "Connect bank", to: "/connections" },
-    secondary: { label: "Settings", to: "/settings" },
-  },
-  {
-    paths: ["/sms"],
-    eyebrow: "Accounts",
-    title: "SMS Finance",
-    description: "Turn bank SMS messages into clean, readable transaction entries.",
-    primary: { label: "Open integrations", to: "/integrations" },
-    secondary: { label: "Transactions", to: "/transactions" },
-  },
-  {
     paths: ["/subscriptions"],
-    eyebrow: "Money",
+    eyebrow: "Finance",
     title: "Subscriptions",
     description: "Track recurring payments, detect subscriptions from your transactions, and manage them in one place.",
     primary: { label: "Add subscription", to: "/subscriptions" },
     secondary: { label: "Transactions", to: "/transactions" },
   },
   {
-    paths: ["/statements"],
-    eyebrow: "Money",
-    title: "Statements",
-    description: "Upload a CSV or PDF and review what the system extracted before saving.",
-    primary: { label: "Upload statement", to: "/statements" },
-    secondary: { label: "Transactions", to: "/transactions" },
-  },
-  {
-    paths: ["/integrations"],
-    eyebrow: "Accounts",
-    title: "Integrations",
-    description: "Keep AI providers, bank tools, and automation settings in one place.",
-    primary: { label: "Settings", to: "/settings" },
-    secondary: { label: "Bank connections", to: "/connections" },
+    paths: ["/import"],
+    eyebrow: "Connect",
+    title: "Bank & Statements",
+    description: "Connect your bank via TrueLayer, upload CSV/PDF statements, or manage existing connections.",
+    primary: { label: "Connect bank", to: "/import" },
+    secondary: { label: "Settings", to: "/settings" },
   },
   {
     paths: ["/investments"],
-    eyebrow: "Tools",
+    eyebrow: "Connect",
     title: "Investments",
     description: "Look at future scenarios, growth trends, and simple projection planning.",
     primary: { label: "Reports", to: "/reports" },
@@ -130,7 +98,7 @@ const ROUTE_META = [
   },
   {
     paths: ["/jewish"],
-    eyebrow: "Tools",
+    eyebrow: "More",
     title: "Jewish Finance",
     description: "Maaser, Tzedakah, and holiday planning with a clean modern layout.",
     primary: { label: "Reports", to: "/reports" },
@@ -138,7 +106,7 @@ const ROUTE_META = [
   },
   {
     paths: ["/uk-tools"],
-    eyebrow: "Tools",
+    eyebrow: "More",
     title: "UK Benefits",
     description: "Simple UK finance helpers, calculators, and planning tools.",
     primary: { label: "Settings", to: "/settings" },
@@ -154,11 +122,11 @@ const ROUTE_META = [
   },
   {
     paths: ["/settings"],
-    eyebrow: "System",
+    eyebrow: "More",
     title: "Settings",
-    description: "Manage your account, premium access, AI providers, and connected services.",
+    description: "Manage your account, subscription, AI providers, integrations, and SMS settings.",
     primary: { label: "Pricing", to: "/pricing" },
-    secondary: { label: "Integrations", to: "/integrations" },
+    secondary: { label: "Import data", to: "/import" },
   },
 ];
 
@@ -215,7 +183,7 @@ export default function AppLayout() {
       }
       if (leaderBuffer.current.length === 1 && leaderBuffer.current[0] === "g") {
         leaderBuffer.current = [];
-        const map = { d: "/dashboard", t: "/transactions", b: "/budgets", s: "/subscriptions", r: "/reports", g: "/settings" };
+        const map = { d: "/dashboard", t: "/transactions", b: "/budgets", s: "/subscriptions", r: "/reports", i: "/import", g: "/settings" };
         if (map[key]) { e.preventDefault(); navigate(map[key]); }
       }
     };

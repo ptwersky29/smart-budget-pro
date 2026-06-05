@@ -1,118 +1,143 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { api, API } from "../lib/api";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
-import { Loader2, Wallet, ArrowDownRight, ArrowUpRight, HeartPulse, RefreshCw, Download, Lock } from "lucide-react";
-import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, Legend } from "recharts";
+import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
 import { toast } from "sonner";
 import AIInsightPanel from "../components/AIInsightPanel";
-import { ActionLink, EmptyState, MetricCard, PageHeader, SectionCard } from "../components/ui/layout";
-import Skeleton, { SkeletonCard, SkeletonChart } from "../components/ui/Skeleton";
+import { EmptyState, MetricCard } from "../components/ui/layout";
+import Skeleton, { SkeletonCard } from "../components/ui/Skeleton";
+import {
+  Wallet, ArrowDownRight, ArrowUpRight, HeartPulse, RefreshCw, Plus,
+  AlertTriangle, CalendarDays, PiggyBank, Building2, TrendingUp,
+  ArrowRight, MoreHorizontal,
+} from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "../components/ui/dropdown-menu";
 
-const PIE_COLORS = Array.from({length: 8}, (_, i) => `hsl(var(--chart-${i + 1}))`);
 const TOOLTIP_STYLE = { backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px" };
 
 const Dashboard = React.memo(function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   useEffect(() => { document.title = "Dashboard | FinanceAI"; }, []);
-  const [data, setData] = useState(null);
+  const [overview, setOverview] = useState(null);
+  const [budgets, setBudgets] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [upcoming, setUpcoming] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [pdfBusy, setPdfBusy] = useState(false);
 
-  const downloadMonth = async () => {
-    if (user?.tier !== "premium" && user?.role !== "admin") {
-      toast.error("PDF reports are a Premium feature. Upgrade to download.");
-      return;
-    }
-    setPdfBusy(true);
+  const loadAll = useCallback(async (silent) => {
+    if (!silent) setLoading(true);
+    else setRefreshing(true);
     try {
-      const res = await fetch(`${API}/reports/monthly`, { credentials: "include" });
-      if (!res.ok) throw new Error();
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = `financeai-${new Date().toISOString().slice(0,7)}.pdf`;
-      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-      toast.success("Report downloaded");
-    } catch { toast.error("Download failed"); }
-    finally { setPdfBusy(false); }
-  };
-
-  const load = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      const { data } = await api.get("/dashboard/overview");
-      setData(data);
-    } catch (err) {
-      const status = err?.response?.status;
-      const detail = err?.response?.data?.detail || err?.message || "Unknown error";
-      console.error("dashboard load failed", err);
-      toast.error(`Dashboard failed (${status || "?"}): ${detail}`);
+      const [ov, bd, al, up] = await Promise.allSettled([
+        api.get("/dashboard/overview"),
+        api.get("/budgets"),
+        api.get("/budget-system/alerts"),
+        api.get("/budget-system/upcoming"),
+      ]);
+      if (ov.status === "fulfilled") setOverview(ov.value.data);
+      else toast.error("Could not load dashboard data");
+      if (bd.status === "fulfilled") setBudgets(bd.value.data.budgets || []);
+      if (al.status === "fulfilled") setAlerts(al.value.data.alerts || al.value.data || []);
+      if (up.status === "fulfilled") setUpcoming(up.value.data.upcoming || up.value.data || []);
     } finally { setLoading(false); setRefreshing(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  const trendData = useMemo(() => {
+    if (!overview?.monthly_flow) return null;
+    const vals = overview.monthly_flow.map(m => m.income - m.spend);
+    return { values: vals, direction: vals.length > 1 ? (vals[vals.length - 1] >= vals[0] ? "up" : "down") : "neutral" };
+  }, [overview]);
+
+  const currentMonthBudget = useMemo(() => {
+    if (!budgets.length) return null;
+    const total = budgets.reduce((s, b) => s + (Number(b.limit) || 0), 0);
+    const spent = budgets.reduce((s, b) => s + (Number(b.spent) || 0), 0);
+    const overCount = budgets.filter(b => (b.progress_pct || 0) >= 100).length;
+    return { total, spent, remaining: total - spent, overCount, pct: total ? Math.round((spent / total) * 100) : 0 };
+  }, [budgets]);
+
+  const topAlerts = useMemo(() => {
+    const arr = Array.isArray(alerts) ? alerts : [];
+    return arr.slice(0, 3);
+  }, [alerts]);
+
+  const topUpcoming = useMemo(() => {
+    const arr = Array.isArray(upcoming) ? upcoming : [];
+    return arr.slice(0, 3);
+  }, [upcoming]);
 
   const seed = async () => {
-    setLoading(true);
-    try { await api.post("/transactions/seed-demo"); toast.success("Demo data added"); await load(); }
-    catch (err) { console.error("seed failed", err); toast.error("Could not seed demo"); setLoading(false); }
+    try {
+      setLoading(true);
+      await api.post("/transactions/seed-demo");
+      toast.success("Demo data added");
+      await loadAll();
+    } catch {
+      toast.error("Could not seed demo");
+      setLoading(false);
+    }
   };
 
   if (loading) return (
     <div className="space-y-8" data-testid="dashboard-root">
-      <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl p-6 lg:p-8 shadow-modal">
-        <Skeleton className="h-3 w-16 mb-3" />
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-5 w-96 mt-3" />
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {[1,2,3,4].map(i => <SkeletonCard key={i} />)}
-      </div>
+      <Skeleton className="h-12 w-full rounded-2xl" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">{[1,2,3,4].map(i => <SkeletonCard key={i} />)}</div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <SkeletonChart className="lg:col-span-2" />
-        <SkeletonChart />
+        <div className="lg:col-span-2 space-y-4"><Skeleton className="h-32 rounded-2xl" /><Skeleton className="h-64 rounded-2xl" /></div>
+        <div className="space-y-4"><Skeleton className="h-32 rounded-2xl" /><Skeleton className="h-32 rounded-2xl" /></div>
       </div>
+      <Skeleton className="h-48 rounded-2xl" />
     </div>
   );
-  if (!data) return (
+
+  if (!overview) return (
     <div className="grid place-items-center min-h-[60vh] text-center p-8">
       <div>
         <p className="text-lg font-medium text-muted-foreground">Could not load dashboard</p>
-        <button onClick={load} className="mt-4 btn-pill border border-emerald text-emerald text-sm">Try again</button>
+        <button onClick={() => loadAll()} className="mt-4 btn-pill border border-emerald text-emerald text-sm">Try again</button>
       </div>
     </div>
   );
 
-  const empty = !data.recent || data.recent.length === 0;
+  const empty = !overview.recent || overview.recent.length === 0;
 
   return (
-    <div className="space-y-8" data-testid="dashboard-root">
-      <PageHeader
-        eyebrow="Overview"
-        title="Your money, today."
-        description="A premium, simple view of your balance, spend, cash flow, and AI-backed insights."
-        actions={
-          <>
-            <button onClick={load} disabled={refreshing} data-testid="dashboard-refresh" className="toolbar-chip hover:bg-secondary/70 disabled:opacity-50">
-              {refreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} Refresh
-            </button>
-            {user?.tier === "premium" || user?.role === "admin" ? (
-              <button onClick={downloadMonth} disabled={pdfBusy} data-testid="download-month-pdf" className="btn-pill border border-border bg-card/80 text-sm h-11 px-5 disabled:opacity-50">
-                {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                <span className="ml-2">Download PDF</span>
-              </button>
-            ) : (
-              <a href="/pricing" className="btn-pill border border-border bg-card/80 text-sm h-11 px-5 inline-flex items-center gap-2 text-muted-foreground">
-                <Lock className="h-4 w-4" />
-                <span>PDF Report</span>
-                <span className="text-xs px-1.5 py-0.5 rounded-full bg-emerald/10 text-emerald">Premium</span>
-              </a>
-            )}
-            <ActionLink to="/transactions" label="Add transaction" />
-          </>
-      }
-      />
+    <div className="space-y-6" data-testid="dashboard-root">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <p className="label-overline text-emerald">Overview</p>
+          <h1 className="text-2xl lg:text-3xl tracking-tight font-semibold mt-1">
+            Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}{user?.name ? `, ${user?.name?.split(" ")[0]}` : ""}.
+          </h1>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger className="toolbar-chip">
+            <MoreHorizontal className="h-3.5 w-3.5 mr-1" /> Actions
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => loadAll(true)}>
+              <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/import")}>
+              <Building2 className="h-4 w-4 mr-2" /> Import
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/transactions")}>
+              <Plus className="h-4 w-4 mr-2" /> Add transaction
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       {empty && (
         <EmptyState
@@ -121,112 +146,220 @@ const Dashboard = React.memo(function Dashboard() {
           description="Connect your bank to import transactions automatically, upload a CSV statement, or add your first transaction manually to get started."
           action={
             <div className="flex flex-wrap gap-3 justify-center">
-              <ActionLink to="/connections" label="Connect bank" />
-              <ActionLink to="/statements" label="Upload statement" variant="secondary" />
-              <ActionLink to="/transactions" label="Add manually" variant="secondary" />
-              <button
-                onClick={seed}
-                data-testid="seed-demo"
-                className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
-              >
-                Explore with sample data
-              </button>
+              <Link to="/import" className="btn-pill gradient-emerald text-white text-sm h-11 px-5">Connect bank <ArrowRight className="ml-2 h-4 w-4" /></Link>
+              <Link to="/import" className="btn-pill border border-border text-sm h-11 px-5">Upload statement</Link>
+              <Link to="/transactions" className="btn-pill border border-border text-sm h-11 px-5">Add manually</Link>
+              <button onClick={seed} className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2">Explore with sample data</button>
             </div>
           }
         />
       )}
 
       {!empty && <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <MetricCard testid="kpi-balance" label="Net Balance" value={`£${data.balance.toLocaleString()}`} icon={Wallet} tone="emerald" />
-        <MetricCard testid="kpi-income" label="Income" value={`£${data.income.toLocaleString()}`} icon={ArrowUpRight} tone="emerald" />
-        <MetricCard testid="kpi-spend" label="Spend" value={`£${data.spend.toLocaleString()}`} icon={ArrowDownRight} tone="ruby" />
-        <MetricCard testid="kpi-health" label="Health Score" value={`${data.health_score}/100`} icon={HeartPulse} tone="topaz" />
+      {/* KPI row */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+        <MetricCard label="Net Worth" value={`£${overview.balance.toLocaleString()}`} icon={Wallet} tone="emerald"
+          detail={trendData ? <span className={`flex items-center gap-1 text-xs ${trendData.direction === "up" ? "text-emerald" : "text-ruby"}`}>{trendData.direction === "up" ? "▲" : "▼"} {trendData.direction === "up" ? "+" : ""}£{Math.abs(trendData.values[trendData.values.length - 1] - trendData.values[0]).toLocaleString()} vs 6mo ago</span> : null} />
+        <MetricCard label="Income" value={`£${overview.income.toLocaleString()}`} icon={ArrowUpRight} tone="emerald"
+          detail={<span className="text-xs text-muted-foreground">this month</span>} />
+        <MetricCard label="Spending" value={`£${overview.spend.toLocaleString()}`} icon={ArrowDownRight} tone="ruby"
+          detail={<span className="text-xs text-muted-foreground">this month</span>} />
+        <MetricCard label="Health" value={`${overview.health_score}`} icon={HeartPulse} tone="topaz"
+          detail={
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-xs text-muted-foreground">/ 100</span>
+              <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden max-w-[80px]">
+                <div className="h-full rounded-full bg-gradient-to-r from-emerald to-topaz" style={{ width: `${overview.health_score}%` }} />
+              </div>
+            </div>
+          } />
       </div>
 
+      {/* Alerts + Upcoming */}
+      {(topAlerts.length > 0 || topUpcoming.length > 0) && (
+        <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden">
+          {topAlerts.length > 0 && (
+            <div className="divide-y divide-border/60">
+              {topAlerts.map((a, i) => (
+                <div key={i} className="px-5 py-3 flex items-center gap-3 text-sm">
+                  <AlertTriangle className={`h-4 w-4 shrink-0 ${a.severity === "critical" || a.severity === "danger" ? "text-ruby" : a.severity === "warning" ? "text-topaz" : "text-emerald"}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{a.title || a.message}</p>
+                    {a.description && <p className="text-xs text-muted-foreground truncate">{a.description}</p>}
+                  </div>
+                  {a.action_url && <Link to={a.action_url} className="text-xs text-emerald font-medium shrink-0 hover:underline">Fix</Link>}
+                </div>
+              ))}
+            </div>
+          )}
+          {topUpcoming.length > 0 && (
+            <div className="border-t border-border/60 divide-y divide-border/60">
+              {topUpcoming.map((u, i) => (
+                <div key={i} className="px-5 py-3 flex items-center gap-3 text-sm">
+                  <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{u.description || u.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {u.date ? new Date(u.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : ""}
+                      {u.amount ? ` · £${Number(u.amount).toFixed(2)}` : ""}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 3-column: Budgets | Cash Flow | Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <SectionCard eyebrow="Cash flow" title="Last 6 months" className="lg:col-span-2" contentClassName="pt-0">
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data.monthly_flow}>
-                <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={11} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} />
-                <Legend
-                  wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }}
-                  formatter={(value) => value === "income" ? "Income" : "Spending"}
-                />
-                <Line type="monotone" dataKey="income" name="income" stroke="hsl(var(--emerald))" strokeWidth={2.5} dot={false} />
-                <Line type="monotone" dataKey="spend" name="spend" stroke="hsl(var(--topaz))" strokeWidth={2.5} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
+        {/* Budgets */}
+        <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="label-overline">Budgets</p>
+              <p className="text-sm font-medium mt-0.5">
+                {currentMonthBudget
+                  ? `${currentMonthBudget.pct}% of limit used`
+                  : "No budgets set"}
+              </p>
+            </div>
+            <Link to="/budgets" className="text-xs text-emerald font-medium hover:underline shrink-0">Manage</Link>
           </div>
-        </SectionCard>
+          {budgets.length === 0 ? (
+            <Link to="/budgets" className="flex items-center gap-3 p-3 rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:text-foreground hover:border-emerald/40 transition-colors">
+              <PiggyBank className="h-4 w-4" />
+              <span>Set your first budget</span>
+              <ArrowRight className="h-4 w-4 ml-auto" />
+            </Link>
+          ) : (
+            <div className="space-y-3">
+              {budgets.slice(0, 4).map((b) => {
+                const pct = Math.min(b.progress_pct || 0, 100);
+                const over = (b.progress_pct || 0) >= 100;
+                return (
+                  <div key={b.budget_id}>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="font-medium capitalize truncate">{b.category}</span>
+                      <span className={`tabular-nums ${over ? "text-ruby font-medium" : "text-muted-foreground"}`}>
+                        £{Math.abs(b.spent || 0).toFixed(0)} / £{b.limit.toFixed(0)}
+                      </span>
+                    </div>
+                    <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full transition-all ${over ? "bg-ruby" : "bg-gradient-to-r from-emerald to-emerald/70"}`} style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
-        <SectionCard eyebrow="Spending" title="By category" contentClassName="pt-0">
+        {/* Cash Flow */}
+        <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card p-5 lg:col-span-1">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <p className="label-overline">Cash flow</p>
+              <p className="text-sm font-medium mt-0.5">Last 6 months</p>
+            </div>
+            <Link to="/reports" className="text-xs text-emerald font-medium hover:underline shrink-0">Details</Link>
+          </div>
           <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={data.categories.slice(0, 6)} dataKey="value" nameKey="name" innerRadius={45} outerRadius={75} paddingAngle={3}>
-                  {data.categories.slice(0, 6).map((c, i) => <Cell key={c.name} fill={PIE_COLORS[i % 8]} />)}
-                </Pie>
-                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => `£${Number(v).toFixed(2)}`} />
-              </PieChart>
-            </ResponsiveContainer>
+            {overview.monthly_flow?.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={overview.monthly_flow}>
+                  <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={10} tickMargin={4} />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickMargin={4} />
+                  <Tooltip contentStyle={TOOLTIP_STYLE} />
+                  <Line type="monotone" dataKey="income" stroke="hsl(var(--emerald))" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="spend" stroke="hsl(var(--topaz))" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full grid place-items-center text-sm text-muted-foreground">No data yet</div>
+            )}
           </div>
-          <div className="space-y-2 mt-2">
-            {data.categories.slice(0, 6).map((c, i) => (
-              <div key={c.name} className="flex items-center justify-between text-xs">
-                <span className="flex items-center gap-2 min-w-0">
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PIE_COLORS[i] }} />
-                  <span className="truncate capitalize">{c.name}</span>
-                </span>
-                <span className="font-medium tabular-nums ml-2">£{c.value.toFixed(2)}</span>
-              </div>
-            ))}
+        </div>
+
+        {/* Quick Actions */}
+        <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card p-5">
+          <p className="label-overline mb-3">Quick actions</p>
+          <div className="grid grid-cols-2 gap-3">
+            <Link to="/transactions" className="flex flex-col items-center gap-1.5 p-4 rounded-xl border border-border hover:border-emerald/30 bg-secondary/20 hover:bg-emerald/5 transition-colors text-center">
+              <span className="grid h-9 w-9 place-items-center rounded-lg bg-emerald/10 text-emerald"><Plus className="h-4 w-4" /></span>
+              <span className="text-xs font-medium leading-tight">Add transaction</span>
+            </Link>
+            <Link to="/import" className="flex flex-col items-center gap-1.5 p-4 rounded-xl border border-border hover:border-emerald/30 bg-secondary/20 hover:bg-emerald/5 transition-colors text-center">
+              <span className="grid h-9 w-9 place-items-center rounded-lg bg-emerald/10 text-emerald"><Building2 className="h-4 w-4" /></span>
+              <span className="text-xs font-medium leading-tight">Connect bank</span>
+            </Link>
+            <Link to="/budgets" className="flex flex-col items-center gap-1.5 p-4 rounded-xl border border-border hover:border-topaz/30 bg-secondary/20 hover:bg-topaz/5 transition-colors text-center">
+              <span className="grid h-9 w-9 place-items-center rounded-lg bg-topaz/10 text-topaz"><PiggyBank className="h-4 w-4" /></span>
+              <span className="text-xs font-medium leading-tight">Budgets</span>
+            </Link>
+            <Link to="/investments" className="flex flex-col items-center gap-1.5 p-4 rounded-xl border border-border hover:border-topaz/30 bg-secondary/20 hover:bg-topaz/5 transition-colors text-center">
+              <span className="grid h-9 w-9 place-items-center rounded-lg bg-topaz/10 text-topaz"><TrendingUp className="h-4 w-4" /></span>
+              <span className="text-xs font-medium leading-tight">Investments</span>
+            </Link>
           </div>
-        </SectionCard>
+        </div>
       </div>
 
-      <AIInsightPanel
-        title="AI Insights"
-        subtitle="What's happening with your money"
-        endpoint="/ai/insights/dashboard"
-      />
+      {/* AI Insights */}
+      <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card p-5">
+        <AIInsightPanel
+          title="AI Insights"
+          subtitle="What's happening with your money"
+          endpoint="/ai/insights/dashboard"
+        />
+      </div>
 
-      <SectionCard eyebrow="Recent" title="Transactions" contentClassName="p-0">
-        {/* Mobile card view */}
-        <div className="block sm:hidden divide-y divide-border">
-          {data.recent.map((t) => (
-            <div key={t.transaction_id} style={{ contentVisibility: "auto" }} className="px-4 py-3 space-y-1.5">
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-xs text-muted-foreground">{t.date?.slice(0,10)}</p>
-                <span className={`shrink-0 font-medium tabular-nums ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}>
-                  {t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}
-                </span>
+      {/* Recent transactions */}
+      <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border/70">
+          <div>
+            <p className="label-overline">Recent</p>
+            <p className="text-sm font-medium mt-0.5">Transactions</p>
+          </div>
+          <Link to="/transactions" className="text-xs text-emerald font-medium hover:underline">View all</Link>
+        </div>
+        <div className="block sm:hidden divide-y divide-border/60">
+          {overview.recent.slice(0, 5).map((t) => (
+            <div key={t.transaction_id} className="px-5 py-3 flex items-center justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-muted-foreground">{t.date?.slice(0, 10)}</p>
+                <p className="text-sm font-medium truncate">{t.description}</p>
+                <span className="text-xs text-muted-foreground capitalize">{t.category}</span>
               </div>
-              <p className="font-medium text-sm truncate">{t.description}</p>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-secondary capitalize">{t.category}</span>
+              <span className={`shrink-0 font-medium tabular-nums text-sm ${t.amount > 0 ? "text-emerald" : ""}`}>
+                {t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}
+              </span>
             </div>
           ))}
         </div>
-        {/* Desktop table */}
-        <div className="hidden sm:block overflow-x-auto"><table className="w-full text-sm">
-          <thead><tr className="text-left text-xs text-muted-foreground border-y border-border bg-secondary/30">
-            <th className="px-6 py-3">Date</th><th className="px-6 py-3">Description</th><th className="px-6 py-3">Category</th><th className="px-6 py-3 text-right">Amount</th>
-          </tr></thead>
-          <tbody>
-            {data.recent.map((t) => (
-              <tr key={t.transaction_id} className="border-b border-border last:border-0 hover:bg-secondary/40">
-                <td className="px-6 py-3 text-muted-foreground text-xs">{t.date?.slice(0,10)}</td>
-                <td className="px-6 py-3 font-medium truncate max-w-xs">{t.description}</td>
-                <td className="px-6 py-3"><span className="text-xs px-2 py-1 rounded-full bg-secondary capitalize">{t.category}</span></td>
-                <td className={`px-6 py-3 text-right font-medium ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}>{t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}</td>
+        <div className="hidden sm:block overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-muted-foreground border-b border-border/60 bg-secondary/20">
+                <th className="px-5 py-3 font-medium">Date</th>
+                <th className="px-5 py-3 font-medium">Description</th>
+                <th className="px-5 py-3 font-medium">Category</th>
+                <th className="px-5 py-3 font-medium text-right">Amount</th>
               </tr>
-            ))}
-          </tbody>
-        </table></div>
-      </SectionCard>
+            </thead>
+            <tbody>
+              {overview.recent.slice(0, 5).map((t) => (
+                <tr key={t.transaction_id} className="border-b border-border/40 last:border-0 hover:bg-secondary/20">
+                  <td className="px-5 py-3 text-muted-foreground text-xs">{t.date?.slice(0, 10)}</td>
+                  <td className="px-5 py-3 font-medium truncate max-w-[200px]">{t.description}</td>
+                  <td className="px-5 py-3"><span className="text-xs px-2 py-0.5 rounded-full bg-secondary capitalize">{t.category || "uncategorized"}</span></td>
+                  <td className={`px-5 py-3 text-right font-medium tabular-nums ${t.amount > 0 ? "text-emerald" : ""}`}>{t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
       </>}
     </div>
   );

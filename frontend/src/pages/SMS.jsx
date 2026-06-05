@@ -7,7 +7,8 @@ import { PageHeader, SectionCard } from "../components/ui/layout";
 
 const SAMPLE = "Tesco: You spent £42.50 at TESCO EXPRESS on 03/05/26. Available balance £812.40.";
 
-export default function SMS() {
+export default function SMS({ embedded }) {
+  useEffect(() => { if (!embedded) document.title = "SMS Transactions | FinanceAI"; }, [embedded]);
   const { user } = useAuth();
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -102,13 +103,15 @@ export default function SMS() {
   };
 
   return (
-    <div className="space-y-8" data-testid="sms-root">
-      <PageHeader
-        eyebrow="Accounts"
-        title="Paste any bank SMS. AI does the rest."
-        description="Drop in a bank SMS and FinanceAI will extract the transaction, category, and useful metadata."
-        meta={user?.tier !== "premium" && user?.role !== "admin" ? [<span key="limit" className="toolbar-chip">Free tier · 3 parses/day</span>] : null}
-      />
+    <div className="space-y-6" data-testid="sms-root">
+      {!embedded && (
+        <PageHeader
+          eyebrow="Accounts"
+          title="Paste any bank SMS. AI does the rest."
+          description="Drop in a bank SMS and FinanceAI will extract the transaction, category, and useful metadata."
+          meta={user?.tier !== "premium" && user?.role !== "admin" ? [<span key="limit" className="toolbar-chip">Free tier · 3 parses/day</span>] : null}
+        />
+      )}
 
       <SectionCard eyebrow="Your Phone" title={senders.length ? `${senders.length} phone${senders.length !== 1 ? "s" : ""} registered` : "Register your phone"} data-testid="phone-card">
         <p className="text-xs text-muted-foreground mb-4">Register your mobile number so the system recognises your SMS messages and can send automatic replies.</p>

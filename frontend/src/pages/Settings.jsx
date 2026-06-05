@@ -4,21 +4,26 @@ import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import {
   Trash2, Plus, Sparkles, Building2, ShieldCheck, Crown, CreditCard,
-  ExternalLink, XCircle, User, Receipt, Bot, Lock,
+  ExternalLink, XCircle, User, Receipt, Bot, Lock, Plug, MessageSquare,
 } from "lucide-react";
 import { PageHeader, SectionCard } from "../components/ui/layout";
 import ConfirmModal from "../components/ui/ConfirmModal";
+import IntegrationsPage from "./Integrations";
+import SMSPage from "./SMS";
 
 const PROVIDERS = ["openai", "anthropic", "gemini", "custom"];
 
 const TABS = [
   { key: "account",      label: "Account",         icon: User },
   { key: "subscription", label: "Subscription",    icon: Receipt },
-  { key: "ai",           label: "AI & Integrations", icon: Bot },
+  { key: "integrations", label: "Integrations",    icon: Plug },
+  { key: "sms",          label: "SMS Finance",     icon: MessageSquare },
+  { key: "ai",           label: "AI Providers",    icon: Bot },
   { key: "admin",        label: "Admin",            icon: Lock, adminOnly: true },
 ];
 
 export default function Settings() {
+  useEffect(() => { document.title = "Settings | FinanceAI"; }, []);
   const { user, refresh } = useAuth();
   const [activeTab, setActiveTab] = useState("account");
 
@@ -130,7 +135,7 @@ export default function Settings() {
       <PageHeader
         eyebrow="System"
         title="Settings"
-        description="Manage your account, subscription, AI providers, and connected services."
+        description="Manage your account, subscription, AI providers, integrations, SMS settings, and admin config."
       />
 
       {/* Tab bar */}
@@ -232,6 +237,20 @@ export default function Settings() {
               </div>
             )}
           </SectionCard>
+        </div>
+      )}
+
+      {/* ── INTEGRATIONS TAB ── */}
+      {activeTab === "integrations" && (
+        <div className="animate-[fadeUp_0.2s_ease-out]">
+          <IntegrationsPage embedded />
+        </div>
+      )}
+
+      {/* ── SMS TAB ── */}
+      {activeTab === "sms" && (
+        <div className="animate-[fadeUp_0.2s_ease-out]">
+          <SMSPage embedded />
         </div>
       )}
 

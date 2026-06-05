@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { api } from "../lib/api";
 import { Landmark, Calculator, Loader2 } from "lucide-react";
 import { PageHeader } from "../components/ui/layout";
 
 export default function UKTools() {
+  useEffect(() => { document.title = "UK Tools | FinanceAI"; }, []);
   const [uc, setUc] = useState({ monthly_earnings: 0, children: 0, housing_cost: 0, couple: false, has_disability: false, result: null, busy: false });
   const [tax, setTax] = useState({ annual_income: 35000, result: null, busy: false });
 

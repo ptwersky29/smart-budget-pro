@@ -21,6 +21,7 @@ const MONTHS = [
 ];
 
 export default function BudgetSystem() {
+  useEffect(() => { document.title = "Budget System | FinanceAI"; }, []);
   const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
 

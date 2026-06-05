@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { PageHeader } from "../components/ui/layout";
 import MaaserPanel from "../components/MaaserPanel";
 import Skeleton from "../components/ui/Skeleton";
+import YearEndJewishReport from "../components/YearEndJewishReport";
 
 const CITIES = ["london","manchester","gateshead","leeds","jerusalem","tel-aviv","new-york","monsey","lakewood","stamford-hill"];
 
@@ -13,6 +14,7 @@ function titleCase(s) {
 }
 
 export default function Jewish() {
+  useEffect(() => { document.title = "Jewish Calendar | FinanceAI"; }, []);
   // Hebcal widget state
   const [hebDate, setHebDate] = useState(null);
   const [zmanim, setZmanim] = useState(null);
@@ -85,6 +87,15 @@ export default function Jewish() {
       </div>
 
       <MaaserPanel />
+
+      <details className="rounded-2xl border border-border bg-card p-6 open:shadow-sm transition-shadow">
+        <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground select-none">
+          Year-End Report
+        </summary>
+        <div className="mt-4">
+          <YearEndJewishReport />
+        </div>
+      </details>
 
       {upcomingHols.length > 0 && (
         <div className="rounded-2xl border border-border bg-card p-6" data-testid="upcoming-holidays">

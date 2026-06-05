@@ -1,12 +1,30 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
-import { Plus, Trash2, Loader2, Pencil, Search, ArrowUpDown, Sparkles, Filter, ChevronLeft, ChevronRight, X, BarChart3, Star, Receipt, Download } from "lucide-react";
+import { Plus, Trash2, Loader2, Pencil, Search, ArrowUpDown, Sparkles, Filter, ChevronLeft, ChevronRight, X, BarChart3, Star, Receipt, Download, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, PageHeader, SectionCard } from "../components/ui/layout";
 import { SkeletonTable } from "../components/ui/Skeleton";
 import { withUndo } from "../lib/undo";
 import ConfirmModal from "../components/ui/ConfirmModal";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+} from "../components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetTrigger,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "../components/ui/sheet";
 import ComparePeriods from "../components/ComparePeriods";
 import MaaserPanel from "../components/MaaserPanel";
 import TransactionRow from "../components/TransactionRow";
@@ -28,6 +46,7 @@ function firstOfMonth() {
 const fmt = (n) => `£${Number(n || 0).toFixed(2)}`;
 
 const Transactions = React.memo(function Transactions() {
+  useEffect(() => { document.title = "Transactions | FinanceAI"; }, []);
   const [txs, setTxs] = useState([]);
   const [total, setTotal] = useState(0);
   const [incomeTotal, setIncomeTotal] = useState(0);
@@ -37,8 +56,6 @@ const Transactions = React.memo(function Transactions() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [selectedCats, setSelectedCats] = useState([]);
-  const [showFilters, setShowFilters] = useState(false);
-  const [showAiSearch, setShowAiSearch] = useState(false);
   const [classifying, setClassifying] = useState(false);
   const [classification, setClassification] = useState(null);
   const [saveAsRecurring, setSaveAsRecurring] = useState(false);
@@ -245,13 +262,9 @@ const Transactions = React.memo(function Transactions() {
     }
   }, [allDisplayedSelected, allDisplayed]);
 
-  const [bulkCat, setBulkCat] = useState("");
-
-  const bulkCategory = useCallback(async () => {
-    if (!bulkCat || selectedIds.size === 0) return;
+  const bulkCategory = useCallback(async (cat) => {
+    if (!cat || selectedIds.size === 0) return;
     const ids = Array.from(selectedIds);
-    const cat = bulkCat;
-    setBulkCat("");
     withUndo({
       action: () => api.post("/transactions/bulk-category", { transaction_ids: ids, category: cat }),
       undo: async () => { await api.post("/transactions/bulk-category", { transaction_ids: ids, category: "" }); await load(); },
@@ -260,7 +273,7 @@ const Transactions = React.memo(function Transactions() {
     });
     setSelectedIds(new Set());
     await load();
-  }, [bulkCat, selectedIds, load]);
+  }, [selectedIds, load]);
 
   const bulkDelete = useCallback(async () => {
     if (selectedIds.size === 0) return;
@@ -363,31 +376,44 @@ const Transactions = React.memo(function Transactions() {
         title="Every penny."
         description="Search, sort, and edit your transactions."
         actions={
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
             {someSelected && (
-              <>
-                <select value={bulkCat} onChange={e => setBulkCat(e.target.value)} className="control-shell text-sm h-11" aria-label="Set category for selected">
-                  <option value="">Category…</option>
-                  {selectedCats.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-                </select>
-                {bulkCat && <button onClick={bulkCategory} className="btn-pill gradient-emerald text-white text-sm h-11 px-4"><Pencil className="h-4 w-4 mr-1.5" /> Apply</button>}
-                <button
-                  onClick={bulkDelete}
-                  className="btn-pill border border-ruby/50 text-ruby text-sm h-11 px-4"
-                >
-                  <Trash2 className="h-4 w-4 mr-1.5" /> Delete {selectedIds.size}
-                </button>
-              </>
+              <DropdownMenu>
+                <DropdownMenuTrigger className="btn-pill border border-ruby/50 text-ruby text-sm h-11 px-4">
+                  <Trash2 className="h-4 w-4 mr-1.5" /> Bulk ({selectedIds.size})
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>Set category</DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                      {selectedCats.map(c => (
+                        <DropdownMenuItem key={c.name} onClick={() => bulkCategory(c.name)}>{c.name}</DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={bulkDelete} className="text-ruby">
+                    <Trash2 className="h-4 w-4 mr-2" /> Delete {selectedIds.size}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
-            <button onClick={() => setCompareOpen(true)} className="toolbar-chip">
-              <BarChart3 className="h-3.5 w-3.5" /> Compare
-            </button>
-            <button onClick={exportCsv} className="toolbar-chip">
-              <Download className="h-3.5 w-3.5" /> Export CSV
-            </button>
-            <button onClick={openAdd} data-testid="add-transaction" className="btn-pill gradient-emerald text-white text-sm h-11 px-5">
-              <Plus className="h-4 w-4 mr-2" /> Add
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="toolbar-chip">
+                <MoreHorizontal className="h-3.5 w-3.5 mr-1" /> Actions
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={openAdd} data-testid="add-transaction">
+                  <Plus className="h-4 w-4 mr-2" /> Add transaction
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setCompareOpen(true)}>
+                  <BarChart3 className="h-4 w-4 mr-2" /> Compare periods
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportCsv}>
+                  <Download className="h-4 w-4 mr-2" /> Export CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         }
       />
@@ -408,11 +434,11 @@ const Transactions = React.memo(function Transactions() {
 
       {/* ───── Ledger tab ───── */}
       {activeTab === "ledger" && <>
-        {/* Unified filters + summary card */}
+        {/* Unified filters card */}
         <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card">
-          {/* Row 1: Search + sort + AI + filters toggle */}
-          <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto_auto_auto] gap-3 p-4">
-            <label className="flex items-center gap-3 rounded-xl border border-border bg-background/70 px-4 h-11">
+          {/* Row 1: Search + Sort + Filters trigger */}
+          <div className="flex items-center gap-3 p-4">
+            <label className="flex-1 flex items-center gap-3 rounded-xl border border-border bg-background/70 px-4 h-11">
               <Search className="h-4 w-4 text-muted-foreground shrink-0" />
               <input value={searchInput} onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
                 placeholder="Search descriptions, merchants, categories..."
@@ -420,7 +446,7 @@ const Transactions = React.memo(function Transactions() {
               {filters.search && <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>}
             </label>
 
-            <label className="flex items-center gap-2 rounded-xl border border-border bg-background/70 px-4 h-11 text-sm">
+            <label className="flex items-center gap-2 rounded-xl border border-border bg-background/70 px-3 h-11 text-sm">
               <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
               <select aria-label="Sort transactions" value={`${filters.sort}-${filters.order}`} onChange={(e) => { const [s, o] = e.target.value.split("-"); setFilters(p => ({ ...p, sort: s, order: o })); }}
                 className="bg-transparent outline-none">
@@ -431,15 +457,82 @@ const Transactions = React.memo(function Transactions() {
               </select>
             </label>
 
-            <button onClick={() => setShowAiSearch(!showAiSearch)}
-              className={`btn-pill border text-sm h-11 px-3 ${showAiSearch ? "border-emerald text-emerald" : "border-border"}`} title="AI search">
-              <Sparkles className="h-4 w-4" />
-            </button>
+            <Sheet>
+              <SheetTrigger asChild>
+                <button className={`btn-pill border text-sm h-11 px-4 ${activeFilters.length > 0 ? "border-emerald text-emerald" : "border-border"}`}>
+                  <Filter className="h-4 w-4 mr-2" /> Filters
+                  {activeFilters.length > 0 && <span className="ml-1">({activeFilters.length})</span>}
+                </button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-full sm:max-w-md">
+                <SheetHeader>
+                  <SheetTitle>Filters</SheetTitle>
+                  <SheetDescription>Refine your transaction list</SheetDescription>
+                </SheetHeader>
+                <div className="mt-6 space-y-5">
+                  <div className="grid grid-cols-2 gap-3">
+                    <select value={filters.tx_type} onChange={(e) => toggleFilter("tx_type", e.target.value)} className="control-shell text-sm h-10">
+                      <option value="">All types</option><option value="income">Income</option><option value="expense">Expense</option>
+                    </select>
+                    <select value={filters.source} onChange={(e) => toggleFilter("source", e.target.value)} className="control-shell text-sm h-10">
+                      <option value="">All sources</option>
+                      {Object.entries(SOURCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </select>
+                    <select value={filters.category} onChange={(e) => toggleFilter("category", e.target.value)} className="control-shell text-sm h-10">
+                      <option value="">All categories</option>
+                      {selectedCats.map(c => <option key={c.category_id ?? `default-${c.name}`} value={c.name}>{c.name}</option>)}
+                    </select>
+                    <input type="number" min="0" step="0.01" placeholder="Min £" value={filters.amount_min}
+                      onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_min: e.target.value })); }}
+                      className="control-shell text-sm h-10" />
+                    <input type="number" min="0" step="0.01" placeholder="Max £" value={filters.amount_max}
+                      onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_max: e.target.value })); }}
+                      className="control-shell text-sm h-10" />
+                    <input type="date" value={filters.date_from} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_from: e.target.value })); }} className="control-shell text-sm h-10" />
+                    <input type="date" value={filters.date_to} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_to: e.target.value })); }} className="control-shell text-sm h-10" />
+                  </div>
 
-            <button onClick={() => setShowFilters(!showFilters)}
-              className={`btn-pill border text-sm h-11 px-4 ${showFilters ? "border-emerald text-emerald" : "border-border"}`}>
-              <Filter className="h-4 w-4 mr-2" /> Filters
-            </button>
+                  <div className="border-t border-border pt-4 space-y-3">
+                    <p className="text-xs font-medium text-muted-foreground">AI search</p>
+                    <div className="flex items-center gap-2">
+                      <input value={aiQuery} onChange={(e) => setAiQuery(e.target.value)}
+                        placeholder="e.g. 'grocery spending last month'"
+                        className="flex-1 control-shell text-sm h-10" onKeyDown={(e) => e.key === "Enter" && runAiSearch()} />
+                      <button onClick={runAiSearch} disabled={aiLoading || !aiQuery.trim()}
+                        className="btn-pill border border-emerald text-emerald text-sm h-10 disabled:opacity-50">
+                        {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                        <span className="ml-1.5">Search</span>
+                      </button>
+                    </div>
+                    {aiResults && (
+                      <div className="rounded-xl border border-emerald/30 bg-emerald/5 p-3 text-sm">
+                        <p className="font-medium text-emerald mb-1">AI results for &ldquo;{aiResults.query}&rdquo; ({aiResults.total} matches)</p>
+                        <button onClick={() => { setAiResults(null); setAiQuery(""); }} className="text-xs text-muted-foreground hover:text-foreground">Clear</button>
+                      </div>
+                    )}
+                  </div>
+
+                  {(filters.source || filters.category || filters.tx_type || filters.search) && total > 0 && (
+                    <div className="border-t border-border pt-4 flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">
+                        {total} transaction{total !== 1 ? "s" : ""} match current filters
+                      </p>
+                      <button onClick={clearAllMatching}
+                        className="text-xs px-3 py-1.5 rounded-full border border-ruby/40 text-ruby hover:bg-ruby/5 transition-colors">
+                        <Trash2 className="h-3 w-3 inline mr-1" />
+                        Delete all {total}
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="border-t border-border pt-4 flex justify-end">
+                    <button onClick={clearAllFilters} className="text-sm text-muted-foreground hover:text-foreground">
+                      Clear all filters
+                    </button>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
 
           {/* Active filter chips */}
@@ -455,86 +548,13 @@ const Transactions = React.memo(function Transactions() {
             </div>
           )}
 
-          {/* Filters panel */}
-          {showFilters && (
-            <div className="border-t border-border px-4 py-3 space-y-3">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                <select value={filters.tx_type} onChange={(e) => toggleFilter("tx_type", e.target.value)} className="control-shell text-sm h-10">
-                  <option value="">All types</option><option value="income">Income</option><option value="expense">Expense</option>
-                </select>
-                <select value={filters.source} onChange={(e) => toggleFilter("source", e.target.value)} className="control-shell text-sm h-10">
-                  <option value="">All sources</option>
-                  {Object.entries(SOURCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
-                <select value={filters.category} onChange={(e) => toggleFilter("category", e.target.value)} className="control-shell text-sm h-10">
-                  <option value="">All categories</option>
-                  {selectedCats.map(c => <option key={c.category_id ?? `default-${c.name}`} value={c.name}>{c.name}</option>)}
-                </select>
-                <input type="number" min="0" step="0.01" placeholder="Min £" value={filters.amount_min}
-                  onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_min: e.target.value })); }}
-                  className="control-shell text-sm h-10" />
-                <input type="number" min="0" step="0.01" placeholder="Max £" value={filters.amount_max}
-                  onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_max: e.target.value })); }}
-                  className="control-shell text-sm h-10" />
-                <input type="date" value={filters.date_from} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_from: e.target.value })); }} className="control-shell text-sm h-10" />
-                <input type="date" value={filters.date_to} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_to: e.target.value })); }} className="control-shell text-sm h-10" />
-              </div>
-
-              {/* AI search inline */}
-              {showAiSearch && (
-                <div className="border-t border-border pt-3">
-                  <div className="flex items-center gap-2">
-                    <input value={aiQuery} onChange={(e) => setAiQuery(e.target.value)}
-                      placeholder="e.g. 'grocery spending last month'"
-                      className="flex-1 control-shell text-sm h-10" onKeyDown={(e) => e.key === "Enter" && runAiSearch()} />
-                    <button onClick={runAiSearch} disabled={aiLoading || !aiQuery.trim()}
-                      className="btn-pill border border-emerald text-emerald text-sm h-10 disabled:opacity-50">
-                      {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                      <span className="ml-1.5">Search</span>
-                    </button>
-                  </div>
-                  {aiResults && (
-                    <div className="rounded-xl border border-emerald/30 bg-emerald/5 p-3 text-sm mt-2">
-                      <p className="font-medium text-emerald mb-1">AI results for &ldquo;{aiResults.query}&rdquo; ({aiResults.total} matches)</p>
-                      <button onClick={() => { setAiResults(null); setAiQuery(""); }} className="text-xs text-muted-foreground hover:text-foreground">Clear</button>
-                    </div>
-                  )}
-                </div>
-              )}
-              {/* Destructive: clear all matching — tucked inside filter panel */}
-              {(filters.source || filters.category || filters.tx_type || filters.search) && total > 0 && (
-                <div className="border-t border-border pt-3 flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">
-                    {total} transaction{total !== 1 ? "s" : ""} match current filters
-                  </p>
-                  <button
-                    onClick={clearAllMatching}
-                    className="text-xs px-3 py-1.5 rounded-full border border-ruby/40 text-ruby hover:bg-ruby/5 transition-colors"
-                  >
-                    <Trash2 className="h-3 w-3 inline mr-1" />
-                    Delete all {total}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Income / Expenses / Net summary bar */}
-          <div className="grid grid-cols-3 divide-x divide-border border-t border-border">
-            <div className="p-4 text-center">
-              <p className="text-xs text-muted-foreground">Income</p>
-              <p className="text-lg font-semibold text-emerald mt-0.5">{fmt(incomeTotal)}</p>
-            </div>
-            <div className="p-4 text-center">
-              <p className="text-xs text-muted-foreground">Expenses</p>
-              <p className="text-lg font-semibold text-ruby mt-0.5">{fmt(expenseTotal)}</p>
-            </div>
-            <div className="p-4 text-center">
-              <p className="text-xs text-muted-foreground">Net</p>
-              <p className={`text-lg font-semibold mt-0.5 ${netTotal >= 0 ? "text-emerald" : "text-ruby"}`}>
-                {netTotal >= 0 ? "+" : ""}{fmt(netTotal)}
-              </p>
-            </div>
+          {/* Compact summary stat line */}
+          <div className="border-t border-border px-4 py-3 flex items-center justify-end gap-4 text-sm">
+            <span>Income <span className="text-emerald font-medium tabular-nums">{fmt(incomeTotal)}</span></span>
+            <span className="text-muted-foreground">|</span>
+            <span>Expenses <span className="text-ruby font-medium tabular-nums">{fmt(expenseTotal)}</span></span>
+            <span className="text-muted-foreground">|</span>
+            <span>Net <span className={`font-medium tabular-nums ${netTotal >= 0 ? "text-emerald" : "text-ruby"}`}>{netTotal >= 0 ? "+" : ""}{fmt(netTotal)}</span></span>
           </div>
         </div>
 
@@ -549,7 +569,7 @@ const Transactions = React.memo(function Transactions() {
             />
           ) : (
             <>
-              {/* Mobile card view */}
+              {/* Mobile card view with ⋮ actions */}
               <div className="block sm:hidden divide-y divide-border">
                 {(aiResults?.transactions || txs).map((t) => (
                   <div key={t.transaction_id} style={{ contentVisibility: "auto" }} className={`px-4 py-3 space-y-1.5 ${selectedIds.has(t.transaction_id) ? "bg-emerald/5" : ""}`}>
@@ -566,10 +586,19 @@ const Transactions = React.memo(function Transactions() {
                           )}
                         </div>
                       </div>
-                      <div className="flex gap-1 shrink-0">
-                        <button onClick={() => openEdit(t)} className="p-2 text-muted-foreground hover:text-emerald" aria-label="Edit transaction"><Pencil className="h-4 w-4" /></button>
-                        <button onClick={() => del(t.transaction_id)} className="p-2 text-muted-foreground hover:text-ruby" aria-label="Delete transaction"><Trash2 className="h-4 w-4" /></button>
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger className="p-2 text-muted-foreground hover:text-foreground" aria-label="Transaction actions">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEdit(t)}>
+                            <Pencil className="h-4 w-4 mr-2" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => del(t.transaction_id)} className="text-ruby">
+                            <Trash2 className="h-4 w-4 mr-2" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                     <div className="flex items-center justify-between pl-6">
                       <span className="text-xs px-2 py-0.5 rounded-full bg-secondary capitalize">{t.category || "uncategorized"}</span>
@@ -580,7 +609,7 @@ const Transactions = React.memo(function Transactions() {
                   </div>
                 ))}
               </div>
-              {/* Desktop table */}
+              {/* Desktop table with TransactionRow (⋮ actions handled by component) */}
               <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead><tr className="text-left text-xs text-muted-foreground border-b border-border">
@@ -588,7 +617,7 @@ const Transactions = React.memo(function Transactions() {
                       <input type="checkbox" checked={allDisplayedSelected} onChange={toggleSelectAll}
                         className="h-4 w-4 rounded border-border accent-emerald cursor-pointer" />
                     </th>
-                    <th className="px-6 py-3">Date</th><th className="px-6 py-3">Description</th><th className="px-6 py-3">Category</th><th className="px-6 py-3 text-right">Amount</th><th className="px-6 py-3 w-24"></th>
+                    <th className="px-6 py-3">Date</th><th className="px-6 py-3">Description</th><th className="px-6 py-3">Category</th><th className="px-6 py-3 text-right">Amount</th><th className="px-6 py-3 w-12"></th>
                   </tr></thead>
                   <tbody>
                     {(aiResults?.transactions || txs).map((t) => (

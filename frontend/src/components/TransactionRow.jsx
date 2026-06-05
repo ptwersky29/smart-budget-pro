@@ -1,5 +1,11 @@
 import React from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "./ui/dropdown-menu";
 
 const TransactionRow = React.memo(({ t, isSelected, onToggleSelect, onEdit, onDelete }) => {
   return (
@@ -24,9 +30,20 @@ const TransactionRow = React.memo(({ t, isSelected, onToggleSelect, onEdit, onDe
       <td className={`px-6 py-3 text-right font-medium tabular-nums ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}>
         {t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}
       </td>
-      <td className="px-6 py-3 text-right whitespace-nowrap">
-        <button onClick={() => onEdit(t)} data-testid={`edit-${t.transaction_id}`} className="p-3 text-muted-foreground hover:text-emerald" title="Edit" aria-label="Edit transaction"><Pencil className="h-4 w-4" /></button>
-        <button onClick={() => onDelete(t.transaction_id)} data-testid={`del-${t.transaction_id}`} className="p-3 text-muted-foreground hover:text-ruby" title="Delete" aria-label="Delete transaction"><Trash2 className="h-4 w-4" /></button>
+      <td className="px-6 py-3 text-right">
+        <DropdownMenu>
+          <DropdownMenuTrigger className="p-3 text-muted-foreground hover:text-foreground" aria-label="Transaction actions">
+            <MoreHorizontal className="h-4 w-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onEdit(t)}>
+              <Pencil className="h-4 w-4 mr-2" /> Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onDelete(t.transaction_id)} className="text-ruby">
+              <Trash2 className="h-4 w-4 mr-2" /> Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </td>
     </tr>
   );

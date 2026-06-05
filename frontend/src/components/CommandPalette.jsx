@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { CommandDialog, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty, CommandSeparator } from "./ui/command";
 import { 
   LayoutDashboard, Receipt, PiggyBank, Building2, TrendingUp, Star,
-  Landmark, FileText, Settings, RefreshCcw, Plug, MessageSquare,
-  Plus, Search, Zap
+  Landmark, FileText, Settings, RefreshCcw, Plus, Search, Zap
 } from "lucide-react";
 
 const COMMAND_GROUPS = [
@@ -17,12 +16,10 @@ const COMMAND_GROUPS = [
       { key: "nav-budgets", label: "Budgets", icon: PiggyBank, to: "/budgets" },
       { key: "nav-reports", label: "Reports", icon: FileText, to: "/reports" },
       { key: "nav-subscriptions", label: "Subscriptions", icon: RefreshCcw, to: "/subscriptions" },
-      { key: "nav-connections", label: "Bank Connections", icon: Building2, to: "/connections" },
+      { key: "nav-import", label: "Bank & Statements", icon: Building2, to: "/import" },
       { key: "nav-investments", label: "Investments", icon: TrendingUp, to: "/investments" },
       { key: "nav-jewish", label: "Jewish Tools", icon: Star, to: "/jewish" },
       { key: "nav-uk", label: "UK Benefits", icon: Landmark, to: "/uk-tools" },
-      { key: "nav-sms", label: "SMS Finance", icon: MessageSquare, to: "/sms" },
-      { key: "nav-integrations", label: "Integrations", icon: Plug, to: "/integrations" },
       { key: "nav-settings", label: "Settings", icon: Settings, to: "/settings" },
     ]
   },

@@ -16,17 +16,14 @@ const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Transactions = lazy(() => import("./pages/Transactions"));
-const Budgets = lazy(() => import("./pages/BudgetSystem"));
-const Connections = lazy(() => import("./pages/Connections"));
+const Budgets = lazy(() => import("./pages/Budgets"));
+const BankStatements = lazy(() => import("./pages/BankStatements"));
 const Investments = lazy(() => import("./pages/Investments"));
 const Jewish = lazy(() => import("./pages/Jewish"));
 const UKTools = lazy(() => import("./pages/UKTools"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Settings = lazy(() => import("./pages/Settings"));
-const SMS = lazy(() => import("./pages/SMS"));
-const Statements = lazy(() => import("./pages/Statements"));
 const Subscriptions = lazy(() => import("./pages/Subscriptions"));
-const Integrations = lazy(() => import("./pages/Integrations"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
 const OnboardingWizard = lazy(() => import("./pages/OnboardingWizard"));
@@ -58,11 +55,8 @@ function AppRouter() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/transactions" element={<Transactions />} />
         <Route path="/budgets" element={<Budgets />} />
-        <Route path="/connections" element={<Connections />} />
         <Route path="/subscriptions" element={<Subscriptions />} />
-        <Route path="/sms" element={<SMS />} />
-        <Route path="/statements" element={<Statements />} />
-        <Route path="/integrations" element={<Integrations />} />
+        <Route path="/import" element={<BankStatements />} />
         <Route path="/investments" element={<Investments />} />
         <Route path="/jewish" element={<Jewish />} />
         <Route path="/uk-tools" element={<UKTools />} />

@@ -7,6 +7,7 @@ import { PageHeader, SectionCard } from "../components/ui/layout";
 import Skeleton from "../components/ui/Skeleton";
 
 export default function Statements() {
+  useEffect(() => { document.title = "Statements | FinanceAI"; }, []);
   const { user } = useAuth();
   const fileRef = useRef(null);
   const [busy, setBusy] = useState(false);

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { Plus, Edit2, Trash2, Loader2, Calendar, DollarSign, Tag, AlertCircle } from "lucide-react";
+import ConfirmModal from "./ui/ConfirmModal";
 
 /**
  * Recurring Transaction Manager
@@ -23,6 +24,7 @@ export default function RecurringTransactionManager() {
     is_income: false,
     enabled: true,
   });
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   const FREQUENCIES = [
     { value: "weekly", label: "Weekly" },
@@ -117,11 +119,10 @@ export default function RecurringTransactionManager() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete this recurring transaction?")) return;
-    
     try {
       await api.delete(`/transactions/recurring/${id}`);
       toast.success("Deleted");
+      setConfirmDelete(null);
       await loadRecurring();
     } catch {
       toast.error("Could not delete");
@@ -200,7 +201,7 @@ export default function RecurringTransactionManager() {
                   <Edit2 className="h-4 w-4" />
                 </button>
                 <button
-                  onClick={() => handleDelete(item.id)}
+                  onClick={() => setConfirmDelete(item.id)}
                   className="p-2 hover:bg-ruby/10 text-ruby/80 rounded transition"
                   aria-label="Delete recurring transaction"
                 >
@@ -212,7 +213,15 @@ export default function RecurringTransactionManager() {
         </div>
       )}
 
-      {/* Form Modal */}
+      {confirmDelete && (
+        <ConfirmModal
+          title="Delete recurring transaction"
+          message="This will permanently remove this recurring transaction."
+          onConfirm={() => handleDelete(confirmDelete)}
+          onCancel={() => setConfirmDelete(null)}
+        />
+      )}
+
       {showForm && (
         <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={() => !busy && setShowForm(false)}>
           <div className="page-shell p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>

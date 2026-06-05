@@ -2,14 +2,19 @@ import React, { useEffect, useState } from "react";
 import { api, API } from "../lib/api";
 import { getToken } from "../lib/storage";
 import { useAuth } from "../contexts/AuthContext";
-import { FileText, TrendingDown, TrendingUp, ShieldCheck, Download, Loader2, Lock, AlertCircle, Sparkles, Wallet } from "lucide-react";
+import { ShieldCheck, Download, Loader2, Lock, AlertCircle, Sparkles, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import AIInsightPanel from "../components/AIInsightPanel";
 import { PageHeader, SectionCard } from "../components/ui/layout";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "../components/ui/dropdown-menu";
 
 const ICONS = {
-  "trending-up": TrendingUp, "trending-down": TrendingDown,
-  alert: AlertCircle, sparkle: Sparkles, wallet: Wallet,
+  alert: AlertCircle, sparkle: Sparkles,
 };
 
 const GRADE_COLOURS = {
@@ -17,6 +22,7 @@ const GRADE_COLOURS = {
 };
 
 export default function Reports() {
+  useEffect(() => { document.title = "Reports | FinanceAI"; }, []);
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(null);
@@ -116,25 +122,28 @@ export default function Reports() {
               <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
                 className="h-10 px-3 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:outline-none" />
             </div>
-            {[
-              {kind: "monthly", label: "This month"},
-              {kind: "yearly", label: "This year"},
-              {kind: "full", label: "Full snapshot"},
-            ].map(({kind, label}) => (
-              <button key={kind} onClick={() => download(kind)} disabled={busy === kind} data-testid={`download-${kind}`}
-                className={`btn-pill h-11 px-4 text-sm ${isPremium ? "gradient-emerald text-white" : "border border-border bg-card/80 text-muted-foreground"} disabled:opacity-50`}>
-                {busy === kind ? <Loader2 className="h-4 w-4 animate-spin" /> : isPremium ? <Download className="h-4 w-4 mr-2"/> : <Lock className="h-4 w-4 mr-2"/>}
-                {label} PDF
-              </button>
-            ))}
-            {isPremium && [
-              {kind: "csv-monthly", label: "CSV"},
-            ].map(({kind, label}) => (
-              <button key={kind} onClick={() => downloadCsv()} disabled={busy === kind} className="btn-pill h-11 px-4 text-sm border border-border bg-card/80 text-muted-foreground disabled:opacity-50 hover:bg-secondary/60">
-                {busy === kind ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4 mr-2"/>}
-                {label}
-              </button>
-            ))}
+            <DropdownMenu>
+              <DropdownMenuTrigger className={`btn-pill h-11 px-4 text-sm ${isPremium ? "gradient-emerald text-white" : "border border-border bg-card/80 text-muted-foreground"}`}>
+                {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                Download <ChevronDown className="h-3.5 w-3.5 ml-1" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => download("monthly")} disabled={busy === "monthly"}>
+                  This month PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => download("yearly")} disabled={busy === "yearly"}>
+                  This year PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => download("full")} disabled={busy === "full"}>
+                  Full snapshot PDF
+                </DropdownMenuItem>
+                {isPremium && (
+                  <DropdownMenuItem onClick={() => downloadCsv()} disabled={busy === "csv-monthly"}>
+                    CSV export
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         }
       />
@@ -146,26 +155,21 @@ export default function Reports() {
         </div>
       )}
 
-      <div className="grid lg:grid-cols-3 gap-4">
-        <SectionCard className="lg:col-span-2" contentClassName="pt-0">
-          <div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald" /><p className="label-overline">Health score</p></div>
-          <div className="flex items-end gap-4 mt-4">
-            <p className="text-7xl tracking-tight font-light leading-none">{data.health_score}</p>
-            <p className="text-2xl tracking-tight text-muted-foreground mb-2">/ 100</p>
-          </div>
-          <div className="h-3 bg-secondary rounded-full mt-6 overflow-hidden">
-            <div className="h-full gradient-emerald" style={{width: `${data.health_score}%`}} />
-          </div>
-          <p className="text-sm text-muted-foreground mt-4 leading-relaxed">
-            Your savings rate is <span className="text-emerald font-medium">{data.savings_rate}%</span>. {data.savings_rate >= 20 ? "Excellent discipline." : data.savings_rate >= 10 ? "Solid — push for 20%." : "Tighten discretionary spend this month."}
-          </p>
-        </SectionCard>
-
-        <SectionCard contentClassName="space-y-4">
-          <ReportRow icon={TrendingDown} title="Top spend" value={topSpend ? `${topSpend.name} · £${topSpend.value.toFixed(0)}` : "—"} />
-          <ReportRow icon={FileText} title="Subscriptions" value={subs ? `£${subs.value.toFixed(2)} / mo` : "None detected"} />
-          <ReportRow icon={TrendingUp} title="Cash flow" value={`£${data.balance.toLocaleString()}`} />
-        </SectionCard>
+      <div className="rounded-2xl border border-border bg-card p-6">
+        <div className="flex items-center gap-3">
+          <ShieldCheck className="h-4 w-4 text-emerald" />
+          <p className="label-overline">Health score</p>
+          <span className="ml-auto text-3xl tracking-tight font-light">{data.health_score}<span className="text-sm text-muted-foreground">/100</span></span>
+        </div>
+        <div className="mt-4 h-2 bg-secondary rounded-full overflow-hidden">
+          <div className="h-full gradient-emerald" style={{width: `${data.health_score}%`}} />
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+          <span>Savings rate: <span className="text-emerald font-medium">{data.savings_rate}%</span></span>
+          <span>Top spend: <span className="font-medium">{topSpend ? `${topSpend.name} · £${topSpend.value.toFixed(0)}` : "—"}</span></span>
+          <span>Subscriptions: <span className="font-medium">{subs ? `£${subs.value.toFixed(2)}/mo` : "None detected"}</span></span>
+          <span>Cash flow: <span className="font-medium">£{data.balance.toLocaleString()}</span></span>
+        </div>
       </div>
 
       <SectionCard eyebrow="Savings" title="AI savings suggestions">
@@ -225,9 +229,4 @@ export default function Reports() {
   );
 }
 
-const ReportRow = ({icon: Icon, title, value}) => (
-  <div className="flex items-center gap-3">
-    <div className="w-10 h-10 rounded-xl bg-secondary grid place-items-center"><Icon className="h-4 w-4 text-emerald" /></div>
-    <div className="flex-1"><p className="label-overline">{title}</p><p className="text-sm font-medium mt-0.5">{value}</p></div>
-  </div>
-);
+

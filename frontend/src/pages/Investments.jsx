@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, Area, AreaChart } from "recharts";
-import { TrendingUp, Loader2, ArrowUpRight, ArrowDownRight, RefreshCw } from "lucide-react";
+import { TrendingUp, Loader2, ArrowUpRight, ArrowDownRight, RefreshCw, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import AIInsightPanel from "../components/AIInsightPanel";
 import { PageHeader } from "../components/ui/layout";
@@ -12,6 +12,7 @@ const STOCK_TICKERS = ["VUSA","VWRL","VUKE","IWDA","EQQQ","ISF","FTSE","SP500","
 const CHART_TOOLTIP_STYLE = { backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px" };
 
 export default function Investments() {
+  useEffect(() => { document.title = "Investments | FinanceAI"; }, []);
   const [form, setForm] = useState({ symbol: "VUSA", monthly_contribution: 500, years: 20, initial_value: 5000 });
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -20,6 +21,7 @@ export default function Investments() {
   const [pricesBusy, setPricesBusy] = useState(false);
   const [stocks, setStocks] = useState([]);
   const [stocksBusy, setStocksBusy] = useState(false);
+  const [priceTab, setPriceTab] = useState("crypto");
 
   const loadPrices = useCallback(async () => {
     setPricesBusy(true);
@@ -70,56 +72,55 @@ export default function Investments() {
 
       <div className="rounded-2xl border border-border bg-card p-6" data-testid="live-prices">
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2"><TrendingUp className="h-4 w-4 text-emerald" /><p className="label-overline">Live crypto prices</p></div>
-          <button onClick={loadPrices} disabled={pricesBusy} data-testid="prices-refresh" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 p-2 disabled:opacity-50">
-            {pricesBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Refresh
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-emerald" />
+            <div className="flex items-center gap-1 rounded-lg bg-secondary p-0.5">
+              <button onClick={() => setPriceTab("crypto")} className={`px-3 py-1 text-xs rounded-md transition-colors ${priceTab === "crypto" ? "bg-card font-medium shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Crypto</button>
+              <button onClick={() => setPriceTab("stocks")} className={`px-3 py-1 text-xs rounded-md transition-colors ${priceTab === "stocks" ? "bg-card font-medium shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>ETFs</button>
+            </div>
+          </div>
+          <button onClick={() => { loadPrices(); loadStocks(); }} disabled={pricesBusy || stocksBusy} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 p-2 disabled:opacity-50">
+            {(pricesBusy || stocksBusy) ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Refresh
             {priceTs && <span className="ml-1">· {new Date(priceTs * 1000).toLocaleTimeString()}</span>}
           </button>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {livePrices.map((p) => {
-            const up = (p.change_24h_pct || 0) >= 0;
-            return (
-              <button key={p.symbol} onClick={() => applyLivePrice(p)} data-testid={`price-${p.symbol}`}
-                className="rounded-xl border border-border bg-secondary/30 p-3 text-left hover:border-emerald transition-all">
-                <p className="text-xs text-muted-foreground">{p.symbol}</p>
-                <p className="text-lg tracking-tight font-medium mt-1">£{p.price?.toLocaleString(undefined,{maximumFractionDigits:2})}</p>
-                <p className={`text-xs mt-1 flex items-center gap-0.5 ${up ? "text-emerald" : "text-ruby"}`}>
-                  {up ? <ArrowUpRight className="h-3 w-3"/> : <ArrowDownRight className="h-3 w-3"/>}
-                  {Math.abs(p.change_24h_pct || 0).toFixed(2)}%
-                </p>
-              </button>
-            );
-          })}
-        </div>
-        <p className="text-xs text-muted-foreground mt-3">Tap any coin to use its live price as your initial investment value.</p>
-      </div>
-
-      <div className="rounded-2xl border border-border bg-card p-6" data-testid="live-stocks">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2"><TrendingUp className="h-4 w-4 text-topaz" /><p className="label-overline">Live ETFs & indices</p></div>
-          <button onClick={loadStocks} disabled={stocksBusy} data-testid="stocks-refresh" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 p-2 disabled:opacity-50">
-            {stocksBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Refresh
-          </button>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {stocks.map((p) => {
-            const up = (p.change_24h_pct || 0) >= 0;
-            const sym = p.currency === "USD" ? "$" : "£";
-            return (
-              <button key={p.symbol} onClick={() => applyLivePrice(p)} data-testid={`stock-${p.symbol}`}
-                className="rounded-xl border border-border bg-secondary/30 p-3 text-left hover:border-topaz transition-all">
-                <p className="text-xs text-muted-foreground truncate" title={p.long_name}>{p.long_name || p.symbol}</p>
-                <p className="text-lg tracking-tight font-medium mt-1">{sym}{p.price?.toLocaleString(undefined,{maximumFractionDigits:2})}</p>
-                <p className={`text-xs mt-1 flex items-center gap-0.5 ${up ? "text-emerald" : "text-ruby"}`}>
-                  {up ? <ArrowUpRight className="h-3 w-3"/> : <ArrowDownRight className="h-3 w-3"/>}
-                  {Math.abs(p.change_24h_pct || 0).toFixed(2)}%
-                </p>
-              </button>
-            );
-          })}
-        </div>
-        <p className="text-xs text-muted-foreground mt-3">Tap any ETF or index to set it as your forecast starting point.</p>
+        {priceTab === "crypto" ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {livePrices.map((p) => {
+              const up = (p.change_24h_pct || 0) >= 0;
+              return (
+                <button key={p.symbol} onClick={() => applyLivePrice(p)} data-testid={`price-${p.symbol}`}
+                  className="rounded-xl border border-border bg-secondary/30 p-3 text-left hover:border-emerald transition-all">
+                  <p className="text-xs text-muted-foreground">{p.symbol}</p>
+                  <p className="text-lg tracking-tight font-medium mt-1">£{p.price?.toLocaleString(undefined,{maximumFractionDigits:2})}</p>
+                  <p className={`text-xs mt-1 flex items-center gap-0.5 ${up ? "text-emerald" : "text-ruby"}`}>
+                    {up ? <ArrowUpRight className="h-3 w-3"/> : <ArrowDownRight className="h-3 w-3"/>}
+                    {Math.abs(p.change_24h_pct || 0).toFixed(2)}%
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {stocks.map((p) => {
+              const up = (p.change_24h_pct || 0) >= 0;
+              const sym = p.currency === "USD" ? "$" : "£";
+              return (
+                <button key={p.symbol} onClick={() => applyLivePrice(p)} data-testid={`stock-${p.symbol}`}
+                  className="rounded-xl border border-border bg-secondary/30 p-3 text-left hover:border-topaz transition-all">
+                  <p className="text-xs text-muted-foreground truncate" title={p.long_name}>{p.long_name || p.symbol}</p>
+                  <p className="text-lg tracking-tight font-medium mt-1">{sym}{p.price?.toLocaleString(undefined,{maximumFractionDigits:2})}</p>
+                  <p className={`text-xs mt-1 flex items-center gap-0.5 ${up ? "text-emerald" : "text-ruby"}`}>
+                    {up ? <ArrowUpRight className="h-3 w-3"/> : <ArrowDownRight className="h-3 w-3"/>}
+                    {Math.abs(p.change_24h_pct || 0).toFixed(2)}%
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground mt-3">Tap any asset to use its live price as your initial investment value.</p>
       </div>
 
       <form onSubmit={run} className="rounded-2xl border border-border bg-card p-6 grid grid-cols-2 lg:grid-cols-5 gap-4 items-end">

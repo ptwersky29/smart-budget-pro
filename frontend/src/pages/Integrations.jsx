@@ -15,7 +15,8 @@ const PROVIDERS = [
   { value: "gemini",    label: "Google Gemini",   models: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-pro"],                   url: "https://aistudio.google.com/apikey" },
 ];
 
-export default function Integrations() {
+export default function Integrations({ embedded }) {
+  useEffect(() => { if (!embedded) document.title = "Integrations | FinanceAI"; }, [embedded]);
   const navigate = useNavigate();
 
   // Twilio (per-user)
@@ -113,12 +114,14 @@ export default function Integrations() {
   const providerMeta = PROVIDERS.find(p => p.value === aiForm.provider) || PROVIDERS[0];
 
   return (
-    <div className="space-y-8" data-testid="integrations-root">
-      <PageHeader
-        eyebrow="System"
-        title="Connect everything in one place."
-        description="Wire up TrueLayer, Twilio, and AI providers in a layout that matches the rest of FinanceAI."
-      />
+    <div className="space-y-6" data-testid="integrations-root">
+      {!embedded && (
+        <PageHeader
+          eyebrow="System"
+          title="Connect everything in one place."
+          description="Wire up TrueLayer, Twilio, and AI providers in a layout that matches the rest of FinanceAI."
+        />
+      )}
 
       {/* AI Provider — bring your own key (works for free tier too) */}
       <Card icon={Sparkles} title="AI Provider"
@@ -179,12 +182,12 @@ export default function Integrations() {
         </div>
       </Card>
 
-      {/* TrueLayer — moved to /connections page for a clean end-user flow */}
+      {/* TrueLayer — moved to /import page for a clean end-user flow */}
       <LinkCard icon={Building2} title="TrueLayer (UK Open Banking)"
                 subtitle="Connect your bank to auto-sync transactions"
                 status={navigate ? "configured" : "info"}
                 statusLabel="Open"
-                href="/connections"
+                href="/import"
                 navigate={navigate}>
         <p className="text-sm text-muted-foreground">One-click bank connection. No client IDs or secrets needed — just authenticate with your bank. Transactions sync automatically.</p>
       </LinkCard>
@@ -245,7 +248,7 @@ export default function Integrations() {
                 subtitle="AI-powered bank SMS parsing"
                 status="configured"
                 statusLabel="Active"
-                href="/sms"
+                href="/settings"
                 navigate={navigate}>
         <p className="text-sm text-muted-foreground">Paste bank SMS texts to auto-parse transactions. Configure Twilio webhook for automatic SMS-to-transaction pipeline.</p>
       </LinkCard>

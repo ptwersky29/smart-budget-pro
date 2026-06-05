@@ -1,13 +1,21 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2, Pencil, RefreshCcw, Sparkles, Bell } from "lucide-react";
+import { Loader2, Plus, Trash2, Pencil, RefreshCcw, Sparkles, Bell, ChevronDown } from "lucide-react";
 import { EmptyState, PageHeader, SectionCard } from "../components/ui/layout";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "../components/ui/dropdown-menu";
 import Skeleton from "../components/ui/Skeleton";
+import RecurringTransactionManager from "../components/RecurringTransactionManager";
 
 const emptyForm = { name: "", amount: "", category: "", frequency: "monthly", merchant: "", notes: "" };
 
 export default function Subscriptions() {
+  useEffect(() => { document.title = "Subscriptions | FinanceAI"; }, []);
   const [subs, setSubs] = useState([]);
   const [detected, setDetected] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -94,35 +102,40 @@ export default function Subscriptions() {
         title="Subscriptions."
         description={`${subs.filter((s) => s.active).length} active — £${monthlyTotal.toFixed(2)} / mo`}
         actions={
-          <div className="flex gap-2">
-            <button onClick={detectRecurring} disabled={detecting} className="btn-pill border border-emerald text-emerald text-sm h-11 px-4 disabled:opacity-50">
-              {detecting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
-              Detect
-            </button>
-            <button onClick={openAdd} className="btn-pill gradient-emerald text-white text-sm h-11 px-5">
-              <Plus className="h-4 w-4 mr-2" /> Add
-            </button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="btn-pill gradient-emerald text-white text-sm h-11 px-5">
+              <Plus className="h-4 w-4 mr-2" /> Add <ChevronDown className="h-3.5 w-3.5 ml-1" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={openAdd}>
+                <Plus className="h-4 w-4 mr-2" /> Add manually
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={detectRecurring} disabled={detecting}>
+                {detecting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
+                Detect with AI
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         }
       />
 
-      {detected.length > 0 && (
-        <SectionCard eyebrow="AI Detected" title="Potential subscriptions found" contentClassName="p-0">
-          <div className="divide-y divide-border text-sm">
-            {detected.map((item, i) => (
-              <div key={i} className="px-6 py-3 flex items-center justify-between gap-3">
-                <div>
-                  <p className="font-medium">{item.normalized_merchant || item.description}</p>
-                  <p className="text-xs text-muted-foreground">£{item.amount.toFixed(2)} / {item.frequency} &middot; {item.occurrences} occurrences</p>
-                </div>
-                <button onClick={() => addFromDetected(item)} className="btn-pill border border-emerald text-emerald text-sm">Save</button>
-              </div>
-            ))}
-          </div>
-        </SectionCard>
-      )}
-
       <SectionCard eyebrow="Managed" title={`${subs.length} subscription${subs.length !== 1 ? "s" : ""}`}>
+        {detected.length > 0 && (
+          <div className="border-b border-border/50">
+            <div className="px-6 py-2 text-xs font-medium text-emerald">AI detected — review and save</div>
+            <div className="divide-y divide-border/40 text-sm">
+              {detected.map((item, i) => (
+                <div key={i} className="px-6 py-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{item.normalized_merchant || item.description}</p>
+                    <p className="text-xs text-muted-foreground">£{item.amount.toFixed(2)} / {item.frequency} &middot; {item.occurrences} occurrences</p>
+                  </div>
+                  <button onClick={() => addFromDetected(item)} className="btn-pill border border-emerald text-emerald text-xs">Save</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {loading ? (
           <div className="space-y-3 p-4">
             <Skeleton className="h-14" />
@@ -188,6 +201,10 @@ export default function Subscriptions() {
             </table>
           </div>
         </>)}
+      </SectionCard>
+
+      <SectionCard eyebrow="Automation" title="Recurring transactions">
+        <RecurringTransactionManager />
       </SectionCard>
 
       {open && (
