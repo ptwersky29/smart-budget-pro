@@ -46,7 +46,7 @@ export const MetricCard = React.memo(function MetricCard({ label, value, icon: I
         {Icon && <span className={`grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-full ${toneClasses}`}><Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></span>}
       </div>
       <p className="mt-2 sm:mt-3 text-xl sm:text-2xl lg:text-4xl tracking-tight font-semibold leading-none">{value}</p>
-      {detail && <p className="mt-1.5 sm:mt-2 text-xs text-muted-foreground leading-relaxed">{detail}</p>}
+      {detail && <div className="mt-1.5 sm:mt-2 text-xs text-muted-foreground leading-relaxed">{detail}</div>}
     </div>
   );
 });
