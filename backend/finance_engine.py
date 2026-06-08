@@ -409,12 +409,16 @@ class BudgetIn(BaseModel):
     category: str
     limit: float
     period: str = "monthly"
+    budget_type: str = "everyday"
+    event_date: Optional[str] = None
 
 
 class BudgetUpdate(BaseModel):
     category: Optional[str] = None
     limit: Optional[float] = None
     period: Optional[str] = None
+    budget_type: Optional[str] = None
+    event_date: Optional[str] = None
 
 
 
@@ -466,6 +470,8 @@ def _budget_to_dict(b: Budget) -> dict:
         "category": b.category,
         "limit": b.amount,
         "period": b.period,
+        "budget_type": b.budget_type or "everyday",
+        "event_date": b.event_date.isoformat() if b.event_date else None,
         "start_date": b.start_date.isoformat() if b.start_date else None,
         "end_date": b.end_date.isoformat() if b.end_date else None,
         "notes": b.notes,
@@ -2032,13 +2038,19 @@ Output ONLY valid JSON, no markdown, no explanation:
     # ── Budgets ──────────────────────────────────────────────────────
 
     @router.get("/budgets")
-    async def list_budgets(request: Request, user: dict = Depends(get_current_user)):
+    async def list_budgets(
+        request: Request,
+        user: dict = Depends(get_current_user),
+        type: str = Query(None, description="Filter: everyday | event"),
+    ):
         sm = request.app.state.db
         async with sm() as session:
-            result = await session.execute(
-                select(Budget).where(Budget.user_id == user["user_id"])
-            )
+            q = select(Budget).where(Budget.user_id == user["user_id"])
+            if type:
+                q = q.where(Budget.budget_type == type)
+            result = await session.execute(q)
             budgets = result.scalars().all()
+
             tx_result = await session.execute(
                 select(Transaction).where(Transaction.user_id == user["user_id"])
             )
@@ -2046,24 +2058,40 @@ Output ONLY valid JSON, no markdown, no explanation:
             result_list = []
             for b in budgets:
                 spent = sum(-t.amount for t in txs if t.amount < 0 and t.category == b.category)
-                result_list.append({
+                entry = {
                     **_budget_to_dict(b),
                     "spent": round(spent, 2),
                     "remaining": round(b.amount - spent, 2),
                     "progress_pct": round(min(100, (spent / b.amount * 100) if b.amount else 0), 1),
-                })
+                }
+                result_list.append(entry)
+
+            # Sort: everyday by category, events by date then category
+            result_list.sort(key=lambda x: (
+                x.get("event_date") or "9999",
+                x["category"],
+            ) if type == "event" else (x["category"],))
+
             return {"budgets": result_list}
 
     @router.post("/budgets")
     async def create_budget(payload: BudgetIn, request: Request, user: dict = Depends(get_current_user)):
         sm = request.app.state.db
         async with sm() as session:
+            event_date = None
+            if payload.event_date:
+                try:
+                    event_date = datetime.fromisoformat(payload.event_date)
+                except ValueError:
+                    raise HTTPException(400, "Invalid event_date format, use ISO 8601")
             b = Budget(
                 budget_id=f"bud_{uuid.uuid4().hex[:12]}",
                 user_id=user["user_id"],
                 category=payload.category.lower(),
                 amount=payload.limit,
                 period=payload.period,
+                budget_type=payload.budget_type,
+                event_date=event_date,
             )
             session.add(b)
             await session.commit()
@@ -2107,6 +2135,13 @@ Output ONLY valid JSON, no markdown, no explanation:
                 b.amount = payload.limit
             if payload.period is not None:
                 b.period = payload.period
+            if payload.budget_type is not None:
+                b.budget_type = payload.budget_type
+            if payload.event_date is not None:
+                try:
+                    b.event_date = datetime.fromisoformat(payload.event_date)
+                except ValueError:
+                    raise HTTPException(400, "Invalid event_date format, use ISO 8601")
             await session.commit()
             await session.refresh(b)
             return _budget_to_dict(b)

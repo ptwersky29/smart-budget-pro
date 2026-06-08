@@ -1,40 +1,36 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { format } from "date-fns";
+import { format, parseISO, isBefore, startOfMonth, endOfMonth } from "date-fns";
 import {
   RefreshCw, Wallet, ShoppingCart, Calendar, Plus, Trash2, Pencil,
-  Check, MoreHorizontal, PiggyBank, PlusCircle,
+  Check, X, PiggyBank, Target, TrendingDown, PlusCircle,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
-import { PageHeader, SectionCard, EmptyState, MetricCard } from "../components/ui/layout";
+import { PageHeader, SectionCard, MetricCard } from "../components/ui/layout";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import {
-  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
-} from "../components/ui/dropdown-menu";
-import {
-  Collapsible, CollapsibleTrigger, CollapsibleContent,
-} from "../components/ui/collapsible";
 import ConfirmModal from "../components/ui/ConfirmModal";
-import BudgetSummaryCards from "../components/BudgetSummaryCards";
-import BudgetAlertBar from "../components/BudgetAlertBar";
-import EverydaySpending from "../components/EverydaySpending";
-import PlannedEvents from "../components/PlannedEvents";
-import { useSwipe } from "../hooks/useSwipe";
 
 const TABS = [
   { value: "overview", label: "This Month", icon: Wallet },
-  { value: "spending", label: "Everyday Spending", icon: ShoppingCart },
+  { value: "everyday", label: "Everyday Spending", icon: ShoppingCart },
   { value: "events", label: "Planned Events", icon: Calendar },
 ];
 
-const CATEGORY_OPTIONS = [
+const CATEGORIES = [
   "groceries", "dining", "transport", "rent", "utilities",
   "subscriptions", "tzedakah", "health", "entertainment",
   "shopping", "insurance", "education", "gifts", "charity",
 ];
+
+function isThisMonth(dateStr) {
+  if (!dateStr) return false;
+  const d = parseISO(dateStr);
+  const now = new Date();
+  return d >= startOfMonth(now) && d <= endOfMonth(now);
+}
 
 export default React.memo(function BudgetPage() {
   const navigate = useNavigate();
@@ -42,142 +38,154 @@ export default React.memo(function BudgetPage() {
   const tabFromUrl = searchParams.get("tab") || "overview";
   const validTab = TABS.find((t) => t.value === tabFromUrl) ? tabFromUrl : "overview";
   const [activeTab, setActiveTab] = useState(validTab);
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [alerts, setAlerts] = useState([]);
-  const contentRef = useRef(null);
-
-  // Budget CRUD state
   const [budgets, setBudgets] = useState([]);
-  const [budgetsLoading, setBudgetsLoading] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ category: "", limit: "" });
+  const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+
+  // Add form state
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ category: "", limit: "", budget_type: "everyday", event_date: "" });
 
   const setTab = useCallback((tab) => {
     setActiveTab(tab);
     setSearchParams({ tab }, { replace: true });
   }, [setSearchParams]);
 
-  // Fetch this-month summary
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const now = new Date();
-      const month = format(now, "yyyy-MM");
-      const res = await api.get(`/budget-system/this-month?month=${month}`);
-      setData(res.data);
-      setAlerts(res.data.alerts || []);
-    } catch (err) {
-      toast.error("Failed to load budget data");
+      const { data } = await api.get("/budgets");
+      setBudgets(data.budgets || []);
+    } catch {
+      toast.error("Failed to load budgets");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Fetch budgets (simple category+limit model)
-  const fetchBudgets = useCallback(async () => {
-    setBudgetsLoading(true);
-    try {
-      const { data } = await api.get("/budgets");
-      setBudgets(data.budgets || []);
-    } catch {
-      // silent
-    } finally {
-      setBudgetsLoading(false);
-    }
-  }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  useEffect(() => { fetchData(); fetchBudgets(); }, [fetchData, fetchBudgets]);
+  // Budgets filtered by type
+  const everyday = useMemo(() => budgets.filter((b) => (b.budget_type || "everyday") === "everyday"), [budgets]);
+  const events = useMemo(() => budgets.filter((b) => b.budget_type === "event"), [budgets]);
+  const thisMonthEvents = useMemo(() => events.filter((b) => isThisMonth(b.event_date)), [events]);
+  const upcomingEvents = useMemo(() => events.filter((b) => b.event_date && !isThisMonth(b.event_date) && !isBefore(parseISO(b.event_date), new Date())), [events]);
 
-  // Budget CRUD handlers
+  const summary = useMemo(() => {
+    const totalPlanned = budgets.reduce((s, b) => s + (Number(b.limit) || 0), 0);
+    const totalSpent = budgets.reduce((s, b) => s + (Number(b.spent) || 0), 0);
+    const overCount = budgets.filter((b) => (b.progress_pct || 0) >= 100).length;
+    const adherence = totalPlanned > 0 ? Math.max(0, 1 - totalSpent / totalPlanned) * 100 : 100;
+    return { count: budgets.length, totalPlanned, totalSpent, overCount, adherence: Math.round(adherence * 10) / 10 };
+  }, [budgets]);
+
+  // CRUD
+  const resetForm = () => setForm({ category: "", limit: "", budget_type: "everyday", event_date: "" });
+
   const handleCreate = async (e) => {
     e.preventDefault();
-    if (!form.category.trim() || !form.limit) {
-      toast.error("Enter a category and limit");
-      return;
-    }
+    if (!form.category.trim() || !form.limit) { toast.error("Enter a category and amount"); return; }
     try {
-      await api.post("/budgets", {
+      const payload = {
         category: form.category.toLowerCase().trim(),
         limit: parseFloat(form.limit),
-      });
-      toast.success("Budget created");
-      setForm({ category: "", limit: "" });
+        budget_type: form.budget_type,
+      };
+      if (form.budget_type === "event" && form.event_date) payload.event_date = form.event_date;
+      await api.post("/budgets", payload);
+      toast.success(form.budget_type === "event" ? "Event created" : "Budget created");
+      resetForm();
       setShowForm(false);
-      await fetchBudgets();
-    } catch (err) {
-      toast.error(err.response?.data?.detail || "Could not create budget");
-    }
+      await fetchData();
+    } catch (err) { toast.error(err.response?.data?.detail || "Could not save"); }
   };
 
-  const startEdit = (budget) => {
-    setEditingId(budget.budget_id);
-    setForm({ category: budget.category, limit: String(budget.amount) });
+  const startEdit = (b) => {
+    setEditingId(b.budget_id);
+    setForm({
+      category: b.category,
+      limit: String(b.limit),
+      budget_type: b.budget_type || "everyday",
+      event_date: b.event_date ? b.event_date.slice(0, 10) : "",
+    });
   };
 
-  const cancelEdit = () => {
-    setEditingId(null);
-    setForm({ category: "", limit: "" });
-  };
+  const cancelEdit = () => { setEditingId(null); resetForm(); };
 
   const handleUpdate = async (id) => {
-    if (!form.category.trim() || !form.limit) {
-      toast.error("Enter a category and limit");
-      return;
-    }
+    if (!form.category.trim() || !form.limit) { toast.error("Enter a category and amount"); return; }
     try {
-      await api.patch(`/budgets/${id}`, {
-        category: form.category.toLowerCase().trim(),
-        limit: parseFloat(form.limit),
-      });
-      toast.success("Budget updated");
+      const payload = { category: form.category.toLowerCase().trim(), limit: parseFloat(form.limit) };
+      if (form.budget_type === "event") payload.event_date = form.event_date || null;
+      await api.patch(`/budgets/${id}`, payload);
+      toast.success("Updated");
       cancelEdit();
-      await fetchBudgets();
-    } catch {
-      toast.error("Could not update budget");
-    }
+      await fetchData();
+    } catch { toast.error("Could not update"); }
   };
 
   const handleDelete = async (id) => {
     try {
       await api.delete(`/budgets/${id}`);
-      toast.success("Budget removed");
+      toast.success("Removed");
       setConfirmDelete(null);
-      await fetchBudgets();
-    } catch {
-      toast.error("Could not delete budget");
-    }
+      await fetchData();
+    } catch { toast.error("Could not delete"); }
   };
 
-  const budgetSummary = useMemo(() => ({
-    totalLimit: budgets.reduce((s, b) => s + (Number(b.amount) || 0), 0),
-    totalSpent: budgets.reduce((s, b) => s + (Number(b.spent) || 0), 0),
-    overCount: budgets.filter((b) => (b.progress_pct || 0) >= 100).length,
-  }), [budgets]);
-
-  // Swipe for mobile tab navigation
-  const swipeHandlers = useSwipe(
-    () => { const idx = TABS.findIndex((t) => t.value === activeTab); if (idx < TABS.length - 1) setTab(TABS[idx + 1].value); },
-    () => { const idx = TABS.findIndex((t) => t.value === activeTab); if (idx > 0) setTab(TABS[idx - 1].value); },
-    50,
-  );
-
-  const dismissAlert = useCallback((idx) => {
-    setAlerts((prev) => prev.filter((_, i) => i !== idx));
-  }, []);
+  // Render a single budget row
+  const renderBudget = (b, showDate = false) => {
+    const over = (b.progress_pct || 0) >= 100;
+    const isEditing = editingId === b.budget_id;
+    return (
+      <div key={b.budget_id} className="rounded-xl border border-border bg-card/50 p-3 sm:p-4">
+        {isEditing ? (
+          <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+            <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="flex-1" />
+            <Input type="number" step="0.01" value={form.limit} onChange={(e) => setForm({ ...form, limit: e.target.value })} className="w-full sm:w-28" />
+            {showDate && <Input type="date" value={form.event_date} onChange={(e) => setForm({ ...form, event_date: e.target.value })} className="w-full sm:w-36" />}
+            <div className="flex gap-1 shrink-0">
+              <button onClick={() => handleUpdate(b.budget_id)} className="h-8 w-8 rounded-lg bg-emerald text-white grid place-items-center"><Check className="h-3.5 w-3.5" /></button>
+              <button onClick={cancelEdit} className="h-8 w-8 rounded-lg border border-border grid place-items-center text-muted-foreground"><X className="h-3.5 w-3.5" /></button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-sm font-medium capitalize truncate">{b.category}</span>
+                {showDate && b.event_date && <span className="text-xs text-muted-foreground shrink-0">{format(parseISO(b.event_date), "d MMM")}</span>}
+                {over && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-ruby/10 text-ruby shrink-0">Over</span>}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs tabular-nums text-muted-foreground">£{b.spent} / £{b.limit}</span>
+                <button onClick={() => startEdit(b)} className="p-1 rounded hover:bg-secondary text-muted-foreground"><Pencil className="h-3 w-3" /></button>
+                <button onClick={() => setConfirmDelete(b.budget_id)} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-ruby"><Trash2 className="h-3 w-3" /></button>
+              </div>
+            </div>
+            <div className="mt-1.5 h-2 rounded-full bg-muted/50 overflow-hidden">
+              <div className={`h-full rounded-full transition-all ${over ? "bg-ruby" : "bg-emerald"}`} style={{ width: `${Math.min(100, b.progress_pct || 0)}%` }} />
+            </div>
+            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+              <span>£{(b.spent || 0).toFixed(2)} spent</span>
+              <span>£{Math.max(0, b.remaining || 0).toFixed(2)} remaining</span>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Finance"
         title="Budgets"
-        description="Track spending, plan ahead, and stay in control."
+        description="Set spending limits and track where your money goes."
         actions={
-          <Button variant="outline" size="sm" onClick={() => { fetchData(); fetchBudgets(); }} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? "animate-spin" : ""}`} />
-            Refresh
+          <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
         }
       />
@@ -194,164 +202,147 @@ export default React.memo(function BudgetPage() {
           </TabsList>
         </div>
 
-        <div ref={contentRef} {...swipeHandlers} className="min-h-[300px]">
+        {/* ═══ THIS MONTH ═══ */}
+        <TabsContent value="overview" className="space-y-6 mt-0">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <MetricCard label="Budgets" value={String(summary.count)} icon={Wallet} tone="emerald" detail="Active budgets" />
+            <MetricCard label="Total Planned" value={`£${summary.totalPlanned.toLocaleString()}`} icon={Target} tone="topaz" detail="Monthly limit" />
+            <MetricCard label="Spent" value={`£${summary.totalSpent.toLocaleString()}`} icon={TrendingDown} tone="ruby" detail={`${summary.overCount > 0 ? `${summary.overCount} over budget` : "On track"}`} />
+            <MetricCard label="Adherence" value={`${summary.adherence}%`} icon={PiggyBank} tone={summary.adherence >= 80 ? "emerald" : summary.adherence >= 50 ? "topaz" : "ruby"} detail="Overall" />
+          </div>
 
-          {/* ═══ THIS MONTH ═══ */}
-          <TabsContent value="overview" className="space-y-6 mt-0">
-            <BudgetSummaryCards data={data} loading={loading} />
-            <BudgetAlertBar alerts={alerts} onDismiss={dismissAlert} />
+          <SectionCard title="Quick Actions" description="Common tasks">
+            <div className="flex flex-wrap gap-3">
+              <Button variant="outline" size="sm" onClick={() => { setTab("everyday"); setShowForm(true); }}>
+                <ShoppingCart className="h-4 w-4 mr-1.5" /> Add everyday budget
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => { setTab("events"); setShowForm(true); }}>
+                <Calendar className="h-4 w-4 mr-1.5" /> Add planned event
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => navigate("/transactions")}>
+                <Plus className="h-4 w-4 mr-1.5" /> Add transaction
+              </Button>
+            </div>
+          </SectionCard>
 
-            {/* Budget management section */}
-            <SectionCard title="My Budgets" description="Set spending limits per category.">
-              {/* Budget summary */}
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                <div className="rounded-xl bg-card border border-border p-3">
-                  <p className="label-overline">Categories</p>
-                  <p className="text-lg font-semibold mt-1">{budgets.length}</p>
-                </div>
-                <div className="rounded-xl bg-card border border-border p-3">
-                  <p className="label-overline">Total limit</p>
-                  <p className="text-lg font-semibold mt-1">£{budgetSummary.totalLimit.toLocaleString()}</p>
-                </div>
-                <div className="rounded-xl bg-card border border-border p-3">
-                  <p className="label-overline">Over budget</p>
-                  <p className={`text-lg font-semibold mt-1 ${budgetSummary.overCount > 0 ? "text-ruby" : ""}`}>{budgetSummary.overCount}</p>
-                </div>
+          {everyday.length > 0 && (
+            <SectionCard eyebrow="Overview" title="Everyday Budgets" description="Quick glance at your spending limits.">
+              <div className="space-y-2">
+                {everyday.slice(0, 5).map((b) => renderBudget(b))}
+                {everyday.length > 5 && <p className="text-xs text-muted-foreground text-center pt-1">+{everyday.length - 5} more</p>}
               </div>
-
-              {/* Create budget form */}
-              <Collapsible open={showForm} onOpenChange={setShowForm} className="border border-border rounded-xl mb-3">
-                <CollapsibleTrigger asChild>
-                  <button className="w-full flex items-center justify-between p-3 text-left">
-                    <span className="text-sm font-medium flex items-center gap-2">
-                      <PlusCircle className="h-4 w-4 text-emerald" />
-                      Add a budget
-                    </span>
-                    <span className="text-xs text-muted-foreground">{showForm ? "Hide" : "Show"}</span>
-                  </button>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="px-3 pb-3 border-t border-border pt-3">
-                    <form onSubmit={handleCreate} className="flex flex-col sm:flex-row gap-2">
-                      <div className="flex-1">
-                        <Input list="budget-cats" placeholder="Category (e.g. groceries)" value={form.category}
-                          onChange={(e) => setForm({ ...form, category: e.target.value })} required />
-                        <datalist id="budget-cats">
-                          {CATEGORY_OPTIONS.map((c) => <option key={c} value={c} />)}
-                        </datalist>
-                      </div>
-                      <div className="w-full sm:w-32">
-                        <Input type="number" step="0.01" min="0" placeholder="Limit £" value={form.limit}
-                          onChange={(e) => setForm({ ...form, limit: e.target.value })} required />
-                      </div>
-                      <Button type="submit" variant="primary" size="pill">
-                        <Plus className="h-4 w-4" /> Add
-                      </Button>
-                    </form>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-
-              {/* Budget list */}
-              {budgetsLoading ? (
-                <div className="space-y-2">{[...Array(3)].map((_, i) => <div key={i} className="h-16 rounded-xl bg-muted/50 animate-pulse" />)}</div>
-              ) : budgets.length === 0 ? (
-                <EmptyState icon={PiggyBank} title="No budgets" description="Add a budget above to start tracking." className="py-6" />
-              ) : (
-                <div className="space-y-2">
-                  {budgets.map((b) => {
-                    const over = (b.progress_pct || 0) >= 100;
-                    const isEditing = editingId === b.budget_id;
-                    return (
-                      <div key={b.budget_id} className="rounded-xl border border-border bg-card/50 p-3">
-                        {isEditing ? (
-                          <div className="flex flex-col sm:flex-row gap-2">
-                            <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="flex-1" />
-                            <Input type="number" value={form.limit} onChange={(e) => setForm({ ...form, limit: e.target.value })} className="w-full sm:w-24" />
-                            <div className="flex gap-1">
-                              <button onClick={() => handleUpdate(b.budget_id)} className="px-3 py-1.5 rounded-lg bg-emerald text-white text-xs font-medium"><Check className="h-3 w-3" /></button>
-                              <button onClick={cancelEdit} className="px-3 py-1.5 rounded-lg border border-border text-xs">Cancel</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium capitalize truncate">{b.category}</span>
-                                {over && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-ruby/10 text-ruby">Over</span>}
-                              </div>
-                              <div className="mt-1.5">
-                                <div className="h-2 rounded-full bg-muted/50 overflow-hidden">
-                                  <div className={`h-full rounded-full transition-all ${over ? "bg-ruby" : "bg-emerald"}`}
-                                    style={{ width: `${Math.min(100, b.progress_pct || 0)}%` }} />
-                                </div>
-                              </div>
-                              <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                                <span>£{(b.spent || 0).toFixed(0)} spent</span>
-                                <span>£{(b.remaining || 0).toFixed(0)} left of £{b.amount}</span>
-                              </div>
-                            </div>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger className="p-1.5 ml-2 rounded-lg hover:bg-secondary text-muted-foreground">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => startEdit(b)}><Pencil className="h-4 w-4 mr-2" /> Edit</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setConfirmDelete(b.budget_id)} className="text-ruby"><Trash2 className="h-4 w-4 mr-2" /> Delete</DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
             </SectionCard>
+          )}
+        </TabsContent>
 
-            {/* Quick actions */}
-            {!loading && data && (
-              <SectionCard title="Quick Actions" description="Common tasks">
-                <div className="flex flex-wrap gap-3">
-                  <Button variant="outline" size="sm" onClick={() => setTab("spending")}>
-                    <ShoppingCart className="h-4 w-4 mr-1.5" /> View spending
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setTab("events")}>
-                    <Calendar className="h-4 w-4 mr-1.5" /> View events
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => navigate("/transactions")}>
-                    <Plus className="h-4 w-4 mr-1.5" /> Add transaction
-                  </Button>
+        {/* ═══ EVERYDAY SPENDING ═══ */}
+        <TabsContent value="everyday" className="space-y-6 mt-0">
+          <SectionCard
+            eyebrow="Everyday"
+            title="Spending Limits"
+            description="Budgets for regular monthly spending categories."
+            actions={
+              <Button variant="chip" size="sm" onClick={() => setShowForm(!showForm)}>
+                <PlusCircle className="h-3.5 w-3.5 mr-1" /> {showForm ? "Close" : "Add"}
+              </Button>
+            }
+          >
+            {showForm && (
+              <form onSubmit={handleCreate} className="mb-4 flex flex-col sm:flex-row gap-2 p-3 rounded-xl border border-emerald/20 bg-emerald/5">
+                <input type="hidden" name="budget_type" value="everyday" />
+                <div className="flex-1">
+                  <Input list="cats-everyday" placeholder="Category" value={form.category}
+                    onChange={(e) => setForm({ ...form, category: e.target.value, budget_type: "everyday" })} required />
+                  <datalist id="cats-everyday">{CATEGORIES.map((c) => <option key={c} value={c} />)}</datalist>
                 </div>
-              </SectionCard>
+                <Input type="number" step="0.01" min="0" placeholder="Monthly limit £" value={form.limit}
+                  onChange={(e) => setForm({ ...form, limit: e.target.value })} required className="w-full sm:w-36" />
+                <Button type="submit" variant="primary" size="pill"><Plus className="h-4 w-4" /> Add</Button>
+              </form>
             )}
-          </TabsContent>
 
-          {/* ═══ EVERYDAY SPENDING ═══ */}
-          <TabsContent value="spending" className="space-y-6 mt-0">
-            <SectionCard eyebrow="Everyday" title="Spending Categories" description="Day-to-day budget categories and progress.">
-              <EverydaySpending data={data?.everyday_spending} loading={loading} />
-            </SectionCard>
-          </TabsContent>
+            {loading ? (
+              <div className="space-y-2">{[...Array(3)].map((_, i) => <div key={i} className="h-16 rounded-xl bg-muted/50 animate-pulse" />)}</div>
+            ) : everyday.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <p className="text-sm">No everyday budgets yet.</p>
+                <p className="text-xs mt-1">Click "Add" above to create your first spending limit.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">{everyday.map((b) => renderBudget(b))}</div>
+            )}
+          </SectionCard>
+        </TabsContent>
 
-          {/* ═══ PLANNED EVENTS ═══ */}
-          <TabsContent value="events" className="space-y-6 mt-0">
-            <SectionCard eyebrow="Planned" title="Events & Occasions" description="Holidays, simchas, and other planned expenses.">
-              <PlannedEvents data={data?.events} loading={loading} />
-            </SectionCard>
-          </TabsContent>
+        {/* ═══ PLANNED EVENTS ═══ */}
+        <TabsContent value="events" className="space-y-6 mt-0">
+          <SectionCard
+            eyebrow="Events"
+            title="Planned Events & Occasions"
+            description="One-time budgets for holidays, simchas, and other events."
+            actions={
+              <Button variant="chip" size="sm" onClick={() => setShowForm(!showForm)}>
+                <PlusCircle className="h-3.5 w-3.5 mr-1" /> {showForm ? "Close" : "Add event"}
+              </Button>
+            }
+          >
+            {showForm && (
+              <form onSubmit={handleCreate} className="mb-4 flex flex-col sm:flex-row gap-2 p-3 rounded-xl border border-topaz/20 bg-topaz/5">
+                <input type="hidden" name="budget_type" value="event" />
+                <div className="flex-1">
+                  <Input placeholder="Event name" value={form.category}
+                    onChange={(e) => setForm({ ...form, category: e.target.value, budget_type: "event" })} required />
+                </div>
+                <Input type="number" step="0.01" min="0" placeholder="Budget £" value={form.limit}
+                  onChange={(e) => setForm({ ...form, limit: e.target.value })} required className="w-full sm:w-32" />
+                <Input type="date" value={form.event_date}
+                  onChange={(e) => setForm({ ...form, event_date: e.target.value })} className="w-full sm:w-36" />
+                <Button type="submit" variant="primary" size="pill"><Plus className="h-4 w-4" /> Add</Button>
+              </form>
+            )}
 
-        </div>
+            {loading ? (
+              <div className="space-y-2">{[...Array(3)].map((_, i) => <div key={i} className="h-16 rounded-xl bg-muted/50 animate-pulse" />)}</div>
+            ) : events.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <p className="text-sm">No planned events yet.</p>
+                <p className="text-xs mt-1">Add a holiday, simcha, or other one-time expense above.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {thisMonthEvents.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                      <Calendar className="h-3.5 w-3.5" /> This Month
+                    </h3>
+                    <div className="space-y-2">{thisMonthEvents.map((b) => renderBudget(b, true))}</div>
+                  </div>
+                )}
+                {upcomingEvents.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                      <Calendar className="h-3.5 w-3.5" /> Upcoming
+                    </h3>
+                    <div className="space-y-2">{upcomingEvents.sort((a, b) => (a.event_date || "").localeCompare(b.event_date || "")).map((b) => renderBudget(b, true))}</div>
+                  </div>
+                )}
+                {thisMonthEvents.length === 0 && upcomingEvents.length === 0 && events.length > 0 && (
+                  <div className="space-y-2">{events.map((b) => renderBudget(b, true))}</div>
+                )}
+              </div>
+            )}
+          </SectionCard>
+        </TabsContent>
       </Tabs>
 
-      {confirmDelete && (
-        <ConfirmModal
-          title="Remove budget?"
-          message="This will permanently delete this budget."
-          onConfirm={() => handleDelete(confirmDelete)}
-          onCancel={() => setConfirmDelete(null)}
-        />
-      )}
+      <ConfirmModal
+        open={!!confirmDelete}
+        title="Remove this budget?"
+        message="This will permanently delete this budget item."
+        confirmLabel="Yes, remove"
+        onConfirm={() => handleDelete(confirmDelete)}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 });

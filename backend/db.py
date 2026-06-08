@@ -69,6 +69,8 @@ async def create_tables():
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_marketing BOOLEAN DEFAULT FALSE"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN DEFAULT FALSE"))
+            await conn.execute(text("ALTER TABLE budgets ADD COLUMN IF NOT EXISTS budget_type VARCHAR(16) DEFAULT 'everyday'"))
+            await conn.execute(text("ALTER TABLE budgets ADD COLUMN IF NOT EXISTS event_date TIMESTAMPTZ"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS app_language VARCHAR(8) DEFAULT 'en'"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS app_theme VARCHAR(16) DEFAULT 'system'"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS app_currency VARCHAR(4) DEFAULT 'GBP'"))
@@ -403,6 +405,8 @@ class Budget(Base, TimestampMixin):
     start_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     end_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    budget_type: Mapped[str] = mapped_column(String(16), default="everyday")  # "everyday" | "event"
+    event_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         Index("idx_budgets_user_category", "user_id", "category"),
