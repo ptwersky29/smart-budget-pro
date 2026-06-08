@@ -1,4 +1,5 @@
-"""Phase 9 — User-facing app settings: language, theme, currency."""
+"""User-facing app settings: language, theme, currency, preferences, and more."""
+import copy
 import logging
 from typing import Optional
 
@@ -11,17 +12,47 @@ from auth import get_current_user
 
 logger = logging.getLogger("app_settings")
 
+# ── Default preferences JSON ─────────────────────────────────────────────
+DEFAULT_PREFERENCES = {
+    "appearance": {"density": "comfortable", "font_size": "medium"},
+    "dashboard": {
+        "layout": "default",
+        "widgets": ["overview", "recent_transactions", "budget_summary", "ai_insights", "spending_chart", "upcoming_events"],
+    },
+    "automation": {"ai_enabled": True, "auto_categorize": True, "predict_budget": True},
+    "notifications": {
+        "email_alerts": True,
+        "push_alerts": True,
+        "sms_alerts": False,
+        "budget_reminders": True,
+        "weekly_report": True,
+        "spending_alerts": True,
+    },
+    "accessibility": {"high_contrast": False, "font_scaling": 100, "keyboard_navigation": True, "reduce_motion": False},
+}
+
 
 class AppSettingsIn(BaseModel):
     language: Optional[str] = Field(None, max_length=8)
     theme: Optional[str] = Field(None, max_length=16)
     currency: Optional[str] = Field(None, max_length=4)
     onboarding_completed: Optional[bool] = None
+    preferences: Optional[dict] = None  # partial deep-merge into stored JSON
 
 
 VALID_LANGUAGES = {"en", "he", "yi", "fr"}
 VALID_THEMES = {"light", "dark", "system"}
 VALID_CURRENCIES = {"GBP", "USD", "EUR", "ILS"}
+
+
+def _deep_merge(base: dict, overlay: dict) -> dict:
+    """Recursively merge overlay into base (mutates base)."""
+    for key, value in overlay.items():
+        if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+            _deep_merge(base[key], value)
+        else:
+            base[key] = value
+    return base
 
 
 def build_router() -> APIRouter:
@@ -34,11 +65,14 @@ def build_router() -> APIRouter:
             u = (await session.execute(select(User).where(User.user_id == user["user_id"]))).scalar_one_or_none()
             if not u:
                 raise HTTPException(404, "User not found")
+            stored = copy.deepcopy(u.preferences) if u.preferences else {}
+            merged = _deep_merge(copy.deepcopy(DEFAULT_PREFERENCES), stored)
             return {
                 "language": u.app_language or "en",
                 "theme": u.app_theme or "system",
                 "currency": u.app_currency or "GBP",
                 "onboarding_completed": u.onboarding_completed,
+                "preferences": merged,
             }
 
     @router.put("/app")
@@ -62,13 +96,20 @@ def build_router() -> APIRouter:
                 u.app_currency = payload.currency
             if payload.onboarding_completed is not None:
                 u.onboarding_completed = payload.onboarding_completed
+            if payload.preferences is not None:
+                stored = copy.deepcopy(u.preferences) if u.preferences else {}
+                merged = _deep_merge(stored, payload.preferences)
+                u.preferences = merged
             await session.commit()
+            stored = copy.deepcopy(u.preferences) if u.preferences else {}
+            merged = _deep_merge(copy.deepcopy(DEFAULT_PREFERENCES), stored)
             return {
                 "status": "updated",
                 "language": u.app_language,
                 "theme": u.app_theme,
                 "currency": u.app_currency,
                 "onboarding_completed": u.onboarding_completed,
+                "preferences": merged,
             }
 
     @router.get("/health")

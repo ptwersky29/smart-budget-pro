@@ -11,19 +11,33 @@ from sqlalchemy import select, func, and_
 
 from db import (
     BudgetOccasion, BudgetOccasionCategory, AISuggestion,
-    Transaction, HolidayBudget, RecurringTransaction, get_session_maker,
+    Transaction, HolidayBudget, RecurringTransaction, CategoryRule,
+    get_session_maker,
 )
 from auth import get_current_user
 from llm import call_llm, track_ai_usage, parse_json
 from security import sanitize_input
+from statements import CATEGORY_HIERARCHY, SECTION_FOR_CATEGORY
+
+# Build a flat list of all valid category names for the LLM prompt
+_ALL_CATEGORY_SECTIONS_STR = "\n".join(
+    f"{section}: {', '.join(name for name, _ in items)}"
+    for section, items in CATEGORY_HIERARCHY.items()
+)
 
 logger = logging.getLogger("budget_system")
 
 FREE_TIER_DAILY_LIMIT = 5
 
 DEFAULT_DAY_TO_DAY_CATEGORIES = [
-    "groceries", "household", "fuel", "school", "utilities", "transport",
-    "dining", "health", "entertainment", "clothing", "personal", "other",
+    "groceries", "dining", "transport", "fuel", "parking", "utilities",
+    "electricity", "gas", "water", "internet", "phone", "council_tax",
+    "household", "cleaning", "laundry", "home_improvement", "clothing",
+    "health", "medical", "dental", "pharmacy", "gym",
+    "shopping", "entertainment", "subscriptions",
+    "education", "school_fees", "childcare",
+    "tzedakah", "maaser", "shul_donations",
+    "insurance", "investments", "personal",
 ]
 
 
@@ -90,11 +104,13 @@ class ClassifyIn(BaseModel):
 
 class ApproveIn(BaseModel):
     suggestion_id: Optional[int] = None
+    suggestion_index: Optional[int] = None  # which suggestion from the array was chosen (0-3)
     description: str
     amount: float
     budget_type: str
     occasion: str
     category: str
+    merchant: Optional[str] = None
     date: Optional[str] = None
     save_as_recurring: Optional[bool] = False
 
@@ -407,6 +423,169 @@ def build_router() -> APIRouter:
                 "ai_forecast": None,
             }
 
+    # ── THIS MONTH (unified summary for the new budget page) ────────────
+
+    @router.get("/this-month")
+    async def this_month(
+        request: Request,
+        month: str = Query(None, description="YYYY-MM, defaults to current"),
+        user: dict = Depends(get_current_user),
+    ):
+        sm = request.app.state.db
+        async with sm() as session:
+            start_dt, end_dt = _month_start_end(month) if month else _current_month_range()
+            days_in_month = (end_dt - start_dt).days + 1
+            day_of_month = (datetime.now(timezone.utc).day)
+            fraction_elapsed = min(day_of_month / days_in_month, 1.0)
+
+            # 1. Transaction totals
+            tx_result = await session.execute(
+                select(
+                    func.coalesce(func.sum(Transaction.amount).filter(Transaction.amount > 0), 0),
+                    func.coalesce(func.sum(Transaction.amount).filter(Transaction.amount < 0), 0),
+                ).where(
+                    Transaction.user_id == user["user_id"],
+                    Transaction.date >= start_dt,
+                    Transaction.date <= end_dt,
+                )
+            )
+            income_total, expense_total = tx_result.one()
+            expense_total = abs(expense_total)
+
+            # 2. Day-to-day budget categories
+            d2d_result = await session.execute(
+                select(BudgetOccasion).where(
+                    BudgetOccasion.user_id == user["user_id"],
+                    BudgetOccasion.budget_type == "day_to_day",
+                    BudgetOccasion.status == "approved",
+                ).order_by(BudgetOccasion.sort_order)
+            )
+            day_categories = []
+            total_budgeted = 0
+            total_actual = 0
+            for occ in d2d_result.scalars().all():
+                cat_result = await session.execute(
+                    select(BudgetOccasionCategory).where(BudgetOccasionCategory.occasion_id == occ.id)
+                )
+                for cat in cat_result.scalars().all():
+                    total_budgeted += cat.budgeted_amount
+                    total_actual += cat.actual_amount
+                    day_categories.append({
+                        "id": cat.id,
+                        "name": cat.name,
+                        "budgeted": round(cat.budgeted_amount, 2),
+                        "actual": round(cat.actual_amount, 2),
+                        "forecast": round(cat.forecast_amount, 2),
+                        "remaining": round(cat.budgeted_amount - cat.actual_amount, 2),
+                        "overspent": cat.actual_amount > cat.budgeted_amount,
+                    })
+
+            # 3. Active planned events this month
+            event_result = await session.execute(
+                select(BudgetOccasion).where(
+                    BudgetOccasion.user_id == user["user_id"],
+                    BudgetOccasion.budget_type.in_(["yom_tov", "holiday", "simcha", "other"]),
+                    BudgetOccasion.status == "approved",
+                    BudgetOccasion.event_date >= start_dt,
+                    BudgetOccasion.event_date <= end_dt,
+                ).order_by(BudgetOccasion.event_date)
+            )
+            events = []
+            total_event_budgeted = 0
+            total_event_actual = 0
+            for ev in event_result.scalars().all():
+                cat_result = await session.execute(
+                    select(BudgetOccasionCategory).where(BudgetOccasionCategory.occasion_id == ev.id)
+                )
+                cats = cat_result.scalars().all()
+                events.append({
+                    "id": ev.id,
+                    "name": ev.name,
+                    "type": ev.budget_type,
+                    "date": ev.event_date.isoformat() if ev.event_date else None,
+                    "estimated_amount": round(ev.estimated_amount, 2),
+                    "notes": ev.notes,
+                    "categories": [{
+                        "name": c.name,
+                        "budgeted": round(c.budgeted_amount, 2),
+                        "actual": round(c.actual_amount, 2),
+                    } for c in cats],
+                })
+                total_event_budgeted += ev.estimated_amount
+                total_event_actual += sum(c.actual_amount for c in cats)
+
+            # 4. Upcoming events in next 60 days
+            upcoming_end = end_dt + timedelta(days=60)
+            upcoming_result = await session.execute(
+                select(BudgetOccasion).where(
+                    BudgetOccasion.user_id == user["user_id"],
+                    BudgetOccasion.status == "approved",
+                    BudgetOccasion.event_date > end_dt,
+                    BudgetOccasion.event_date <= upcoming_end,
+                ).order_by(BudgetOccasion.event_date)
+            )
+            upcoming_events = []
+            for ev in upcoming_result.scalars().all():
+                upcoming_events.append({
+                    "id": ev.id,
+                    "name": ev.name,
+                    "type": ev.budget_type,
+                    "date": ev.event_date.isoformat() if ev.event_date else None,
+                    "estimated_amount": round(ev.estimated_amount, 2),
+                    "days_away": (ev.event_date - end_dt).days if ev.event_date else None,
+                })
+
+            # 5. Alerts
+            alerts = []
+            for cat in day_categories:
+                if cat["overspent"]:
+                    alerts.append({
+                        "type": "overspend",
+                        "severity": "warning",
+                        "message": f"{cat['name']} overspent by £{abs(cat['remaining']):.0f}",
+                        "category": cat["name"],
+                    })
+                elif cat["actual"] > cat["budgeted"] * 0.85:
+                    alerts.append({
+                        "type": "near_limit",
+                        "severity": "info",
+                        "message": f"{cat['name']} at {cat['actual']}/{cat['budgeted']}",
+                        "category": cat["name"],
+                    })
+
+            # 6. Income-based projection
+            predicted_eom_expense = expense_total / fraction_elapsed if fraction_elapsed > 0 else expense_total
+            projected_balance = income_total - predicted_eom_expense
+
+            return {
+                "month": start_dt.strftime("%Y-%m"),
+                "summary": {
+                    "budgeted": round(total_budgeted + total_event_budgeted, 2),
+                    "spent": round(expense_total + total_event_actual, 2),
+                    "remaining": round((total_budgeted + total_event_budgeted) - (expense_total + total_event_actual), 2),
+                    "income": round(income_total, 2),
+                    "predicted_eom": round(projected_balance, 2),
+                    "budget_adherence": round(max(0, 1 - (expense_total / total_budgeted)) * 100, 1) if total_budgeted > 0 else 100,
+                },
+                "everyday_spending": {
+                    "categories": day_categories,
+                    "totals": {
+                        "budgeted": round(total_budgeted, 2),
+                        "actual": round(total_actual, 2),
+                        "remaining": round(total_budgeted - total_actual, 2),
+                    },
+                },
+                "events": {
+                    "this_month": events,
+                    "upcoming": upcoming_events,
+                    "totals": {
+                        "budgeted": round(total_event_budgeted, 2),
+                        "actual": round(total_event_actual, 2),
+                    },
+                },
+                "alerts": alerts,
+            }
+
     # ── DAY-TO-DAY ───────────────────────────────────────────────────────
 
     @router.get("/day-to-day")
@@ -585,6 +764,77 @@ def build_router() -> APIRouter:
             return {"predictions": predictions}
 
     # ── CLASSIFY ──────────────────────────────────────────────────────────
+    # Returns 4 ranked suggestions. Historical rules take priority before LLM.
+
+    async def _lookup_historical_suggestions(session, user_id: str, description: str) -> list[dict]:
+        """Check CategoryRule for known merchant→category mappings.
+        Returns up to 3 suggestions sorted by match_count desc."""
+        text = (description or "").lower().strip()
+        words = text.split()
+        merchant = None
+        # Heuristic: first proper-looking word is likely the merchant
+        if words:
+            potential = words[0].rstrip(".,!?")
+            if len(potential) > 1:
+                merchant = potential
+        if not merchant:
+            return []
+
+        rules_result = await session.execute(
+            select(CategoryRule).where(
+                CategoryRule.user_id == user_id,
+                CategoryRule.merchant.ilike(f"%{merchant}%"),
+            ).order_by(CategoryRule.match_count.desc())
+        )
+        rules = rules_result.scalars().all()
+        if not rules:
+            return []
+
+        suggestions = []
+        seen_cats = set()
+        for rule in rules:
+            if rule.category in seen_cats:
+                continue
+            seen_cats.add(rule.category)
+            confidence = min(0.95, 0.5 + rule.match_count * 0.05)
+            suggestions.append({
+                "budget_type": "day_to_day",
+                "occasion": "Monthly Living",
+                "category": rule.category,
+                "merchant": merchant,
+                "recurring": False,
+                "confidence": round(confidence, 2),
+                "source": "historical",
+            })
+            if len(suggestions) >= 3:
+                break
+        return suggestions
+
+    async def _classify_with_llm(session, user_id: str, description: str, amount: float) -> dict:
+        """Call LLM to get 4 ranked category suggestions."""
+        system_prompt = (
+            "You classify UK personal finance transactions. "
+            "Output valid JSON only. No markdown, no explanations."
+        )
+        user_prompt = (
+            f"Classify this transaction and return the top 4 category suggestions ranked by confidence:\n"
+            f"Description: {description}\nAmount: £{amount}\n\n"
+            f"Available categories (section: category_names):\n{_ALL_CATEGORY_SECTIONS_STR}\n\n"
+            f"Respond with JSON array of 4 objects, each:\n"
+            f'{{"budget_type": "day_to_day|yom_tov|holiday|simcha|other", '
+            f'"occasion": "e.g. Monthly Living | Pesach 2026 | Summer Trip | Chaim Wedding", '
+            f'"category": "one category name from the list above", '
+            f'"merchant": "e.g. Tesco", '
+            f'"recurring": true|false, '
+            f'"confidence": 0.0-1.0}}\n'
+            f'Return as JSON: {{"suggestions": [...]}}'
+        )
+        raw, provider, model, pt, ct, cost = await call_llm(
+            system_prompt, user_prompt,
+            json_mode=True, temperature=0.1, max_tokens=1024,
+        )
+        await _track_usage(session, user_id, provider, model, pt, ct, cost)
+        return parse_json(raw)
 
     @router.post("/classify")
     async def classify_transaction(
@@ -598,53 +848,48 @@ def build_router() -> APIRouter:
 
             clean_desc = sanitize_input(payload.description.strip(), max_len=200)
 
-            system_prompt = (
-                "You classify UK personal finance transactions. "
-                "Output valid JSON only. No markdown, no explanations."
-            )
-            user_prompt = (
-                f"Classify this transaction:\nDescription: {clean_desc}\nAmount: £{payload.amount}\n\n"
-                f"Respond with JSON:\n"
-                f'{{"budget_type": "day_to_day|yom_tov|holiday|simcha|other", '
-                f'"occasion": "e.g. Monthly Living | Pesach 2026 | Summer Trip | Chaim Wedding", '
-                f'"category": "e.g. groceries, dining, flights, hall, etc.", '
-                f'"merchant": "e.g. Tesco", '
-                f'"recurring": true|false, '
-                f'"confidence": 0.95}}'
-            )
+            # Step 1: Historical lookup — check CategoryRules first
+            historical = await _lookup_historical_suggestions(session, user["user_id"], clean_desc)
 
+            # Step 2: LLM classification — get 4 AI suggestions
+            llm_suggestions = []
             try:
-                raw, provider, model, pt, ct, cost = await call_llm(
-                    system_prompt, user_prompt,
-                    json_mode=True, temperature=0.1, max_tokens=512,
-                )
-                await _track_usage(session, user["user_id"], provider, model, pt, ct, cost)
-                result = parse_json(raw)
-                confidence = result.get("confidence", 0)
+                llm_result = await _classify_with_llm(session, user["user_id"], clean_desc, payload.amount)
+                raw_suggestions = llm_result.get("suggestions", []) if isinstance(llm_result, dict) else (llm_result if isinstance(llm_result, list) else [])
+                for s in raw_suggestions[:4]:
+                    s["source"] = "ai"
+                    llm_suggestions.append(s)
             except Exception as e:
                 logger.warning("AI classification failed: %s", e)
-                result = {
+                llm_suggestions = [{
                     "budget_type": "day_to_day",
                     "occasion": "Monthly Living",
                     "category": "uncategorized",
                     "merchant": None,
                     "recurring": False,
-                }
-                confidence = 0
+                    "confidence": 0,
+                    "source": "ai",
+                }]
 
-            # Save as pending AI suggestion
+            # Step 3: Merge — historical first (sorted by confidence), then AI, deduped by category
+            seen_cats = set()
+            merged = []
+            for s in historical + llm_suggestions:
+                cat = s.get("category", "uncategorized")
+                if cat not in seen_cats:
+                    seen_cats.add(cat)
+                    merged.append(s)
+                if len(merged) >= 4:
+                    break
+
+            # Step 4: Save as pending AI suggestion
             suggestion = AISuggestion(
                 user_id=user["user_id"],
                 suggestion_type="classification",
                 data={
                     "description": clean_desc,
                     "amount": payload.amount,
-                    "budget_type": result.get("budget_type", "day_to_day"),
-                    "occasion": result.get("occasion", "Monthly Living"),
-                    "category": result.get("category", "uncategorized"),
-                    "merchant": result.get("merchant"),
-                    "recurring": result.get("recurring", False),
-                    "confidence": confidence,
+                    "suggestions": merged,
                 },
                 status="pending",
             )
@@ -654,12 +899,7 @@ def build_router() -> APIRouter:
 
             return {
                 "suggestion_id": suggestion.id,
-                "budget_type": result.get("budget_type", "day_to_day"),
-                "occasion": result.get("occasion", "Monthly Living"),
-                "category": result.get("category", "uncategorized"),
-                "merchant": result.get("merchant"),
-                "recurring": result.get("recurring", False),
-                "confidence": round(confidence, 2),
+                "suggestions": merged,
             }
 
     # ── APPROVE ───────────────────────────────────────────────────────────
@@ -674,13 +914,15 @@ def build_router() -> APIRouter:
         async with sm() as session:
             # Create the transaction via existing endpoint logic
             from finance_engine import _tx_to_dict
+            merchant_name = payload.merchant or payload.occasion or ""
             tx = Transaction(
                 transaction_id=f"tx_{uuid.uuid4().hex[:12]}",
                 user_id=user["user_id"],
                 amount=-abs(payload.amount) if payload.amount > 0 else payload.amount,
                 description=payload.description.strip(),
                 category=payload.category.lower().strip(),
-                merchant_name=payload.occasion,
+                merchant_name=merchant_name,
+                normalized_merchant=merchant_name.lower().strip(),
                 date=datetime.fromisoformat(payload.date) if payload.date else datetime.now(timezone.utc),
                 source="manual",
                 tx_type="expense",
@@ -690,6 +932,7 @@ def build_router() -> APIRouter:
             await session.refresh(tx)
 
             # Mark suggestion as approved if provided
+            chosen_suggestion = None
             if payload.suggestion_id:
                 s_result = await session.execute(
                     select(AISuggestion).where(
@@ -699,9 +942,40 @@ def build_router() -> APIRouter:
                 )
                 sug = s_result.scalar_one_or_none()
                 if sug:
+                    if payload.suggestion_index is not None and isinstance(sug.data, dict):
+                        suggestions_list = sug.data.get("suggestions", [])
+                        if 0 <= payload.suggestion_index < len(suggestions_list):
+                            chosen_suggestion = suggestions_list[payload.suggestion_index]
                     sug.status = "approved"
                     sug.applied_at = datetime.now(timezone.utc)
                     await session.commit()
+
+            # Learn: update or create CategoryRule for this merchant→category mapping
+            if merchant_name and len(merchant_name) > 1:
+                normalized_merchant = merchant_name.lower().strip()
+                try:
+                    rule_result = await session.execute(
+                        select(CategoryRule).where(
+                            CategoryRule.user_id == user["user_id"],
+                            CategoryRule.merchant == normalized_merchant,
+                        )
+                    )
+                    rule = rule_result.scalar_one_or_none()
+                    if rule:
+                        rule.match_count = (rule.match_count or 0) + 1
+                        rule.last_used_at = datetime.now(timezone.utc)
+                    else:
+                        rule = CategoryRule(
+                            user_id=user["user_id"],
+                            merchant=normalized_merchant,
+                            category=payload.category.lower().strip(),
+                            match_count=1,
+                            source="user_approved",
+                        )
+                        session.add(rule)
+                    await session.commit()
+                except Exception as e:
+                    logger.warning("Failed to update CategoryRule: %s", e)
 
             # Create RecurringTransaction if requested
             if payload.save_as_recurring:

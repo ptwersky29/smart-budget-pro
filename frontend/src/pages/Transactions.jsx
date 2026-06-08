@@ -31,9 +31,21 @@ import TransactionRow from "../components/TransactionRow";
 import TransactionForm from "../components/TransactionForm";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { useSwipe } from "../hooks/useSwipe";
+import { useKeyboardShortcut } from "../hooks/useKeyboardShortcut";
 
 const SOURCE_LABELS = { manual: "Manual", truelayer: "Bank", csv: "CSV", pdf: "PDF", statement: "Statement", sms: "SMS" };
 const emptyForm = { description: "", amount: "", category: "", is_income: false, budget_type: "", occasion: "", merchant: "" };
+
+function groupCatsBySection(cats) {
+  const groups = {};
+  for (const c of cats) {
+    const section = c.section || "Other";
+    if (!groups[section]) groups[section] = [];
+    groups[section].push(c);
+  }
+  return groups;
+}
 
 function today() {
   const d = new Date();
@@ -80,6 +92,9 @@ const Transactions = React.memo(function Transactions() {
   const [aiLoading, setAiLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [searchInput, setSearchInput] = useState(filters.search);
+  const [swipedId, setSwipedId] = useState(null);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
+  const searchRef = useRef(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmTitle, setConfirmTitle] = useState("");
   const [confirmMessage, setConfirmMessage] = useState("");
@@ -149,7 +164,9 @@ const Transactions = React.memo(function Transactions() {
   const loadCats = useCallback(async () => {
     try {
       const { data } = await api.get("/categories");
-      setSelectedCats(data.categories || []);
+      const cats = data.categories || [];
+      cats.hierarchy = data.hierarchy || {};
+      setSelectedCats(cats);
     } catch {}
   }, []);
 
@@ -192,11 +209,12 @@ const Transactions = React.memo(function Transactions() {
     try {
       const { data } = await api.post("/budget-system/classify", { description: description.trim(), amount });
       setClassification(data);
-      // Pre-fill category if not already set
-      if (data.category && !form.category) {
-        setForm(prev => ({ ...prev, category: data.category }));
+      // Auto-fill category from top suggestion if very confident (≥ 95%)
+      const top = data.suggestions?.[0];
+      if (top && top.confidence >= 0.95 && !form.category) {
+        setForm(prev => ({ ...prev, category: top.category, budget_type: top.budget_type || "", occasion: top.occasion || "", merchant: top.merchant || "" }));
       }
-      if (data.recurring) setSaveAsRecurring(true);
+      if (top?.recurring) setSaveAsRecurring(true);
     } catch { toast.error("Classification failed"); }
     finally { setClassifying(false); }
   }, [form.category]);
@@ -216,13 +234,17 @@ const Transactions = React.memo(function Transactions() {
         });
       } else if (classification || form.budget_type) {
         // Use AI or manual classification
+        const suggestions = classification?.suggestions || [];
+        const chosenIdx = suggestions.findIndex(s => s.category === form.category);
         await api.post("/budget-system/approve", {
           description: form.description.trim(),
           amount: signed,
-          budget_type: form.budget_type || classification?.budget_type || "day_to_day",
-          occasion: form.occasion || classification?.occasion || "Monthly Living",
-          category: form.category || classification?.category || "uncategorized",
+          budget_type: form.budget_type || suggestions[0]?.budget_type || "day_to_day",
+          occasion: form.occasion || suggestions[0]?.occasion || "Monthly Living",
+          category: form.category || suggestions[0]?.category || "uncategorized",
+          merchant: form.merchant || suggestions[0]?.merchant || "",
           suggestion_id: classification?.suggestion_id || null,
+          suggestion_index: chosenIdx >= 0 ? chosenIdx : null,
           save_as_recurring: saveAsRecurring,
         });
         toast.success("Transaction added");
@@ -263,6 +285,51 @@ const Transactions = React.memo(function Transactions() {
       setSelectedIds(new Set(allDisplayed.map(t => t.transaction_id)));
     }
   }, [allDisplayedSelected, allDisplayed]);
+
+  // ── Desktop power-user keyboard shortcuts ──
+  useKeyboardShortcut("n", () => { if (!open) openAdd(); }, { enabled: !open });
+  useKeyboardShortcut("/", () => { searchRef.current?.focus(); });
+  useKeyboardShortcut("r", () => { load(); }, { when: !open });
+  useKeyboardShortcut("b", () => {
+    if (selectedIds.size > 0) { setSelectedIds(new Set()); }
+    else { setSelectedIds(new Set(allDisplayed.map(t => t.transaction_id))); }
+  });
+  useKeyboardShortcut({ key: "Backspace", meta: true }, () => {
+    if (selectedIds.size > 0 && !open) {
+      showConfirm("Delete transactions", `Delete ${selectedIds.size} selected transactions?`, async () => {
+        try { await withUndo({ action: api.post("/transactions/bulk-delete", { transaction_ids: Array.from(selectedIds) }), undo: api.post("/transactions/undo-bulk-delete", { transaction_ids: Array.from(selectedIds) }), successMsg: `Deleted ${selectedIds.size} transactions`, errorMsg: "Delete failed", undoLabel: "Undo" }); setSelectedIds(new Set()); await load(); } catch { toast.error("Delete failed"); }
+      });
+    }
+  }, { enabled: !open });
+  useKeyboardShortcut("j", () => {
+    if (open) return;
+    setFocusedIndex(i => Math.min((i < 0 ? -1 : i) + 1, allDisplayed.length - 1));
+  });
+  useKeyboardShortcut("k", () => {
+    if (open) return;
+    setFocusedIndex(i => Math.max(-1, i - 1));
+  });
+  useKeyboardShortcut("Escape", () => {
+    setSelectedIds(new Set()); setFocusedIndex(-1);
+    if (swipedId) setSwipedId(null);
+  }, { enabled: !open });
+  useKeyboardShortcut("[", () => {
+    if (offset > 0 && !open) setOffset(o => Math.max(0, o - limit));
+  });
+  useKeyboardShortcut("]", () => {
+    if (offset + limit < total && !open) setOffset(o => o + limit);
+  });
+
+  // Listen for command-palette-triggered actions
+  useEffect(() => {
+    const handler = (e) => {
+      const { action } = e.detail || {};
+      if (action === "open-new-transaction") openAdd();
+      if (action === "focus-search") searchRef.current?.focus();
+    };
+    window.addEventListener("app-quick-action", handler);
+    return () => window.removeEventListener("app-quick-action", handler);
+  }, [openAdd]);
 
   const bulkCategory = useCallback(async (cat) => {
     if (!cat || selectedIds.size === 0) return;
@@ -390,9 +457,11 @@ const Transactions = React.memo(function Transactions() {
                   <DropdownMenuSub>
                     <DropdownMenuSubTrigger>Set category</DropdownMenuSubTrigger>
                     <DropdownMenuSubContent>
-                      {selectedCats.map(c => (
-                        <DropdownMenuItem key={c.name} onClick={() => bulkCategory(c.name)}>{c.name}</DropdownMenuItem>
-                      ))}
+                      {Object.entries(groupCatsBySection(selectedCats)).map(([section, cats]) =>
+                        cats.map(c => (
+                          <DropdownMenuItem key={c.name} onClick={() => bulkCategory(c.name)}>{c.name}</DropdownMenuItem>
+                        ))
+                      )}
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
                   <DropdownMenuSeparator />
@@ -411,6 +480,7 @@ const Transactions = React.memo(function Transactions() {
               <DropdownMenuContent>
                 <DropdownMenuItem onClick={openAdd} data-testid="add-transaction">
                   <Plus className="h-4 w-4 mr-2" /> Add transaction
+                  <span className="ml-auto text-[10px] text-muted-foreground">N</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setCompareOpen(true)}>
                   <BarChart3 className="h-4 w-4 mr-2" /> Compare periods
@@ -446,8 +516,8 @@ const Transactions = React.memo(function Transactions() {
           <div className="flex items-center gap-3 p-4">
             <label className="flex-1 flex items-center gap-3 rounded-xl border border-border bg-background/70 px-4 h-11">
               <Search className="h-4 w-4 text-muted-foreground shrink-0" />
-              <input value={searchInput} onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
-                placeholder="Search descriptions, merchants, categories..."
+              <input ref={searchRef} value={searchInput} onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
+                placeholder="Search descriptions, merchants, categories... (/ to focus)"
                 className="w-full bg-transparent outline-none text-sm" />
               {filters.search && <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>}
             </label>
@@ -486,7 +556,11 @@ const Transactions = React.memo(function Transactions() {
                     </select>
                     <select value={filters.category} onChange={(e) => toggleFilter("category", e.target.value)} className="h-10 px-4 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors">
                       <option value="">All categories</option>
-                      {selectedCats.map(c => <option key={c.category_id ?? `default-${c.name}`} value={c.name}>{c.name}</option>)}
+                      {Object.entries(groupCatsBySection(selectedCats)).map(([section, cats]) => (
+                        <optgroup key={section} label={section}>
+                          {cats.map(c => <option key={c.category_id ?? `default-${c.name}`} value={c.name}>{c.name}</option>)}
+                        </optgroup>
+                      ))}
                     </select>
                     <Input type="number" min="0" step="0.01" placeholder="Min £" value={filters.amount_min}
                       onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_min: e.target.value })); }}
@@ -574,46 +648,32 @@ const Transactions = React.memo(function Transactions() {
             />
           ) : (
             <>
-              {/* Mobile card view with swipe-aware actions */}
-              <div className="block sm:hidden divide-y divide-border">
+              {/* Desktop keyboard shortcut hints */}
+              <div className="hidden sm:flex items-center gap-3 px-4 py-2 text-[11px] text-muted-foreground border-b border-border">
+                <span><kbd className="px-1 rounded bg-secondary font-mono text-[10px]">j</kbd> <kbd className="px-1 rounded bg-secondary font-mono text-[10px]">k</kbd> navigate</span>
+                <span><kbd className="px-1 rounded bg-secondary font-mono text-[10px]">n</kbd> new</span>
+                <span><kbd className="px-1 rounded bg-secondary font-mono text-[10px]">b</kbd> bulk</span>
+                <span><kbd className="px-1 rounded bg-secondary font-mono text-[10px]">/</kbd> search</span>
+                <span><kbd className="px-1 rounded bg-secondary font-mono text-[10px]">[</kbd> <kbd className="px-1 rounded bg-secondary font-mono text-[10px]">]</kbd> pages</span>
+                <span><kbd className="px-1 rounded bg-secondary font-mono text-[10px]">⌘⌫</kbd> delete</span>
+                <span><kbd className="px-1 rounded bg-secondary font-mono text-[10px]">?</kbd> help</span>
+                <span className="ml-auto">
+                  <span className="px-1 py-0.5 rounded bg-secondary/50">{currentPage}/{totalPages}</span>
+                </span>
+              </div>
+              {/* Mobile card view with swipe to delete */}
+              <div className="block sm:hidden">
                 {(aiResults?.transactions || txs).map((t) => (
-                  <div key={t.transaction_id} style={{ contentVisibility: "auto" }} className={`relative px-4 py-4 space-y-1.5 tap-highlight-none ${selectedIds.has(t.transaction_id) ? "bg-emerald/5" : ""}`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <label className="flex items-center justify-center" aria-label="Select transaction">
-                          <input type="checkbox" checked={selectedIds.has(t.transaction_id)}
-                            onChange={() => toggleSelect(t.transaction_id)}
-                            className="h-5 w-5 rounded border-border accent-emerald cursor-pointer shrink-0" />
-                        </label>
-                        <div className="min-w-0">
-                          <p className="text-xs text-muted-foreground">{t.date?.slice(0, 10)}</p>
-                          <p className="font-medium text-sm truncate">{t.description}</p>
-                          {t.normalized_merchant && t.normalized_merchant !== t.description && (
-                            <p className="text-xs text-muted-foreground truncate">{t.normalized_merchant}</p>
-                          )}
-                        </div>
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger className="p-3 -mr-1 text-muted-foreground hover:text-foreground active:scale-95 transition-transform" aria-label="Transaction actions">
-                          <MoreHorizontal className="h-5 w-5" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEdit(t)}>
-                            <Pencil className="h-4 w-4 mr-2" /> Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => del(t.transaction_id)} className="text-ruby">
-                            <Trash2 className="h-4 w-4 mr-2" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    <div className="flex items-center justify-between pl-11">
-                      <span className="text-xs px-2.5 py-1 rounded-full bg-secondary capitalize">{t.category || "uncategorized"}</span>
-                      <span className={`font-semibold tabular-nums text-sm ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}>
-                        {t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
+                  <SwipeableCard
+                    key={t.transaction_id}
+                    t={t}
+                    isSelected={selectedIds.has(t.transaction_id)}
+                    swipedId={swipedId}
+                    setSwipedId={setSwipedId}
+                    onToggleSelect={toggleSelect}
+                    onEdit={openEdit}
+                    onDelete={del}
+                  />
                 ))}
               </div>
               {/* Desktop table with TransactionRow (⋮ actions handled by component) */}
@@ -627,10 +687,12 @@ const Transactions = React.memo(function Transactions() {
                     <th className="px-6 py-3">Date</th><th className="px-6 py-3">Description</th><th className="px-6 py-3">Category</th><th className="px-6 py-3 text-right">Amount</th><th className="px-6 py-3 w-12"></th>
                   </tr></thead>
                   <tbody>
-                    {(aiResults?.transactions || txs).map((t) => (
+                    {(aiResults?.transactions || txs).map((t, idx) => (
                       <TransactionRow key={t.transaction_id} t={t}
                         isSelected={selectedIds.has(t.transaction_id)}
-                        onToggleSelect={toggleSelect} onEdit={openEdit} onDelete={del} />
+                        isFocused={focusedIndex === idx}
+                        onToggleSelect={toggleSelect} onEdit={openEdit} onDelete={del}
+                        onSetFocus={() => setFocusedIndex(idx)} />
                     ))}
                   </tbody>
                 </table>
@@ -641,12 +703,12 @@ const Transactions = React.memo(function Transactions() {
                   <span className="text-muted-foreground">Showing {offset + 1}–{Math.min(offset + limit, total)} of {total}</span>
                   <div className="flex items-center gap-2">
                     <button onClick={() => setOffset(Math.max(0, offset - limit))} disabled={offset === 0}
-                      className="h-10 w-10 rounded-full grid place-items-center border border-border hover:bg-secondary disabled:opacity-30" aria-label="Previous page">
+                      className="h-10 w-10 rounded-full grid place-items-center border border-border hover:bg-secondary disabled:opacity-30" aria-label="Previous page" title="Previous page ([)">
                       <ChevronLeft className="h-4 w-4" />
                     </button>
                     <span className="text-muted-foreground min-w-[4rem] text-center">{currentPage} / {totalPages}</span>
                     <button onClick={() => setOffset(Math.min((totalPages - 1) * limit, offset + limit))} disabled={offset + limit >= total}
-                      className="h-10 w-10 rounded-full grid place-items-center border border-border hover:bg-secondary disabled:opacity-30" aria-label="Next page">
+                      className="h-10 w-10 rounded-full grid place-items-center border border-border hover:bg-secondary disabled:opacity-30" aria-label="Next page" title="Next page (])">
                       <ChevronRight className="h-4 w-4" />
                     </button>
                   </div>
@@ -680,5 +742,70 @@ const Transactions = React.memo(function Transactions() {
     </div>
   );
 });
+
+function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, onEdit, onDelete }) {
+  const handlers = useSwipe(
+    () => setSwipedId(t.transaction_id),
+    () => setSwipedId(null),
+    50,
+  );
+  const deleting = swipedId === t.transaction_id;
+
+  return (
+    <div className="relative overflow-hidden tap-highlight-none" {...handlers} onClick={() => { if (deleting) setSwipedId(null); }}>
+      <div
+        className={`transition-transform duration-200 ease-out ${deleting ? "-translate-x-20" : "translate-x-0"} ${isSelected ? "bg-emerald/5" : ""} divide-y divide-border`}
+        style={{ contentVisibility: "auto" }}
+      >
+        <div className="px-4 py-4 space-y-1.5">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0">
+              <label className="flex items-center justify-center" aria-label="Select transaction">
+                <input type="checkbox" checked={isSelected}
+                  onChange={() => onToggleSelect(t.transaction_id)}
+                  className="h-5 w-5 rounded border-border accent-emerald cursor-pointer shrink-0" />
+              </label>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">{t.date?.slice(0, 10)}</p>
+                <p className="font-medium text-sm truncate">{t.description}</p>
+                {t.normalized_merchant && t.normalized_merchant !== t.description && (
+                  <p className="text-xs text-muted-foreground truncate">{t.normalized_merchant}</p>
+                )}
+              </div>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="p-3 -mr-1 text-muted-foreground hover:text-foreground active:scale-95 transition-transform" aria-label="Transaction actions">
+                <MoreHorizontal className="h-5 w-5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onEdit(t)}>
+                  <Pencil className="h-4 w-4 mr-2" /> Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onDelete(t.transaction_id)} className="text-ruby">
+                  <Trash2 className="h-4 w-4 mr-2" /> Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          <div className="flex items-center justify-between pl-11">
+            <span className="text-xs px-2.5 py-1 rounded-full bg-secondary capitalize">{t.category || "uncategorized"}</span>
+            <span className={`font-semibold tabular-nums text-sm ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}>
+              {t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}
+            </span>
+          </div>
+        </div>
+      </div>
+      <div className={`absolute right-0 top-0 bottom-0 flex items-center transition-opacity duration-200 ${deleting ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+        <button
+          onClick={() => { onDelete(t.transaction_id); setSwipedId(null); }}
+          className="h-full w-20 flex items-center justify-center bg-ruby text-white font-medium text-sm"
+          aria-label="Delete transaction"
+        >
+          <Trash2 className="h-5 w-5" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default Transactions;

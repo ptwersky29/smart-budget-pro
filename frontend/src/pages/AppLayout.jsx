@@ -205,6 +205,22 @@ export default function AppLayout() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [navigate]);
 
+  // Wire up CommandPalette quick actions
+  useEffect(() => {
+    const handler = (e) => {
+      const { action } = e.detail || {};
+      if (action === "new-transaction") {
+        // Dispatch a custom event that pages can listen for
+        window.dispatchEvent(new CustomEvent("app-quick-action", { detail: { action: "open-new-transaction" } }));
+      } else if (action === "search-transactions") {
+        navigate("/transactions");
+        setTimeout(() => window.dispatchEvent(new CustomEvent("app-quick-action", { detail: { action: "focus-search" } })), 100);
+      }
+    };
+    window.addEventListener("command-action", handler);
+    return () => window.removeEventListener("command-action", handler);
+  }, [navigate]);
+
   const routeMeta = useMemo(() => getRouteMeta(location.pathname), [location.pathname]);
   const currentSection = useMemo(() => NAV_SECTIONS.find((section) => section.items.some((item) => location.pathname.startsWith(item.to))) || NAV_SECTIONS[0], [location.pathname]);
 
@@ -344,7 +360,7 @@ export default function AppLayout() {
                 </Link>
               )}
               <NotificationCenter />
-              <button onClick={toggleTheme} data-testid="theme-toggle" className="h-11 w-11 grid place-items-center rounded-full border border-border bg-card/80 hover:bg-secondary transition-colors" aria-label="Toggle theme">
+              <button onClick={toggleTheme} data-testid="theme-toggle" className="h-11 w-11 grid place-items-center rounded-full border border-border bg-card/80 hover:bg-secondary transition-colors" aria-label="Toggle theme" title="Toggle theme">
                 {dark ? <Sun className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
               </button>
             </div>
@@ -362,7 +378,7 @@ export default function AppLayout() {
           </div>
         </header>
 
-        <main className="p-4 sm:p-5 lg:p-8 pb-24 lg:pb-8 max-w-[1680px] mx-auto animate-[fadeUp_0.35s_ease-out]">
+        <main className="p-4 sm:p-5 lg:p-8 pb-24 lg:pb-8 max-w-[1680px] mx-auto">
           <div className="space-y-8">
             <div className="lg:hidden rounded-2xl border border-border bg-card/90 backdrop-blur-xl p-5 shadow-card">
               <p className="label-overline text-emerald">{routeMeta.eyebrow}</p>
@@ -373,7 +389,9 @@ export default function AppLayout() {
                 {routeMeta.primary && <Button asChild variant="primary" size="pill"><Link to={routeMeta.primary.to}>{routeMeta.primary.label}</Link></Button>}
               </div>
             </div>
-            <Outlet />
+            <div key={location.pathname} className="animate-[slideInRight_0.3s_ease-out]">
+              <Outlet />
+            </div>
           </div>
         </main>
       </div>

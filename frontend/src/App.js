@@ -2,6 +2,7 @@ import React, { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import "./App.css";
 import { AuthProvider } from "./contexts/AuthContext";
+import { SettingsProvider } from "./contexts/SettingsContext";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "next-themes";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -16,13 +17,14 @@ const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Transactions = lazy(() => import("./pages/Transactions"));
-const Budgets = lazy(() => import("./pages/Budgets"));
+const BudgetPage = lazy(() => import("./pages/BudgetPage"));
 const BankStatements = lazy(() => import("./pages/BankStatements"));
 const Investments = lazy(() => import("./pages/Investments"));
 const Jewish = lazy(() => import("./pages/Jewish"));
 const UKTools = lazy(() => import("./pages/UKTools"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Settings = lazy(() => import("./pages/Settings"));
+const CategoryManager = lazy(() => import("./pages/CategoryManager"));
 const Subscriptions = lazy(() => import("./pages/Subscriptions"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
@@ -54,7 +56,7 @@ function AppRouter() {
       <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/transactions" element={<Transactions />} />
-        <Route path="/budgets" element={<Budgets />} />
+        <Route path="/budgets" element={<BudgetPage />} />
         <Route path="/subscriptions" element={<Subscriptions />} />
         <Route path="/import" element={<BankStatements />} />
         <Route path="/investments" element={<Investments />} />
@@ -62,6 +64,7 @@ function AppRouter() {
         <Route path="/uk-tools" element={<UKTools />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/settings/categories" element={<CategoryManager />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
@@ -73,12 +76,14 @@ export default function App() {
     <BrowserRouter>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <AuthProvider>
+          <SettingsProvider>
           <ErrorBoundary>
             <Suspense fallback={<PageLoader />}>
               <AppRouter />
             </Suspense>
             <ConsentBanner />
           </ErrorBoundary>
+          </SettingsProvider>
           <Toaster richColors position="top-right" />
         </AuthProvider>
       </ThemeProvider>

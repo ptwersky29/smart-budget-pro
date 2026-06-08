@@ -19,15 +19,130 @@ MAX_BYTES = 5 * 1024 * 1024
 PARSE_LIMIT_FREE = 1
 MAX_CHARS_TO_AI = 40000
 
-INCOME_CATEGORIES = {"salary", "income"}
-EXPENSE_CATEGORIES = {
-    "groceries", "dining", "transport", "utilities", "subscriptions",
-    "tzedakah", "rent", "shopping", "health", "entertainment",
-    "insurance", "education", "transfer", "cash", "tax", "fees",
-    "mortgage",
+# ── Expanded category hierarchy ─────────────────────────────────────────
+# Each section maps to a list of (category_name, display_label) tuples.
+# The category_name is stored in DB; display_label is shown in UI.
+CATEGORY_HIERARCHY = {
+    "Household": [
+        ("groceries", "Groceries"),
+        ("cleaning", "Cleaning"),
+        ("furniture", "Furniture"),
+        ("household", "Household"),
+        ("home_improvement", "Home Improvement"),
+        ("laundry", "Laundry"),
+        ("kitchen", "Kitchen"),
+    ],
+    "Transport": [
+        ("transport", "Transport"),
+        ("fuel", "Fuel"),
+        ("parking", "Parking"),
+        ("public_transport", "Public Transport"),
+        ("car_maintenance", "Car Maintenance"),
+        ("car_hire", "Car Hire"),
+        ("taxi", "Taxi"),
+    ],
+    "Utilities": [
+        ("utilities", "Utilities"),
+        ("electricity", "Electricity"),
+        ("gas", "Gas"),
+        ("water", "Water"),
+        ("internet", "Internet"),
+        ("phone", "Phone"),
+        ("council_tax", "Council Tax"),
+    ],
+    "Children & Education": [
+        ("education", "Education"),
+        ("school_fees", "School Fees"),
+        ("tuition", "Tuition"),
+        ("books", "Books"),
+        ("childcare", "Childcare"),
+        ("children", "Children"),
+    ],
+    "Health": [
+        ("health", "Health"),
+        ("medical", "Medical"),
+        ("dental", "Dental"),
+        ("pharmacy", "Pharmacy"),
+        ("optical", "Optical"),
+        ("gym", "Gym"),
+        ("fitness", "Fitness"),
+        ("therapy", "Therapy"),
+    ],
+    "Jewish & Community": [
+        ("tzedakah", "Tzedakah"),
+        ("maaser", "Maaser"),
+        ("shul_donations", "Shul Donations"),
+        ("mikvah", "Mikvah"),
+        ("jewish_education", "Jewish Education"),
+    ],
+    "Yom Tov": [
+        ("pesach", "Pesach"),
+        ("succah", "Succah"),
+        ("purim", "Purim"),
+        ("chanukah", "Chanukah"),
+        ("shavuos", "Shavuos"),
+        ("rosh_hashanah", "Rosh Hashanah"),
+        ("yom_kippur", "Yom Kippur"),
+    ],
+    "Simchas": [
+        ("wedding", "Wedding"),
+        ("bar_bas_mitzvah", "Bar/Bas Mitzvah"),
+        ("bris", "Bris"),
+        ("engagement", "Engagement"),
+        ("sheva_brachos", "Sheva Brachos"),
+        ("gifts", "Gifts"),
+    ],
+    "Travel": [
+        ("travel", "Travel"),
+        ("flights", "Flights"),
+        ("hotels", "Hotels"),
+        ("car_hire", "Car Hire"),
+        ("holiday", "Holiday"),
+    ],
+    "Business": [
+        ("business", "Business"),
+        ("office_supplies", "Office Supplies"),
+        ("software", "Software"),
+        ("advertising", "Advertising"),
+    ],
+    "Entertainment & Dining": [
+        ("dining", "Dining"),
+        ("entertainment", "Entertainment"),
+        ("streaming", "Streaming"),
+        ("subscriptions", "Subscriptions"),
+        ("hobbies", "Hobbies"),
+    ],
+    "Shopping": [
+        ("shopping", "Shopping"),
+        ("clothing", "Clothing"),
+        ("electronics", "Electronics"),
+    ],
+    "Financial": [
+        ("rent", "Rent"),
+        ("mortgage", "Mortgage"),
+        ("insurance", "Insurance"),
+        ("tax", "Tax"),
+        ("fees", "Fees"),
+        ("transfer", "Transfer"),
+        ("cash", "Cash"),
+        ("investments", "Investments"),
+    ],
+    "Income": [
+        ("salary", "Salary"),
+        ("income", "Income"),
+    ],
 }
-ALL_CATEGORIES = INCOME_CATEGORIES | EXPENSE_CATEGORIES | {"uncategorized"}
+
+# Derived sets for backward compatibility
+ALL_CATEGORY_NAMES = {name for section in CATEGORY_HIERARCHY.values() for name, _ in section}
+INCOME_CATEGORIES = {"salary", "income"}
+EXPENSE_CATEGORIES = ALL_CATEGORY_NAMES - INCOME_CATEGORIES
+ALL_CATEGORIES = ALL_CATEGORY_NAMES | {"uncategorized"}
 CATEGORIES = sorted(ALL_CATEGORIES)
+SECTION_FOR_CATEGORY = {}
+for section, items in CATEGORY_HIERARCHY.items():
+    for name, _ in items:
+        SECTION_FOR_CATEGORY[name] = section
 
 PARSE_PROMPT = """You are a UK bank statement parser. Below is text extracted from a bank statement (CSV or PDF).
 Extract every transaction as JSON. Return STRICT JSON only — no markdown, no commentary.
@@ -110,15 +225,33 @@ async def _ai_parse_statement(text: str, session=None, user_id: str = None) -> d
 
 CATEGORISE_KEYWORDS = {
     "subscriptions": ["netflix", "spotify", "disney+", "disney plus", "apple.com/bill", "apple.com", "icloud", "google one", "microsoft 365", "office 365", "dropbox", "adobe", "notion", "slack", "zoom", "github", "patreon", "onlyfans", "paramount", "now tv", "hbo", "apple tv", "youtube premium", "tidal", "deezer", "audible", "kindle unlimited", "puregym", "david lloyd", "nuffield", "anytime fitness", "the gym", "gym membership"],
+    "streaming": ["netflix", "spotify", "disney+", "disney plus", "apple tv", "youtube premium", "paramount", "now tv", "hbo", "tidal", "deezer", "audible"],
     "utilities": ["british gas", "edf energy", "edf ", "eon ", "octopus energy", "octopus ", "scottish power", "npower", "bulb ", "ovo energy", "ovo ", "thames water", "anglian water", "welsh water", "bt ", " sky ", "sky tv", "sky broadband", "virgin media", "vodafone", " ee ", " three ", " o2 ", "talk talk", "plusnet", "council tax", "gas bill", "electricity", "broadband", "phone bill", "internet bill", "water bill"],
+    "electricity": ["electricity", "electric bill", "edf", "eon", "octopus", "british gas", "npower", "scottish power", "bulb", "ovo"],
+    "gas": ["gas bill", "british gas", "edf", "eon", "octopus", "npower"],
+    "water": ["thames water", "water bill", "anglian water", "yorkshire water", "severn trent", "southern water", "welsh water"],
+    "internet": ["broadband", "internet", "bt broadband", "virgin media", "sky broadband", "plusnet", "talk talk"],
+    "phone": ["phone bill", "vodafone", "ee ", " three ", "o2 ", "giffgaff", "tesco mobile", "lebara", "lycamobile"],
     "groceries": ["tesco", "sainsbury", "asda", "waitrose", "lidl", "aldi", "morrisons", "co-op", "coop", "m&s food", "marks & spencer", "iceland", "farmfoods", "budgens", "spar ", "nisa", "londis", "supermarket", "tesco metro", "sainsbury's", "ocado"],
     "dining": ["mcdonald", "nando", "kfc", "subway ", "pret a manger", "pret ", "starbucks", "costa ", "cafe nero", "wagamama", "pizza hut", "dominos", "papa johns", "deliveroo", "uber eats", "uber_eats", "just eat", "justeat", "restaurant", "cafe ", "café", "bistro", " pub ", "bar ", "grill", "kitchen", "diner", "brasserie", "eatery", "bagel", "sushi", "noodle", " thai", " indian", " chinese", "chippy", "fish & chips", "greek", "burger", "kebab", "pizza", "taco", "burrito", "greggs", "leon ", "wasabi", "itsu", "dishoom", "yo! sushi", "pizzaexpress", "zizzi", "ask italian", "prezzo", "frankie & benny", "toby carvery", "harvester", "beefeater", "brewers fayre", "wethers", "spoons", "weatherspoon", "jamie oliver", "gordon ramsay", "m&s food to go", "meal deal", "breakfast", "lunch"],
     "transport": ["uber trip", "uber ", "bolt ", "lyft", "free now", "viavan", "addison lee", "tfl ", "oyster", "tube ", "trainline", "national rail", "stagecoach", "arriva", "first bus", "shell ", " bp ", "esso", "texaco", "petrol", "diesel", "unleaded", "ev charge", "parking", "ncp", "apcoa", "ringgo", "paybyphone", "zipcar", "enterprise rent", "hertz", "avis ", "budget rent", "autoglass", "kwik fit", "halfords", "dvla", "car tax", "vehicle tax", "mot test", "barclays cycle", "santander cycle", "lime ", "bike rental"],
+    "fuel": ["shell ", " bp ", "esso", "texaco", "petrol", "diesel", "unleaded", "ev charge", "fuel"],
+    "parking": ["parking", "ncp", "apcoa", "ringgo", "paybyphone", "parking eye"],
+    "public_transport": ["trainline", "national rail", "stagecoach", "arriva", "first bus", "tfl", "oyster", "tube", "southern railway", "thameslink", "south western", "great western", "lner", "avanti", "crosscountry", "chiltern", "c2c"],
     "health": ["boots", "lloyds pharmacy", "superdrug", "pharmacy", "nhs ", "bupa", "dental", "dentist", "optician", "specsavers", "vision express", "hospital", " clinic", "physio", "chiropractor", "counselling", "therapy", "prescription"],
-    "entertainment": ["odeon", "vue cinema", "vue ", "cineworld", " cinema", "theatre", "concert", "stubhub", "viagogo", "steam ", "playstation", "xbox", "nintendo", "epic games", "gog.com"],
+    "medical": ["nhs", "hospital", "clinic", "doctor", "gp", "consultant", "surgeon", "operation", "surgery"],
+    "dental": ["dentist", "dental", "dental check", "hygienist", "orthodontist", "braces"],
+    "pharmacy": ["boots", "superdrug", "lloyds pharmacy", "pharmacy", "prescription", "medication", "medicine"],
+    "optical": ["optician", "specsavers", "vision express", "glasses", "contact lens", "eye test"],
+    "gym": ["puregym", "david lloyd", "nuffield", "anytime fitness", "the gym", "gym", "fitness", "gym membership", "better gym", "everyone active"],
+    "entertainment": ["odeon", "vue cinema", "vue ", "cineworld", " cinema", "theatre", "concert", "stubhub", "viagogo", "steam ", "playstation", "xbox", "nintendo", "epic games", "gog.com", "eventim", "ticketmaster", "national trust", "english heritage"],
     "shopping": ["amazon", "ebay", "argos", "john lewis", "next ", "zara", "h&m", "primark", "tk maxx", "matalan", "asos", "boohoo", "river island", "new look", "debenhams", "selfridges", "harrods", "apple store", "currys", "pc world", "game ", "decathlon", "ikea", "dunelm", "wilko", "homebase", "b&q", "wickes", "screwfix", "toolstation", "amazon.co.uk"],
+    "clothing": ["primark", "zara", "h&m", "next ", "asos", "boohoo", "river island", "new look", "tk maxx", "matalan", "nike", "adidas", "sports direct", "jd sports", "footasylum", "clothing", "fashion", "outfit", "apparel"],
+    "electronics": ["currys", "pc world", "apple store", "john lewis electrical", "very ", "ao.com", "electrical", "laptop", "phone", "tablet", "headphones", "charger"],
     "insurance": ["aviva", "direct line", "admiral", "lv=", "liverpool victoria", "churchill", "compare the market", "go compare", "money supermarket", "axa", "zurich", "legal & general", "scottish widows", "standard life", "hastings", "esure", "saga", "petplan", "animal friends"],
     "education": ["university", "ucas", "tuition", "udemy", "coursera", "linkedin learning", "skillshare", "masterclass", "futurelearn", "open university"],
+    "school_fees": ["school fee", "school fees", "school payment", "nursery fee", "nursery", "preschool", "childcare"],
+    "childcare": ["nursery", "childcare", "childminder", "nanny", "babysitter", "child care", "creche"],
     "transfer": ["faster payment", "bacs", "chaps", "standing order", "direct debit", "monzo to monzo", "revolut", "wise ", "paypal", "venmo", "zelle", "bank transfer"],
     "cash": ["atm withdrawal", "atm ", "cashpoint", "link ", "cash withdrawal", "cashback"],
     "tax": ["hmrc", "self assessment", "vat payment"],
@@ -126,6 +259,24 @@ CATEGORISE_KEYWORDS = {
     "rent": [" rent ", "landlord", "letting agent", "foxtons", "savills", "knight frank"],
     "mortgage": ["mortgage", "halifax", "natwest", "santander", "barclays", "lloyds", "hsbc", "first direct", "yorkshire bs", "skipton", "nationwide"],
     "tzedakah": ["tzedakah", "tzedaka", "jnf", "jewish national fund", "world jewish relief", "chabad", "jewish charity", "gift aid", "justgiving", "go fund me", "gofundme", "chesed", "yeshiva", "kollel", "shul donation"],
+    "maaser": ["maaser", "maaser money", "maaser fund", "tithe"],
+    "shul_donations": ["shul", "synagogue", "shul membership", "shul donation", "minyan", "kiddush sponsor"],
+    "mikvah": ["mikvah", "mikveh", "mikva", "ritual bath"],
+    "travel": ["ryanair", "easyjet", "british airways", "ba.com", "wizz air", "jet2", "virgin atlantic", "emirates", "qatar", "expedia", "booking.com", "hotel", "airbnb", "tripadvisor", "skyscanner", "kayak"],
+    "flights": ["ryanair", "easyjet", "british airways", "ba.com", "wizz air", "jet2", "virgin atlantic", "emirates", "flybe", "flight", "airline", "airport"],
+    "hotels": ["booking.com", "hotel", "airbnb", "hotels.com", "expedia", "premier inn", "travelodge", "hilton", "marriott", "ibis", "holiday inn"],
+    "holiday": ["tui", "thomas cook", "trailfinders", "holiday", "vacation", "all inclusive", "package holiday", "ski holiday", "beach holiday"],
+    "business": ["office", "business", "professional", "consultancy", "contractor", "hmrc", "self employed"],
+    "office_supplies": ["ryman", "whsmith", "paper", "printer", "toner", "office supply", "stationery", "ink"],
+    "software": ["adobe", "microsoft 365", "office 365", "slack", "zoom", "notion", "figma", "jira", "confluence", "github", "gitlab", "digitalocean", "aws", "google cloud", "azure", "namecheap", "godaddy", "cloudflare", "wordpress", "shopify"],
+    "advertising": ["google ads", "facebook ads", "linkedin ads", "instagram ads", "tiktok ads", "social media ad", "cpc", "ppc", "advertising", "marketing", "sponsored"],
+    "investments": ["vanguard", "fidelity", "hargreaves lansdown", "trading212", "freetrade", "stocks", "shares", "isa", "pension", "s&p 500", "fund", "etf", "investment", "dividend deposit", "interest deposit"],
+    "home_improvement": ["b&q", "wickes", "screwfix", "toolstation", "homebase", "decor", "paint", "wallpaper", "plumbing", "electrical", "building materials", "garden centre", "diy"],
+    "furniture": ["ikea", "dunelm", "habitat", "made.com", "swoon", "loaf", "furniture", "sofa", "bed", "wardrobe", "table", "chair", "bookshelf"],
+    "cleaning": ["cleaning", "cleaner", "domestic help", "housekeeping", "dry cleaning", "laundry", "washing"],
+    "laundry": ["laundry", "dry cleaning", "launderette", "wash and fold"],
+    "therapy": ["therapy", "counselling", "psychologist", "psychiatrist", "mental health", "therapist"],
+    "jewish_education": ["jewish school", "yeshiva", "kollel", "jewish education", "hebrew school", "cheder", "jewish studies", "torah class", "seminary", "jewish learning"],
     "income": ["salary", "wages", "payroll", "pension", "dividend", "tax credit", "child benefit", "universal credit"],
 }
 
@@ -153,26 +304,22 @@ CATEGORISE_PROMPT = """You are a UK bank transaction categoriser. Think step by 
 
 SIGN: amount > 0 = money IN (income). amount < 0 = money OUT (expense).
 
-CATEGORIES:
-- income: salary, wages, pension, refunds, interest, dividends (amount > 0)
-- groceries: supermarket food shopping. AMOUNT-AWARE: small supermarket tx (< £10 at Tesco/Co-op/Sainsbury) is likely a meal deal/snack → dining, not groceries. Over £10 = groceries.
-- dining: restaurants, cafes, takeaways, fast food, coffee shops, meal deals. "Uber" + food keywords = dining. "Uber" + trip/ride keywords = transport.
-- transport: fuel, parking, tube, train, bus, taxi, Uber/Bolt rides, TfL, Oyster, rail tickets, car maintenance, EV charging
-- utilities: gas, electric, water, broadband, phone, council tax (British Gas, EDF, Eon, Octopus, BT, Sky, Virgin, Vodafone, EE, Three, O2)
-- subscriptions: streaming, software, memberships, recurring small payments (Netflix, Spotify, Disney+, Amazon Prime, Apple, iCloud, gym, Google)
-- tzedakah: charitable donations, Jewish charitable giving (Jewish charities, tzedakah, Gift Aid, direct debit to charity)
-- rent: monthly rent payments to landlord or letting agent (usually >500 and monthly pattern)
-- shopping: general retail, online shopping, clothes, electronics (Amazon non-Prime, eBay, Argos, John Lewis, Next, H&M, Zara, Primark, M&S clothes)
-- health: pharmacies, GP, dentist, opticians, hospital, gym, fitness (Boots, Lloyds Pharmacy, Superdrug, NHS, Bupa, PureGym, The Gym Group)
-- entertainment: cinema, theatre, concerts, books, games, hobbies (Odeon, Vue, Cineworld, Steam, PlayStation, Xbox, Waterstones)
-- insurance: home, car, life, pet, travel insurance (Aviva, Direct Line, Admiral, LV=, Churchill, comparethemarket)
-- education: tuition, books, courses, training (UCAS, university, Udemy, Coursera, Skillshare)
-- transfer: bank transfers between own accounts, peer-to-peer, savings pots (Faster Payment, BACS, standing order to savings, Monzo to Monzo, Revolut)
-- cash: ATM withdrawals, cashback, "CASH"
-- tax: HMRC, VAT, self-assessment, council tax, tax credits
-- fees: bank fees, overdraft, FX fees, interest charges, credit card fees
-- mortgage: monthly mortgage payments, home loan payments
-- uncategorized: only if truly nothing above fits
+CATEGORY HIERARCHY (pick one category name from below — the value after the colon is the category to return):
+
+Household: groceries (supermarket food shopping), cleaning (cleaning products, services), furniture (furniture, homeware), household, home_improvement (DIY, B&Q, hardware), laundry, kitchen
+Transport: transport (general transport), fuel (petrol, diesel, EV charging), parking, public_transport (train, bus, tube, tram), car_maintenance (repairs, MOT, tyres), car_hire, taxi
+Utilities: utilities (general bills), electricity, gas, water, internet, phone, council_tax
+Children & Education: education (general), school_fees, tuition, books, childcare, children
+Health: health (general), medical, dental, pharmacy, optical (optometrist, glasses), gym, fitness, therapy
+Jewish & Community: tzedakah (charitable donations, Jewish charities), maaser, shul_donations, mikvah, jewish_education
+Yom Tov: pesach, succah, purim, chanukah, shavuos, rosh_hashanah, yom_kippur
+Simchas: wedding, bar_bas_mitzvah, bris, engagement, sheva_brachos, gifts
+Travel: travel (general), flights, hotels, car_hire, holiday
+Business: business, office_supplies, software, advertising
+Entertainment & Dining: dining (restaurants, cafes, takeaways, fast food), entertainment (cinema, theatre, events), streaming (Netflix, Spotify, etc.), subscriptions, hobbies
+Shopping: shopping (retail, online), clothing, electronics
+Financial: rent, mortgage, insurance, tax, fees (bank fees, charges), transfer (bank transfers, PayPal), cash (ATM withdrawals), investments (stocks, ISAs)
+Income: salary, income (refunds, interest, dividends)
 
 AMOUNT-AWARE LOGIC (use this to disambiguate):
 - Tesco/Co-op/Sainsbury < £10 → dining (meal deal/snack), >= £10 → groceries
@@ -181,7 +328,7 @@ AMOUNT-AWARE LOGIC (use this to disambiguate):
 - PayPal: check description — if "PAYPAL *TRANSFER" → transfer, if "PAYPAL *EBAY" → shopping, if "PAYPAL *UBER" → depends on Uber context
 - Any recurring small amount (3.99-14.99) with digital service name likely → subscriptions
 
-Output STRICT JSON only: {{"category": "<one of the above>"}}
+Output STRICT JSON only: {{"category": "<one of the categories listed above>"}}
 
 Transaction: {description}
 Merchant: {merchant}
