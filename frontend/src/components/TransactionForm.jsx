@@ -40,6 +40,15 @@ export default function TransactionForm({
   saveAsRecurring, setSaveAsRecurring,
 }) {
   const [showMore, setShowMore] = useState(false);
+
+  // Build grouped categories from selectedCats + AI suggestions
+  // MUST be called before any early return (Rules of Hooks)
+  const grouped = useMemo(() => {
+    if (!selectedCats || selectedCats.length === 0) return {};
+    const hierarchy = selectedCats.hierarchy || {};
+    return groupCatsBySection(selectedCats, hierarchy);
+  }, [selectedCats]);
+
   if (!open) return null;
 
   const canClassify = form.description.trim() && form.amount && !editingId && !classifying;
@@ -48,13 +57,6 @@ export default function TransactionForm({
   const suggestions = classification?.suggestions || [];
   const topSuggestion = suggestions[0];
   const autoFill = topSuggestion && topSuggestion.confidence >= 0.95;
-
-  // Build grouped categories from selectedCats + AI suggestions
-  const grouped = useMemo(() => {
-    if (!selectedCats || selectedCats.length === 0) return {};
-    const hierarchy = selectedCats.hierarchy || {};
-    return groupCatsBySection(selectedCats, hierarchy);
-  }, [selectedCats]);
 
   const sourceBadge = (cat) => {
     const source = cat.source || "System";
