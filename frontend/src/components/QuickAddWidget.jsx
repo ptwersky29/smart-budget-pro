@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Plus, Loader2, Sparkles, Check, X, Brain } from "lucide-react";
-import { Button } from "../components/ui/button";
+import { Button } from "./ui/button";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 
