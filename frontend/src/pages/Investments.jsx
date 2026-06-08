@@ -124,7 +124,7 @@ export default function Investments() {
         <p className="text-xs text-muted-foreground mt-3">Tap any asset to use its live price as your initial investment value.</p>
       </div>
 
-      <form onSubmit={run} className="rounded-2xl border border-border bg-card p-6 grid grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+      <form onSubmit={run} className="rounded-2xl border border-border bg-card p-4 sm:p-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 items-end">
         <div>
           <label className="label-overline">Symbol</label>
           <select data-testid="inv-symbol" value={form.symbol} onChange={(e)=>setForm({...form, symbol:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none">

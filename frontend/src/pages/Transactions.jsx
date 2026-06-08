@@ -473,10 +473,10 @@ const Transactions = React.memo(function Transactions() {
               <SheetContent side="right" className="w-full sm:max-w-md">
                 <SheetHeader>
                   <SheetTitle>Filters</SheetTitle>
-                  <SheetDescription>Refine your transaction list</SheetDescription>
+                  <SheetDescription className="text-xs sm:text-sm">Refine your transaction list</SheetDescription>
                 </SheetHeader>
-                <div className="mt-6 space-y-5">
-                  <div className="grid grid-cols-2 gap-3">
+                <div className="mt-4 sm:mt-6 space-y-4 sm:space-y-5">
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
                     <select value={filters.tx_type} onChange={(e) => toggleFilter("tx_type", e.target.value)} className="h-10 px-4 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors">
                       <option value="">All types</option><option value="income">Income</option><option value="expense">Expense</option>
                     </select>
@@ -574,15 +574,17 @@ const Transactions = React.memo(function Transactions() {
             />
           ) : (
             <>
-              {/* Mobile card view with ⋮ actions */}
+              {/* Mobile card view with swipe-aware actions */}
               <div className="block sm:hidden divide-y divide-border">
                 {(aiResults?.transactions || txs).map((t) => (
-                  <div key={t.transaction_id} style={{ contentVisibility: "auto" }} className={`px-4 py-3 space-y-1.5 ${selectedIds.has(t.transaction_id) ? "bg-emerald/5" : ""}`}>
+                  <div key={t.transaction_id} style={{ contentVisibility: "auto" }} className={`relative px-4 py-4 space-y-1.5 tap-highlight-none ${selectedIds.has(t.transaction_id) ? "bg-emerald/5" : ""}`}>
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <input type="checkbox" checked={selectedIds.has(t.transaction_id)}
-                          onChange={() => toggleSelect(t.transaction_id)}
-                          className="h-4 w-4 rounded border-border accent-emerald cursor-pointer shrink-0" />
+                      <div className="flex items-center gap-3 min-w-0">
+                        <label className="flex items-center justify-center" aria-label="Select transaction">
+                          <input type="checkbox" checked={selectedIds.has(t.transaction_id)}
+                            onChange={() => toggleSelect(t.transaction_id)}
+                            className="h-5 w-5 rounded border-border accent-emerald cursor-pointer shrink-0" />
+                        </label>
                         <div className="min-w-0">
                           <p className="text-xs text-muted-foreground">{t.date?.slice(0, 10)}</p>
                           <p className="font-medium text-sm truncate">{t.description}</p>
@@ -592,8 +594,8 @@ const Transactions = React.memo(function Transactions() {
                         </div>
                       </div>
                       <DropdownMenu>
-                        <DropdownMenuTrigger className="p-2 text-muted-foreground hover:text-foreground" aria-label="Transaction actions">
-                          <MoreHorizontal className="h-4 w-4" />
+                        <DropdownMenuTrigger className="p-3 -mr-1 text-muted-foreground hover:text-foreground active:scale-95 transition-transform" aria-label="Transaction actions">
+                          <MoreHorizontal className="h-5 w-5" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => openEdit(t)}>
@@ -605,9 +607,9 @@ const Transactions = React.memo(function Transactions() {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
-                    <div className="flex items-center justify-between pl-6">
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-secondary capitalize">{t.category || "uncategorized"}</span>
-                      <span className={`font-medium tabular-nums text-sm ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}>
+                    <div className="flex items-center justify-between pl-11">
+                      <span className="text-xs px-2.5 py-1 rounded-full bg-secondary capitalize">{t.category || "uncategorized"}</span>
+                      <span className={`font-semibold tabular-nums text-sm ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}>
                         {t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}
                       </span>
                     </div>

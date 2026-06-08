@@ -115,13 +115,13 @@ export default function Reports() {
         description="A cleaner monthly readout with health score, insights, and premium PDF reports."
         actions={
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-muted-foreground">From</label>
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <label className="text-[11px] sm:text-xs text-muted-foreground">From</label>
               <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                className="h-10 px-3 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:outline-none" />
-              <label className="text-xs text-muted-foreground">To</label>
+                className="h-10 px-2 sm:px-3 rounded-xl bg-secondary/50 border border-transparent text-xs sm:text-sm focus:border-ring focus:outline-none w-[130px] sm:w-auto" />
+              <label className="text-[11px] sm:text-xs text-muted-foreground">To</label>
               <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-                className="h-10 px-3 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:outline-none" />
+                className="h-10 px-2 sm:px-3 rounded-xl bg-secondary/50 border border-transparent text-xs sm:text-sm focus:border-ring focus:outline-none w-[130px] sm:w-auto" />
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -159,15 +159,15 @@ export default function Reports() {
       )}
 
       <div className="rounded-2xl border border-border bg-card p-6">
-        <div className="flex items-center gap-3">
-          <ShieldCheck className="h-4 w-4 text-emerald" />
+        <div className="flex items-center gap-2 sm:gap-3">
+          <ShieldCheck className="h-4 w-4 text-emerald shrink-0" />
           <p className="label-overline">Health score</p>
-          <span className="ml-auto text-3xl tracking-tight font-light">{data.health_score}<span className="text-sm text-muted-foreground">/100</span></span>
+          <span className="ml-auto text-2xl sm:text-3xl tracking-tight font-light">{data.health_score}<span className="text-xs sm:text-sm text-muted-foreground">/100</span></span>
         </div>
-        <div className="mt-4 h-2 bg-secondary rounded-full overflow-hidden">
+        <div className="mt-3 sm:mt-4 h-2 bg-secondary rounded-full overflow-hidden">
           <div className="h-full gradient-emerald" style={{width: `${data.health_score}%`}} />
         </div>
-        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+        <div className="mt-3 sm:mt-4 flex flex-wrap items-center gap-x-4 sm:gap-x-6 gap-y-1.5 sm:gap-y-2 text-xs sm:text-sm">
           <span>Savings rate: <span className="text-emerald font-medium">{data.savings_rate}%</span></span>
           <span>Top spend: <span className="font-medium">{topSpend ? `${topSpend.name} · £${topSpend.value.toFixed(0)}` : "—"}</span></span>
           <span>Subscriptions: <span className="font-medium">{subs ? `£${subs.value.toFixed(2)}/mo` : "None detected"}</span></span>

@@ -150,8 +150,8 @@ export default function Budgets() {
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="px-5 pb-5 border-t border-border pt-4">
-            <form onSubmit={handleCreate} className="flex flex-wrap gap-3 items-end">
-              <div className="flex-1 min-w-[200px]">
+            <form onSubmit={handleCreate} className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3 items-stretch sm:items-end">
+              <div className="flex-1 min-w-0 w-full sm:min-w-[200px]">
                 <label className="label-overline">Category</label>
                 <Input list="budget-categories" value={form.category}
                   onChange={(e) => setForm({ ...form, category: e.target.value })}
@@ -160,13 +160,13 @@ export default function Budgets() {
                   {CATEGORY_OPTIONS.map(cat => <option key={cat} value={cat} />)}
                 </datalist>
               </div>
-              <div className="flex-1 min-w-[140px]">
+              <div className="flex-1 min-w-0 w-full sm:min-w-[140px]">
                 <label className="label-overline">Monthly limit (£)</label>
                 <Input type="number" step="0.01" min="0" value={form.limit}
                   onChange={(e) => setForm({ ...form, limit: e.target.value })}
                   placeholder="e.g., 300" className="mt-1 w-full" required />
               </div>
-              <Button type="submit" variant="primary" size="pill">
+              <Button type="submit" variant="primary" size="pill" className="w-full sm:w-auto">
                 <Plus className="h-4 w-4" /> Add Budget
               </Button>
             </form>

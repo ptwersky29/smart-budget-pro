@@ -140,13 +140,13 @@ export default function Settings() {
         description="Manage your account, subscription, AI providers, integrations, SMS settings, and admin config."
       />
 
-      {/* Tab bar */}
-      <div className="flex gap-1 flex-wrap border-b border-border pb-0">
+      {/* Tab bar — horizontal scroll on mobile */}
+      <div className="flex gap-1 overflow-x-auto no-scrollbar border-b border-border pb-0 -mx-4 sm:mx-0 px-4 sm:px-0">
         {visibleTabs.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             onClick={() => setActiveTab(key)}
-            className={`inline-flex items-center gap-2 text-sm px-4 py-3 border-b-2 transition-colors font-medium ${
+            className={`inline-flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm whitespace-nowrap px-3 sm:px-4 py-3 border-b-2 transition-colors font-medium shrink-0 ${
               activeTab === key
                 ? "border-emerald text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"

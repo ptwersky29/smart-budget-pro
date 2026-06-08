@@ -111,18 +111,18 @@ export default function BankStatements() {
         }
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl p-5 shadow-card">
-          <p className="label-overline">Bank connections</p>
-          <p className="mt-3 text-3xl tracking-tight font-semibold">{conns.length}</p>
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl p-3 sm:p-5 shadow-card">
+          <p className="label-overline text-[10px] sm:text-[11px]">Bank connections</p>
+          <p className="mt-2 sm:mt-3 text-xl sm:text-3xl tracking-tight font-semibold">{conns.length}</p>
         </div>
-        <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl p-5 shadow-card">
-          <p className="label-overline">Transactions synced</p>
-          <p className="mt-3 text-3xl tracking-tight font-semibold">{totalTx.toLocaleString()}</p>
+        <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl p-3 sm:p-5 shadow-card">
+          <p className="label-overline text-[10px] sm:text-[11px]">Transactions synced</p>
+          <p className="mt-2 sm:mt-3 text-xl sm:text-3xl tracking-tight font-semibold">{totalTx.toLocaleString()}</p>
         </div>
-        <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl p-5 shadow-card">
-          <p className="label-overline">Total balance</p>
-          <p className="mt-3 text-3xl tracking-tight font-semibold">{totalBalance !== 0 ? `£${totalBalance.toLocaleString()}` : "—"}</p>
+        <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl p-3 sm:p-5 shadow-card">
+          <p className="label-overline text-[10px] sm:text-[11px]">Total balance</p>
+          <p className="mt-2 sm:mt-3 text-xl sm:text-3xl tracking-tight font-semibold">{totalBalance !== 0 ? `£${totalBalance.toLocaleString()}` : "—"}</p>
         </div>
       </div>
 
@@ -135,7 +135,7 @@ export default function BankStatements() {
         </div>
       )}
 
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Bank Connections */}
         <SectionCard contentClassName="p-0">
           <div className="p-5 border-b border-border/70 flex items-center gap-3 flex-wrap">

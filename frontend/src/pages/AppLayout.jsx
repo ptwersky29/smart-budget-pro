@@ -9,11 +9,24 @@ import NotificationCenter from "../components/NotificationCenter";
 import AccessibilityOverlay from "../components/AccessibilityOverlay";
 import QuickAddWidget from "../components/QuickAddWidget";
 import { Button } from "../components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "../components/ui/dropdown-menu";
 
 import {
   LayoutDashboard, Receipt, PiggyBank, Building2, TrendingUp, Star,
-  Landmark, FileText, Settings, LogOut, Menu, X, MoonStar, Sun, Crown, ArrowRight, RefreshCcw
+  Landmark, FileText, Settings, LogOut, Menu, X, MoonStar, Sun, Crown, ArrowRight, RefreshCcw, MoreHorizontal
 } from "lucide-react";
+
+const BOTTOM_NAV = [
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/transactions", label: "Transactions", icon: Receipt },
+  { to: "/budgets", label: "Budgets", icon: PiggyBank },
+  { to: "/settings", label: "More", icon: MoreHorizontal, isMore: true },
+];
 
 const NAV_SECTIONS = [
   {
@@ -349,7 +362,7 @@ export default function AppLayout() {
           </div>
         </header>
 
-        <main className="p-4 sm:p-5 lg:p-8 max-w-[1680px] mx-auto animate-[fadeUp_0.35s_ease-out]">
+        <main className="p-4 sm:p-5 lg:p-8 pb-24 lg:pb-8 max-w-[1680px] mx-auto animate-[fadeUp_0.35s_ease-out]">
           <div className="space-y-8">
             <div className="lg:hidden rounded-2xl border border-border bg-card/90 backdrop-blur-xl p-5 shadow-card">
               <p className="label-overline text-emerald">{routeMeta.eyebrow}</p>
@@ -364,6 +377,60 @@ export default function AppLayout() {
           </div>
         </main>
       </div>
+      {/* ── Bottom Navigation (mobile) ── */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/90 backdrop-blur-xl safe-bottom-fixed tap-highlight-none" role="tablist" aria-label="Main navigation">
+        <div className="flex items-center justify-around h-16 px-2">
+          {BOTTOM_NAV.map(({ to, label, icon: Icon, isMore }) => {
+            const active = location.pathname.startsWith(to);
+            if (isMore) {
+              const otherSections = NAV_SECTIONS.flatMap(s => s.items).filter(
+                item => !BOTTOM_NAV.some(n => n.to === item.to || n.isMore)
+              );
+              const moreActive = otherSections.some(s => location.pathname.startsWith(s.to));
+              return (
+                <DropdownMenu key="more">
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-colors relative ${
+                        moreActive ? "text-emerald" : "text-muted-foreground hover:text-foreground"
+                      }`}
+                      aria-label="More"
+                    >
+                      <Icon className="h-5 w-5" />
+                      <span className="text-[10px] font-medium">More</span>
+                      {moreActive && <span className="absolute -top-1 left-1/2 -translate-x-1/2 h-1 w-6 rounded-full bg-emerald" />}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="center" side="top" className="mb-3">
+                    {otherSections.map(({ to: t, label: l, icon: Ic }) => (
+                      <DropdownMenuItem key={t} onClick={() => { navigate(t); }}>
+                        <Ic className="h-4 w-4 mr-2" />
+                        {l}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              );
+            }
+            return (
+              <Link
+                key={to}
+                to={to}
+                role="tab"
+                aria-selected={active}
+                className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-colors relative ${
+                  active ? "text-emerald" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Icon className="h-5 w-5" />
+                <span className="text-[10px] font-medium">{label}</span>
+                {active && <span className="absolute -top-1 left-1/2 -translate-x-1/2 h-1 w-6 rounded-full bg-emerald" />}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+
       <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
       <KeyboardShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
       <AccessibilityOverlay />
