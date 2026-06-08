@@ -755,7 +755,6 @@ function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, o
     <div className="relative overflow-hidden tap-highlight-none" {...handlers} onClick={() => { if (deleting) setSwipedId(null); }}>
       <div
         className={`transition-transform duration-200 ease-out ${deleting ? "-translate-x-20" : "translate-x-0"} ${isSelected ? "bg-emerald/5" : ""} divide-y divide-border`}
-        style={{ contentVisibility: "auto" }}
       >
         <div className="px-4 py-4 space-y-1.5">
           <div className="flex items-start justify-between gap-2">
