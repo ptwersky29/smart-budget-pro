@@ -89,6 +89,75 @@ async def _track_usage(session, user_id: str, provider: str, model: str, pt: int
         pass
 
 
+
+
+# ── Default budget seeding ───────────────────────────────────────────────
+
+# Smart default budgets for new users (UK-based amounts, monthly)
+DEFAULT_MONTHLY_BUDGETS = {
+    "groceries": 300,
+    "dining": 100,
+    "transport": 150,
+    "fuel": 80,
+    "parking": 50,
+    "utilities": 120,
+    "electricity": 60,
+    "gas": 40,
+    "water": 30,
+    "internet": 40,
+    "phone": 30,
+    "council_tax": 150,
+    "household": 100,
+    "cleaning": 30,
+    "clothing": 80,
+    "health": 50,
+    "gym": 30,
+    "shopping": 100,
+    "entertainment": 80,
+    "subscriptions": 40,
+    "insurance": 100,
+    "personal": 50,
+}
+
+
+async def seed_default_budgets_for_user(session, user_id: str):
+    """
+    Seed default monthly budget with smart category limits for a new user.
+    Called on user registration to provide immediate budget structure.
+    """
+    try:
+        # Create "Monthly Living" budget occasion
+        occasion = BudgetOccasion(
+            user_id=user_id,
+            budget_type="day_to_day",
+            name="Monthly Living",
+            status="approved",
+            estimated_amount=sum(DEFAULT_MONTHLY_BUDGETS.values()),
+            sort_order=0,
+        )
+        session.add(occasion)
+        await session.flush()  # Get the occasion ID
+        
+        # Add default category budgets
+        for category, amount in DEFAULT_MONTHLY_BUDGETS.items():
+            cat = BudgetOccasionCategory(
+                occasion_id=occasion.id,
+                name=category,
+                budgeted_amount=amount,
+                actual_amount=0,
+                forecast_amount=0,
+            )
+            session.add(cat)
+        
+        await session.commit()
+        logger.info("Seeded default budgets for user %s", user_id[:16])
+        return True
+    except Exception as e:
+        logger.warning("Failed to seed default budgets for user %s: %s", user_id[:16], str(e))
+        await session.rollback()
+        return False
+
+
 # ── Pydantic models ──────────────────────────────────────────────────────
 
 class DayToDayBudgetIn(BaseModel):

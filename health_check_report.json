@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-06-08T15:55:52.230568",
+    "timestamp": "2026-06-08T15:59:03.797316",
     "root_path": "D:\\Users\\PC\\Downloads\\smart-budget-pro-main (1)\\smart-budget-pro-main",
-    "duration_seconds": 1.8616206645965576
+    "duration_seconds": 2.2163329124450684
   },
   "backend": {
     "environment": {
@@ -530,12 +530,12 @@
       },
       "frontend_usage": {
         "used_endpoints": [
-          "/api/budgets",
-          "/api/auth/login",
-          "/api/auth/logout",
-          "/api/auth/me",
           "/api/settings",
-          "/api/transactions"
+          "/api/auth/logout",
+          "/api/transactions",
+          "/api/auth/me",
+          "/api/budgets",
+          "/api/auth/login"
         ],
         "unused_endpoints": []
       },
