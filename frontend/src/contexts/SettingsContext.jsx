@@ -19,6 +19,18 @@ const DEFAULTS = {
   accessibility: { high_contrast: false, font_scaling: 100, keyboard_navigation: true, reduce_motion: false },
 };
 
+function applyToDOM(preferences) {
+  const root = document.documentElement;
+  const a = preferences?.appearance || {};
+  const acc = preferences?.accessibility || {};
+
+  root.dataset.density = a.density || "comfortable";
+  root.dataset.fontSize = a.font_size || "medium";
+  root.style.setProperty("--fs-multiplier", String((acc.font_scaling ?? 100) / 100));
+  root.dataset.highContrast = acc.high_contrast ? "true" : "false";
+  root.dataset.reduceMotion = acc.reduce_motion ? "true" : "false";
+}
+
 export function SettingsProvider({ children }) {
   const { setTheme } = useTheme();
   const [settings, setSettings] = useState({
@@ -33,6 +45,7 @@ export function SettingsProvider({ children }) {
       const { data } = await api.get("/settings/app");
       setSettings(data);
       if (data.theme) setTheme(data.theme);
+      applyToDOM(data.preferences);
     } catch {
       // offline-safe
     } finally {
@@ -48,6 +61,7 @@ export function SettingsProvider({ children }) {
       const { data } = await api.put("/settings/app", patch);
       setSettings(data);
       if (patch.theme) setTheme(patch.theme);
+      applyToDOM(data.preferences);
       return data;
     } catch (err) {
       toast.error("Failed to save settings");
