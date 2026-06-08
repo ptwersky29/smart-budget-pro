@@ -40,14 +40,19 @@ export function SettingsProvider({ children }) {
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Apply defaults to DOM immediately on mount so settings take effect even before API loads
+  useEffect(() => {
+    applyToDOM(DEFAULTS);
+  }, []);
+
   const load = useCallback(async () => {
     try {
       const { data } = await api.get("/settings/app");
       setSettings(data);
       if (data.theme) setTheme(data.theme);
-      applyToDOM(data.preferences);
+      applyToDOM(data.preferences || DEFAULTS);
     } catch {
-      // offline-safe
+      // offline-safe - defaults already applied above
     } finally {
       setLoaded(true);
     }

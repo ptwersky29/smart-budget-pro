@@ -1,0 +1,583 @@
+{
+  "metadata": {
+    "timestamp": "2026-06-08T15:55:52.230568",
+    "root_path": "D:\\Users\\PC\\Downloads\\smart-budget-pro-main (1)\\smart-budget-pro-main",
+    "duration_seconds": 1.8616206645965576
+  },
+  "backend": {
+    "environment": {
+      "required_vars": {
+        "passed": true,
+        "missing": [],
+        "present": [
+          "DATABASE_URL",
+          "JWT_SECRET",
+          "FRONTEND_URL"
+        ]
+      },
+      "optional_vars": {
+        "present": [
+          "ADMIN_EMAIL",
+          "ADMIN_PASSWORD"
+        ],
+        "missing": [
+          "OPENROUTER_API_KEY",
+          "STRIPE_SECRET_KEY",
+          "TRUELAYER_CLIENT_ID",
+          "TRUELAYER_CLIENT_SECRET",
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET"
+        ]
+      },
+      "env_file": {
+        "passed": true,
+        "exists": true,
+        "readable": true,
+        "lines": 13,
+        "detail": "File has 13 configuration lines"
+      },
+      "jwt_secret": {
+        "passed": true,
+        "exists": true,
+        "length": 64,
+        "detail": "JWT_SECRET length: 64 chars"
+      },
+      "database_url": {
+        "passed": false,
+        "exists": true,
+        "valid_format": false,
+        "detail": "Invalid format. Expected: postgresql://user:pass@host:port/db"
+      }
+    },
+    "file_structure": {
+      "required_files": {
+        "passed": true,
+        "present": [
+          "server.py",
+          "db.py",
+          "auth.py",
+          "requirements.txt"
+        ],
+        "missing": []
+      },
+      "required_dirs": {
+        "passed": true,
+        "present": [
+          "tests"
+        ],
+        "missing": []
+      }
+    },
+    "dependencies": {
+      "requirements_file": {
+        "passed": true,
+        "exists": true,
+        "lines": 30,
+        "packages": [
+          "fastapi==0.110.1",
+          "uvicorn==0.25.0",
+          "boto3>=1.34.129,<2.0.0",
+          "requests-oauthlib>=2.0.0",
+          "cryptography>=42.0.8,<44.0.0",
+          "python-dotenv>=1.0.1",
+          "pydantic>=2.6.4,<3.0.0",
+          "email-validator>=2.2.0",
+          "pyjwt>=2.10.1",
+          "bcrypt==4.1.3",
+          "passlib>=1.7.4",
+          "tzdata>=2024.2",
+          "pytest>=8.0.0",
+          "black>=24.1.1",
+          "isort>=5.13.2",
+          "flake8>=7.0.0",
+          "mypy>=1.8.0",
+          "python-jose>=3.3.0",
+          "requests>=2.31.0,<3.0.0",
+          "pandas>=2.2.0,<3.0.0",
+          "numpy>=1.26.0,<2.0.0",
+          "python-multipart>=0.0.9",
+          "typer>=0.9.0",
+          "httpx",
+          "stripe>=10.0.0,<12.0.0",
+          "sqlalchemy[asyncio]>=2.0.30,<2.1.0",
+          "asyncpg>=0.29.0",
+          "psycopg2-binary>=2.9.9",
+          "pypdf>=4.2.0,<5.0.0",
+          "reportlab>=4.1.0,<5.0.0"
+        ],
+        "detail": "30 packages listed"
+      },
+      "critical_packages": {
+        "passed": true,
+        "installed": [
+          "fastapi",
+          "uvicorn",
+          "sqlalchemy",
+          "pydantic",
+          "asyncpg",
+          "bcrypt"
+        ],
+        "missing": [],
+        "detail": "Installed: 6/6"
+      },
+      "import_check": {
+        "passed": true,
+        "modules": {
+          "db": {
+            "passed": true,
+            "error": null
+          },
+          "auth": {
+            "passed": true,
+            "error": null
+          },
+          "server": {
+            "passed": true,
+            "error": null
+          },
+          "budget_system": {
+            "passed": true,
+            "error": null
+          },
+          "jewish": {
+            "passed": true,
+            "error": null
+          }
+        },
+        "detail": "Imported 5/5 core modules"
+      }
+    },
+    "database": {
+      "configured": true,
+      "connection": {
+        "passed": false,
+        "connected": false,
+        "error": "invalid DSN: scheme is expected to be either \"postgresql\" or \"postgres\", got 'postgresql+asyncpg'",
+        "detail": "Connection failed: invalid DSN: scheme is expected to be either \"postgresql\" or \"postgres\", got 'postgresql+asyncpg'"
+      },
+      "tables": {
+        "passed": false,
+        "tables": [],
+        "missing": [],
+        "error": "invalid DSN: scheme is expected to be either \"postgresql\" or \"postgres\", got 'postgresql+asyncpg'"
+      }
+    }
+  },
+  "frontend": {
+    "package": {
+      "file_exists": true,
+      "valid_json": true,
+      "scripts": {
+        "passed": true,
+        "present": [
+          "start",
+          "build",
+          "test"
+        ],
+        "missing": []
+      },
+      "dependencies": {
+        "passed": true,
+        "installed": [
+          "react@^18.3.1",
+          "react-dom@^18.3.1",
+          "react-router-dom@^7.5.1",
+          "axios@^1.8.4",
+          "tailwindcss@^3.4.17"
+        ],
+        "missing": []
+      },
+      "react_version": "^18.3.1",
+      "node_modules": {
+        "exists": false,
+        "likely_installed": false
+      }
+    },
+    "config": {
+      "tailwind": {
+        "config_exists": true,
+        "valid": true,
+        "detail": "Configuration file present and valid"
+      },
+      "postcss": {
+        "config_exists": true,
+        "valid": true,
+        "detail": "Configuration file present"
+      },
+      "jsconfig": {
+        "config_exists": true,
+        "valid": true,
+        "has_paths": true,
+        "detail": "Aliases configured: True"
+      },
+      "build_config": {
+        "vercel_config": true,
+        "components_json": true,
+        "detail": "Build configuration present"
+      }
+    },
+    "structure": {
+      "directories": {
+        "passed": true,
+        "present": [
+          "src",
+          "src/components",
+          "src/pages",
+          "src/hooks",
+          "src/contexts",
+          "public"
+        ],
+        "missing": []
+      },
+      "files": {
+        "passed": true,
+        "present": [
+          "src/index.js",
+          "src/App.js",
+          "public/index.html"
+        ],
+        "missing": []
+      },
+      "component_count": {
+        "count": 17,
+        "jsx_files": [
+          "AccessibilityOverlay.jsx",
+          "AIInsightPanel.jsx",
+          "CommandPalette.jsx",
+          "ComparePeriods.jsx",
+          "ConsentBanner.jsx",
+          "ErrorBoundary.jsx",
+          "KeyboardShortcutsHelp.jsx",
+          "MaaserPanel.jsx",
+          "NotificationCenter.jsx",
+          "PageLoader.jsx",
+          "ProtectedRoute.jsx",
+          "QuickAddWidget.jsx",
+          "RecurringTransactionManager.jsx",
+          "SettingsLayout.jsx",
+          "TransactionForm.jsx",
+          "TransactionRow.jsx",
+          "YearEndJewishReport.jsx"
+        ],
+        "detail": "17 component files found"
+      },
+      "test_coverage": {
+        "test_dir_exists": true,
+        "test_files": [
+          "ConfirmModal.test.jsx",
+          "EmptyState.test.jsx",
+          "Skeleton.test.jsx"
+        ],
+        "detail": "3 test files found"
+      }
+    }
+  },
+  "infrastructure": {
+    "render": {
+      "file_exists": true,
+      "valid_yaml": true,
+      "config": {
+        "services": [
+          {
+            "type": "web",
+            "name": "financeai-api",
+            "env": "python",
+            "rootDir": "backend",
+            "buildCommand": "pip install -r requirements.txt",
+            "startCommand": "uvicorn server:app --host 0.0.0.0 --port $PORT",
+            "healthCheckPath": "/api/health",
+            "envVars": [
+              {
+                "key": "DATABASE_URL",
+                "sync": false
+              },
+              {
+                "key": "JWT_SECRET",
+                "generateValue": true
+              },
+              {
+                "key": "FRONTEND_URL",
+                "value": "https://smart-budget-pro-ewtm.vercel.app"
+              },
+              {
+                "key": "TRUELAYER_REDIRECT_URI",
+                "value": "https://budget-pro-4jlg.onrender.com/api/truelayer/callback"
+              },
+              {
+                "key": "ADMIN_EMAIL",
+                "sync": false
+              },
+              {
+                "key": "ADMIN_PASSWORD",
+                "sync": false
+              },
+              {
+                "key": "GOOGLE_CLIENT_ID",
+                "sync": false
+              },
+              {
+                "key": "GOOGLE_CLIENT_SECRET",
+                "sync": false
+              },
+              {
+                "key": "OPENROUTER_API_KEY",
+                "sync": false
+              }
+            ]
+          }
+        ]
+      },
+      "services": [],
+      "environment_vars": [],
+      "health_check": {
+        "configured": false,
+        "endpoint": null
+      }
+    },
+    "procfile": {
+      "file_exists": true,
+      "valid": true,
+      "content": "web: uvicorn server:app --host 0.0.0.0 --port $PORT",
+      "has_web_process": true,
+      "uses_uvicorn": true,
+      "detail": "Valid FastAPI/Uvicorn Procfile"
+    },
+    "environment": {
+      "env_file_exists": true,
+      "critical_vars": {
+        "present": [
+          {
+            "name": "DATABASE_URL",
+            "description": "PostgreSQL connection string",
+            "value_sample": "postgresql+asyncpg:/..."
+          },
+          {
+            "name": "JWT_SECRET",
+            "description": "JWT secret key for authentication",
+            "value_sample": "v_6bKrcPXnefnew3KNHa..."
+          },
+          {
+            "name": "FRONTEND_URL",
+            "description": "Frontend application URL",
+            "value_sample": "http://localhost:300..."
+          }
+        ],
+        "missing": [],
+        "empty": []
+      },
+      "deployment_vars": {
+        "present": [],
+        "missing": [
+          {
+            "name": "NODE_ENV",
+            "description": "Environment (production/development)"
+          },
+          {
+            "name": "DEBUG",
+            "description": "Debug mode flag"
+          },
+          {
+            "name": "LOG_LEVEL",
+            "description": "Logging level"
+          }
+        ],
+        "empty": []
+      },
+      "integration_vars": {
+        "present": [],
+        "missing": [
+          {
+            "name": "STRIPE_SECRET_KEY",
+            "description": "Stripe payment key"
+          },
+          {
+            "name": "TRUELAYER_CLIENT_ID",
+            "description": "Bank sync integration"
+          }
+        ],
+        "empty": [
+          "OPENROUTER_API_KEY"
+        ]
+      },
+      "env_specific": {
+        "node_env": "not set",
+        "debug_mode": false,
+        "recommendation": "Set NODE_ENV=production for production deployments"
+      }
+    },
+    "security": {
+      "cors_configured": {
+        "found": true,
+        "origins": [],
+        "detail": "CORS configured with 0 origin(s)"
+      },
+      "security_headers": {
+        "found": false,
+        "headers": [],
+        "detail": "0 security headers configured"
+      },
+      "https_redirect": {
+        "configured": true,
+        "detail": "HTTPS redirect configured"
+      },
+      "csrf_protection": {
+        "configured": true,
+        "detail": "CSRF protection enabled"
+      }
+    },
+    "api": {
+      "found": [],
+      "missing": [
+        {
+          "endpoint": "GET /api/health",
+          "description": "Health check endpoint"
+        },
+        {
+          "endpoint": "POST /api/auth/login",
+          "description": "Login endpoint"
+        },
+        {
+          "endpoint": "GET /api/transactions",
+          "description": "List transactions"
+        },
+        {
+          "endpoint": "POST /api/budgets",
+          "description": "Create budget"
+        },
+        {
+          "endpoint": "GET /api/settings",
+          "description": "Get settings"
+        }
+      ],
+      "detail": "0/5 endpoints found"
+    }
+  },
+  "integration": {
+    "api_client": {
+      "axios_config": {
+        "found": true,
+        "files": [
+          "api.js",
+          "useApiQuery.js"
+        ],
+        "detail": "Found 2 API-related files"
+      },
+      "api_base_url": {
+        "found": true,
+        "base_url": "https://budget-pro-4jlg.onrender.com",
+        "configurable": true,
+        "detail": "Configured in api.js"
+      },
+      "interceptors": {
+        "auth_interceptor": true,
+        "error_interceptor": true,
+        "detail": "Auth: \u2713, Errors: \u2713"
+      }
+    },
+    "frontend_env": {
+      "env_files": {
+        "found_files": [
+          ".env"
+        ],
+        "recommended_missing": [
+          ".env.production (prod config)"
+        ]
+      },
+      "build_config": {
+        "has_build_script": true,
+        "supports_env_vars": true,
+        "detail": "React Scripts: REACT_APP_* env vars supported"
+      },
+      "api_url_env_var": {
+        "has_backend_url_var": true,
+        "env_var_name": "REACT_APP_BACKEND_URL",
+        "detail": "Configured in api.js"
+      }
+    },
+    "backend_api": {
+      "cors_origins": {
+        "configured": false,
+        "origins": [],
+        "includes_localhost": false,
+        "detail": "0 origins: "
+      },
+      "api_prefix": {
+        "configured": true,
+        "prefix": "/api",
+        "detail": "API routes use /api prefix"
+      },
+      "error_handling": {
+        "has_error_handlers": true,
+        "returns_json": true,
+        "detail": "Custom error handlers configured"
+      },
+      "content_type": {
+        "json_content_type": true,
+        "detail": "JSON content type configured"
+      }
+    },
+    "compatibility": {
+      "backend_endpoints": {
+        "found": [],
+        "missing": [
+          "/api/auth/login",
+          "/api/auth/me",
+          "/api/auth/logout",
+          "/api/transactions",
+          "/api/budgets",
+          "/api/settings"
+        ]
+      },
+      "frontend_usage": {
+        "used_endpoints": [
+          "/api/budgets",
+          "/api/auth/login",
+          "/api/auth/logout",
+          "/api/auth/me",
+          "/api/settings",
+          "/api/transactions"
+        ],
+        "unused_endpoints": []
+      },
+      "compatibility": {
+        "/api/auth/login": {
+          "backend_defined": false,
+          "frontend_uses": true,
+          "compatible": false
+        },
+        "/api/auth/me": {
+          "backend_defined": false,
+          "frontend_uses": true,
+          "compatible": false
+        },
+        "/api/auth/logout": {
+          "backend_defined": false,
+          "frontend_uses": true,
+          "compatible": false
+        },
+        "/api/transactions": {
+          "backend_defined": false,
+          "frontend_uses": true,
+          "compatible": false
+        },
+        "/api/budgets": {
+          "backend_defined": false,
+          "frontend_uses": true,
+          "compatible": false
+        },
+        "/api/settings": {
+          "backend_defined": false,
+          "frontend_uses": true,
+          "compatible": false
+        }
+      }
+    }
+  },
+  "summary": {
+    "total_checks": 0,
+    "passed_checks": 0,
+    "warning_checks": 0,
+    "failed_checks": 0,
+    "status": "READY \u2705"
+  }
+}

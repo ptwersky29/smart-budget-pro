@@ -43,7 +43,7 @@ export default React.memo(function AccessibilitySettings() {
               </div>
             </div>
             <Slider
-              value={[a11y.font_scaling]}
+              value={[a11y.font_scaling ?? 100]}
               onValueChange={([v]) => setA11y("font_scaling", v)}
               min={80}
               max={150}
