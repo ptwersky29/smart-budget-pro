@@ -125,6 +125,10 @@ async def create_tables():
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarded BOOLEAN DEFAULT FALSE"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_step VARCHAR(64)"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS preferences JSON"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS app_language VARCHAR(8) DEFAULT 'en'"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS app_theme VARCHAR(16) DEFAULT 'system'"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS app_currency VARCHAR(4) DEFAULT 'GBP'"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN DEFAULT FALSE"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled BOOLEAN DEFAULT FALSE"))
             # Phase 2 — Bank connection improvements
             await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS import_start_date DATE"))
