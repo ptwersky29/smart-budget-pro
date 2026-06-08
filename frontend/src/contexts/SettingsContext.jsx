@@ -16,7 +16,7 @@ const DEFAULTS = {
     email_alerts: true, push_alerts: true, sms_alerts: false,
     budget_reminders: true, weekly_report: true, spending_alerts: true,
   },
-  accessibility: { high_contrast: false, font_scaling: 100, keyboard_navigation: true, reduce_motion: false },
+  accessibility: { high_contrast: false, font_scaling: 100, keyboard_navigation: true, reduce_motion: false, enhanced_focus: false },
 };
 
 function applyToDOM(preferences) {
@@ -29,6 +29,20 @@ function applyToDOM(preferences) {
   root.style.setProperty("--fs-multiplier", String((acc.font_scaling ?? 100) / 100));
   root.dataset.highContrast = acc.high_contrast ? "true" : "false";
   root.dataset.reduceMotion = acc.reduce_motion ? "true" : "false";
+  root.dataset.enhancedFocus = acc.enhanced_focus ? "true" : "false";
+  
+  // Apply CSS classes for high contrast and enhanced focus
+  if (acc.high_contrast) {
+    root.classList.add("high-contrast-mode");
+  } else {
+    root.classList.remove("high-contrast-mode");
+  }
+  
+  if (acc.enhanced_focus) {
+    root.classList.add("enhanced-focus");
+  } else {
+    root.classList.remove("enhanced-focus");
+  }
 }
 
 export function SettingsProvider({ children }) {
