@@ -19,11 +19,27 @@ const TABS = [
   { value: "events", label: "Planned Events", icon: Calendar },
 ];
 
-const CATEGORIES = [
-  "groceries", "dining", "transport", "rent", "utilities",
-  "subscriptions", "tzedakah", "health", "entertainment",
-  "shopping", "insurance", "education", "gifts", "charity",
-];
+function groupBySection(cats, hierarchy) {
+  const grouped = {};
+  if (hierarchy && Object.keys(hierarchy).length > 0) {
+    for (const [section, names] of Object.entries(hierarchy)) {
+      const sectionCats = names.map(n => cats.find(c => c.name === n)).filter(Boolean);
+      if (sectionCats.length > 0) {
+        grouped[section] = sectionCats;
+      }
+    }
+  }
+  // Add uncategorised remaining
+  const used = new Set(Object.values(grouped).flat().map(c => c.name));
+  for (const c of cats) {
+    if (!used.has(c.name)) {
+      const section = c.section || "Other";
+      if (!grouped[section]) grouped[section] = [];
+      grouped[section].push(c);
+    }
+  }
+  return grouped;
+}
 
 function isThisMonth(dateStr) {
   if (!dateStr) return false;
@@ -42,6 +58,11 @@ export default React.memo(function BudgetPage() {
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+
+  // Categories loaded from API
+  const [categories, setCategories] = useState([]);
+  const [hierarchy, setHierarchy] = useState({});
+  const [catsLoading, setCatsLoading] = useState(true);
 
   // Add form state
   const [showForm, setShowForm] = useState(false);
@@ -64,7 +85,39 @@ export default React.memo(function BudgetPage() {
     }
   }, []);
 
+  const loadCats = useCallback(async () => {
+    setCatsLoading(true);
+    try {
+      const { data } = await api.get("/categories");
+      setCategories(data.categories || []);
+      setHierarchy(data.hierarchy || {});
+    } catch {
+      // Fallback: use a minimal built-in set if API fails
+      setCategories([]);
+      setHierarchy({});
+    } finally {
+      setCatsLoading(false);
+    }
+  }, []);
+
   useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { loadCats(); }, [loadCats]);
+
+  // Build grouped categories for the datalist/optgroup
+  const groupedCategories = useMemo(() => {
+    return groupBySection(categories, hierarchy);
+  }, [categories, hierarchy]);
+
+  // Build a flat list of unique category names for datalist
+  const allCategoryNames = useMemo(() => {
+    const names = new Set();
+    for (const cats of Object.values(groupedCategories)) {
+      for (const c of cats) {
+        names.add(c.name);
+      }
+    }
+    return Array.from(names).sort();
+  }, [groupedCategories]);
 
   // Budgets filtered by type
   const everyday = useMemo(() => budgets.filter((b) => (b.budget_type || "everyday") === "everyday"), [budgets]);
@@ -142,7 +195,12 @@ export default React.memo(function BudgetPage() {
       <div key={b.budget_id} className="rounded-xl border border-border bg-card/50 p-3 sm:p-4">
         {isEditing ? (
           <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-            <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="flex-1" />
+            <div className="flex-1 w-full">
+              <Input list="edit-category-list" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full" />
+              <datalist id="edit-category-list">
+                {allCategoryNames.map(cat => <option key={cat} value={cat} />)}
+              </datalist>
+            </div>
             <Input type="number" step="0.01" value={form.limit} onChange={(e) => setForm({ ...form, limit: e.target.value })} className="w-full sm:w-28" />
             {showDate && <Input type="date" value={form.event_date} onChange={(e) => setForm({ ...form, event_date: e.target.value })} className="w-full sm:w-36" />}
             <div className="flex gap-1 shrink-0">
@@ -251,9 +309,41 @@ export default React.memo(function BudgetPage() {
               <form onSubmit={handleCreate} className="mb-4 flex flex-col sm:flex-row gap-2 p-3 rounded-xl border border-emerald/20 bg-emerald/5">
                 <input type="hidden" name="budget_type" value="everyday" />
                 <div className="flex-1">
-                  <Input list="cats-everyday" placeholder="Category" value={form.category}
-                    onChange={(e) => setForm({ ...form, category: e.target.value, budget_type: "everyday" })} required />
-                  <datalist id="cats-everyday">{CATEGORIES.map((c) => <option key={c} value={c} />)}</datalist>
+                  <Input
+                    list="cats-everyday"
+                    placeholder="Category (start typing to see suggestions)"
+                    value={form.category}
+                    onChange={(e) => setForm({ ...form, category: e.target.value, budget_type: "everyday" })}
+                    required
+                  />
+                  <datalist id="cats-everyday">
+                    {allCategoryNames.map((c) => <option key={c} value={c} />)}
+                  </datalist>
+                  {/* Grouped suggestions shown below on desktop */}
+                  {!catsLoading && Object.keys(groupedCategories).length > 0 && (
+                    <div className="mt-2 hidden sm:block">
+                      <p className="text-[11px] text-muted-foreground mb-1">Available categories by section:</p>
+                      <div className="max-h-40 overflow-y-auto space-y-1 text-xs text-muted-foreground border border-border rounded-lg p-2">
+                        {Object.entries(groupedCategories).map(([section, cats]) => (
+                          <div key={section}>
+                            <span className="font-medium text-[10px] uppercase tracking-wider">{section}</span>
+                            <div className="flex flex-wrap gap-1 mt-0.5 mb-1">
+                              {cats.map(c => (
+                                <button
+                                  key={c.name}
+                                  type="button"
+                                  onClick={() => setForm({ ...form, category: c.name, budget_type: "everyday" })}
+                                  className="px-1.5 py-0.5 rounded bg-secondary/50 hover:bg-secondary text-[11px] transition-colors"
+                                >
+                                  {c.name.replace(/_/g, " ")}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <Input type="number" step="0.01" min="0" placeholder="Monthly limit £" value={form.limit}
                   onChange={(e) => setForm({ ...form, limit: e.target.value })} required className="w-full sm:w-36" />
@@ -266,7 +356,7 @@ export default React.memo(function BudgetPage() {
             ) : everyday.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <p className="text-sm">No everyday budgets yet.</p>
-                <p className="text-xs mt-1">Click "Add" above to create your first spending limit.</p>
+                <p className="text-xs mt-1">Click "Add" above to create your first spending limit using any category from your transactions.</p>
               </div>
             ) : (
               <div className="space-y-2">{everyday.map((b) => renderBudget(b))}</div>
@@ -290,8 +380,16 @@ export default React.memo(function BudgetPage() {
               <form onSubmit={handleCreate} className="mb-4 flex flex-col sm:flex-row gap-2 p-3 rounded-xl border border-topaz/20 bg-topaz/5">
                 <input type="hidden" name="budget_type" value="event" />
                 <div className="flex-1">
-                  <Input placeholder="Event name" value={form.category}
-                    onChange={(e) => setForm({ ...form, category: e.target.value, budget_type: "event" })} required />
+                  <Input
+                    list="cats-events"
+                    placeholder="Event name or category"
+                    value={form.category}
+                    onChange={(e) => setForm({ ...form, category: e.target.value, budget_type: "event" })}
+                    required
+                  />
+                  <datalist id="cats-events">
+                    {allCategoryNames.map((c) => <option key={c} value={c} />)}
+                  </datalist>
                 </div>
                 <Input type="number" step="0.01" min="0" placeholder="Budget £" value={form.limit}
                   onChange={(e) => setForm({ ...form, limit: e.target.value })} required className="w-full sm:w-32" />
