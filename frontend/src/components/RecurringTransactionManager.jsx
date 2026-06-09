@@ -5,6 +5,7 @@ import { Plus, Edit2, Trash2, Loader2, Calendar, DollarSign, Tag, AlertCircle } 
 import ConfirmModal from "./ui/ConfirmModal";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import CategoryCombobox from "./CategoryCombobox";
 
 /**
  * Recurring Transaction Manager
@@ -282,32 +283,13 @@ export default function RecurringTransactionManager() {
 
               <div>
                 <label className="label-overline">Category *</label>
-                <select
+                <CategoryCombobox
                   value={form.category}
-                  onChange={(e) => {
-                    if (e.target.value === "__add__") {
-                      const c = prompt("New category name:");
-                      if (c) setForm({ ...form, category: c.trim().toLowerCase().replace(/\s+/g, "_") });
-                    } else {
-                      setForm({ ...form, category: e.target.value });
-                    }
-                  }}
-                  className="h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors w-full"
-                  required
-                >
-                  <option value="">Select category…</option>
-                  {Object.entries(allCats.reduce((acc, c) => {
-                    const section = c.section || "Other";
-                    if (!acc[section]) acc[section] = [];
-                    acc[section].push(c);
-                    return acc;
-                  }, {})).map(([section, cats]) => (
-                    <optgroup key={section} label={section}>
-                      {cats.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-                    </optgroup>
-                  ))}
-                  <option value="__add__">➕ Add custom category</option>
-                </select>
+                  onChange={(val) => setForm({ ...form, category: val })}
+                  categories={allCats}
+                  placeholder="Select category…"
+                  onCategoryCreated={fetchCategories}
+                />
               </div>
 
               <div>

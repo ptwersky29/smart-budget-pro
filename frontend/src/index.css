@@ -218,6 +218,23 @@ input, select, textarea, button, a { touch-action: manipulation; }
   to { transform: translateX(0); opacity: 1; }
 }
 
+/* ─── Density-aware utility classes ─── */
+.density-gap { gap: var(--density-gap, 0.75rem); }
+.density-gap-x { column-gap: var(--density-gap, 0.75rem); }
+.density-gap-y > * + * { margin-top: var(--density-gap, 0.75rem); }
+.density-pad { padding: var(--density-pad, 1rem); }
+.density-pad-x { padding-left: var(--density-pad, 1rem); padding-right: var(--density-pad, 1rem); }
+.density-pad-y { padding-top: var(--density-pad, 1rem); padding-bottom: var(--density-pad, 1rem); }
+
+/* ─── Bottom sheet slide-up animation ─── */
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slide-up 0.25s ease-out;
+}
+
 /* ─── Settings-driven overrides ─── */
 
 /* Density: compact → tighter spacing */

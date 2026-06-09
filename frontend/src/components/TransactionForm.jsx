@@ -1,53 +1,19 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Sparkles, Loader2, X, ChevronDown, ChevronUp, Check, Brain } from "lucide-react";
+import CategoryCombobox from "./CategoryCombobox";
 
 const emptyForm = { description: "", amount: "", category: "", is_income: false, budget_type: "", occasion: "", merchant: "" };
 const BUDGET_TYPES = ["day_to_day", "yom_tov", "holiday", "simcha", "other"];
-
-function groupCatsBySection(cats, hierarchy) {
-  if (!hierarchy || Object.keys(hierarchy).length === 0) {
-    const groups = {};
-    for (const c of cats) {
-      const section = c.section || "Other";
-      if (!groups[section]) groups[section] = [];
-      groups[section].push(c);
-    }
-    return groups;
-  }
-  const grouped = {};
-  const used = new Set();
-  for (const [section, names] of Object.entries(hierarchy)) {
-    const sectionCats = names
-      .map(n => cats.find(c => c.name === n))
-      .filter(Boolean);
-    if (sectionCats.length > 0) {
-      grouped[section] = sectionCats;
-      sectionCats.forEach(c => used.add(c.name));
-    }
-  }
-  const remaining = cats.filter(c => !used.has(c.name));
-  if (remaining.length > 0) {
-    grouped["Other"] = remaining;
-  }
-  return grouped;
-}
 
 export default function TransactionForm({
   open, editingId, form, setForm, selectedCats, onClose, onSubmit,
   onClassify, classifying, classification, onClearClassification,
   saveAsRecurring, setSaveAsRecurring,
+  onCategoryCreated,
 }) {
   const [showMore, setShowMore] = useState(false);
-
-  // Build grouped categories from selectedCats + AI suggestions
-  // MUST be called before any early return (Rules of Hooks)
-  const grouped = useMemo(() => {
-    if (!selectedCats || selectedCats.length === 0) return {};
-    const hierarchy = selectedCats.hierarchy || {};
-    return groupCatsBySection(selectedCats, hierarchy);
-  }, [selectedCats]);
 
   if (!open) return null;
 
@@ -57,14 +23,6 @@ export default function TransactionForm({
   const suggestions = classification?.suggestions || [];
   const topSuggestion = suggestions[0];
   const autoFill = topSuggestion && topSuggestion.confidence >= 0.95;
-
-  const sourceBadge = (cat) => {
-    const source = cat.source || "System";
-    if (source === "System") {
-      return <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary/60 text-muted-foreground">System</span>;
-    }
-    return <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-topaz/10 text-topaz">Custom</span>;
-  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={onClose} role="dialog" aria-modal="true" aria-label={editingId ? "Edit transaction" : "New transaction"}>
@@ -76,47 +34,14 @@ export default function TransactionForm({
           <Input data-testid="tx-amount" required type="number" step="0.01" placeholder="Amount (£)" value={form.amount}
             onChange={(e) => { setForm({ ...form, amount: e.target.value }); if (onClearClassification) onClearClassification(); }} />
 
-          {/* Category selector — grouped by section, AI suggestions at top */}
-          <div className="relative">
-            <select data-testid="tx-category" value={form.category} onChange={(e) => {
-              if (e.target.value === "__add__") {
-                const c = prompt("New category name:");
-                if (c) setForm({ ...form, category: c.trim().toLowerCase().replace(/\s+/g, "_") });
-              } else {
-                setForm({ ...form, category: e.target.value });
-              }
-            }}
-              className="flex h-11 w-full rounded-xl bg-secondary/50 border border-transparent px-4 text-sm transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50">
-              <option value="">
-                {autoFill ? `${topSuggestion.category} (AI Suggested — ${Math.round(topSuggestion.confidence * 100)}%)` : "Select category…"}
-              </option>
-
-              {/* AI suggestions at top when available */}
-              {suggestions.length > 0 && (
-                <optgroup label={`✦ AI Suggestions (${Math.round(topSuggestion?.confidence * 100)}% confident)`}>
-                  {suggestions.map((s, i) => (
-                    <option key={`ai-${i}`} value={s.category}>
-                      {s.category} — {Math.round(s.confidence * 100)}% {s.merchant ? `(${s.merchant})` : ""}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-
-              {/* Grouped categories by section */}
-              {Object.entries(grouped).map(([section, cats]) => (
-                <optgroup key={section} label={section}>
-                  {cats.map((c) => (
-                    <option key={c.category_id ?? `default-${c.name}`} value={c.name}>
-                      {c.name} {c.source === "Custom" ? "⚡" : ""}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-
-              {/* Custom category option */}
-              <option value="__add__" className="border-t border-border mt-1">➕ Add custom category</option>
-            </select>
-          </div>
+          {/* Category selector — grouped by section, add custom category */}
+          <CategoryCombobox
+            value={form.category}
+            onChange={(val) => setForm({ ...form, category: val })}
+            categories={selectedCats}
+            placeholder={autoFill ? `${topSuggestion.category} (AI Suggested — ${Math.round(topSuggestion.confidence * 100)}%)` : "Select category…"}
+            onCategoryCreated={onCategoryCreated}
+          />
 
           {/* Source badges for selected category */}
           {form.category && (

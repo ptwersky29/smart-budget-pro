@@ -35,18 +35,10 @@ import { Input } from "../components/ui/input";
 import { useSwipe } from "../hooks/useSwipe";
 import { useKeyboardShortcut } from "../hooks/useKeyboardShortcut";
 
+import CategoryCombobox from "../components/CategoryCombobox";
+
 const SOURCE_LABELS = { manual: "Manual", truelayer: "Bank", csv: "CSV", pdf: "PDF", statement: "Statement", sms: "SMS" };
 const emptyForm = { description: "", amount: "", category: "", is_income: false, budget_type: "", occasion: "", merchant: "" };
-
-function groupCatsBySection(cats) {
-  const groups = {};
-  for (const c of cats) {
-    const section = c.section || "Other";
-    if (!groups[section]) groups[section] = [];
-    groups[section].push(c);
-  }
-  return groups;
-}
 
 function today() {
   const d = new Date();
@@ -562,22 +554,14 @@ const Transactions = React.memo(function Transactions() {
                       <option value="">All sources</option>
                       {Object.entries(SOURCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
-                    <select value={filters.category} onChange={(e) => {
-                      if (e.target.value === "__add__") {
-                        const c = prompt("New category name:");
-                        if (c) toggleFilter("category", c.trim().toLowerCase().replace(/\s+/g, "_"));
-                      } else {
-                        toggleFilter("category", e.target.value);
-                      }
-                    }} className="h-10 px-4 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors">
-                      <option value="">All categories</option>
-                      {Object.entries(groupCatsBySection(selectedCats)).map(([section, cats]) => (
-                        <optgroup key={section} label={section}>
-                          {cats.map(c => <option key={c.category_id ?? `default-${c.name}`} value={c.name}>{c.name}</option>)}
-                        </optgroup>
-                      ))}
-                      <option value="__add__">➕ Add custom category</option>
-                    </select>
+                    <CategoryCombobox
+                      value={filters.category}
+                      onChange={(val) => toggleFilter("category", val)}
+                      categories={selectedCats}
+                      placeholder="All categories"
+                      allowClear
+                      onCategoryCreated={loadCats}
+                    />
                     <Input type="number" min="0" step="0.01" placeholder="Min £" value={filters.amount_min}
                       onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_min: e.target.value })); }}
                       className="text-sm h-10" />
@@ -744,7 +728,8 @@ const Transactions = React.memo(function Transactions() {
         selectedCats={selectedCats} onClose={closeForm} onSubmit={submit}
         onClassify={handleClassify} classifying={classifying} classification={classification}
         onClearClassification={clearClassification}
-        saveAsRecurring={saveAsRecurring} setSaveAsRecurring={setSaveAsRecurring} />
+        saveAsRecurring={saveAsRecurring} setSaveAsRecurring={setSaveAsRecurring}
+        onCategoryCreated={loadCats} />
 
       <ComparePeriods open={compareOpen} onClose={() => setCompareOpen(false)} />
 

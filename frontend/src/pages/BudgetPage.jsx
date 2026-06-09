@@ -12,16 +12,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import { Area, AreaChart, ResponsiveContainer } from "recharts";
-
-function groupCatsBySection(cats) {
-  const groups = {};
-  for (const c of cats) {
-    const section = c.section || "Other";
-    if (!groups[section]) groups[section] = [];
-    groups[section].push(c);
-  }
-  return groups;
-}
+import CategoryCombobox from "../components/CategoryCombobox";
 
 function fmtMonth(y, m) { return `${y}-${String(m).padStart(2, "0")}`; }
 
@@ -616,116 +607,107 @@ export default React.memo(function BudgetPage() {
             </div>
 
             {addTab === "expense" ? (
-              <form onSubmit={handleQuickExpense} className="space-y-4">
-                <p className="text-sm text-muted-foreground -mt-2">Log an expense and auto-attribute it to a budget category.</p>
-                <div>
-                  <label className="label-overline mb-1 block">Amount (£)</label>
-                  <Input type="number" step="0.01" min="0.01" placeholder="0.00" value={quickForm.amount}
-                    onChange={(e) => setQuickForm({ ...quickForm, amount: e.target.value })} required autoFocus />
-                </div>
-                <div>
-                  <label className="label-overline mb-1 block">Category</label>
-                  <div className="relative">
-                    <select value={quickForm.category} onChange={(e) => {
-                      if (e.target.value === "__add__") {
-                        const c = prompt("New category name:");
-                        if (c) setQuickForm({ ...quickForm, category: c.trim().toLowerCase().replace(/\s+/g, "_") });
-                      } else {
-                        setQuickForm({ ...quickForm, category: e.target.value });
-                      }
-                    }} className="flex h-11 w-full rounded-xl bg-secondary/50 border border-transparent px-4 text-sm transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none" required>
-                      <option value="">Select category…</option>
-                      {Object.entries(groupCatsBySection(allCats)).map(([section, cats]) => (
-                        <optgroup key={section} label={section}>
-                          {cats.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-                        </optgroup>
-                      ))}
-                      <option value="__add__">➕ Add custom category</option>
-                    </select>
+              <form onSubmit={handleQuickExpense}>
+                <div className="flex items-end gap-3">
+                  <div className="flex-1">
+                    <CategoryCombobox
+                      value={quickForm.category}
+                      onChange={(val) => setQuickForm({ ...quickForm, category: val })}
+                      categories={allCats}
+                      placeholder="Category"
+                      onCategoryCreated={fetchCategories}
+                    />
                   </div>
-                </div>
-                <div>
-                  <label className="label-overline mb-1 block">Description (optional)</label>
-                  <Input placeholder="e.g. Weekly shop at Tesco" value={quickForm.description}
-                    onChange={(e) => setQuickForm({ ...quickForm, description: e.target.value })} />
-                </div>
-                <div className="flex gap-3 justify-end pt-2">
-                  <Button type="button" variant="outlinePill" size="pill" onClick={() => { setShowAdd(false); resetQuickForm(); }}>Cancel</Button>
-                  <Button type="submit" variant="primary" size="pill">
-                    <Plus className="h-4 w-4 mr-1" /> Add Expense
+                  <div className="w-28">
+                    <Input type="number" step="0.01" min="0.01" placeholder="£0.00" value={quickForm.amount}
+                      onChange={(e) => setQuickForm({ ...quickForm, amount: e.target.value })} required autoFocus className="text-right" />
+                  </div>
+                  <Button type="submit" variant="primary" size="pill" className="shrink-0 h-11 px-4">
+                    <Plus className="h-4 w-4" />
                   </Button>
+                </div>
+                {quickForm.description && (
+                  <div className="mt-2">
+                    <Input placeholder="Description (optional)" value={quickForm.description}
+                      onChange={(e) => setQuickForm({ ...quickForm, description: e.target.value })} />
+                  </div>
+                )}
+                <div className="flex items-center justify-between mt-2">
+                  <button type="button" onClick={() => setQuickForm({ ...quickForm, description: quickForm.description ? "" : " " })}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                    {quickForm.description ? "Remove description" : "+ Add description"}
+                  </button>
+                  <button type="button" onClick={() => { setShowAdd(false); resetQuickForm(); }}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                    Cancel
+                  </button>
                 </div>
               </form>
             ) : (
-              <form onSubmit={handleCreate} className="space-y-4">
-                {/* Type toggle inside budget tab */}
-                <div className="flex gap-2 p-1 rounded-xl bg-muted/50">
-                  <button
-                    type="button"
+              <form onSubmit={handleCreate}>
+                {/* Type toggle */}
+                <div className="flex gap-2 p-1 rounded-xl bg-muted/50 mb-4">
+                  <button type="button"
                     onClick={() => setForm({ ...form, budget_type: "everyday", event_date: "" })}
-                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${form.budget_type === "everyday" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
-                  >
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${form.budget_type === "everyday" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}>
                     <ShoppingCart className="h-3.5 w-3.5 inline mr-1.5" /> Monthly
                   </button>
-                  <button
-                    type="button"
+                  <button type="button"
                     onClick={() => setForm({ ...form, budget_type: "event" })}
-                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${form.budget_type === "event" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
-                  >
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${form.budget_type === "event" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}>
                     <Calendar className="h-3.5 w-3.5 inline mr-1.5" /> Event
                   </button>
                 </div>
 
                 {form.budget_type === "everyday" ? (
-                  <div>
-                    <label className="label-overline mb-1 block">Category</label>
-                    <div className="relative">
-                      <select value={form.category} onChange={(e) => {
-                        if (e.target.value === "__add__") {
-                          const c = prompt("New category name:");
-                          if (c) setForm({ ...form, category: c.trim().toLowerCase().replace(/\s+/g, "_") });
-                        } else {
-                          setForm({ ...form, category: e.target.value });
-                        }
-                      }} className="flex h-11 w-full rounded-xl bg-secondary/50 border border-transparent px-4 text-sm transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none" required>
-                        <option value="">Select category…</option>
-                        {Object.entries(groupCatsBySection(allCats)).map(([section, cats]) => (
-                          <optgroup key={section} label={section}>
-                            {cats.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-                          </optgroup>
-                        ))}
-                        <option value="__add__">➕ Add custom category</option>
-                      </select>
+                  <div className="flex items-end gap-3">
+                    <div className="flex-1">
+                      <CategoryCombobox
+                        value={form.category}
+                        onChange={(val) => setForm({ ...form, category: val })}
+                        categories={allCats}
+                        placeholder="Category"
+                        onCategoryCreated={fetchCategories}
+                      />
                     </div>
+                    <div className="w-28">
+                      <Input type="number" step="0.01" min="0" placeholder="£0.00" value={form.limit}
+                        onChange={(e) => setForm({ ...form, limit: e.target.value })} required className="text-right" />
+                    </div>
+                    <Button type="submit" variant="primary" size="pill" className="shrink-0 h-11 px-4">
+                      <Plus className="h-4 w-4" />
+                    </Button>
                   </div>
                 ) : (
-                  <div>
-                    <label className="label-overline mb-1 block">Event name</label>
-                    <Input placeholder="e.g. Pesach 2026" value={form.category}
-                      onChange={(e) => setForm({ ...form, category: e.target.value })} required />
-                  </div>
+                  <>
+                    <div className="flex items-end gap-3">
+                      <div className="flex-[2]">
+                        <Input placeholder="Event name (e.g. Pesach 2026)" value={form.category}
+                          onChange={(e) => setForm({ ...form, category: e.target.value })} required />
+                      </div>
+                      <div className="w-28">
+                        <Input type="number" step="0.01" min="0" placeholder="£0.00" value={form.limit}
+                          onChange={(e) => setForm({ ...form, limit: e.target.value })} required className="text-right" />
+                      </div>
+                    </div>
+                    <div className="flex items-end gap-3 mt-3">
+                      <div className="flex-1">
+                        <Input type="date" value={form.event_date}
+                          onChange={(e) => setForm({ ...form, event_date: e.target.value })}
+                          className="text-sm" />
+                      </div>
+                      <Button type="submit" variant="primary" size="pill" className="shrink-0 h-11 px-4">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="label-overline mb-1 block">Amount (£)</label>
-                    <Input type="number" step="0.01" min="0" placeholder="0.00" value={form.limit}
-                      onChange={(e) => setForm({ ...form, limit: e.target.value })} required />
-                  </div>
-                  {form.budget_type === "event" && (
-                    <div>
-                      <label className="label-overline mb-1 block">Event date</label>
-                      <Input type="date" value={form.event_date}
-                        onChange={(e) => setForm({ ...form, event_date: e.target.value })} />
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex gap-3 justify-end pt-2">
-                  <Button type="button" variant="outlinePill" size="pill" onClick={() => { setShowAdd(false); resetForm(); }}>Cancel</Button>
-                  <Button type="submit" variant="primary" size="pill">
-                    <Plus className="h-4 w-4 mr-1" /> {form.budget_type === "event" ? "Add Event" : "Add Budget"}
-                  </Button>
+                <div className="flex justify-end mt-2">
+                  <button type="button" onClick={() => { setShowAdd(false); resetForm(); }}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                    Cancel
+                  </button>
                 </div>
               </form>
             )}
