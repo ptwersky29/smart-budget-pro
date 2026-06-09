@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
@@ -457,11 +458,18 @@ const Transactions = React.memo(function Transactions() {
                   <DropdownMenuSub>
                     <DropdownMenuSubTrigger>Set category</DropdownMenuSubTrigger>
                     <DropdownMenuSubContent>
-                      {Object.entries(groupCatsBySection(selectedCats)).map(([section, cats]) =>
-                        cats.map(c => (
-                          <DropdownMenuItem key={c.name} onClick={() => bulkCategory(c.name)}>{c.name}</DropdownMenuItem>
-                        ))
-                      )}
+                      {Object.entries(groupCatsBySection(selectedCats)).map(([section, cats]) => (
+                        <React.Fragment key={section}>
+                          <DropdownMenuLabel className="text-xs text-muted-foreground font-semibold uppercase tracking-wider px-2 py-1">{section}</DropdownMenuLabel>
+                          {cats.map(c => (
+                            <DropdownMenuItem key={c.name} onClick={() => bulkCategory(c.name)}>{c.name}</DropdownMenuItem>
+                          ))}
+                        </React.Fragment>
+                      ))}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => { const c = prompt("New category name:"); if (c) bulkCategory(c.trim().toLowerCase().replace(/\s+/g, "_")); }}>
+                        ➕ Add custom category
+                      </DropdownMenuItem>
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
                   <DropdownMenuSeparator />
@@ -554,13 +562,21 @@ const Transactions = React.memo(function Transactions() {
                       <option value="">All sources</option>
                       {Object.entries(SOURCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
-                    <select value={filters.category} onChange={(e) => toggleFilter("category", e.target.value)} className="h-10 px-4 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors">
+                    <select value={filters.category} onChange={(e) => {
+                      if (e.target.value === "__add__") {
+                        const c = prompt("New category name:");
+                        if (c) toggleFilter("category", c.trim().toLowerCase().replace(/\s+/g, "_"));
+                      } else {
+                        toggleFilter("category", e.target.value);
+                      }
+                    }} className="h-10 px-4 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors">
                       <option value="">All categories</option>
                       {Object.entries(groupCatsBySection(selectedCats)).map(([section, cats]) => (
                         <optgroup key={section} label={section}>
                           {cats.map(c => <option key={c.category_id ?? `default-${c.name}`} value={c.name}>{c.name}</option>)}
                         </optgroup>
                       ))}
+                      <option value="__add__">➕ Add custom category</option>
                     </select>
                     <Input type="number" min="0" step="0.01" placeholder="Min £" value={filters.amount_min}
                       onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_min: e.target.value })); }}

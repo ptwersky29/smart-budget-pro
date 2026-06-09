@@ -3,6 +3,7 @@ import { parseISO, isBefore } from "date-fns";
 import {
   RefreshCw, Wallet, ShoppingCart, Calendar, Plus, Pencil, Trash2,
   Check, X, Target, TrendingDown, ChevronLeft, ChevronRight,
+  Sparkles, AlertTriangle, TrendingUp, Zap,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
@@ -10,12 +11,17 @@ import { PageHeader, MetricCard } from "../components/ui/layout";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import ConfirmModal from "../components/ui/ConfirmModal";
+import { Area, AreaChart, ResponsiveContainer } from "recharts";
 
-const CATEGORIES = [
-  "groceries", "dining", "transport", "rent", "utilities",
-  "subscriptions", "tzedakah", "health", "entertainment",
-  "shopping", "insurance", "education", "gifts", "charity",
-];
+function groupCatsBySection(cats) {
+  const groups = {};
+  for (const c of cats) {
+    const section = c.section || "Other";
+    if (!groups[section]) groups[section] = [];
+    groups[section].push(c);
+  }
+  return groups;
+}
 
 function fmtMonth(y, m) { return `${y}-${String(m).padStart(2, "0")}`; }
 
@@ -30,11 +36,27 @@ function addMonth(str, delta) {
   return fmtMonth(d.getFullYear(), d.getMonth() + 1);
 }
 
-
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
+
+function Sparkline({ data, color }) {
+  if (!data || data.length < 2) return null;
+  return (
+    <ResponsiveContainer width="100%" height={32}>
+      <AreaChart data={data} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+        <defs>
+          <linearGradient id={`grad-${color}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.25} />
+            <stop offset="100%" stopColor={color} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <Area type="monotone" dataKey="spent" stroke={color} strokeWidth={1.5} fill={`url(#grad-${color})`} dot={false} />
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+}
 
 export default React.memo(function BudgetPage() {
   const now = new Date();
@@ -43,8 +65,19 @@ export default React.memo(function BudgetPage() {
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [allCats, setAllCats] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
+  const [addTab, setAddTab] = useState("expense");
   const [form, setForm] = useState({ category: "", limit: "", budget_type: "everyday", event_date: "" });
+  const [quickForm, setQuickForm] = useState({ amount: "", description: "", category: "" });
+  const [alerts, setAlerts] = useState([]);
+  const [dismissedAlerts, setDismissedAlerts] = useState(new Set());
+  const [insights, setInsights] = useState([]);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [trends, setTrends] = useState({});
+  const [trendsLoading, setTrendsLoading] = useState(false);
+  const [showInsights, setShowInsights] = useState(false);
+  const [applyingInsight, setApplyingInsight] = useState(null);
 
   const { year, month: mNum } = parseMonth(month);
   const monthLabel = `${MONTH_NAMES[mNum - 1]} ${year}`;
@@ -54,14 +87,13 @@ export default React.memo(function BudgetPage() {
   const events = useMemo(() => budgets.filter((b) => b.budget_type === "event"), [budgets]);
   const upcomingEvents = useMemo(() =>
     events
-      .filter((b) => b.event_date && !isBefore(parseISO(b.event_date), new Date()))
+      .filter((b) => b.event_date && !isBefore(parseISO(b.event_date), now))
       .sort((a, b) => (a.event_date || "").localeCompare(b.event_date || "")),
-    [events],
+    [events, now],
   );
-  // Events in the past for this month
   const pastEvents = useMemo(() =>
-    events.filter((b) => b.event_date && isBefore(parseISO(b.event_date), new Date())),
-    [events],
+    events.filter((b) => b.event_date && isBefore(parseISO(b.event_date), now)),
+    [events, now],
   );
 
   const summary = useMemo(() => {
@@ -83,9 +115,49 @@ export default React.memo(function BudgetPage() {
     }
   }, [month]);
 
+  const fetchCategories = useCallback(async () => {
+    try {
+      const { data } = await api.get("/categories");
+      setAllCats(data.categories || []);
+    } catch {}
+  }, []);
+
+  const fetchAlerts = useCallback(async () => {
+    try {
+      const { data } = await api.get("/budgets/alerts");
+      setAlerts(data.alerts || []);
+    } catch {}
+  }, []);
+
+  const fetchInsights = useCallback(async () => {
+    setInsightsLoading(true);
+    try {
+      const { data } = await api.get("/budgets/insights");
+      setInsights(data.insights || []);
+    } catch {} finally {
+      setInsightsLoading(false);
+    }
+  }, []);
+
+  const fetchTrends = useCallback(async () => {
+    if (everyday.length === 0) return;
+    setTrendsLoading(true);
+    try {
+      const { data } = await api.get("/budgets/trends", { params: { all: true, months: 6 } });
+      setTrends(data.trends || {});
+    } catch {} finally {
+      setTrendsLoading(false);
+    }
+  }, [everyday.length]);
+
   useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchCategories(); }, []);
+  useEffect(() => { fetchAlerts(); }, []);
+  useEffect(() => { fetchInsights(); }, []);
+  useEffect(() => { if (!loading && everyday.length > 0) fetchTrends(); }, [loading, everyday.length, fetchTrends]);
 
   const resetForm = () => setForm({ category: "", limit: "", budget_type: "everyday", event_date: "" });
+  const resetQuickForm = () => setQuickForm({ amount: "", description: "", category: "" });
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -103,6 +175,46 @@ export default React.memo(function BudgetPage() {
       setShowAdd(false);
       await fetchData();
     } catch (err) { toast.error(err.response?.data?.detail || "Could not save"); }
+  };
+
+  const handleQuickExpense = async (e) => {
+    e.preventDefault();
+    if (!quickForm.amount || !quickForm.category) { toast.error("Enter amount and category"); return; }
+    try {
+      await api.post("/transactions", {
+        amount: -Math.abs(parseFloat(quickForm.amount)),
+        description: quickForm.description || `Quick expense: ${quickForm.category}`,
+        category: quickForm.category.toLowerCase().trim(),
+      });
+      toast.success("Expense added");
+      resetQuickForm();
+      setShowAdd(false);
+      await fetchData();
+    } catch (err) { toast.error(err.response?.data?.detail || "Could not save"); }
+  };
+
+  const handleApplyInsight = async (insight) => {
+    setApplyingInsight(insight.category);
+    try {
+      const existing = budgets.find((b) => b.category === insight.category);
+      if (existing) {
+        await api.patch(`/budgets/${existing.budget_id}`, { limit: insight.suggested_budget });
+      } else {
+        await api.post("/budgets", {
+          category: insight.category,
+          limit: insight.suggested_budget,
+          period: "monthly",
+          budget_type: "everyday",
+        });
+      }
+      toast.success(`Budget for ${insight.category} set to £${insight.suggested_budget}`);
+      await fetchData();
+      await fetchInsights();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Could not apply suggestion");
+    } finally {
+      setApplyingInsight(null);
+    }
   };
 
   const startEdit = (b) => {
@@ -138,13 +250,18 @@ export default React.memo(function BudgetPage() {
     } catch { toast.error("Could not delete"); }
   };
 
+  const criticalAlerts = alerts.filter((a) => a.severity === "critical");
+  const warningAlerts = alerts.filter((a) => a.severity === "warning");
+  const spikeAlerts = alerts.filter((a) => a.severity === "spike");
+
   const renderBudgetCard = (b, showDate = false) => {
     const over = (b.progress_pct || 0) >= 100;
     const isEditing = editingId === b.budget_id;
+    const catTrends = trends[b.category];
 
     if (isEditing) {
       return (
-        <div key={b.budget_id} className="rounded-xl border border-border bg-card/50 p-4 space-y-3">
+        <div key={b.budget_id} className="rounded-xl border border-border bg-card/50 p-4 density-pad space-y-3">
           <div className="flex flex-col sm:flex-row gap-2">
             <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="flex-1" />
             <Input type="number" step="0.01" value={form.limit} onChange={(e) => setForm({ ...form, limit: e.target.value })} className="w-full sm:w-28" />
@@ -159,14 +276,14 @@ export default React.memo(function BudgetPage() {
     }
 
     return (
-      <div key={b.budget_id} className="rounded-xl border border-border bg-card/50 p-4 hover:border-muted-foreground/20 transition-all group">
+      <div key={b.budget_id} className="rounded-xl border border-border bg-card/50 p-4 density-pad hover:border-muted-foreground/20 transition-all group">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="min-w-0">
             <h3 className="text-sm font-medium capitalize truncate">{b.category}</h3>
             {showDate && b.event_date && (
               <p className="text-xs text-muted-foreground mt-0.5">
                 {formatDate(b.event_date)}
-                {!isBefore(parseISO(b.event_date), new Date()) && (
+                {!isBefore(parseISO(b.event_date), now) && (
                   <span className="ml-2">· {daysUntil(b.event_date)} days away</span>
                 )}
               </p>
@@ -178,7 +295,7 @@ export default React.memo(function BudgetPage() {
           </div>
         </div>
 
-        <div className="flex items-baseline gap-1.5 mb-2">
+        <div className="flex items-baseline gap-1.5 mb-1.5">
           <span className={`text-lg font-semibold tabular-nums ${over ? "text-ruby" : "text-foreground"}`}>
             £{b.spent}
           </span>
@@ -186,17 +303,23 @@ export default React.memo(function BudgetPage() {
           {over && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-ruby/10 text-ruby font-medium">Over</span>}
         </div>
 
-        <div className="h-2 rounded-full bg-muted/50 overflow-hidden mb-1.5">
+        <div className="h-2 rounded-full bg-muted/50 overflow-hidden mb-1">
           <div
             className={`h-full rounded-full transition-all ${over ? "bg-ruby" : "bg-emerald"}`}
             style={{ width: `${Math.min(100, b.progress_pct || 0)}%` }}
           />
         </div>
 
-        <div className="flex justify-between text-xs text-muted-foreground">
+        <div className="flex justify-between text-xs text-muted-foreground mb-1">
           <span>{b.progress_pct}% used</span>
           <span>£{Math.max(0, b.remaining || 0).toFixed(2)} left</span>
         </div>
+
+        {catTrends && catTrends.length >= 2 && (
+          <div className="mt-0.5 -mx-1">
+            <Sparkline data={catTrends} color={over ? "#e5484d" : "#30a46c"} />
+          </div>
+        )}
       </div>
     );
   };
@@ -213,7 +336,7 @@ export default React.memo(function BudgetPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 density-gap-y">
       <PageHeader
         eyebrow="Finance"
         title="Budgets"
@@ -225,8 +348,70 @@ export default React.memo(function BudgetPage() {
         }
       />
 
+      {/* Smart Alerts Banner */}
+      {alerts.length > 0 && (
+        <div className="density-gap-y">
+          {criticalAlerts.length > 0 && criticalAlerts.map((a) => (
+            !dismissedAlerts.has(a.category + a.severity) && (
+              <div key={`critical-${a.category}`} className="flex items-start gap-3 rounded-xl border border-ruby/30 bg-ruby/5 p-3 density-pad">
+                <AlertTriangle className="h-5 w-5 text-ruby shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-ruby">{a.message}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">£{a.spent} of £{a.budget} used</p>
+                </div>
+                <button onClick={() => setDismissedAlerts(new Set([...dismissedAlerts, a.category + a.severity]))} className="p-1 rounded hover:bg-ruby/10 text-ruby/60 hover:text-ruby"><X className="h-4 w-4" /></button>
+              </div>
+            )
+          ))}
+          {warningAlerts.length > 0 && warningAlerts.filter((a) => !dismissedAlerts.has(a.category + a.severity)).length > 0 && (
+            <details className="group">
+              <summary className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer hover:text-foreground">
+                <TrendingUp className="h-4 w-4" />
+                <span>{warningAlerts.filter((a) => !dismissedAlerts.has(a.category + a.severity)).length} budgets nearing limit</span>
+              </summary>
+              <div className="mt-2 density-gap-y">
+                {warningAlerts.map((a) => (
+                  !dismissedAlerts.has(a.category + a.severity) && (
+                    <div key={`warning-${a.category}`} className="flex items-start gap-3 rounded-xl border border-topaz/30 bg-topaz/5 p-3 density-pad">
+                      <TrendingUp className="h-5 w-5 text-topaz shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{a.message}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">£{a.spent} of £{a.budget} used</p>
+                      </div>
+                      <button onClick={() => setDismissedAlerts(new Set([...dismissedAlerts, a.category + a.severity]))} className="p-1 rounded hover:bg-topaz/10 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+                    </div>
+                  )
+                ))}
+              </div>
+            </details>
+          )}
+          {spikeAlerts.length > 0 && spikeAlerts.filter((a) => !dismissedAlerts.has(a.category + a.severity)).length > 0 && (
+            <details className="group">
+              <summary className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer hover:text-foreground">
+                <Zap className="h-4 w-4" />
+                <span>{spikeAlerts.filter((a) => !dismissedAlerts.has(a.category + a.severity)).length} spending spikes</span>
+              </summary>
+              <div className="mt-2 density-gap-y">
+                {spikeAlerts.map((a) => (
+                  !dismissedAlerts.has(a.category + a.severity) && (
+                    <div key={`spike-${a.category}`} className="flex items-start gap-3 rounded-xl border border-chart-1/30 bg-chart-1/5 p-3 density-pad">
+                      <Zap className="h-5 w-5 text-chart-1 shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{a.message}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">3-month avg: £{a.avg_3m}</p>
+                      </div>
+                      <button onClick={() => setDismissedAlerts(new Set([...dismissedAlerts, a.category + a.severity]))} className="p-1 rounded hover:bg-chart-1/10 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+                    </div>
+                  )
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      )}
+
       {/* Month selector + summary */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 density-gap">
         <div className="flex items-center gap-2">
           <button onClick={() => setMonth(addMonth(month, -1))} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground">
             <ChevronLeft className="h-5 w-5" />
@@ -249,7 +434,7 @@ export default React.memo(function BudgetPage() {
       </div>
 
       {/* Metric cards */}
-      <div className="grid grid-cols-3 gap-3 sm:gap-4">
+      <div className="grid grid-cols-3 gap-3 sm:gap-4 density-gap">
         <MetricCard label="Budgets" value={String(summary.count)} icon={Wallet} tone="emerald" />
         <MetricCard label="Budgeted" value={`£${summary.totalPlanned.toLocaleString()}`} icon={Target} tone="topaz" />
         <MetricCard label="Spent" value={`£${summary.totalSpent.toLocaleString()}`} icon={TrendingDown} tone={summary.overCount > 0 ? "ruby" : "emerald"} />
@@ -257,7 +442,7 @@ export default React.memo(function BudgetPage() {
 
       {/* Loading */}
       {loading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 density-gap">
           {[...Array(6)].map((_, i) => <div key={i} className="h-32 rounded-xl bg-muted/50 animate-pulse" />)}
         </div>
       )}
@@ -267,7 +452,7 @@ export default React.memo(function BudgetPage() {
           <Wallet className="h-10 w-10 mx-auto mb-3 opacity-40" />
           <p className="text-sm font-medium">No budgets yet</p>
           <p className="text-xs mt-1 mb-4">Create your first spending limit or planned event.</p>
-          <Button variant="primary" size="pill" onClick={() => setShowAdd(true)}>
+          <Button variant="primary" size="pill" onClick={() => { setAddTab("budget"); setShowAdd(true); }}>
             <Plus className="h-4 w-4 mr-1.5" /> Create budget
           </Button>
         </div>
@@ -285,9 +470,12 @@ export default React.memo(function BudgetPage() {
                 </h2>
                 <span className="text-xs text-muted-foreground">{everyday.length} budgets</span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 density-gap">
                 {everyday.map((b) => renderBudgetCard(b))}
               </div>
+              {trendsLoading && everyday.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-2">Loading trends...</p>
+              )}
             </section>
           )}
 
@@ -301,13 +489,13 @@ export default React.memo(function BudgetPage() {
                 </h2>
                 <span className="text-xs text-muted-foreground">{upcomingEvents.length} events</span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 density-gap">
                 {upcomingEvents.map((b) => renderBudgetCard(b, true))}
               </div>
             </section>
           )}
 
-          {/* Past events for current month (shown separate) */}
+          {/* Past events for current month */}
           {pastEvents.length > 0 && isCurrentMonth && (
             <section>
               <div className="flex items-center justify-between mb-3">
@@ -316,13 +504,12 @@ export default React.memo(function BudgetPage() {
                   Past Events
                 </h2>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 density-gap">
                 {pastEvents.map((b) => renderBudgetCard(b, true))}
               </div>
             </section>
           )}
 
-          {/* Events with no date shown separately */}
           {events.length > 0 && upcomingEvents.length === 0 && pastEvents.length === 0 && (
             <section>
               <div className="flex items-center justify-between mb-3">
@@ -331,7 +518,7 @@ export default React.memo(function BudgetPage() {
                   Planned Events
                 </h2>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 density-gap">
                 {events.map((b) => renderBudgetCard(b, true))}
               </div>
             </section>
@@ -339,87 +526,209 @@ export default React.memo(function BudgetPage() {
         </>
       )}
 
+      {/* AI Budget Insights */}
+      {!loading && (insights.length > 0) && (
+        <section>
+          <button
+            onClick={() => setShowInsights(!showInsights)}
+            className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3 hover:opacity-80"
+          >
+            <Sparkles className={`h-4 w-4 text-topaz ${insightsLoading ? "animate-pulse" : ""}`} />
+            AI Budget Insights
+            <span className="text-xs text-muted-foreground font-normal">({insights.length} suggestions)</span>
+          </button>
+          {showInsights && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 density-gap">
+              {insights.map((ins) => {
+                const hasBudget = ins.current_budget > 0;
+                const needsChange = ins.suggested_budget !== ins.current_budget;
+                return (
+                  <div key={ins.category} className="rounded-xl border border-border bg-card/50 p-4 density-pad">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h4 className="text-sm font-medium capitalize">{ins.category}</h4>
+                      {!hasBudget && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-topaz/10 text-topaz font-medium">No budget</span>}
+                    </div>
+                    <div className="text-xs text-muted-foreground space-y-1 mb-3">
+                      <p>Current: <strong className="text-foreground">£{ins.current_spent}</strong> this month</p>
+                      <p>3-month avg: <strong className="text-foreground">£{ins.avg_spent_3m}</strong></p>
+                      {hasBudget && <p>Budget: <strong className="text-foreground">£{ins.current_budget}</strong></p>}
+                      <p className="text-topaz font-medium mt-1">{ins.reason}</p>
+                    </div>
+                    {needsChange && (
+                      <Button
+                        variant="primary"
+                        size="pill"
+                        className="w-full"
+                        onClick={() => handleApplyInsight(ins)}
+                        disabled={applyingInsight === ins.category}
+                      >
+                        {applyingInsight === ins.category ? "Applying..." : `Set to £${ins.suggested_budget}`}
+                      </Button>
+                    )}
+                    {!needsChange && hasBudget && (
+                      <p className="text-xs text-emerald text-center">Budget is on track ✓</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* FAB */}
       {!loading && !showAdd && (
         <button
-          onClick={() => setShowAdd(true)}
+          onClick={() => { setAddTab("expense"); setShowAdd(true); }}
           className="fixed bottom-6 right-6 z-20 h-14 w-14 rounded-full bg-emerald text-white shadow-lg hover:bg-emerald/90 active:scale-95 transition-all flex items-center justify-center"
-          aria-label="Add budget"
+          aria-label="Quick add"
         >
           <Plus className="h-6 w-6" />
         </button>
       )}
 
-      {/* Add modal */}
+      {/* Bottom sheet (QuickAdd) */}
       {showAdd && (
-        <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={() => { setShowAdd(false); resetForm(); }}>
-          <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-xl tracking-tight font-medium mb-1">
-              {form.budget_type === "event" ? "Add Planned Event" : "Add Spending Limit"}
-            </h3>
-            <p className="text-sm text-muted-foreground mb-5">
-              {form.budget_type === "event"
-                ? "One-time budget for a holiday, simcha, or other event."
-                : "Monthly limit for a regular spending category."}
-            </p>
+        <div className="fixed inset-0 z-50 bg-black/40" onClick={() => { setShowAdd(false); resetForm(); resetQuickForm(); }}>
+          <div
+            className="absolute bottom-0 left-0 right-0 rounded-t-2xl border border-border bg-card/95 backdrop-blur-xl shadow-modal p-6 max-h-[85vh] overflow-y-auto animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Handle */}
+            <div className="w-10 h-1 rounded-full bg-muted-foreground/20 mx-auto mb-4" />
 
-            <form onSubmit={handleCreate} className="space-y-4">
-              {/* Type toggle */}
-              <div className="flex gap-2 p-1 rounded-xl bg-muted/50">
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, budget_type: "everyday", event_date: "" })}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${form.budget_type === "everyday" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
-                >
-                  <ShoppingCart className="h-3.5 w-3.5 inline mr-1.5" /> Monthly
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, budget_type: "event" })}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${form.budget_type === "event" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
-                >
-                  <Calendar className="h-3.5 w-3.5 inline mr-1.5" /> Event
-                </button>
-              </div>
+            {/* Tabs */}
+            <div className="flex gap-2 p-1 rounded-xl bg-muted/50 mb-5">
+              <button
+                type="button"
+                onClick={() => setAddTab("expense")}
+                className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-medium transition-all ${addTab === "expense" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
+              >
+                <TrendingDown className="h-3.5 w-3.5 inline mr-1.5" /> Quick Expense
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddTab("budget")}
+                className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-medium transition-all ${addTab === "budget" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
+              >
+                <Target className="h-3.5 w-3.5 inline mr-1.5" /> New Budget
+              </button>
+            </div>
 
-              {/* Category / Event name */}
-              {form.budget_type === "everyday" ? (
-                <div>
-                  <label className="label-overline mb-1 block">Category</label>
-                  <Input list="cats" placeholder="e.g. groceries" value={form.category}
-                    onChange={(e) => setForm({ ...form, category: e.target.value })} required />
-                  <datalist id="cats">{CATEGORIES.map((c) => <option key={c} value={c} />)}</datalist>
-                </div>
-              ) : (
-                <div>
-                  <label className="label-overline mb-1 block">Event name</label>
-                  <Input placeholder="e.g. Pesach 2026" value={form.category}
-                    onChange={(e) => setForm({ ...form, category: e.target.value })} required />
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
+            {addTab === "expense" ? (
+              <form onSubmit={handleQuickExpense} className="space-y-4">
+                <p className="text-sm text-muted-foreground -mt-2">Log an expense and auto-attribute it to a budget category.</p>
                 <div>
                   <label className="label-overline mb-1 block">Amount (£)</label>
-                  <Input type="number" step="0.01" min="0" placeholder="0.00" value={form.limit}
-                    onChange={(e) => setForm({ ...form, limit: e.target.value })} required />
+                  <Input type="number" step="0.01" min="0.01" placeholder="0.00" value={quickForm.amount}
+                    onChange={(e) => setQuickForm({ ...quickForm, amount: e.target.value })} required autoFocus />
                 </div>
-                {form.budget_type === "event" && (
+                <div>
+                  <label className="label-overline mb-1 block">Category</label>
+                  <div className="relative">
+                    <select value={quickForm.category} onChange={(e) => {
+                      if (e.target.value === "__add__") {
+                        const c = prompt("New category name:");
+                        if (c) setQuickForm({ ...quickForm, category: c.trim().toLowerCase().replace(/\s+/g, "_") });
+                      } else {
+                        setQuickForm({ ...quickForm, category: e.target.value });
+                      }
+                    }} className="flex h-11 w-full rounded-xl bg-secondary/50 border border-transparent px-4 text-sm transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none" required>
+                      <option value="">Select category…</option>
+                      {Object.entries(groupCatsBySection(allCats)).map(([section, cats]) => (
+                        <optgroup key={section} label={section}>
+                          {cats.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                        </optgroup>
+                      ))}
+                      <option value="__add__">➕ Add custom category</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="label-overline mb-1 block">Description (optional)</label>
+                  <Input placeholder="e.g. Weekly shop at Tesco" value={quickForm.description}
+                    onChange={(e) => setQuickForm({ ...quickForm, description: e.target.value })} />
+                </div>
+                <div className="flex gap-3 justify-end pt-2">
+                  <Button type="button" variant="outlinePill" size="pill" onClick={() => { setShowAdd(false); resetQuickForm(); }}>Cancel</Button>
+                  <Button type="submit" variant="primary" size="pill">
+                    <Plus className="h-4 w-4 mr-1" /> Add Expense
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleCreate} className="space-y-4">
+                {/* Type toggle inside budget tab */}
+                <div className="flex gap-2 p-1 rounded-xl bg-muted/50">
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, budget_type: "everyday", event_date: "" })}
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${form.budget_type === "everyday" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
+                  >
+                    <ShoppingCart className="h-3.5 w-3.5 inline mr-1.5" /> Monthly
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, budget_type: "event" })}
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${form.budget_type === "event" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
+                  >
+                    <Calendar className="h-3.5 w-3.5 inline mr-1.5" /> Event
+                  </button>
+                </div>
+
+                {form.budget_type === "everyday" ? (
                   <div>
-                    <label className="label-overline mb-1 block">Event date</label>
-                    <Input type="date" value={form.event_date}
-                      onChange={(e) => setForm({ ...form, event_date: e.target.value })} />
+                    <label className="label-overline mb-1 block">Category</label>
+                    <div className="relative">
+                      <select value={form.category} onChange={(e) => {
+                        if (e.target.value === "__add__") {
+                          const c = prompt("New category name:");
+                          if (c) setForm({ ...form, category: c.trim().toLowerCase().replace(/\s+/g, "_") });
+                        } else {
+                          setForm({ ...form, category: e.target.value });
+                        }
+                      }} className="flex h-11 w-full rounded-xl bg-secondary/50 border border-transparent px-4 text-sm transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none" required>
+                        <option value="">Select category…</option>
+                        {Object.entries(groupCatsBySection(allCats)).map(([section, cats]) => (
+                          <optgroup key={section} label={section}>
+                            {cats.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                          </optgroup>
+                        ))}
+                        <option value="__add__">➕ Add custom category</option>
+                      </select>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="label-overline mb-1 block">Event name</label>
+                    <Input placeholder="e.g. Pesach 2026" value={form.category}
+                      onChange={(e) => setForm({ ...form, category: e.target.value })} required />
                   </div>
                 )}
-              </div>
 
-              <div className="flex gap-3 justify-end pt-2">
-                <Button type="button" variant="outlinePill" size="pill" onClick={() => { setShowAdd(false); resetForm(); }}>Cancel</Button>
-                <Button type="submit" variant="primary" size="pill">
-                  <Plus className="h-4 w-4 mr-1" /> {form.budget_type === "event" ? "Add Event" : "Add Budget"}
-                </Button>
-              </div>
-            </form>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="label-overline mb-1 block">Amount (£)</label>
+                    <Input type="number" step="0.01" min="0" placeholder="0.00" value={form.limit}
+                      onChange={(e) => setForm({ ...form, limit: e.target.value })} required />
+                  </div>
+                  {form.budget_type === "event" && (
+                    <div>
+                      <label className="label-overline mb-1 block">Event date</label>
+                      <Input type="date" value={form.event_date}
+                        onChange={(e) => setForm({ ...form, event_date: e.target.value })} />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3 justify-end pt-2">
+                  <Button type="button" variant="outlinePill" size="pill" onClick={() => { setShowAdd(false); resetForm(); }}>Cancel</Button>
+                  <Button type="submit" variant="primary" size="pill">
+                    <Plus className="h-4 w-4 mr-1" /> {form.budget_type === "event" ? "Add Event" : "Add Budget"}
+                  </Button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

@@ -78,7 +78,14 @@ export default function TransactionForm({
 
           {/* Category selector — grouped by section, AI suggestions at top */}
           <div className="relative">
-            <select data-testid="tx-category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}
+            <select data-testid="tx-category" value={form.category} onChange={(e) => {
+              if (e.target.value === "__add__") {
+                const c = prompt("New category name:");
+                if (c) setForm({ ...form, category: c.trim().toLowerCase().replace(/\s+/g, "_") });
+              } else {
+                setForm({ ...form, category: e.target.value });
+              }
+            }}
               className="flex h-11 w-full rounded-xl bg-secondary/50 border border-transparent px-4 text-sm transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50">
               <option value="">
                 {autoFill ? `${topSuggestion.category} (AI Suggested — ${Math.round(topSuggestion.confidence * 100)}%)` : "Select category…"}
@@ -105,6 +112,9 @@ export default function TransactionForm({
                   ))}
                 </optgroup>
               ))}
+
+              {/* Custom category option */}
+              <option value="__add__" className="border-t border-border mt-1">➕ Add custom category</option>
             </select>
           </div>
 

@@ -224,76 +224,59 @@ def detect_recurring_txns(tx_list: list) -> list:
 # ── Category rules / smart categorisation ────────────────────────────────
 
 CATEGORY_RULES = {
-    "groceries": ["tesco", "sainsbury", "asda", "aldi", "lidl", "morrison", "waitrose", "kosher", "m&s food", "marks & spencer food", "co-op", "iceland", "farmfoods", "m&s simply food", "ocado", "budgens", "spar"],
-    "transport": ["tfl", "uber", "bolt", "trainline", "petrol", "national express", "oyster", "charging", "ev", "railway", "rail", "bus", "tube", "underground", "traffic"],
-    "public_transport": ["trainline", "tfl", "oyster", "national rail", "southern railway", "thameslink", "southwestern", "great western", "lner", "avanti", "stagecoach", "arriva", "first bus", "bus", "tube", "underground", "tram", "metro"],
-    "fuel": ["shell", "bp", "esso", "texaco", "petrol", "diesel", "unleaded", "ev charge", "charging", "fuel", "applegreen", "sse", "gulf", "jet", "murco", "total", "bp pulse", "pod point"],
-    "parking": ["parking", "ncp", "apcoa", "ringgo", "paybyphone", "parking eye", "civil enforcement"],
-    "dining": ["restaurant", "pizza", "deliveroo", "ubereats", "just eat", "mcdonald", "kfc", "subway", "greggs", "costa", "starbucks", "pret", "cafe", "coffee", "takeaway", "nando", "wagamama", "itsu", "wasabi", "leon", "dishoom", "zizzi", "pizzaexpress", "prezzo", "toby carvery", "harvester", "beefeater", "weatherspoon", "wethers", "spoons"],
-    "streaming": ["netflix", "spotify", "disney+", "disney plus", "apple tv", "youtube premium", "paramount", "now tv", "hbo", "tidal", "deezer", "audible", "kindle unlimited"],
-    "subscriptions": ["chatgpt", "openai", "github", "adobe", "microsoft 365", "icloud", "dropbox", "notion", "slack", "zoom", "patreon", "onlyfans", "medium", "substack"],
-    "utilities": ["british gas", "edf", "octopus", "thames water", "council tax", "ee", "vodafone", "sky", "virgin media", "severn trent", "yorkshire water", "anglia water", "southern water", "npower", "e.on", "scottish power", "utility warehouse", "broadband", "mobile", "phone bill", "water bill", "electric", "gas bill"],
+    "maaser_tzedakah": ["maaser", "tithe", "maaser fund", "maaser money", "maaser tzedakah"],
+    "charity": ["chesed", "tzedakah", "donation", "charity", "terumah", "gift aid", "justgiving", "gofundme", "jgive", "world jewish relief", "jnf", "jewish national fund", "chabad"],
+    "other_charity": ["shul", "synagogue", "shul membership", "shul donation", "minyan sponsor", "kiddush sponsor", "shul fund", "jewish school", "yeshiva", "kollel", "jewish education", "hebrew school", "cheder", "jewish studies", "torah class"],
+    "clothing_husband": ["clothing men", "menswear", "mens clothing", "suit", "tie", "shirt men", "trousers men", "blazer", "polo men"],
+    "clothing_wife": ["clothing women", "womenswear", "womens clothing", "dress", "skirt", "blouse", "handbag", "jewelry"],
+    "clothing_kids": ["children clothing", "kids clothing", "baby clothes", "childrenswear", "school uniform", "blazer school", "jumper school", "kids wear"],
+    "shoes": ["shoe", "trainer", "boot", "sandal", "sneaker", "loafer", "heel", "clarks", "schuh", "office shoe"],
+    "grocery": ["tesco", "sainsbury", "asda", "aldi", "lidl", "morrison", "waitrose", "m&s food", "marks & spencer food", "co-op", "iceland", "farmfoods", "m&s simply food", "ocado", "budgens", "spar", "kosher", "supermarket", "grocery", "food shop"],
+    "fruit_veg": ["fruit", "vegetable", "greengrocer", "market fruit", "veg box", "fruit and veg"],
+    "bakery": ["bakery", "bread", "baguette", "croissant", "pastry", "cake", "doughnut", "bagel shop", "baker"],
+    "fish": ["fishmonger", "seafood", "cod", "salmon", "haddock", "prawn", "fish shop", "fish stall"],
+    "meat": ["butcher", "meat", "steak", "chicken breast", "beef", "lamb", "pork", "mince", "sausage", "bacon", "deli meat", "kosher butcher", "meat shop"],
+    "paper_goods": ["kitchen roll", "tissue", "toilet paper", "paper towel", "tissue box", "napkin", "paper goods"],
+    "takeaway": ["restaurant", "pizza", "deliveroo", "ubereats", "just eat", "mcdonald", "kfc", "subway", "greggs", "costa", "starbucks", "pret", "cafe", "coffee", "takeaway", "nando", "wagamama", "itsu", "wasabi", "leon", "dishoom", "zizzi", "pizzaexpress", "prezzo", "toby carvery", "harvester", "beefeater", "weatherspoon", "wethers", "spoons"],
+    "wine": ["wine", "wine shop", "majestic wine", "laithwaites", "naked wines", "whisky", "beer shop", "off licence", "off license"],
+    "house_supplies": ["b&q", "wickes", "screwfix", "toolstation", "homebase", "diy", "decor", "paint", "wallpaper", "plumbing", "tile", "flooring", "carpet", "curtains", "blinds", "garden centre", "plants", "gardening", "ikea", "dunelm", "habitat", "made.com", "furniture", "sofa", "bed", "wardrobe", "table", "chair", "shelving", "bookshelf", "storage", "cleaning", "cleaner", "domestic help", "housekeeping", "cleaning supplies", "detergent", "washing up", "laundry", "ryman", "office supply", "stationery"],
+    "chemist": ["boots", "superdrug", "lloyds pharmacy", "pharmacy", "prescription", "medication", "medicine", "chemist"],
+    "rent_mortgage": ["rent", "letting", "landlord", "tenancy", "lease", "property management", "ground rent", "service charge", "mortgage", "halifax", "natwest", "santander", "barclays mortgage", "lloyds mortgage", "hsbc mortgage", "first direct", "nationwide", "skipton", "yorkshire bs"],
     "electricity": ["electricity", "electric bill", "edf", "e.on", "npower", "scottish power", "bulb", "ovo energy", "octopus energy"],
+    "heating": ["heating", "central heating", "boiler", "oil", "heating oil", "calor gas", "bottled gas"],
     "gas": ["gas bill", "british gas", "e.on", "npower"],
     "water": ["thames water", "water bill", "anglian water", "yorkshire water", "severn trent", "southern water", "welsh water", "united utilities"],
-    "internet": ["broadband", "internet", "bt broadband", "virgin media", "sky broadband", "plusnet", "talk talk", "hyperoptic", "gigaclear", "community fibre"],
-    "phone": ["phone bill", "vodafone", "three", "o2", "giffgaff", "tesco mobile", "lebara", "lycamobile", "smarty", "mobile"],
-    "tzedakah": ["chesed", "tzedakah", "donation", "charity", "terumah", "gift aid", "justgiving", "gofundme", "jgive", "world jewish relief", "jnf", "jewish national fund", "chabad"],
-    "maaser": ["maaser", "tithe", "maaser fund", "maaser money"],
-    "shul_donations": ["shul", "synagogue", "shul membership", "shul donation", "minyan sponsor", "kiddush sponsor", "shul fund"],
-    "mikvah": ["mikvah", "mikveh", "mikva", "ritual bath", "mikvah fee"],
-    "rent": ["rent", "letting", "landlord", "tenancy", "lease", "property management", "ground rent", "service charge"],
-    "mortgage": ["mortgage", "halifax", "natwest", "santander", "barclays mortgage", "lloyds mortgage", "hsbc mortgage", "first direct", "nationwide", "skipton", "yorkshire bs"],
-    "salary": ["salary", "wages", "payroll", "hmrc", "employment", "pay", "earnings"],
-    "income": ["refund", "interest", "dividend", "tax refund", "cashback", "rebate", "bonus", "commission", "freelance", "self employed", "benefits", "universal credit", "child benefit", "pension", "state pension", "investment income"],
-    "shopping": ["amazon", "argos", "ebay", "etsy", "john lewis", "next", "amazon.co.uk", "amazon.com"],
-    "clothing": ["primark", "zara", "h&m", "asos", "boohoo", "river island", "new look", "tk maxx", "matalan", "nike", "adidas", "sports direct", "jd sports", "footasylum", "clothing", "fashion"],
-    "electronics": ["currys", "pc world", "apple store", "john lewis electrical", "very", "ao.com", "electrical", "laptop", "phone"],
-    "health": ["nhs", "boots", "superdrug", "doctor", "hospital", "physio", "therapy", "psychologist", "counselling", "prescription"],
-    "medical": ["nhs", "hospital", "clinic", "doctor", "gp", "consultant", "surgeon", "operation", "surgery", "medical"],
-    "dental": ["dentist", "dental", "dental check", "hygienist", "orthodontist", "braces", "dental practice"],
-    "pharmacy": ["boots", "superdrug", "lloyds pharmacy", "pharmacy", "prescription", "medication", "medicine", "chemist"],
-    "optical": ["optician", "specsavers", "vision express", "glasses", "contact lens", "eye test", "optometry"],
-    "gym": ["puregym", "david lloyd", "nuffield", "anytime fitness", "the gym", "gym", "fitness", "gym membership", "better", "everyone active", "virgin active", "bannatyne", "leisure centre"],
-    "entertainment": ["cinema", "odeon", "vue", "showcase", "national trust", "english heritage", "eventim", "ticketmaster", "concert", "theatre", "museum", "gallery", "zoo", "attraction", "theme park", "bowling", "escape room", "waterstones", "books", "bookshop", "hobbies", "craft", "sewing", "knitting"],
-    "education": ["coursera", "udemy", "open university", "skillshare", "masterclass", "futurelearn", "linkedin learning"],
-    "school_fees": ["school fee", "school fees", "school payment", "nursery fee", "preschool", "school trip", "school dinner", "school lunch", "school uniform"],
-    "tuition": ["tuition", "tutor", "private tutor", "maths tutor", "english tutor", "music lesson", "piano lesson", "swimming lesson", "extra curricular"],
-    "books": ["waterstones", "bookshop", "bookshop.org", "books", "book", "amazon books", "whsmith books", "foyles", "blackwells"],
-    "childcare": ["nursery", "childcare", "childminder", "nanny", "babysitter", "child care", "creche", "nursery fees", "daycare", "child care"],
-    "transfer": ["bank transfer", "transfer", "faster payment", "bacs", "chaps", "paypal", "monzo me", "starling", "internal transfer", "payment from", "money to", "sent by", "received from", "revolut", "wise"],
-    "cash": ["cash", "atm", "withdrawal", "cashpoint"],
-    "tax": ["self assessment", "tax", "hmrc", "stamp duty", "capital gains", "income tax", "council tax", "vat", "corporation tax"],
-    "fees": ["fee", "charge", "penalty", "interest charge", "o/d fee", "overdraft", "late payment", "service charge", "bank charge", "foreign transaction", "conversion fee", "credit card fee"],
-    "insurance": ["aviva", "direct line", "admiral", "churchill", "axa", "legal & general", "life insurance", "car insurance", "home insurance", "pet insurance", "travel insurance", "breakdown cover", "aa", "rac", "lv=", "compare the market", "gocompare", "moneysupermarket"],
-    "investments": ["vanguard", "fidelity", "hargreaves lansdown", "freetrade", "trading212", "invest", "stocks", "shares", "isa", "pension", "s&p", "fund", "etf", "dividend", "investment"],
-    "travel": ["ryanair", "easyjet", "british airways", "ba.com", "wizz air", "jet2", "virgin atlantic", "emirates", "qatar", "expedia", "booking.com", "airbnb", "skyscanner", "kayak", "trailfinders", "travel agent"],
-    "flights": ["ryanair", "easyjet", "british airways", "ba.com", "wizz air", "jet2", "virgin atlantic", "emirates", "flybe", "flight", "airline", "airport", "aer lingus", "klm", "lufthansa", "air france"],
-    "hotels": ["booking.com", "hotels.com", "expedia", "premier inn", "travelodge", "hilton", "marriott", "ibis", "holiday inn", "airbnb", "hotel", "accommodation", "b&b", "guest house"],
-    "car_hire": ["enterprise rent", "hertz", "avis", "budget rent", "europcar", "sixt", "rental car", "car hire", "van hire"],
-    "holiday": ["tui", "thomas cook", "holiday", "vacation", "all inclusive", "package holiday", "ski holiday", "beach holiday", "lastminute.com", "loveholidays", "on the beach", "jet2holidays"],
-    "business": ["business", "professional", "consultancy", "contractor", "self employed", "hmrc"],
-    "office_supplies": ["ryman", "whsmith", "paper", "printer", "toner", "office supply", "stationery", "ink", "office", "pens", "envelopes", "postage", "shipping"],
-    "software": ["adobe", "microsoft 365", "office 365", "slack", "zoom", "notion", "figma", "jira", "confluence", "github", "gitlab", "digitalocean", "aws", "google cloud", "azure", "namecheap", "godaddy", "cloudflare", "wordpress", "shopify", "wix", "squarespace"],
-    "advertising": ["google ads", "facebook ads", "linkedin ads", "instagram ads", "tiktok ads", "social media ad", "cpc", "ppc", "advertising", "marketing", "sponsored", "adwords"],
-    "home_improvement": ["b&q", "wickes", "screwfix", "toolstation", "homebase", "diy", "decor", "paint", "wallpaper", "plumbing", "tile", "flooring", "carpet", "curtains", "blinds", "garden centre", "plants", "gardening"],
-    "furniture": ["ikea", "dunelm", "habitat", "made.com", "swoon", "loaf", "furniture", "sofa", "bed", "wardrobe", "table", "chair", "shelving", "bookshelf", "storage"],
-    "cleaning": ["cleaning", "cleaner", "domestic help", "housekeeping", "cleaning supplies", "detergent", "washing up"],
+    "council_tax": ["council tax", "council tax", "bin collection", "bins"],
+    "telephone": ["bt", "phone bill", "landline", "talk talk", "plusnet phone", "telephone"],
+    "mobile": ["vodafone", "three", "o2", "giffgaff", "tesco mobile", "lebara", "lycamobile", "smarty", "mobile phone"],
+    "cleaning_help": ["cleaning help", "cleaner", "domestic help", "housekeeper", "cleaning service", "home help"],
+    "life_insurance": ["life insurance", "aviva", "direct line", "admiral", "churchill", "axa", "legal & general", "car insurance", "home insurance", "pet insurance", "travel insurance", "breakdown cover", "aa", "rac", "lv=", "compare the market", "gocompare", "moneysupermarket"],
+    "buildings_insurance": ["buildings insurance", "contents insurance", "home insurance", "house insurance", "property insurance"],
+    "school_fees": ["school fee", "school fees", "school payment", "nursery fee", "preschool", "school trip", "school dinner", "school lunch", "school uniform", "coursera", "udemy", "open university", "skillshare", "masterclass", "futurelearn", "linkedin learning", "tuition fee", "university"],
+    "bus_fee": ["bus fee", "school bus", "bus pass", "student bus", "school bus pass"],
+    "babysitting": ["nursery", "childcare", "childminder", "nanny", "babysitter", "child care", "creche", "nursery fees", "daycare", "babysitting"],
+    "nappies": ["nappies", "nappy", "diaper", "pampers", "huggies", "baby wipes", "baby lotion", "baby care"],
+    "trust_savings": ["trust fund", "child trust", "junior isa", "child savings", "kids savings", "childrens savings", "trust savings"],
+    "toys": ["toy", "toys", "lego", "barbie", "game", "action figure", "board game", "puzzle", "kids toy", "toy shop", "the entertainer", "smyths"],
+    "tutor": ["tutor", "private tutor", "maths tutor", "english tutor", "music lesson", "piano lesson", "swimming lesson", "extra curricular", "tuition", "tutoring"],
     "therapy": ["therapy", "counselling", "psychologist", "psychiatrist", "mental health", "therapist", "cbt", "cognitive behavioural"],
-    "jewish_education": ["jewish school", "yeshiva", "kollel", "jewish education", "hebrew school", "cheder", "jewish studies", "torah class", "seminary", "jewish learning", "jewish course"],
-    "pesach": ["pesach", "passover", "pesach hotel", "pesach programme", "pesach holiday", "matzah", "kosher for passover"],
-    "succah": ["succah", "sukkah", "succah build", "succah kit", "arba minim", "lulav", "esrog"],
-    "purim": ["purim", "mishloach manot", "purim costume", "megillah", "purim seuda", "shalach manos"],
-    "chanukah": ["chanukah", "hanukkah", "chanukah gift", "menorah", "chanukah candles", "oil", "sufganiyot", "latkes", "dreidel"],
-    "shavuos": ["shavuos", "shavuot", "shavuos", "cheesecake", "dairy", "blintzes"],
-    "rosh_hashanah": ["rosh hashanah", "rosh hashana", "apple honey", "shofar", "round challah", "honey cake", "pomegranate", "new year card"],
-    "yom_kippur": ["yom kippur", "yom kippur", "kol nidre", "machzor", "yizkor", "fast", "break fast"],
-    "wedding": ["wedding", "wedding hall", "catering", "wedding photographer", "wedding dress", "wedding suit", "chuppah", "wedding band", "wedding cake", "wedding venue", "smorgasbord", "wedding gift"],
-    "bar_bas_mitzvah": ["bar mitzvah", "bat mitzvah", "bas mitzvah", "bar mitzvah", "bar mitzvah hall", "bar mitzvah photographer", "bar mitzvah gift"],
-    "bris": ["bris", "brit", "bris milah", "mohel", "bris ceremony", "bris catering"],
-    "engagement": ["engagement", "engagement party", "engagement ring", "vort", "tena'im", "engagement gift"],
-    "sheva_brachos": ["sheva brachos", "sheva brachot", "shevah berachot", "sheva brachos catering", "sheva brachos host"],
-    "gifts": ["gift", "present", "gift card", "gift voucher", "gift certificate", "wedding gift", "birthday gift", "anniversary gift"],
+    "medical": ["nhs", "hospital", "clinic", "doctor", "gp", "consultant", "surgeon", "operation", "surgery", "medical", "dentist", "dental", "dental check", "hygienist", "orthodontist", "braces", "dental practice", "optician", "specsavers", "vision express", "glasses", "contact lens", "eye test", "optometry", "boots", "superdrug", "lloyds pharmacy", "pharmacy", "prescription", "medication", "medicine", "chemist"],
+    "public_transport": ["trainline", "tfl", "oyster", "national rail", "southern railway", "thameslink", "southwestern", "great western", "lner", "avanti", "stagecoach", "arriva", "first bus", "bus", "tube", "underground", "tram", "metro", "national express", "railway", "rail"],
+    "car_lease": ["car lease", "lease car", "car finance", "pcp", "hire purchase", "motability", "car leasing"],
+    "petrol_diesel": ["shell", "bp", "esso", "texaco", "petrol", "diesel", "unleaded", "ev charge", "charging", "fuel", "applegreen", "gulf", "jet", "murco", "total", "bp pulse", "pod point"],
+    "dart_charge": ["dart charge", "dartford", "congestion charge", "ulez", "parking", "ncp", "apcoa", "ringgo", "paybyphone", "parking eye", "civil enforcement"],
+    "tolls": ["toll", "toll road", "m6 toll", "m25", "bridge toll", "road charge"],
+    "tickets": ["parking fine", "speeding fine", "penalty charge", "fixed penalty", "court fine", "ticket", "fine", "penalty"],
+    "loan_payoff": ["loan payment", "loan repayment", "loan payoff", "personal loan", "debt repayment", "credit card payment", "credit card repay", "loan"],
+    "interest": ["fee", "charge", "penalty", "interest charge", "overdraft", "o/d fee", "late payment", "service charge", "bank charge", "foreign transaction", "conversion fee", "credit card fee", "interest"],
+    "investments": ["vanguard", "fidelity", "hargreaves lansdown", "freetrade", "trading212", "invest", "stocks", "shares", "isa", "pension", "s&p", "fund", "etf", "dividend", "investment"],
+    "petty_cash": ["cash", "atm", "withdrawal", "cashpoint", "petty cash"],
+    "miscellaneous": ["amazon", "argos", "ebay", "etsy", "john lewis", "next", "amazon.co.uk", "amazon.com", "currys", "pc world", "apple store", "john lewis electrical", "very", "ao.com", "electrical", "laptop", "phone", "netflix", "spotify", "disney+", "disney plus", "apple tv", "youtube premium", "paramount", "now tv", "hbo", "tidal", "deezer", "audible", "kindle unlimited", "chatgpt", "openai", "github", "adobe", "microsoft 365", "icloud", "dropbox", "notion", "slack", "zoom", "patreon", "onlyfans", "medium", "substack", "cinema", "odeon", "vue", "showcase", "national trust", "english heritage", "eventim", "ticketmaster", "concert", "theatre", "museum", "gallery", "zoo", "attraction", "theme park", "bowling", "escape room", "waterstones", "books", "bookshop", "hobbies", "craft", "sewing", "knitting", "primark", "zara", "h&m", "asos", "boohoo", "river island", "new look", "tk maxx", "matalan", "nike", "adidas", "sports direct", "jd sports", "footasylum", "clothing", "fashion", "puregym", "david lloyd", "nuffield", "anytime fitness", "the gym", "gym", "fitness", "gym membership", "better", "everyone active", "virgin active", "bannatyne", "leisure centre", "ryanair", "easyjet", "british airways", "ba.com", "wizz air", "jet2", "virgin atlantic", "emirates", "qatar", "expedia", "booking.com", "airbnb", "skyscanner", "kayak", "trailfinders", "travel agent", "premier inn", "travelodge", "hilton", "marriott", "ibis", "holiday inn", "enterprise rent", "hertz", "avis", "budget rent", "europcar", "sixt", "rental car", "car hire", "van hire", "tui", "thomas cook", "holiday", "vacation", "lastminute.com", "loveholidays", "on the beach", "jet2holidays", "business", "professional", "consultancy", "contractor", "self employed", "adobe", "microsoft 365", "office 365", "slack", "zoom", "notion", "figma", "jira", "confluence", "github", "gitlab", "digitalocean", "aws", "google cloud", "azure", "namecheap", "godaddy", "cloudflare", "wordpress", "shopify", "wix", "squarespace", "google ads", "facebook ads", "linkedin ads", "instagram ads", "tiktok ads", "social media ad", "cpc", "ppc", "advertising", "marketing", "sponsored", "adwords", "bank transfer", "transfer", "faster payment", "bacs", "chaps", "paypal", "monzo me", "starling", "internal transfer", "revolut", "wise", "broadband", "internet", "bt broadband", "virgin media", "sky broadband", "plusnet", "talk talk", "hyperoptic", "gigaclear", "community fibre", "british gas", "edf", "octopus", "thames water", "severn trent", "yorkshire water", "anglia water", "southern water", "npower", "e.on", "scottish power", "utility warehouse", "umbrella", "gift", "present", "gift card", "gift voucher", "pesach", "passover", "succah", "sukkah", "purim", "chanukah", "hanukkah", "shavuos", "rosh hashanah", "yom kippur", "wedding", "bar mitzvah", "bat mitzvah", "bris", "engagement", "sheva brachos"],
+    "taxi": ["uber", "bolt", "uber trip", "uber ride", "lyft", "free now", "viavan", "addison lee", "taxi", "minicab", "private hire"],
+    "mikva": ["mikvah", "mikveh", "mikva", "ritual bath", "mikvah fee"],
+    "taxes": ["self assessment", "tax", "hmrc", "stamp duty", "capital gains", "income tax", "vat", "corporation tax", "tax bill"],
+    "upcoming_savings": ["savings", "saving", "regular saver", "easy access", "savings account", "savings pot", "monzo pot", "starling space", "savings deposit"],
+    "income": ["salary", "wages", "payroll", "hmrc repayment", "employment", "pay", "earnings", "refund", "interest", "dividend", "tax refund", "cashback", "rebate", "bonus", "commission", "freelance", "benefits", "universal credit", "child benefit", "pension", "state pension", "investment income"],
 }
 
 
@@ -309,40 +292,39 @@ def smart_categorize(text: str) -> str:
     return "uncategorized"
 
 
+def resolve_category(value: str) -> str:
+    """Resolve old/new category slug to canonical new slug, with fallback."""
+    from statements import resolve_category as _resolve
+    return _resolve(value)
+
+
 CATEGORISE_PROMPT_FE = """You are a UK bank transaction categoriser. Think step by step about what this transaction is, then output the category.
 
-CATEGORY HIERARCHY (pick exactly one category name from below):
+CATEGORY HIERARCHY (pick exactly one category slug from below):
 
-Household: groceries (supermarket food), cleaning, furniture, household, home_improvement, laundry, kitchen
-Transport: transport, fuel, parking, public_transport, car_maintenance, car_hire, taxi
-Utilities: utilities, electricity, gas, water, internet, phone, council_tax
-Children & Education: education, school_fees, tuition, books, childcare, children
-Health: health, medical, dental, pharmacy, optical, gym, fitness, therapy
-Jewish & Community: tzedakah, maaser, shul_donations, mikvah, jewish_education
-Yom Tov: pesach, succah, purim, chanukah, shavuos, rosh_hashanah, yom_kippur
-Simchas: wedding, bar_bas_mitzvah, bris, engagement, sheva_brachos, gifts
-Travel: travel, flights, hotels, car_hire, holiday
-Business: business, office_supplies, software, advertising
-Entertainment & Dining: dining, entertainment, streaming, subscriptions, hobbies
-Shopping: shopping, clothing, electronics
-Financial: rent, mortgage, insurance, tax, fees, transfer, cash, investments
-Income: salary, income
+❤️ Charity: maaser_tzedakah, charity, other_charity
+👕 Clothing: clothing_husband, clothing_wife, clothing_kids, shoes
+🏠 Household: fruit_veg, grocery, bakery, fish, meat, paper_goods, takeaway, wine, house_supplies, chemist
+🏠 Housing: rent_mortgage, electricity, heating, gas, water, council_tax, telephone, mobile, cleaning_help, life_insurance, buildings_insurance
+👦 Kids: school_fees, bus_fee, babysitting, nappies, trust_savings, toys, tutor, therapy, medical
+🧩 Ungrouped: public_transport, car_lease, petrol_diesel, dart_charge, tolls, tickets, loan_payoff, interest, investments, petty_cash, miscellaneous, taxi, mikva, taxes, upcoming_savings
+💰 Income: salary, income
 
 Also acceptable: uncategorized
 
 MERCHANT → CATEGORY (with amount-aware logic):
-- Tesco/Sainsbury/Asda/Waitrose/Lidl/Aldi/Co-op/Morrisons: if abs(amount) < 10 → dining (meal deal/snack), if abs(amount) >= 10 → groceries (weekly shop)
-- McDonald/Nando/KFC/Pret/Starbucks/Costa → dining (always)
-- Deliveroo/Uber Eats/JustEat: if merchant says "uber" but description says "Uber Eats" → dining; if "Uber trip" → transport
-- Uber/Bolt: check description — "uber eats" → dining, "trip/ride" → transport
-- TfL/Oyster/Shell/BP/Esso/SSE/texaco/Applegreen → transport (fuel for petrol stations)
+- Tesco/Sainsbury/Asda/Waitrose/Lidl/Aldi/Co-op/Morrisons: if abs(amount) < 10 → takeaway (meal deal/snack), if abs(amount) >= 10 → grocery
+- McDonald/Nando/KFC/Pret/Starbucks/Costa → takeaway (always)
+- Deliveroo/Uber Eats/JustEat → takeaway; Uber trip/ride → taxi
+- TfL/Oyster → public_transport; Shell/BP/Esso/texaco/Applegreen → petrol_diesel
 - Trainline/raileasy → public_transport
-- British Gas/EDF/Eon/Octopus/BT/Sky/Virgin/Vodafone/EE → utilities
-- Netflix/Spotify/Disney+/Apple Music/Apple.com/Google/YouTube Premium → streaming (or subscriptions)
-- Amazon: if "prime" in description → subscriptions, otherwise → shopping
-- Boots/Lloyds/Superdrug → pharmacy; Specsavers → optical
-- eBay/Argos/John Lewis/Next/H&M/Primark/M&S/clothing/fashion → shopping (or clothing)
-- HMRC/tax/VAT/VAT payment → tax
+- British Gas/EDF/Eon/Octopus → gas or electricity
+- Netflix/Spotify/Disney+/YouTube Premium → miscellaneous
+- Amazon: if "PRIME" or "MUSIC" or "VIDEO" → miscellaneous, otherwise → miscellaneous
+- Boots/Lloyds/Superdrug → chemist; Specsavers → medical
+- eBay/Amazon/Argos/John Lewis → miscellaneous
+- HMRC/VAT → taxes
+- BT/Sky/Virgin/Vodafone/EE → telephone or mobile
 - ATM/WITHDRAWAL → cash
 - Faster payment/standing order/PayPal/Monzo-to-Monzo → check description: "salary/wages/payroll" → salary; "transfer"/"payment to"/"savings" → transfer
 - Charity/Donation/Tzedakah/JGive/Keren → tzedakah; maaser-specific → maaser
@@ -479,6 +461,25 @@ def _budget_to_dict(b: Budget) -> dict:
     }
 
 
+def _insight_reason(cat: str, current: float, avg: float, budget: float) -> str:
+    """Generate a human-readable reason for a budget insight suggestion."""
+    if budget == 0 and current > 0:
+        return f"You're spending £{current:.0f} on {cat} but have no budget set."
+    if budget > 0 and current > budget * 1.2:
+        return f"Spending £{current:.0f} exceeds your £{budget:.0f} budget by {int((current/budget-1)*100)}%."
+    if avg > 0 and avg > budget * 1.1 and budget > 0:
+        return f"Your 3-month avg (£{avg:.0f}) is above your budget (£{budget:.0f})."
+    if budget > 0 and avg < budget * 0.8:
+        return f"You're consistently under budget — consider lowering from £{budget:.0f} to £{avg:.0f}."
+    if current > 0 and avg > 0 and current > avg * 1.3:
+        return f"This month (£{current:.0f}) is much higher than your 3-month avg (£{avg:.0f})."
+    if avg > 0 and budget == 0:
+        return f"Average spending on {cat} is £{avg:.0f} — consider setting a budget."
+    if current > 0:
+        return f"Current spend £{current:.0f} — suggested budget aligns with actuals."
+    return f"Based on your spending patterns."
+
+
 # ── Router ───────────────────────────────────────────────────────────────
 
 def build_router() -> APIRouter:
@@ -612,61 +613,86 @@ def build_router() -> APIRouter:
             }
 
     _SEARCH_CATEGORIES = {
-        "groceries": "groceries", "grocery": "groceries", "supermarket": "groceries", "food shop": "groceries",
-        "dining": "dining", "restaurant": "dining", "restaurants": "dining", "cafe": "dining", "cafes": "dining",
-        "takeaway": "dining", "takeaways": "dining", "eating out": "dining", "food": "dining",
-        "transport": "transport", "uber": "transport", "taxi": "transport", "taxis": "transport",
-        "fuel": "fuel", "petrol": "fuel", "gas station": "fuel", "ev charge": "fuel", "charging": "fuel",
-        "parking": "parking",
-        "public transport": "public_transport", "train": "public_transport", "bus": "public_transport",
-        "tube": "public_transport", "tram": "public_transport",
-        "utilities": "utilities", "bills": "utilities", "electric": "electricity", "gas bill": "gas",
-        "water": "water", "broadband": "internet", "phone": "phone", "mobile": "phone", "internet": "internet",
-        "subscriptions": "subscriptions", "sub": "subscriptions", "subs": "subscriptions",
-        "streaming": "streaming", "membership": "subscriptions", "memberships": "subscriptions",
-        "tzedakah": "tzedakah", "charity": "tzedakah", "charities": "tzedakah", "donation": "tzedakah",
-        "donations": "tzedakah", "maaser": "maaser",
-        "shul": "shul_donations", "synagogue": "shul_donations",
-        "rent": "rent", "rentals": "rent",
-        "mortgage": "mortgage",
-        "shopping": "shopping", "shop": "shopping", "shops": "shopping", "amazon": "shopping", "purchases": "shopping",
-        "clothing": "clothing", "clothes": "clothing", "fashion": "clothing",
-        "electronics": "electronics", "electrical": "electronics",
-        "health": "health", "doctor": "medical", "dental": "dental", "dentist": "dental",
-        "pharmacy": "pharmacy", "optician": "optical", "glasses": "optical",
-        "gym": "gym", "fitness": "gym",
+        "maaser": "maaser_tzedakah", "tithe": "maaser_tzedakah",
+        "charity": "charity", "charities": "charity", "donation": "charity", "donations": "charity", "tzedakah": "charity",
+        "shul": "other_charity", "synagogue": "other_charity",
+        "clothing": "clothing_husband", "clothes": "clothing_husband", "fashion": "clothing_husband",
+        "shoes": "shoes",
+        "grocery": "grocery", "groceries": "grocery", "supermarket": "grocery", "food shop": "grocery",
+        "fruit": "fruit_veg", "veg": "fruit_veg", "vegetables": "fruit_veg",
+        "bakery": "bakery", "bread": "bakery",
+        "fish": "fish", "seafood": "fish",
+        "meat": "meat", "butcher": "meat",
+        "takeaway": "takeaway", "takeaways": "takeaway", "dining": "takeaway", "restaurant": "takeaway",
+        "restaurants": "takeaway", "cafe": "takeaway", "cafes": "takeaway", "eating out": "takeaway",
+        "wine": "wine",
+        "house supplies": "house_supplies", "household": "house_supplies", "cleaning": "house_supplies",
+        "diy": "house_supplies", "furniture": "house_supplies", "laundry": "house_supplies",
+        "chemist": "chemist", "pharmacy": "chemist",
+        "rent": "rent_mortgage", "rentals": "rent_mortgage", "mortgage": "rent_mortgage",
+        "electric": "electricity", "electricity": "electricity",
+        "heating": "heating",
+        "gas": "gas", "gas bill": "gas",
+        "water": "water",
+        "council tax": "council_tax",
+        "telephone": "telephone", "landline": "telephone",
+        "mobile": "mobile", "phone": "mobile",
+        "cleaning help": "cleaning_help", "cleaner": "cleaning_help",
+        "life insurance": "life_insurance",
+        "buildings insurance": "buildings_insurance", "home insurance": "buildings_insurance",
+        "school": "school_fees", "school fees": "school_fees",
+        "education": "school_fees", "courses": "school_fees",
+        "tuition": "school_fees", "tutor": "school_fees",
+        "bus fee": "bus_fee", "bus fare": "bus_fee",
+        "babysitting": "babysitting", "childcare": "babysitting", "nursery": "babysitting",
+        "nappies": "nappies", "nappy": "nappies",
+        "toys": "toys",
         "therapy": "therapy", "counselling": "therapy",
-        "entertainment": "entertainment", "fun": "entertainment", "cinema": "entertainment",
-        "hobbies": "hobbies", "hobby": "hobbies",
-        "insurance": "insurance",
-        "education": "education", "courses": "education",
-        "school fees": "school_fees", "school": "school_fees",
-        "tuition": "tuition", "tutor": "tuition",
-        "childcare": "childcare", "nursery": "childcare",
-        "books": "books",
-        "transfer": "transfer", "transfers": "transfer",
-        "cash": "cash", "atm": "cash", "withdrawal": "cash", "withdrawals": "cash",
-        "tax": "tax", "taxes": "tax", "hmrc": "tax",
-        "fees": "fees", "fee": "fees", "charges": "fees", "charge": "fees",
+        "medical": "medical", "health": "medical", "doctor": "medical",
+        "dental": "medical", "dentist": "medical",
+        "optician": "medical", "glasses": "medical",
+        "pharmacy": "chemist", "boots": "chemist",
+        "gym": "miscellaneous", "fitness": "miscellaneous",
+        "public transport": "public_transport", "train": "public_transport", "bus": "public_transport",
+        "tube": "public_transport", "tram": "public_transport", "transport": "public_transport",
+        "car lease": "car_lease",
+        "petrol": "petrol_diesel", "diesel": "petrol_diesel", "fuel": "petrol_diesel", "ev charge": "petrol_diesel",
+        "dart charge": "dart_charge", "congestion": "dart_charge",
+        "parking": "dart_charge",
+        "tolls": "tolls", "toll": "tolls",
+        "tickets": "tickets", "fine": "tickets", "fines": "tickets",
+        "loan": "loan_payoff",
+        "interest": "interest", "fees": "interest", "fee": "interest", "charges": "interest", "charge": "interest",
         "investments": "investments", "investing": "investments",
+        "cash": "petty_cash", "atm": "petty_cash", "withdrawal": "petty_cash",
+        "miscellaneous": "miscellaneous", "other": "miscellaneous", "general": "miscellaneous",
+        "shopping": "miscellaneous", "shop": "miscellaneous", "amazon": "miscellaneous",
+        "entertainment": "miscellaneous", "fun": "miscellaneous", "cinema": "miscellaneous",
+        "streaming": "miscellaneous", "subscriptions": "miscellaneous", "sub": "miscellaneous",
+        "travel": "miscellaneous", "flights": "miscellaneous", "flight": "miscellaneous",
+        "hotel": "miscellaneous", "hotels": "miscellaneous", "accommodation": "miscellaneous",
+        "holiday": "miscellaneous", "vacation": "miscellaneous",
+        "car hire": "miscellaneous",
+        "business": "miscellaneous", "office supplies": "miscellaneous", "software": "miscellaneous",
+        "advertising": "miscellaneous", "marketing": "miscellaneous",
+        "hobbies": "miscellaneous", "hobby": "miscellaneous",
+        "books": "miscellaneous", "book": "miscellaneous",
+        "taxi": "taxi", "uber": "taxi", "taxis": "taxi",
+        "mikva": "mikva", "mikvah": "mikva",
+        "tax": "taxes", "taxes": "taxes", "hmrc": "taxes",
+        "savings": "upcoming_savings",
         "salary": "salary", "wages": "salary", "paycheck": "salary", "pay": "salary",
         "income": "income",
-        "travel": "travel", "flights": "flights", "flight": "flights", "airline": "flights",
-        "hotels": "hotels", "hotel": "hotels", "accommodation": "hotels",
-        "car hire": "car_hire",
-        "holiday": "holiday", "vacation": "holiday",
-        "business": "business", "office supplies": "office_supplies", "stationery": "office_supplies",
-        "software": "software", "advertising": "advertising", "marketing": "advertising",
-        "home improvement": "home_improvement", "diy": "home_improvement", "furniture": "furniture",
-        "cleaning": "cleaning", "laundry": "laundry",
-        "jewish education": "jewish_education",
-        "pesach": "pesach", "passover": "pesach",
-        "succah": "succah", "sukkah": "succah",
-        "purim": "purim", "chanukah": "chanukah", "hanukkah": "chanukah",
-        "shavuos": "shavuos", "rosh hashanah": "rosh_hashanah", "yom kippur": "yom_kippur",
-        "wedding": "wedding", "bar mitzvah": "bar_bas_mitzvah", "bat mitzvah": "bar_bas_mitzvah",
-        "bris": "bris", "engagement": "engagement", "sheva brachos": "sheva_brachos",
-        "gifts": "gifts", "gift": "gifts",
+        "pesach": "miscellaneous", "passover": "miscellaneous",
+        "purim": "miscellaneous", "chanukah": "miscellaneous", "succah": "miscellaneous",
+        "wedding": "miscellaneous", "bar mitzvah": "miscellaneous", "bat mitzvah": "miscellaneous",
+        "bris": "miscellaneous", "engagement": "miscellaneous",
+        "gifts": "miscellaneous", "gift": "miscellaneous",
+        "insurance": "life_insurance",
+        "transfer": "miscellaneous", "transfers": "miscellaneous",
+        "electronics": "miscellaneous", "electrical": "miscellaneous",
+        "utilities": "house_supplies", "bills": "house_supplies",
+        "internet": "miscellaneous", "broadband": "miscellaneous",
     }
 
     def _regex_parse_search(q: str) -> dict:
@@ -1037,6 +1063,8 @@ Output ONLY valid JSON, no markdown, no explanation:
             desc = payload.description or ""
             merch = payload.merchant or ""
             category = payload.category or smart_categorize(f"{desc} {merch}")
+            from statements import resolve_category as _rc
+            category = _rc(category)
             if category == "uncategorized":
                 # Fast path: keyword match
                 from statements import _keyword_categorise as kw_cat
@@ -1107,7 +1135,8 @@ Output ONLY valid JSON, no markdown, no explanation:
             category_changed = False
             old_category = tx.category
             if payload.category is not None and payload.category != tx.category:
-                tx.category = payload.category
+                from statements import resolve_category as _rc
+                tx.category = _rc(payload.category)
                 category_changed = True
             if payload.date is not None:
                 tx.date = datetime.fromisoformat(payload.date)
@@ -1270,22 +1299,23 @@ Output ONLY valid JSON, no markdown, no explanation:
             existing = result.scalar() or 0
             if existing > 0:
                 return {"ok": True, "skipped": True}
+            from statements import resolve_category as _rc
             sample = [
-                ("Tesco Express", -42.50, "groceries"),
+                ("Tesco Express", -42.50, "grocery"),
                 ("Salary - Acme Ltd", 3200.00, "salary"),
-                ("TfL Travel", -7.20, "transport"),
-                ("Netflix - Monthly", -10.99, "subscriptions"),
-                ("Octopus Energy", -85.40, "utilities"),
-                ("Chesed Fund", -36.00, "tzedakah"),
-                ("Deliveroo", -22.15, "dining"),
-                ("Sainsbury's", -68.30, "groceries"),
-                ("Apple iCloud", -2.99, "subscriptions"),
-                ("Rent", -1450.00, "rent"),
-                ("Trainline", -38.50, "transport"),
-                ("Yeshiva Donation", -100.00, "tzedakah"),
-                ("Amazon.co.uk", -15.99, "shopping"),
-                ("PureGym Monthly", -29.99, "subscriptions"),
-                ("Council Tax", -185.00, "utilities"),
+                ("TfL Travel", -7.20, "public_transport"),
+                ("Netflix - Monthly", -10.99, "miscellaneous"),
+                ("Octopus Energy", -85.40, "electricity"),
+                ("Chesed Fund", -36.00, "charity"),
+                ("Deliveroo", -22.15, "takeaway"),
+                ("Sainsbury's", -68.30, "grocery"),
+                ("Apple iCloud", -2.99, "miscellaneous"),
+                ("Rent", -1450.00, "rent_mortgage"),
+                ("Trainline", -38.50, "public_transport"),
+                ("Yeshiva Donation", -100.00, "other_charity"),
+                ("Amazon.co.uk", -15.99, "miscellaneous"),
+                ("PureGym Monthly", -29.99, "miscellaneous"),
+                ("Council Tax", -185.00, "council_tax"),
             ]
             now = datetime.now(timezone.utc)
             for i, (desc, amt, cat) in enumerate(sample):
@@ -2178,6 +2208,291 @@ Output ONLY valid JSON, no markdown, no explanation:
             await session.commit()
             await session.refresh(b)
             return _budget_to_dict(b)
+
+    # ── AI Budget Insights ─────────────────────────────────────────
+
+    @router.get("/budgets/insights")
+    async def budget_insights(request: Request, user: dict = Depends(get_current_user)):
+        """Compare current month spending vs last 3 months per category, return suggestions."""
+        sm = request.app.state.db
+        async with sm() as session:
+            now = datetime.now(timezone.utc)
+            y, m = now.year, now.month
+
+            # Current month range
+            cur_start = datetime(y, m, 1, tzinfo=timezone.utc)
+            cur_end = datetime(y + 1, 1, 1, tzinfo=timezone.utc) if m == 12 else datetime(y, m + 1, 1, tzinfo=timezone.utc)
+
+            # Last 3 months range (start of 3 months ago to start of current month)
+            past_start = cur_start - timedelta(days=90)
+            past_start = datetime(past_start.year, past_start.month, 1, tzinfo=timezone.utc)
+
+            # Current month transactions (expenses only)
+            cur_tx = await session.execute(
+                select(Transaction).where(
+                    Transaction.user_id == user["user_id"],
+                    Transaction.amount < 0,
+                    Transaction.date >= cur_start,
+                    Transaction.date < cur_end,
+                    Transaction.category.isnot(None),
+                )
+            )
+            cur_txns = cur_tx.scalars().all()
+
+            # Past 3 months transactions
+            past_tx = await session.execute(
+                select(Transaction).where(
+                    Transaction.user_id == user["user_id"],
+                    Transaction.amount < 0,
+                    Transaction.date >= past_start,
+                    Transaction.date < cur_start,
+                    Transaction.category.isnot(None),
+                )
+            )
+            past_txns = past_tx.scalars().all()
+
+            # Aggregate current month per category
+            cur_by_cat = defaultdict(float)
+            for t in cur_txns:
+                cur_by_cat[t.category] += -t.amount
+
+            # Aggregate past 3 months per category, compute monthly avg
+            past_by_cat = defaultdict(list)
+            for t in past_txns:
+                month_key = f"{t.date.year}-{t.date.month:02d}"
+                past_by_cat[(t.category, month_key)] += -t.amount
+
+            # Get unique months in past period
+            past_months = set()
+            for (cat, mk), _ in past_by_cat.items():
+                past_months.add(mk)
+            num_past_months = max(len(past_months), 1)
+
+            past_avg = defaultdict(float)
+            for (cat, _), total in past_by_cat.items():
+                past_avg[cat] += total
+            for cat in past_avg:
+                past_avg[cat] /= num_past_months
+
+            # Get current budgets
+            result = await session.execute(
+                select(Budget).where(
+                    Budget.user_id == user["user_id"],
+                    Budget.budget_type != "event",
+                )
+            )
+            budgets = result.scalars().all()
+            budget_map = {b.category: float(b.amount) for b in budgets}
+
+            # Build insights
+            categories = set(list(cur_by_cat.keys()) + list(past_avg.keys()) + list(budget_map.keys()))
+            insights = []
+            for cat in sorted(categories):
+                if not cat:
+                    continue
+                current_spent = round(cur_by_cat.get(cat, 0), 2)
+                avg_spent = round(past_avg.get(cat, 0), 2)
+                current_budget = round(budget_map.get(cat, 0), 2)
+                suggestion = round(max(current_spent, avg_spent, current_budget), 2)
+                if current_budget > 0 or current_spent > 0 or avg_spent > 0:
+                    insights.append({
+                        "category": cat,
+                        "current_spent": current_spent,
+                        "avg_spent_3m": avg_spent,
+                        "current_budget": current_budget,
+                        "suggested_budget": suggestion,
+                        "reason": _insight_reason(cat, current_spent, avg_spent, current_budget),
+                    })
+
+            return {"insights": insights, "month": f"{y}-{m:02d}"}
+
+    # ── Budget Trends ───────────────────────────────────────────────
+
+    @router.get("/budgets/trends")
+    async def budget_trends(
+        request: Request,
+        user: dict = Depends(get_current_user),
+        category: str = Query(None),
+        months: int = Query(6, ge=1, le=24),
+        all_categories: bool = Query(False, alias="all"),
+    ):
+        """Return monthly budget vs spent for a category over N months.
+        Pass ?all=true to get data for ALL budgeted categories in batch."""
+        sm = request.app.state.db
+        async with sm() as session:
+            now = datetime.now(timezone.utc)
+
+            # Determine which categories to fetch
+            cats_to_fetch = []
+            if all_categories:
+                result = await session.execute(
+                    select(Budget).where(Budget.user_id == user["user_id"], Budget.budget_type != "event")
+                )
+                cats_to_fetch = [b.category for b in result.scalars().all()]
+                if not cats_to_fetch:
+                    return {"trends": {}, "months": []}
+            elif category and category.lower() != "all":
+                cats_to_fetch = [category.lower()]
+
+            if not cats_to_fetch:
+                # No category filter — return total aggregate
+                cats_to_fetch = None
+
+            # Build month list
+            month_keys = []
+            month_ranges = []
+            for i in range(months - 1, -1, -1):
+                first_of_month = datetime(now.year, now.month, 1, tzinfo=timezone.utc) - timedelta(days=30 * i)
+                y_m, m_m = first_of_month.year, first_of_month.month
+                m_start = datetime(y_m, m_m, 1, tzinfo=timezone.utc)
+                m_end = datetime(y_m + 1, 1, 1, tzinfo=timezone.utc) if m_m == 12 else datetime(y_m, m_m + 1, 1, tzinfo=timezone.utc)
+                month_keys.append(f"{y_m}-{m_m:02d}")
+                month_ranges.append((m_start, m_end))
+
+            if not cats_to_fetch:
+                # Total aggregate across all categories
+                trends = []
+                for i, mk in enumerate(month_keys):
+                    tx_q = select(Transaction).where(
+                        Transaction.user_id == user["user_id"],
+                        Transaction.amount < 0,
+                        Transaction.date >= month_ranges[i][0],
+                        Transaction.date < month_ranges[i][1],
+                    )
+                    tx_result = await session.execute(tx_q)
+                    txs = tx_result.scalars().all()
+                    spent = round(sum(-t.amount for t in txs), 2)
+                    trends.append({"month": mk, "budget": 0, "spent": spent})
+                return {"trends": {"_total": trends}, "months": month_keys}
+            else:
+                # Per-category data
+                result_map = {}
+                # Get current budgets
+                budget_result = await session.execute(
+                    select(Budget).where(Budget.user_id == user["user_id"], Budget.budget_type != "event")
+                )
+                budget_map = {b.category: float(b.amount) for b in budget_result.scalars().all()}
+
+                for cat in cats_to_fetch:
+                    cat_trends = []
+                    for i, mk in enumerate(month_keys):
+                        tx_q = select(Transaction).where(
+                            Transaction.user_id == user["user_id"],
+                            Transaction.amount < 0,
+                            Transaction.date >= month_ranges[i][0],
+                            Transaction.date < month_ranges[i][1],
+                            Transaction.category == cat,
+                        )
+                        tx_result = await session.execute(tx_q)
+                        txs = tx_result.scalars().all()
+                        spent = round(sum(-t.amount for t in txs), 2)
+                        budget_val = round(budget_map.get(cat, 0), 2)
+                        cat_trends.append({
+                            "month": mk,
+                            "budget": budget_val,
+                            "spent": spent,
+                        })
+                    result_map[cat] = cat_trends
+
+                return {"trends": result_map, "months": month_keys}
+
+    # ── Budget Alerts ───────────────────────────────────────────────
+
+    @router.get("/budgets/alerts")
+    async def budget_alerts(request: Request, user: dict = Depends(get_current_user)):
+        """Return budgets that are over threshold, or have unusual spending spikes."""
+        sm = request.app.state.db
+        async with sm() as session:
+            now = datetime.now(timezone.utc)
+            y, m_val = now.year, now.month
+            m_start = datetime(y, m_val, 1, tzinfo=timezone.utc)
+            m_end = datetime(y + 1, 1, 1, tzinfo=timezone.utc) if m_val == 12 else datetime(y, m_val + 1, 1, tzinfo=timezone.utc)
+
+            result = await session.execute(
+                select(Budget).where(
+                    Budget.user_id == user["user_id"],
+                    Budget.budget_type != "event",
+                )
+            )
+            budgets = result.scalars().all()
+
+            tx_result = await session.execute(
+                select(Transaction).where(
+                    Transaction.user_id == user["user_id"],
+                    Transaction.amount < 0,
+                    Transaction.date >= m_start,
+                    Transaction.date < m_end,
+                    Transaction.category.isnot(None),
+                )
+            )
+            txs = tx_result.scalars().all()
+            spent_by_cat = defaultdict(float)
+            for t in txs:
+                spent_by_cat[t.category] += -t.amount
+
+            # Past 3 months avg for spike detection
+            past_start = m_start - timedelta(days=90)
+            past_start = datetime(past_start.year, past_start.month, 1, tzinfo=timezone.utc)
+            past_tx = await session.execute(
+                select(Transaction).where(
+                    Transaction.user_id == user["user_id"],
+                    Transaction.amount < 0,
+                    Transaction.date >= past_start,
+                    Transaction.date < m_start,
+                    Transaction.category.isnot(None),
+                )
+            )
+            past_txns = past_tx.scalars().all()
+            past_monthly = defaultdict(float)
+            past_months_set = set()
+            for t in past_txns:
+                mk = f"{t.date.year}-{t.date.month:02d}"
+                past_months_set.add(mk)
+                past_monthly[t.category] += -t.amount
+            num_past = max(len(past_months_set), 1)
+            for cat in past_monthly:
+                past_monthly[cat] /= num_past
+
+            alerts = []
+            for b in budgets:
+                cat = b.category
+                spent = spent_by_cat.get(cat, 0)
+                lim = float(b.amount)
+                if lim <= 0:
+                    continue
+                pct = round((spent / lim) * 100, 1)
+                avg = round(past_monthly.get(cat, 0), 2)
+
+                if pct >= 100:
+                    alerts.append({
+                        "category": cat,
+                        "severity": "critical",
+                        "message": f"{cat.capitalize()} is over budget ({pct}% used)",
+                        "spent": round(spent, 2),
+                        "budget": lim,
+                        "progress_pct": pct,
+                    })
+                elif pct >= 80:
+                    alerts.append({
+                        "category": cat,
+                        "severity": "warning",
+                        "message": f"{cat.capitalize()} is at {pct}% of budget",
+                        "spent": round(spent, 2),
+                        "budget": lim,
+                        "progress_pct": pct,
+                    })
+                if avg > 0 and spent > avg * 1.5 and spent > 50:
+                    alerts.append({
+                        "category": cat,
+                        "severity": "spike",
+                        "message": f"{cat.capitalize()} spending spike: £{round(spent,2)} vs usual £{avg}",
+                        "spent": round(spent, 2),
+                        "budget": lim,
+                        "avg_3m": avg,
+                        "progress_pct": pct,
+                    })
+
+            return {"alerts": alerts}
 
     # ── Transaction system health check ─────────────────────────────
 

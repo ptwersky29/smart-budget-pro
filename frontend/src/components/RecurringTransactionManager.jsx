@@ -36,10 +36,7 @@ export default function RecurringTransactionManager() {
     { value: "annually", label: "Annually" },
   ];
 
-  const CATEGORIES = [
-    "rent", "salary", "utilities", "insurance", "subscriptions",
-    "groceries", "transport", "health", "entertainment"
-  ];
+  const [allCats, setAllCats] = useState([]);
 
   const loadRecurring = useCallback(async () => {
     setLoading(true);
@@ -53,9 +50,20 @@ export default function RecurringTransactionManager() {
     }
   }, []);
 
+  const fetchCategories = useCallback(async () => {
+    try {
+      const { data } = await api.get("/categories");
+      setAllCats(data.categories || []);
+    } catch {}
+  }, []);
+
   useEffect(() => {
     loadRecurring();
   }, [loadRecurring]);
+
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
 
   const resetForm = () => {
     setForm({
@@ -276,14 +284,29 @@ export default function RecurringTransactionManager() {
                 <label className="label-overline">Category *</label>
                 <select
                   value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                  onChange={(e) => {
+                    if (e.target.value === "__add__") {
+                      const c = prompt("New category name:");
+                      if (c) setForm({ ...form, category: c.trim().toLowerCase().replace(/\s+/g, "_") });
+                    } else {
+                      setForm({ ...form, category: e.target.value });
+                    }
+                  }}
                   className="h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors w-full"
                   required
                 >
                   <option value="">Select category…</option>
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>{c}</option>
+                  {Object.entries(allCats.reduce((acc, c) => {
+                    const section = c.section || "Other";
+                    if (!acc[section]) acc[section] = [];
+                    acc[section].push(c);
+                    return acc;
+                  }, {})).map(([section, cats]) => (
+                    <optgroup key={section} label={section}>
+                      {cats.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                    </optgroup>
                   ))}
+                  <option value="__add__">➕ Add custom category</option>
                 </select>
               </div>
 
