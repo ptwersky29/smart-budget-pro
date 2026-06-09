@@ -39,6 +39,7 @@ function AppRouter() {
   const authHash = location.hash || "";
 
   if (authHash.includes("access_token=") || authHash.includes("refresh_token=") || authHash.includes("session_id=")) {
+    console.log("[AppRouter] hash detected, rendering AuthCallback");
     return <AuthCallback />;
   }
 
