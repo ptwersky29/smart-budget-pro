@@ -2042,9 +2042,27 @@ Output ONLY valid JSON, no markdown, no explanation:
         request: Request,
         user: dict = Depends(get_current_user),
         type: str = Query(None, description="Filter: everyday | event"),
+        month: str = Query(None, description="YYYY-MM — defaults to current month"),
     ):
         sm = request.app.state.db
         async with sm() as session:
+            # Determine the month range (default: current month)
+            if month:
+                try:
+                    y, m = int(month[:4]), int(month[5:7])
+                    if not (1 <= m <= 12):
+                        raise ValueError
+                except (ValueError, IndexError):
+                    raise HTTPException(400, "Invalid month format, use YYYY-MM")
+            else:
+                now = datetime.now(timezone.utc)
+                y, m = now.year, now.month
+            month_start = datetime(y, m, 1, tzinfo=timezone.utc)
+            if m == 12:
+                month_end = datetime(y + 1, 1, 1, tzinfo=timezone.utc)
+            else:
+                month_end = datetime(y, m + 1, 1, tzinfo=timezone.utc)
+
             q = select(Budget).where(Budget.user_id == user["user_id"])
             if type:
                 q = q.where(Budget.budget_type == type)
@@ -2052,17 +2070,26 @@ Output ONLY valid JSON, no markdown, no explanation:
             budgets = result.scalars().all()
 
             tx_result = await session.execute(
-                select(Transaction).where(Transaction.user_id == user["user_id"])
+                select(Transaction).where(
+                    Transaction.user_id == user["user_id"],
+                    Transaction.date >= month_start,
+                    Transaction.date < month_end,
+                )
             )
             txs = tx_result.scalars().all()
             result_list = []
+            total_budgeted = 0
+            total_spent = 0
             for b in budgets:
                 spent = sum(-t.amount for t in txs if t.amount < 0 and t.category == b.category)
+                limit_val = float(b.amount)
+                total_budgeted += limit_val
+                total_spent += spent
                 entry = {
                     **_budget_to_dict(b),
                     "spent": round(spent, 2),
-                    "remaining": round(b.amount - spent, 2),
-                    "progress_pct": round(min(100, (spent / b.amount * 100) if b.amount else 0), 1),
+                    "remaining": round(limit_val - spent, 2),
+                    "progress_pct": round(min(100, (spent / limit_val * 100) if limit_val else 0), 1),
                 }
                 result_list.append(entry)
 
@@ -2072,7 +2099,13 @@ Output ONLY valid JSON, no markdown, no explanation:
                 x["category"],
             ) if type == "event" else (x["category"],))
 
-            return {"budgets": result_list}
+            return {
+                "budgets": result_list,
+                "month": f"{y}-{m:02d}",
+                "total_budgeted": round(total_budgeted, 2),
+                "total_spent": round(total_spent, 2),
+                "total_remaining": round(total_budgeted - total_spent, 2),
+            }
 
     @router.post("/budgets")
     async def create_budget(payload: BudgetIn, request: Request, user: dict = Depends(get_current_user)):

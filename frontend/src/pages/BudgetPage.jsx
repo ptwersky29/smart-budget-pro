@@ -1,139 +1,90 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
-import { format, parseISO, isBefore, startOfMonth, endOfMonth } from "date-fns";
+import { parseISO, isBefore } from "date-fns";
 import {
-  RefreshCw, Wallet, ShoppingCart, Calendar, Plus, Trash2, Pencil,
-  Check, X, PiggyBank, Target, TrendingDown, PlusCircle,
+  RefreshCw, Wallet, ShoppingCart, Calendar, Plus, Pencil, Trash2,
+  Check, X, Target, TrendingDown, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
-import { PageHeader, SectionCard, MetricCard } from "../components/ui/layout";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
+import { PageHeader, MetricCard } from "../components/ui/layout";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import ConfirmModal from "../components/ui/ConfirmModal";
 
-const TABS = [
-  { value: "overview", label: "This Month", icon: Wallet },
-  { value: "everyday", label: "Everyday Spending", icon: ShoppingCart },
-  { value: "events", label: "Planned Events", icon: Calendar },
+const CATEGORIES = [
+  "groceries", "dining", "transport", "rent", "utilities",
+  "subscriptions", "tzedakah", "health", "entertainment",
+  "shopping", "insurance", "education", "gifts", "charity",
 ];
 
-function groupBySection(cats, hierarchy) {
-  const grouped = {};
-  if (hierarchy && Object.keys(hierarchy).length > 0) {
-    for (const [section, names] of Object.entries(hierarchy)) {
-      const sectionCats = names.map(n => cats.find(c => c.name === n)).filter(Boolean);
-      if (sectionCats.length > 0) {
-        grouped[section] = sectionCats;
-      }
-    }
-  }
-  // Add uncategorised remaining
-  const used = new Set(Object.values(grouped).flat().map(c => c.name));
-  for (const c of cats) {
-    if (!used.has(c.name)) {
-      const section = c.section || "Other";
-      if (!grouped[section]) grouped[section] = [];
-      grouped[section].push(c);
-    }
-  }
-  return grouped;
+function fmtMonth(y, m) { return `${y}-${String(m).padStart(2, "0")}`; }
+
+function parseMonth(str) {
+  const p = str.split("-");
+  return { year: parseInt(p[0], 10), month: parseInt(p[1], 10) };
 }
 
-function isThisMonth(dateStr) {
-  if (!dateStr) return false;
-  const d = parseISO(dateStr);
-  const now = new Date();
-  return d >= startOfMonth(now) && d <= endOfMonth(now);
+function addMonth(str, delta) {
+  const { year, month } = parseMonth(str);
+  const d = new Date(year, month - 1 + delta, 1);
+  return fmtMonth(d.getFullYear(), d.getMonth() + 1);
 }
+
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
 
 export default React.memo(function BudgetPage() {
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tabFromUrl = searchParams.get("tab") || "overview";
-  const validTab = TABS.find((t) => t.value === tabFromUrl) ? tabFromUrl : "overview";
-  const [activeTab, setActiveTab] = useState(validTab);
+  const now = new Date();
+  const [month, setMonth] = useState(fmtMonth(now.getFullYear(), now.getMonth() + 1));
   const [budgets, setBudgets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
-
-  // Categories loaded from API
-  const [categories, setCategories] = useState([]);
-  const [hierarchy, setHierarchy] = useState({});
-  const [catsLoading, setCatsLoading] = useState(true);
-
-  // Add form state
-  const [showForm, setShowForm] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ category: "", limit: "", budget_type: "everyday", event_date: "" });
 
-  const setTab = useCallback((tab) => {
-    setActiveTab(tab);
-    setSearchParams({ tab }, { replace: true });
-  }, [setSearchParams]);
+  const { year, month: mNum } = parseMonth(month);
+  const monthLabel = `${MONTH_NAMES[mNum - 1]} ${year}`;
+  const isCurrentMonth = month === fmtMonth(now.getFullYear(), now.getMonth() + 1);
+
+  const everyday = useMemo(() => budgets.filter((b) => (b.budget_type || "everyday") !== "event"), [budgets]);
+  const events = useMemo(() => budgets.filter((b) => b.budget_type === "event"), [budgets]);
+  const upcomingEvents = useMemo(() =>
+    events
+      .filter((b) => b.event_date && !isBefore(parseISO(b.event_date), new Date()))
+      .sort((a, b) => (a.event_date || "").localeCompare(b.event_date || "")),
+    [events],
+  );
+  // Events in the past for this month
+  const pastEvents = useMemo(() =>
+    events.filter((b) => b.event_date && isBefore(parseISO(b.event_date), new Date())),
+    [events],
+  );
+
+  const summary = useMemo(() => {
+    const totalPlanned = budgets.reduce((s, b) => s + (Number(b.limit) || 0), 0);
+    const totalSpent = budgets.reduce((s, b) => s + (Number(b.spent) || 0), 0);
+    const overCount = budgets.filter((b) => (b.progress_pct || 0) >= 100).length;
+    return { count: budgets.length, totalPlanned, totalSpent, overCount };
+  }, [budgets]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get("/budgets");
+      const { data } = await api.get("/budgets", { params: { month } });
       setBudgets(data.budgets || []);
     } catch {
       toast.error("Failed to load budgets");
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  const loadCats = useCallback(async () => {
-    setCatsLoading(true);
-    try {
-      const { data } = await api.get("/categories");
-      setCategories(data.categories || []);
-      setHierarchy(data.hierarchy || {});
-    } catch {
-      // Fallback: use a minimal built-in set if API fails
-      setCategories([]);
-      setHierarchy({});
-    } finally {
-      setCatsLoading(false);
-    }
-  }, []);
+  }, [month]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
-  useEffect(() => { loadCats(); }, [loadCats]);
 
-  // Build grouped categories for the datalist/optgroup
-  const groupedCategories = useMemo(() => {
-    return groupBySection(categories, hierarchy);
-  }, [categories, hierarchy]);
-
-  // Build a flat list of unique category names for datalist
-  const allCategoryNames = useMemo(() => {
-    const names = new Set();
-    for (const cats of Object.values(groupedCategories)) {
-      for (const c of cats) {
-        names.add(c.name);
-      }
-    }
-    return Array.from(names).sort();
-  }, [groupedCategories]);
-
-  // Budgets filtered by type
-  const everyday = useMemo(() => budgets.filter((b) => (b.budget_type || "everyday") === "everyday"), [budgets]);
-  const events = useMemo(() => budgets.filter((b) => b.budget_type === "event"), [budgets]);
-  const thisMonthEvents = useMemo(() => events.filter((b) => isThisMonth(b.event_date)), [events]);
-  const upcomingEvents = useMemo(() => events.filter((b) => b.event_date && !isThisMonth(b.event_date) && !isBefore(parseISO(b.event_date), new Date())), [events]);
-
-  const summary = useMemo(() => {
-    const totalPlanned = budgets.reduce((s, b) => s + (Number(b.limit) || 0), 0);
-    const totalSpent = budgets.reduce((s, b) => s + (Number(b.spent) || 0), 0);
-    const overCount = budgets.filter((b) => (b.progress_pct || 0) >= 100).length;
-    const adherence = totalPlanned > 0 ? Math.max(0, 1 - totalSpent / totalPlanned) * 100 : 100;
-    return { count: budgets.length, totalPlanned, totalSpent, overCount, adherence: Math.round(adherence * 10) / 10 };
-  }, [budgets]);
-
-  // CRUD
   const resetForm = () => setForm({ category: "", limit: "", budget_type: "everyday", event_date: "" });
 
   const handleCreate = async (e) => {
@@ -149,7 +100,7 @@ export default React.memo(function BudgetPage() {
       await api.post("/budgets", payload);
       toast.success(form.budget_type === "event" ? "Event created" : "Budget created");
       resetForm();
-      setShowForm(false);
+      setShowAdd(false);
       await fetchData();
     } catch (err) { toast.error(err.response?.data?.detail || "Could not save"); }
   };
@@ -187,52 +138,78 @@ export default React.memo(function BudgetPage() {
     } catch { toast.error("Could not delete"); }
   };
 
-  // Render a single budget row
-  const renderBudget = (b, showDate = false) => {
+  const renderBudgetCard = (b, showDate = false) => {
     const over = (b.progress_pct || 0) >= 100;
     const isEditing = editingId === b.budget_id;
-    return (
-      <div key={b.budget_id} className="rounded-xl border border-border bg-card/50 p-3 sm:p-4">
-        {isEditing ? (
-          <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-            <div className="flex-1 w-full">
-              <Input list="edit-category-list" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full" />
-              <datalist id="edit-category-list">
-                {allCategoryNames.map(cat => <option key={cat} value={cat} />)}
-              </datalist>
-            </div>
+
+    if (isEditing) {
+      return (
+        <div key={b.budget_id} className="rounded-xl border border-border bg-card/50 p-4 space-y-3">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="flex-1" />
             <Input type="number" step="0.01" value={form.limit} onChange={(e) => setForm({ ...form, limit: e.target.value })} className="w-full sm:w-28" />
             {showDate && <Input type="date" value={form.event_date} onChange={(e) => setForm({ ...form, event_date: e.target.value })} className="w-full sm:w-36" />}
-            <div className="flex gap-1 shrink-0">
-              <button onClick={() => handleUpdate(b.budget_id)} className="h-8 w-8 rounded-lg bg-emerald text-white grid place-items-center"><Check className="h-3.5 w-3.5" /></button>
-              <button onClick={cancelEdit} className="h-8 w-8 rounded-lg border border-border grid place-items-center text-muted-foreground"><X className="h-3.5 w-3.5" /></button>
-            </div>
           </div>
-        ) : (
-          <div>
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-sm font-medium capitalize truncate">{b.category}</span>
-                {showDate && b.event_date && <span className="text-xs text-muted-foreground shrink-0">{format(parseISO(b.event_date), "d MMM")}</span>}
-                {over && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-ruby/10 text-ruby shrink-0">Over</span>}
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-xs tabular-nums text-muted-foreground">£{b.spent} / £{b.limit}</span>
-                <button onClick={() => startEdit(b)} className="p-1 rounded hover:bg-secondary text-muted-foreground"><Pencil className="h-3 w-3" /></button>
-                <button onClick={() => setConfirmDelete(b.budget_id)} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-ruby"><Trash2 className="h-3 w-3" /></button>
-              </div>
-            </div>
-            <div className="mt-1.5 h-2 rounded-full bg-muted/50 overflow-hidden">
-              <div className={`h-full rounded-full transition-all ${over ? "bg-ruby" : "bg-emerald"}`} style={{ width: `${Math.min(100, b.progress_pct || 0)}%` }} />
-            </div>
-            <div className="flex justify-between text-xs text-muted-foreground mt-1">
-              <span>£{(b.spent || 0).toFixed(2)} spent</span>
-              <span>£{Math.max(0, b.remaining || 0).toFixed(2)} remaining</span>
-            </div>
+          <div className="flex gap-2">
+            <Button variant="primary" size="pill" onClick={() => handleUpdate(b.budget_id)}><Check className="h-3.5 w-3.5 mr-1" /> Save</Button>
+            <Button variant="outlinePill" size="pill" onClick={cancelEdit}><X className="h-3.5 w-3.5 mr-1" /> Cancel</Button>
           </div>
-        )}
+        </div>
+      );
+    }
+
+    return (
+      <div key={b.budget_id} className="rounded-xl border border-border bg-card/50 p-4 hover:border-muted-foreground/20 transition-all group">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="min-w-0">
+            <h3 className="text-sm font-medium capitalize truncate">{b.category}</h3>
+            {showDate && b.event_date && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {formatDate(b.event_date)}
+                {!isBefore(parseISO(b.event_date), new Date()) && (
+                  <span className="ml-2">· {daysUntil(b.event_date)} days away</span>
+                )}
+              </p>
+            )}
+          </div>
+          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+            <button onClick={() => startEdit(b)} className="p-1 rounded hover:bg-secondary text-muted-foreground"><Pencil className="h-3 w-3" /></button>
+            <button onClick={() => setConfirmDelete(b.budget_id)} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-ruby"><Trash2 className="h-3 w-3" /></button>
+          </div>
+        </div>
+
+        <div className="flex items-baseline gap-1.5 mb-2">
+          <span className={`text-lg font-semibold tabular-nums ${over ? "text-ruby" : "text-foreground"}`}>
+            £{b.spent}
+          </span>
+          <span className="text-sm text-muted-foreground">/ £{b.limit}</span>
+          {over && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-ruby/10 text-ruby font-medium">Over</span>}
+        </div>
+
+        <div className="h-2 rounded-full bg-muted/50 overflow-hidden mb-1.5">
+          <div
+            className={`h-full rounded-full transition-all ${over ? "bg-ruby" : "bg-emerald"}`}
+            style={{ width: `${Math.min(100, b.progress_pct || 0)}%` }}
+          />
+        </div>
+
+        <div className="flex justify-between text-xs text-muted-foreground">
+          <span>{b.progress_pct}% used</span>
+          <span>£{Math.max(0, b.remaining || 0).toFixed(2)} left</span>
+        </div>
       </div>
     );
+  };
+
+  const formatDate = (d) => {
+    if (!d) return "";
+    const dt = parseISO(d);
+    return dt.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  };
+
+  const daysUntil = (d) => {
+    const diff = parseISO(d).getTime() - Date.now();
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   };
 
   return (
@@ -248,190 +225,204 @@ export default React.memo(function BudgetPage() {
         }
       />
 
-      <Tabs value={activeTab} onValueChange={setTab} className="space-y-6">
-        <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl -mx-4 sm:-mx-6 px-4 sm:px-6 pb-2">
-          <TabsList className="w-full sm:w-auto">
-            {TABS.map((t) => (
-              <TabsTrigger key={t.value} value={t.value} className="flex-1 sm:flex-initial gap-1.5">
-                <t.icon className="h-4 w-4" />
-                <span className="hidden sm:inline">{t.label}</span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </div>
-
-        {/* ═══ THIS MONTH ═══ */}
-        <TabsContent value="overview" className="space-y-6 mt-0">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <MetricCard label="Budgets" value={String(summary.count)} icon={Wallet} tone="emerald" detail="Active budgets" />
-            <MetricCard label="Total Planned" value={`£${summary.totalPlanned.toLocaleString()}`} icon={Target} tone="topaz" detail="Monthly limit" />
-            <MetricCard label="Spent" value={`£${summary.totalSpent.toLocaleString()}`} icon={TrendingDown} tone="ruby" detail={`${summary.overCount > 0 ? `${summary.overCount} over budget` : "On track"}`} />
-            <MetricCard label="Adherence" value={`${summary.adherence}%`} icon={PiggyBank} tone={summary.adherence >= 80 ? "emerald" : summary.adherence >= 50 ? "topaz" : "ruby"} detail="Overall" />
-          </div>
-
-          <SectionCard title="Quick Actions" description="Common tasks">
-            <div className="flex flex-wrap gap-3">
-              <Button variant="outline" size="sm" onClick={() => { setTab("everyday"); setShowForm(true); }}>
-                <ShoppingCart className="h-4 w-4 mr-1.5" /> Add everyday budget
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => { setTab("events"); setShowForm(true); }}>
-                <Calendar className="h-4 w-4 mr-1.5" /> Add planned event
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => navigate("/transactions")}>
-                <Plus className="h-4 w-4 mr-1.5" /> Add transaction
-              </Button>
-            </div>
-          </SectionCard>
-
-          {everyday.length > 0 && (
-            <SectionCard eyebrow="Overview" title="Everyday Budgets" description="Quick glance at your spending limits.">
-              <div className="space-y-2">
-                {everyday.slice(0, 5).map((b) => renderBudget(b))}
-                {everyday.length > 5 && <p className="text-xs text-muted-foreground text-center pt-1">+{everyday.length - 5} more</p>}
-              </div>
-            </SectionCard>
+      {/* Month selector + summary */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+        <div className="flex items-center gap-2">
+          <button onClick={() => setMonth(addMonth(month, -1))} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground">
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <span className="text-lg font-semibold min-w-[140px] text-center">{monthLabel}</span>
+          <button onClick={() => setMonth(addMonth(month, 1))} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground">
+            <ChevronRight className="h-5 w-5" />
+          </button>
+          {!isCurrentMonth && (
+            <Button variant="ghost" size="pill" onClick={() => setMonth(fmtMonth(now.getFullYear(), now.getMonth() + 1))}>
+              Back to today
+            </Button>
           )}
-        </TabsContent>
+        </div>
+        <div className="flex items-center gap-3 text-sm text-muted-foreground ml-auto">
+          <span>Budgeted <strong className="text-foreground">£{summary.totalPlanned.toLocaleString()}</strong></span>
+          <span>Spent <strong className={summary.overCount > 0 ? "text-ruby" : "text-emerald"}>£{summary.totalSpent.toLocaleString()}</strong></span>
+          {summary.overCount > 0 && <span className="text-ruby">{summary.overCount} over</span>}
+        </div>
+      </div>
 
-        {/* ═══ EVERYDAY SPENDING ═══ */}
-        <TabsContent value="everyday" className="space-y-6 mt-0">
-          <SectionCard
-            eyebrow="Everyday"
-            title="Spending Limits"
-            description="Budgets for regular monthly spending categories."
-            actions={
-              <Button variant="chip" size="sm" onClick={() => setShowForm(!showForm)}>
-                <PlusCircle className="h-3.5 w-3.5 mr-1" /> {showForm ? "Close" : "Add"}
-              </Button>
-            }
-          >
-            {showForm && (
-              <form onSubmit={handleCreate} className="mb-4 flex flex-col sm:flex-row gap-2 p-3 rounded-xl border border-emerald/20 bg-emerald/5">
-                <input type="hidden" name="budget_type" value="everyday" />
-                <div className="flex-1">
-                  <Input
-                    list="cats-everyday"
-                    placeholder="Category (start typing to see suggestions)"
-                    value={form.category}
-                    onChange={(e) => setForm({ ...form, category: e.target.value, budget_type: "everyday" })}
-                    required
-                  />
-                  <datalist id="cats-everyday">
-                    {allCategoryNames.map((c) => <option key={c} value={c} />)}
-                  </datalist>
-                  {/* Grouped suggestions shown below on desktop */}
-                  {!catsLoading && Object.keys(groupedCategories).length > 0 && (
-                    <div className="mt-2 hidden sm:block">
-                      <p className="text-[11px] text-muted-foreground mb-1">Available categories by section:</p>
-                      <div className="max-h-40 overflow-y-auto space-y-1 text-xs text-muted-foreground border border-border rounded-lg p-2">
-                        {Object.entries(groupedCategories).map(([section, cats]) => (
-                          <div key={section}>
-                            <span className="font-medium text-[10px] uppercase tracking-wider">{section}</span>
-                            <div className="flex flex-wrap gap-1 mt-0.5 mb-1">
-                              {cats.map(c => (
-                                <button
-                                  key={c.name}
-                                  type="button"
-                                  onClick={() => setForm({ ...form, category: c.name, budget_type: "everyday" })}
-                                  className="px-1.5 py-0.5 rounded bg-secondary/50 hover:bg-secondary text-[11px] transition-colors"
-                                >
-                                  {c.name.replace(/_/g, " ")}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <Input type="number" step="0.01" min="0" placeholder="Monthly limit £" value={form.limit}
-                  onChange={(e) => setForm({ ...form, limit: e.target.value })} required className="w-full sm:w-36" />
-                <Button type="submit" variant="primary" size="pill"><Plus className="h-4 w-4" /> Add</Button>
-              </form>
-            )}
+      {/* Metric cards */}
+      <div className="grid grid-cols-3 gap-3 sm:gap-4">
+        <MetricCard label="Budgets" value={String(summary.count)} icon={Wallet} tone="emerald" />
+        <MetricCard label="Budgeted" value={`£${summary.totalPlanned.toLocaleString()}`} icon={Target} tone="topaz" />
+        <MetricCard label="Spent" value={`£${summary.totalSpent.toLocaleString()}`} icon={TrendingDown} tone={summary.overCount > 0 ? "ruby" : "emerald"} />
+      </div>
 
-            {loading ? (
-              <div className="space-y-2">{[...Array(3)].map((_, i) => <div key={i} className="h-16 rounded-xl bg-muted/50 animate-pulse" />)}</div>
-            ) : everyday.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <p className="text-sm">No everyday budgets yet.</p>
-                <p className="text-xs mt-1">Click "Add" above to create your first spending limit using any category from your transactions.</p>
+      {/* Loading */}
+      {loading && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => <div key={i} className="h-32 rounded-xl bg-muted/50 animate-pulse" />)}
+        </div>
+      )}
+
+      {!loading && budgets.length === 0 && (
+        <div className="text-center py-16 text-muted-foreground">
+          <Wallet className="h-10 w-10 mx-auto mb-3 opacity-40" />
+          <p className="text-sm font-medium">No budgets yet</p>
+          <p className="text-xs mt-1 mb-4">Create your first spending limit or planned event.</p>
+          <Button variant="primary" size="pill" onClick={() => setShowAdd(true)}>
+            <Plus className="h-4 w-4 mr-1.5" /> Create budget
+          </Button>
+        </div>
+      )}
+
+      {!loading && budgets.length > 0 && (
+        <>
+          {/* Everyday Spending */}
+          {everyday.length > 0 && (
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                  Monthly Spending Limits
+                </h2>
+                <span className="text-xs text-muted-foreground">{everyday.length} budgets</span>
               </div>
-            ) : (
-              <div className="space-y-2">{everyday.map((b) => renderBudget(b))}</div>
-            )}
-          </SectionCard>
-        </TabsContent>
-
-        {/* ═══ PLANNED EVENTS ═══ */}
-        <TabsContent value="events" className="space-y-6 mt-0">
-          <SectionCard
-            eyebrow="Events"
-            title="Planned Events & Occasions"
-            description="One-time budgets for holidays, simchas, and other events."
-            actions={
-              <Button variant="chip" size="sm" onClick={() => setShowForm(!showForm)}>
-                <PlusCircle className="h-3.5 w-3.5 mr-1" /> {showForm ? "Close" : "Add event"}
-              </Button>
-            }
-          >
-            {showForm && (
-              <form onSubmit={handleCreate} className="mb-4 flex flex-col sm:flex-row gap-2 p-3 rounded-xl border border-topaz/20 bg-topaz/5">
-                <input type="hidden" name="budget_type" value="event" />
-                <div className="flex-1">
-                  <Input
-                    list="cats-events"
-                    placeholder="Event name or category"
-                    value={form.category}
-                    onChange={(e) => setForm({ ...form, category: e.target.value, budget_type: "event" })}
-                    required
-                  />
-                  <datalist id="cats-events">
-                    {allCategoryNames.map((c) => <option key={c} value={c} />)}
-                  </datalist>
-                </div>
-                <Input type="number" step="0.01" min="0" placeholder="Budget £" value={form.limit}
-                  onChange={(e) => setForm({ ...form, limit: e.target.value })} required className="w-full sm:w-32" />
-                <Input type="date" value={form.event_date}
-                  onChange={(e) => setForm({ ...form, event_date: e.target.value })} className="w-full sm:w-36" />
-                <Button type="submit" variant="primary" size="pill"><Plus className="h-4 w-4" /> Add</Button>
-              </form>
-            )}
-
-            {loading ? (
-              <div className="space-y-2">{[...Array(3)].map((_, i) => <div key={i} className="h-16 rounded-xl bg-muted/50 animate-pulse" />)}</div>
-            ) : events.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <p className="text-sm">No planned events yet.</p>
-                <p className="text-xs mt-1">Add a holiday, simcha, or other one-time expense above.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {everyday.map((b) => renderBudgetCard(b))}
               </div>
-            ) : (
-              <div className="space-y-4">
-                {thisMonthEvents.length > 0 && (
+            </section>
+          )}
+
+          {/* Upcoming Events */}
+          {upcomingEvents.length > 0 && (
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  Upcoming Events
+                </h2>
+                <span className="text-xs text-muted-foreground">{upcomingEvents.length} events</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {upcomingEvents.map((b) => renderBudgetCard(b, true))}
+              </div>
+            </section>
+          )}
+
+          {/* Past events for current month (shown separate) */}
+          {pastEvents.length > 0 && isCurrentMonth && (
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  Past Events
+                </h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {pastEvents.map((b) => renderBudgetCard(b, true))}
+              </div>
+            </section>
+          )}
+
+          {/* Events with no date shown separately */}
+          {events.length > 0 && upcomingEvents.length === 0 && pastEvents.length === 0 && (
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  Planned Events
+                </h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {events.map((b) => renderBudgetCard(b, true))}
+              </div>
+            </section>
+          )}
+        </>
+      )}
+
+      {/* FAB */}
+      {!loading && !showAdd && (
+        <button
+          onClick={() => setShowAdd(true)}
+          className="fixed bottom-6 right-6 z-20 h-14 w-14 rounded-full bg-emerald text-white shadow-lg hover:bg-emerald/90 active:scale-95 transition-all flex items-center justify-center"
+          aria-label="Add budget"
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+      )}
+
+      {/* Add modal */}
+      {showAdd && (
+        <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={() => { setShowAdd(false); resetForm(); }}>
+          <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xl tracking-tight font-medium mb-1">
+              {form.budget_type === "event" ? "Add Planned Event" : "Add Spending Limit"}
+            </h3>
+            <p className="text-sm text-muted-foreground mb-5">
+              {form.budget_type === "event"
+                ? "One-time budget for a holiday, simcha, or other event."
+                : "Monthly limit for a regular spending category."}
+            </p>
+
+            <form onSubmit={handleCreate} className="space-y-4">
+              {/* Type toggle */}
+              <div className="flex gap-2 p-1 rounded-xl bg-muted/50">
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, budget_type: "everyday", event_date: "" })}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${form.budget_type === "everyday" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
+                >
+                  <ShoppingCart className="h-3.5 w-3.5 inline mr-1.5" /> Monthly
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, budget_type: "event" })}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${form.budget_type === "event" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
+                >
+                  <Calendar className="h-3.5 w-3.5 inline mr-1.5" /> Event
+                </button>
+              </div>
+
+              {/* Category / Event name */}
+              {form.budget_type === "everyday" ? (
+                <div>
+                  <label className="label-overline mb-1 block">Category</label>
+                  <Input list="cats" placeholder="e.g. groceries" value={form.category}
+                    onChange={(e) => setForm({ ...form, category: e.target.value })} required />
+                  <datalist id="cats">{CATEGORIES.map((c) => <option key={c} value={c} />)}</datalist>
+                </div>
+              ) : (
+                <div>
+                  <label className="label-overline mb-1 block">Event name</label>
+                  <Input placeholder="e.g. Pesach 2026" value={form.category}
+                    onChange={(e) => setForm({ ...form, category: e.target.value })} required />
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label-overline mb-1 block">Amount (£)</label>
+                  <Input type="number" step="0.01" min="0" placeholder="0.00" value={form.limit}
+                    onChange={(e) => setForm({ ...form, limit: e.target.value })} required />
+                </div>
+                {form.budget_type === "event" && (
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                      <Calendar className="h-3.5 w-3.5" /> This Month
-                    </h3>
-                    <div className="space-y-2">{thisMonthEvents.map((b) => renderBudget(b, true))}</div>
+                    <label className="label-overline mb-1 block">Event date</label>
+                    <Input type="date" value={form.event_date}
+                      onChange={(e) => setForm({ ...form, event_date: e.target.value })} />
                   </div>
                 )}
-                {upcomingEvents.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                      <Calendar className="h-3.5 w-3.5" /> Upcoming
-                    </h3>
-                    <div className="space-y-2">{upcomingEvents.sort((a, b) => (a.event_date || "").localeCompare(b.event_date || "")).map((b) => renderBudget(b, true))}</div>
-                  </div>
-                )}
-                {thisMonthEvents.length === 0 && upcomingEvents.length === 0 && events.length > 0 && (
-                  <div className="space-y-2">{events.map((b) => renderBudget(b, true))}</div>
-                )}
               </div>
-            )}
-          </SectionCard>
-        </TabsContent>
-      </Tabs>
+
+              <div className="flex gap-3 justify-end pt-2">
+                <Button type="button" variant="outlinePill" size="pill" onClick={() => { setShowAdd(false); resetForm(); }}>Cancel</Button>
+                <Button type="submit" variant="primary" size="pill">
+                  <Plus className="h-4 w-4 mr-1" /> {form.budget_type === "event" ? "Add Event" : "Add Budget"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <ConfirmModal
         open={!!confirmDelete}
