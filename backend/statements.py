@@ -275,58 +275,58 @@ async def _ai_parse_statement(text: str, session=None, user_id: str = None) -> d
 
 CATEGORISE_KEYWORDS = {
     "maaser_tzedakah": ["maaser", "maaser money", "maaser fund", "tithe", "maaser tzedakah"],
-    "charity": ["tzedakah", "tzedaka", "jnf", "jewish national fund", "world jewish relief", "chabad", "jewish charity", "gift aid", "justgiving", "go fund me", "gofundme", "chesed", "yeshiva", "kollel", "shul donation"],
-    "other_charity": ["shul", "synagogue", "shul membership", "shul donation", "minyan", "kiddush sponsor", "jewish school", "jewish education", "hebrew school", "cheder", "jewish studies", "torah class", "seminary", "jewish learning"],
-    "clothing_husband": ["clothing men", "menswear", "mens clothing", "suit", "tie", "shirt men", "trousers", "blazer"],
-    "clothing_wife": ["clothing women", "womenswear", "womens clothing", "dress", "skirt", "blouse", "handbag"],
-    "clothing_kids": ["children clothing", "kids clothing", "baby clothes", "childrenswear", "school uniform", "blazer school", "jumper school"],
+    "charity": ["chesed", "tzedakah", "tzedaka", "donation", "charity", "terumah", "gift aid", "justgiving", "jgive", "gofundme", "go fund me", "world jewish relief", "jnf", "jewish national fund", "chabad", "jewish charity", "yeshiva", "kollel", "shul donation"],
+    "other_charity": ["shul", "synagogue", "shul membership", "shul donation", "shul fund", "minyan", "minyan sponsor", "kiddush sponsor", "jewish school", "jewish education", "hebrew school", "cheder", "jewish studies", "torah class", "seminary", "jewish learning"],
+    "clothing_husband": ["clothing men", "menswear", "mens clothing", "suit", "tie", "shirt men", "trousers", "blazer", "polo men"],
+    "clothing_wife": ["clothing women", "womenswear", "womens clothing", "dress", "skirt", "blouse", "handbag", "jewelry"],
+    "clothing_kids": ["children clothing", "kids clothing", "baby clothes", "childrenswear", "school uniform", "blazer school", "jumper school", "kids wear"],
     "shoes": ["shoe", "trainer", "boot", "sandal", "sneaker", "loafer", "heel", "clarks", "schuh", "office shoe", "sports direct shoe"],
-    "grocery": ["tesco", "sainsbury", "asda", "waitrose", "lidl", "aldi", "morrisons", "co-op", "coop", "m&s food", "marks & spencer", "iceland", "farmfoods", "budgens", "spar ", "nisa", "londis", "supermarket", "tesco metro", "sainsbury's", "ocado", "grocery", "food shop", "weekly shop"],
-    "fruit_veg": ["fruit", "vegetable", "greengrocer", "market fruit", "veg box", "fruit stall"],
-    "bakery": ["bakery", "bread", "baguette", "croissant", "pastry", "cake", "doughnut", "bagel shop", "greggs"],
-    "fish": ["fish", "fishmonger", "seafood", "cod", "salmon", "haddock", "prawn"],
-    "meat": ["butcher", "meat", "steak", "chicken breast", "beef", "lamb", "pork", "mince", "sausage", "bacon", "deli meat"],
-    "paper_goods": ["kitchen roll", "tissue", "toilet paper", "paper towel", "tissue box", "napkin"],
-    "takeaway": ["mcdonald", "nando", "kfc", "subway ", "pret a manger", "pret ", "starbucks", "costa ", "cafe nero", "wagamama", "pizza hut", "dominos", "papa johns", "deliveroo", "uber eats", "uber_eats", "just eat", "justeat", "restaurant", "cafe ", "café", "bistro", " pub ", "bar ", "grill", "kitchen", "diner", "brasserie", "eatery", "bagel", "sushi", "noodle", " thai", " indian", " chinese", "chippy", "fish & chips", "greek", "burger", "kebab", "pizza", "taco", "burrito", "greggs", "leon ", "wasabi", "itsu", "dishoom", "yo! sushi", "pizzaexpress", "zizzi", "ask italian", "prezzo", "frankie & benny", "toby carvery", "harvester", "beefeater", "brewers fayre", "wethers", "spoons", "weatherspoon", "jamie oliver", "gordon ramsay", "m&s food to go", "meal deal", "breakfast", "lunch", "dining", "takeaway"],
-    "wine": ["wine", "wine shop", "majestic wine", "laithwaites", "naked wines", "whisky", "beer shop", "off licence"],
-    "house_supplies": ["b&q", "wickes", "screwfix", "toolstation", "homebase", "cleaning", "cleaner", "domestic help", "housekeeping", "dry cleaning", "laundry", "washing", "launderette", "decor", "paint", "wallpaper", "plumbing", "electrical", "building materials", "garden centre", "diy", "household", "home improvement", "fabric softener", "washing up", "dishwasher tablet", "ryman", "whsmith", "office supply", "stationery"],
+    "grocery": ["tesco", "sainsbury", "asda", "waitrose", "lidl", "aldi", "morrison", "morrisons", "co-op", "coop", "m&s food", "marks & spencer", "m&s simply food", "iceland", "farmfoods", "budgens", "spar", "spar ", "nisa", "londis", "supermarket", "tesco metro", "sainsbury's", "ocado", "grocery", "food shop", "weekly shop", "kosher"],
+    "fruit_veg": ["fruit", "vegetable", "greengrocer", "market fruit", "veg box", "fruit stall", "fruit and veg"],
+    "bakery": ["bakery", "bread", "baguette", "croissant", "pastry", "cake", "doughnut", "bagel shop", "greggs", "baker"],
+    "fish": ["fish", "fishmonger", "seafood", "cod", "salmon", "haddock", "prawn", "fish shop", "fish stall"],
+    "meat": ["butcher", "meat", "steak", "chicken breast", "beef", "lamb", "pork", "mince", "sausage", "bacon", "deli meat", "kosher butcher", "meat shop"],
+    "paper_goods": ["kitchen roll", "tissue", "toilet paper", "paper towel", "tissue box", "napkin", "paper goods"],
+    "takeaway": ["mcdonald", "nando", "kfc", "subway", "subway ", "pret a manger", "pret", "pret ", "starbucks", "costa", "costa ", "cafe nero", "cafe", "coffee", "wagamama", "pizza hut", "dominos", "papa johns", "deliveroo", "uber eats", "uber_eats", "just eat", "justeat", "restaurant", "pizza", "cafe ", "café", "bistro", " pub ", "bar ", "grill", "kitchen", "diner", "brasserie", "eatery", "bagel", "sushi", "noodle", " thai", " indian", " chinese", "chippy", "fish & chips", "greek", "burger", "kebab", "taco", "burrito", "greggs", "leon", "leon ", "wasabi", "itsu", "dishoom", "yo! sushi", "pizzaexpress", "zizzi", "ask italian", "prezzo", "frankie & benny", "toby carvery", "harvester", "beefeater", "brewers fayre", "wethers", "spoons", "weatherspoon", "jamie oliver", "gordon ramsay", "m&s food to go", "meal deal", "breakfast", "lunch", "dining", "takeaway"],
+    "wine": ["wine", "wine shop", "majestic wine", "laithwaites", "naked wines", "whisky", "beer shop", "off licence", "off license"],
+    "house_supplies": ["b&q", "wickes", "screwfix", "toolstation", "homebase", "ikea", "dunelm", "habitat", "made.com", "furniture", "sofa", "bed", "wardrobe", "table", "chair", "shelving", "bookshelf", "storage", "carpet", "flooring", "tile", "curtains", "blinds", "decor", "paint", "wallpaper", "plumbing", "electrical", "building materials", "garden centre", "plants", "gardening", "diy", "household", "home improvement", "cleaning", "cleaner", "domestic help", "housekeeping", "dry cleaning", "laundry", "washing", "launderette", "cleaning supplies", "detergent", "fabric softener", "washing up", "dishwasher tablet", "ryman", "whsmith", "office supply", "stationery"],
     "chemist": ["boots", "superdrug", "lloyds pharmacy", "pharmacy", "prescription", "medication", "medicine", "chemist"],
-    "rent_mortgage": [" rent ", "landlord", "letting agent", "foxtons", "savills", "knight frank", "mortgage", "halifax", "natwest", "santander", "barclays", "lloyds", "hsbc", "first direct", "yorkshire bs", "skipton", "nationwide"],
-    "electricity": ["electricity", "electric bill", "edf energy", "edf", "eon", "octopus energy", "octopus", "british gas", "npower", "scottish power", "bulb", "ovo"],
+    "rent_mortgage": ["rent", " rent ", "landlord", "letting agent", "foxtons", "savills", "knight frank", "tenancy", "lease", "property management", "ground rent", "service charge", "mortgage", "halifax", "natwest", "santander", "barclays", "lloyds", "hsbc", "first direct", "yorkshire bs", "skipton", "nationwide"],
+    "electricity": ["electricity", "electric bill", "edf energy", "edf", "e.on", "eon", "octopus energy", "octopus", "british gas", "npower", "scottish power", "bulb", "ovo", "ovo energy"],
     "heating": ["heating", "central heating", "boiler", "oil", "heating oil", "calor gas", "bottled gas"],
-    "gas": ["gas bill", "british gas", "edf", "eon", "octopus", "npower"],
-    "water": ["thames water", "water bill", "anglian water", "yorkshire water", "severn trent", "southern water", "welsh water"],
-    "council_tax": ["council tax", "council tax band", "bins collection"],
-    "telephone": ["bt ", "phone bill", "landline", "talk talk", "plusnet phone"],
-    "mobile": ["vodafone", "ee ", " three ", "o2 ", "giffgaff", "tesco mobile", "lebara", "lycamobile", "mobile phone"],
-    "cleaning_help": ["cleaning help", "cleaner", "domestic help", "housekeeper", "cleaning service"],
-    "life_insurance": ["aviva", "direct line", "admiral", "lv=", "liverpool victoria", "churchill", "compare the market", "go compare", "money supermarket", "axa", "zurich", "legal & general", "scottish widows", "standard life", "hastings", "esure", "saga", "life insurance", "petplan", "animal friends"],
-    "buildings_insurance": ["buildings insurance", "contents insurance", "home insurance", "house insurance"],
-    "school_fees": ["school fee", "school fees", "school payment", "nursery fee", "nursery", "preschool", "childcare", "school fee", "tuition fee", "university", "ucas", "udemy", "coursera", "linkedin learning", "skillshare", "open university"],
-    "bus_fee": ["bus fee", "school bus", "bus pass", "student bus"],
-    "babysitting": ["babysitter", "babysitting", "nanny", "childminder", "creche", "child care", "childcare"],
+    "gas": ["gas bill", "british gas", "edf", "e.on", "eon", "octopus", "npower"],
+    "water": ["thames water", "water bill", "anglian water", "yorkshire water", "severn trent", "southern water", "welsh water", "united utilities"],
+    "council_tax": ["council tax", "council tax band", "bin collection", "bins", "bins collection"],
+    "telephone": ["bt", "bt ", "phone bill", "landline", "talk talk", "plusnet phone", "telephone"],
+    "mobile": ["vodafone", "ee", "ee ", " three", " three ", "o2", "o2 ", "giffgaff", "tesco mobile", "lebara", "lycamobile", "smarty", "mobile phone"],
+    "cleaning_help": ["cleaning help", "cleaner", "domestic help", "housekeeper", "cleaning service", "home help"],
+    "life_insurance": ["life insurance", "aviva", "direct line", "admiral", "lv=", "liverpool victoria", "churchill", "compare the market", "gocompare", "go compare", "money supermarket", "moneysupermarket", "axa", "zurich", "legal & general", "scottish widows", "standard life", "hastings", "esure", "saga", "car insurance", "home insurance", "pet insurance", "travel insurance", "breakdown cover", "aa", "rac", "petplan", "animal friends"],
+    "buildings_insurance": ["buildings insurance", "contents insurance", "home insurance", "house insurance", "property insurance"],
+    "school_fees": ["school fee", "school fees", "school payment", "nursery fee", "nursery", "preschool", "childcare", "school trip", "school dinner", "school lunch", "tuition fee", "university", "ucas", "udemy", "coursera", "linkedin learning", "skillshare", "masterclass", "futurelearn", "open university"],
+    "bus_fee": ["bus fee", "school bus", "bus pass", "student bus", "school bus pass"],
+    "babysitting": ["babysitter", "babysitting", "nanny", "childminder", "creche", "child care", "childcare", "nursery fees", "daycare"],
     "nappies": ["nappies", "nappy", "diaper", "pampers", "huggies", "baby wipes", "baby lotion", "baby care"],
-    "trust_savings": ["trust fund", "child trust", "junior isa", "child savings", "kids savings", "childrens savings"],
+    "trust_savings": ["trust fund", "child trust", "junior isa", "child savings", "kids savings", "childrens savings", "trust savings"],
     "toys": ["toy", "toys", "lego", "barbie", "game", "action figure", "board game", "puzzle", "kids toy", "toy shop", "the entertainer", "smyths"],
-    "tutor": ["tutor", "tutoring", "private tuition", "maths tutor", "english tutor", "music lesson", "piano lesson", "swimming lesson"],
-    "therapy": ["therapy", "counselling", "psychologist", "psychiatrist", "mental health", "therapist", "physio", "chiropractor"],
-    "medical": ["nhs", "hospital", "clinic", "doctor", "gp", "consultant", "surgeon", "dentist", "dental", "dental check", "hygienist", "orthodontist", "braces", "optician", "specsavers", "vision express", "glasses", "contact lens", "eye test", "boots", "superdrug", "lloyds pharmacy", "pharmacy", "prescription", "medication", "medicine", "medical", "prescriptions"],
-    "public_transport": ["trainline", "national rail", "stagecoach", "arriva", "first bus", "tfl", "oyster", "tube", "southern railway", "thameslink", "south western", "great western", "lner", "avanti", "crosscountry", "chiltern", "c2c", "bus ticket", "train ticket", "tube ticket", "metro"],
-    "car_lease": ["car lease", "lease car", "car finance", "pcp", "hire purchase", "motability"],
-    "petrol_diesel": ["shell ", " bp ", "esso", "texaco", "petrol", "diesel", "unleaded", "ev charge", "fuel", "charging point", "pod point"],
-    "dart_charge": ["dart charge", "dartford", "congestion charge", "ulez", "c upfront", "parking", "ncp", "apcoa", "ringgo", "paybyphone", "parking eye"],
-    "tolls": ["toll", "toll road", "m6 toll", "m25", "bridge toll"],
-    "tickets": ["parking fine", "speeding fine", "penalty charge", "pc n", "fixed penalty", "court fine"],
-    "loan_payoff": ["loan payment", "loan repayment", "loan payoff", "personal loan", "debt repayment", "credit card payment", "credit card repay"],
-    "interest": ["interest charge", "overdraft", "bank fee", "monthly fee", "service charge", "account fee", "interest"],
-    "investments": ["vanguard", "fidelity", "hargreaves lansdown", "trading212", "freetrade", "stocks", "shares", "isa", "pension", "s&p 500", "fund", "etf", "investment", "dividend deposit", "interest deposit"],
-    "petty_cash": ["atm withdrawal", "atm ", "cashpoint", "link ", "cash withdrawal", "cashback", "petty cash"],
-    "miscellaneous": ["amazon", "ebay", "argos", "john lewis", "amazon.co.uk", "netflix", "spotify", "disney+", "disney plus", "apple.com/bill", "apple.com", "icloud", "google one", "microsoft 365", "office 365", "dropbox", "adobe", "notion", "slack", "zoom", "github", "patreon", "onlyfans", "paramount", "now tv", "hbo", "apple tv", "youtube premium", "tidal", "deezer", "audible", "kindle unlimited", "odeon", "vue cinema", "vue ", "cineworld", " cinema", "theatre", "concert", "stubhub", "viagogo", "steam ", "playstation", "xbox", "nintendo", "epic games", "gog.com", "eventim", "ticketmaster", "national trust", "english heritage", "ikea", "dunelm", "wilko", "next ", "zara", "h&m", "primark", "tk maxx", "matalan", "asos", "boohoo", "river island", "new look", "debenhams", "selfridges", "harrods", "apple store", "currys", "pc world", "game ", "decathlon", "faster payment", "bacs", "chaps", "standing order", "direct debit", "monzo to monzo", "revolut", "wise ", "paypal", "venmo", "zelle", "bank transfer", "puregym", "david lloyd", "nuffield", "anytime fitness", "the gym", "gym", "fitness", "gym membership", "better gym", "everyone active", "adobe", "microsoft 365", "slack", "zoom", "notion", "figma", "jira", "confluence", "github", "gitlab", "digitalocean", "aws", "google cloud", "azure", "namecheap", "godaddy", "cloudflare", "wordpress", "shopify", "google ads", "facebook ads", "linkedin ads", "instagram ads", "tiktok ads", "social media ad", "cpc", "ppc", "advertising", "marketing", "sponsored", "ryanair", "easyjet", "british airways", "ba.com", "wizz air", "jet2", "virgin atlantic", "emirates", "qatar", "expedia", "booking.com", "hotel", "airbnb", "tripadvisor", "skyscanner", "kayak", "premier inn", "travelodge", "hilton", "marriott", "ibis", "holiday inn", "tui", "thomas cook", "trailfinders", "holiday", "vacation", "all inclusive", "package holiday", "ski holiday", "beach holiday", "office", "business", "professional", "consultancy", "contractor", "self employed", "furniture", "sofa", "bed", "wardrobe", "table", "chair", "bookshelf", "broadband", "internet", "bt broadband", "virgin media", "sky broadband", "plusnet", "talk talk", "currys", "pc world", "john lewis electrical", "very ", "ao.com", "electrical", "laptop", "phone", "tablet", "headphones", "charger"],
-    "taxi": ["uber", "bolt", "lyft", "free now", "viavan", "addison lee", "taxi", "minicab", "private hire"],
-    "mikva": ["mikvah", "mikveh", "mikva", "ritual bath"],
-    "taxes": ["hmrc", "self assessment", "vat payment", "income tax", "tax return", "corporation tax", "tax bill"],
-    "upcoming_savings": ["savings", "saving", "regular saver", "easy access", "savings account", "savings pot", "monzo pot", "starling space"],
-    "income": ["salary", "wages", "payroll", "pension", "dividend", "tax credit", "child benefit", "universal credit", "refund", "interest income", "cashback reward"],
+    "tutor": ["tutor", "tutoring", "private tuition", "private tutor", "maths tutor", "english tutor", "music lesson", "piano lesson", "swimming lesson", "extra curricular", "tuition"],
+    "therapy": ["therapy", "counselling", "psychologist", "psychiatrist", "mental health", "therapist", "physio", "chiropractor", "cbt", "cognitive behavioural"],
+    "medical": ["nhs", "hospital", "clinic", "doctor", "gp", "consultant", "surgeon", "operation", "surgery", "dentist", "dental", "dental check", "hygienist", "orthodontist", "braces", "dental practice", "optician", "specsavers", "vision express", "glasses", "contact lens", "eye test", "optometry", "boots", "superdrug", "lloyds pharmacy", "pharmacy", "prescription", "medication", "medicine", "medical", "prescriptions"],
+    "public_transport": ["trainline", "national rail", "stagecoach", "arriva", "first bus", "tfl", "oyster", "tube", "underground", "southern railway", "thameslink", "south western", "southwestern", "great western", "lner", "avanti", "crosscountry", "chiltern", "c2c", "bus", "bus ticket", "train ticket", "tube ticket", "tram", "metro", "national express", "railway", "rail"],
+    "car_lease": ["car lease", "lease car", "car finance", "pcp", "hire purchase", "motability", "car leasing"],
+    "petrol_diesel": ["shell", "shell ", "bp", " bp ", "esso", "texaco", "petrol", "diesel", "unleaded", "ev charge", "charging", "charging point", "pod point", "fuel", "applegreen", "gulf", "jet", "murco", "total", "bp pulse"],
+    "dart_charge": ["dart charge", "dartford", "congestion charge", "ulez", "c upfront", "parking", "ncp", "apcoa", "ringgo", "paybyphone", "parking eye", "civil enforcement"],
+    "tolls": ["toll", "toll road", "m6 toll", "m25", "bridge toll", "road charge"],
+    "tickets": ["parking fine", "speeding fine", "penalty charge", "pc n", "fixed penalty", "court fine", "ticket", "fine", "penalty"],
+    "loan_payoff": ["loan payment", "loan repayment", "loan payoff", "personal loan", "debt repayment", "credit card payment", "credit card repay", "loan"],
+    "interest": ["fee", "charge", "penalty", "interest charge", "overdraft", "o/d fee", "bank fee", "monthly fee", "service charge", "account fee", "late payment", "bank charge", "foreign transaction", "conversion fee", "credit card fee", "interest"],
+    "investments": ["vanguard", "fidelity", "hargreaves lansdown", "trading212", "freetrade", "invest", "stocks", "shares", "isa", "pension", "s&p 500", "s&p", "fund", "etf", "investment", "dividend deposit", "interest deposit", "dividend"],
+    "petty_cash": ["cash", "atm", "atm withdrawal", "atm ", "cashpoint", "link ", "withdrawal", "cash withdrawal", "cashback", "petty cash"],
+    "miscellaneous": ["amazon", "ebay", "etsy", "argos", "john lewis", "amazon.co.uk", "amazon.com", "currys", "pc world", "apple store", "john lewis electrical", "very", "ao.com", "next", "next ", "zara", "h&m", "primark", "tk maxx", "matalan", "asos", "boohoo", "river island", "new look", "debenhams", "selfridges", "harrods", "nike", "adidas", "sports direct", "jd sports", "footasylum", "clothing", "fashion", "netflix", "spotify", "disney+", "disney plus", "apple tv", "apple.com/bill", "apple.com", "icloud", "google one", "youtube premium", "paramount", "now tv", "hbo", "tidal", "deezer", "audible", "kindle unlimited", "chatgpt", "openai", "microsoft 365", "office 365", "dropbox", "adobe", "notion", "slack", "zoom", "patreon", "onlyfans", "medium", "substack", "github", "gitlab", "digitalocean", "aws", "google cloud", "azure", "namecheap", "godaddy", "cloudflare", "wordpress", "shopify", "wix", "squarespace", "google ads", "facebook ads", "linkedin ads", "instagram ads", "tiktok ads", "social media ad", "cpc", "ppc", "advertising", "marketing", "sponsored", "odeon", "vue", "vue cinema", "vue ", "cineworld", "showcase", " cinema", "theatre", "concert", "stubhub", "viagogo", "eventim", "ticketmaster", "museum", "gallery", "zoo", "attraction", "theme park", "bowling", "escape room", "waterstones", "books", "bookshop", "national trust", "english heritage", "steam", "steam ", "playstation", "xbox", "nintendo", "epic games", "gog.com", "hobbies", "craft", "sewing", "knitting", "decathlon", "puregym", "david lloyd", "nuffield", "anytime fitness", "the gym", "gym", "fitness", "gym membership", "better gym", "better", "everyone active", "virgin active", "bannatyne", "leisure centre", "faster payment", "bacs", "chaps", "standing order", "direct debit", "monzo to monzo", "revolut", "wise", "wise ", "paypal", "venmo", "zelle", "bank transfer", "ryanair", "easyjet", "british airways", "ba.com", "wizz air", "jet2", "virgin atlantic", "emirates", "qatar", "expedia", "booking.com", "hotel", "airbnb", "tripadvisor", "skyscanner", "kayak", "trailfinders", "travel agent", "premier inn", "travelodge", "hilton", "marriott", "ibis", "holiday inn", "enterprise rent", "hertz", "avis", "budget rent", "europcar", "sixt", "rental car", "car hire", "van hire", "tui", "thomas cook", "holiday", "vacation", "lastminute.com", "loveholidays", "on the beach", "jet2holidays", "all inclusive", "package holiday", "ski holiday", "beach holiday", "office", "business", "professional", "consultancy", "contractor", "self employed", "electrical", "laptop", "phone", "game", "game ", "office", "wilko"],
+    "taxi": ["uber", "bolt", "lyft", "free now", "viavan", "addison lee", "uber trip", "uber ride", "taxi", "minicab", "private hire"],
+    "mikva": ["mikvah", "mikveh", "mikva", "ritual bath", "mikvah fee"],
+    "taxes": ["hmrc", "self assessment", "vat payment", "income tax", "tax return", "corporation tax", "tax bill", "tax", "stamp duty", "capital gains", "vat"],
+    "upcoming_savings": ["savings", "saving", "regular saver", "easy access", "savings account", "savings pot", "monzo pot", "starling space", "savings deposit"],
+    "income": ["salary", "wages", "payroll", "hmrc repayment", "employment", "pay", "earnings", "refund", "interest", "dividend", "tax refund", "cashback", "rebate", "bonus", "commission", "freelance", "benefits", "universal credit", "child benefit", "pension", "state pension", "investment income", "tax credit", "interest income", "cashback reward"],
 }
 
 
@@ -364,13 +364,29 @@ CATEGORY HIERARCHY (pick one category slug from below):
 🧩 Ungrouped: public_transport, car_lease, petrol_diesel, dart_charge (congestion), tolls, tickets (fines), loan_payoff, interest (bank fees), investments, petty_cash, miscellaneous (everything else), taxi, mikva, taxes (HMRC), upcoming_savings
 💰 Income: salary, income
 
-AMOUNT-AWARE LOGIC (use this to disambiguate):
-- Tesco/Co-op/Sainsbury/Asda < £10 → takeaway (meal deal/snack), >= £10 → grocery
-- Amazon: if "PRIME" or "MUSIC" or "VIDEO" → miscellaneous, otherwise → miscellaneous (shopping)
-- Uber: check description for "EATS" → takeaway, "TRIP"/"RIDE" → taxi
-- PayPal: if "EBAY" → miscellaneous, if "UBER EATS" → takeaway, if "UBER TRIP" → taxi
-- Any recurring small amount (3.99-14.99) with digital service name likely → miscellaneous
-- Restaurant/pub/café names → takeaway
+MERCHANT → CATEGORY (with amount-aware logic):
+- Tesco/Sainsbury/Asda/Waitrose/Lidl/Aldi/Co-op/Morrisons: if abs(amount) < 10 → takeaway, if abs(amount) >= 10 → grocery
+- McDonald/Nando/KFC/Pret/Starbucks/Costa → takeaway (always)
+- Deliveroo/Uber Eats/JustEat → takeaway; Uber trip/ride → taxi
+- TfL/Oyster → public_transport; Shell/BP/Esso → petrol_diesel
+- Trainline/raileasy → public_transport
+- British Gas/EDF/Eon/Octopus → gas or electricity
+- Netflix/Spotify/Disney+/YouTube Premium → miscellaneous
+- Amazon → miscellaneous (shopping)
+- Boots/Lloyds/Superdrug → chemist; Specsavers → medical
+- eBay/Amazon/Argos/John Lewis → miscellaneous
+- HMRC/VAT → taxes
+- BT/Sky/Virgin/Vodafone/EE → telephone or mobile
+- ATM/WITHDRAWAL → petty_cash
+- Faster payment/standing order/PayPal: if "salary/wages/payroll" → income; if "transfer"/"payment" → miscellaneous
+- Charity/Donation/Tzedakah/JGive → charity; maaser-specific → maaser_tzedakah
+- Rent/mortgage payment → rent_mortgage (abs(amount) > 500 likely)
+- Dentist/Doctor/Prescription → medical
+- Gym/Fitness/ClassPass → miscellaneous
+- Cinema/Theatre/Event/Ticket → miscellaneous
+- Coursera/Udemy/Skillshare → school_fees
+
+Also acceptable: uncategorized
 
 Output STRICT JSON only: {{"category": "<one slug from above>"}}
 

@@ -52,6 +52,16 @@ function firstOfMonth() {
 
 const fmt = (n) => `£${Number(n || 0).toFixed(2)}`;
 
+function groupCatsBySection(cats) {
+  const groups = {};
+  for (const c of cats) {
+    const section = c.section || "Other";
+    if (!groups[section]) groups[section] = [];
+    groups[section].push(c);
+  }
+  return groups;
+}
+
 const Transactions = React.memo(function Transactions() {
   useEffect(() => { document.title = "Transactions | FinanceAI"; }, []);
   const [txs, setTxs] = useState([]);
