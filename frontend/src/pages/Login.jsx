@@ -47,7 +47,9 @@ export default function Login() {
       toast.success("Welcome back");
       navigate("/dashboard");
     } catch (err) {
-      const msg = formatApiError(err.response?.data?.detail) || "Incorrect email or password. Please try again.";
+      const status = err.response?.status;
+      const detail = err.response?.data?.detail;
+      const msg = (status ? `(${status}) ` : "") + (formatApiError(detail) || "Incorrect email or password. Please try again.");
       toast.error(msg);
       setErrors({ submit: msg });
     } finally {
