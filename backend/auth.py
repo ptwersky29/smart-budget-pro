@@ -595,6 +595,25 @@ def build_router() -> APIRouter:
             await session.commit()
             return {"ok": True, "message": "Email verified"}
 
+    # ── OAuth diagnostic ────────────────────────────────────────────────
+
+    @router.get("/oauth-status")
+    async def oauth_status(request: Request):
+        """Check if Google OAuth is configured (no secrets leaked)."""
+        client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+        client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+        frontend_url = os.environ.get("FRONTEND_URL", "")
+        scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+        redirect_uri = f"{scheme}://{request.url.hostname}/api/auth/google/callback"
+        return {
+            "google_configured": bool(client_id and client_secret),
+            "google_client_id_set": bool(client_id),
+            "google_client_secret_set": bool(client_secret),
+            "frontend_url": frontend_url or "(not set)",
+            "redirect_uri": redirect_uri,
+            "cookie_secure": _cookie_secure(),
+        }
+
     # ── Google OAuth ────────────────────────────────────────────────────
 
     @router.get("/google")
@@ -717,10 +736,10 @@ def build_router() -> APIRouter:
                 await session.commit()
             access = create_access_token(user.user_id, email)
             refresh = create_refresh_token(user.user_id)
-            frontend_url = os.environ.get("FRONTEND_URL")
+            frontend_url = os.environ.get("FRONTEND_URL", "").rstrip("/")
             if not frontend_url:
                 raise HTTPException(500, "FRONTEND_URL not configured")
-            redirect_url = f"{frontend_url}/dashboard#access_token={urllib.parse.quote(access)}&refresh_token={urllib.parse.quote(refresh)}"
+            redirect_url = f"{frontend_url}/dashboard?access_token={urllib.parse.quote(access, safe='')}&refresh_token={urllib.parse.quote(refresh, safe='')}"
             resp = RedirectResponse(url=redirect_url)
             set_auth_cookies(resp, access, refresh)
             return resp
