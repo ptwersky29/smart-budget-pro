@@ -1,5 +1,11 @@
 export function getToken(key) {
-  return sessionStorage.getItem(key) || localStorage.getItem(key) || "";
+  const local = localStorage.getItem(key);
+  const session = sessionStorage.getItem(key);
+  // Return the first non-expired token, preferring localStorage
+  if (local && !isTokenExpired(local)) return local;
+  if (session && !isTokenExpired(session)) return session;
+  // Fall back to any available token even if expired (backend will reject it)
+  return local || session || "";
 }
 
 export function setToken(key, value, persistent = true) {

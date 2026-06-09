@@ -88,6 +88,8 @@ api.interceptors.response.use(
         console.warn("[auth] refresh failed", status, refreshError?.response?.data);
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
+        sessionStorage.removeItem("access_token");
+        sessionStorage.removeItem("refresh_token");
         // Redirect to login so the user isn't stuck in a zombie authenticated state
         if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
           window.location.assign("/login?expired=1");

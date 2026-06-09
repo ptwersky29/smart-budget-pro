@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
-import { setToken } from "../lib/storage";
+import { setToken, clearTokens } from "../lib/storage";
 import Skeleton from "../components/ui/Skeleton";
 
 export default function AuthCallback() {
@@ -26,6 +26,7 @@ export default function AuthCallback() {
     });
 
     if (accessToken) {
+      clearTokens();
       (async () => {
         try {
           const { data } = await api.post("/auth/emergent-session", {
@@ -53,6 +54,7 @@ export default function AuthCallback() {
       navigate("/login");
       return;
     }
+    clearTokens();
     (async () => {
       try {
         const { data } = await api.post("/auth/emergent-session", { session_id: sessionId });
