@@ -71,6 +71,7 @@ export default React.memo(function BudgetPage() {
   const [showInsights, setShowInsights] = useState(false);
   const [applyingInsight, setApplyingInsight] = useState(null);
   const [seeding, setSeeding] = useState(false);
+  const [eventGroups, setEventGroups] = useState({});
 
   const { year, month: mNum } = parseMonth(month);
   const monthLabel = `${MONTH_NAMES[mNum - 1]} ${year}`;
@@ -105,7 +106,6 @@ export default React.memo(function BudgetPage() {
     return { count: budgets.length, totalPlanned, totalSpent, overCount };
   }, [budgets]);
 
-  const [eventGroups, setEventGroups] = useState({});
 
   const fetchData = useCallback(async () => {
     setLoading(true);
