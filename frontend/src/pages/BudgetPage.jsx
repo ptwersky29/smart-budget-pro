@@ -62,6 +62,7 @@ export default React.memo(function BudgetPage() {
   const [addTab, setAddTab] = useState("expense");
   const [form, setForm] = useState({ category: "", limit: "", budget_type: "everyday", event_date: "", event_group_id: "", event_group_name: "" });
   const [quickForm, setQuickForm] = useState({ amount: "", description: "", category: "" });
+  const [budgetAdded, setBudgetAdded] = useState(false);
   const [alerts, setAlerts] = useState([]);
   const [dismissedAlerts, setDismissedAlerts] = useState(new Set());
   const [insights, setInsights] = useState([]);
@@ -180,11 +181,12 @@ export default React.memo(function BudgetPage() {
         if (form.event_group_name) payload.event_group_name = form.event_group_name.trim();
       }
       await api.post("/budgets", payload);
-      toast.success(form.budget_type === "event" ? "Item added to event" : "Budget created");
+      toast.success(form.budget_type === "event" ? "Item added to event" : "Budget added");
+      setBudgetAdded(true);
       if (form.budget_type === "event") {
         setForm((prev) => ({ ...prev, category: "", limit: "" }));
       } else {
-        resetForm();
+        setForm((prev) => ({ ...prev, category: "", limit: "" }));
       }
       await fetchData();
     } catch (err) { toast.error(err.response?.data?.detail || "Could not save"); }
@@ -740,7 +742,7 @@ export default React.memo(function BudgetPage() {
       {/* FAB */}
       {!loading && !showAdd && (
         <button
-          onClick={() => { setAddTab("expense"); setShowAdd(true); }}
+          onClick={() => { setAddTab("expense"); setShowAdd(true); setBudgetAdded(false); }}
           className="fixed bottom-6 right-6 z-20 h-14 w-14 rounded-full bg-emerald text-white shadow-lg hover:bg-emerald/90 active:scale-95 transition-all flex items-center justify-center"
           aria-label="Quick add"
         >
@@ -823,31 +825,39 @@ export default React.memo(function BudgetPage() {
                     <ShoppingCart className="h-3.5 w-3.5 inline mr-1.5" /> Monthly
                   </button>
                   <button type="button"
-                    onClick={() => setForm({ ...form, budget_type: "event" })}
+                    onClick={() => { setForm({ ...form, budget_type: "event" }); setBudgetAdded(false); }}
                     className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${form.budget_type === "event" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}>
                     <Calendar className="h-3.5 w-3.5 inline mr-1.5" /> Event
                   </button>
                 </div>
 
                 {form.budget_type === "everyday" ? (
-                  <div className="flex items-end gap-3">
-                    <div className="flex-1">
-                      <CategoryCombobox
-                        value={form.category}
-                        onChange={(val) => setForm({ ...form, category: val })}
-                        categories={allCats}
-                        placeholder="Category"
-                        onCategoryCreated={fetchCategories}
-                      />
+                  <>
+                    {budgetAdded && (
+                      <div className="flex items-center gap-2 p-2 mb-3 rounded-xl bg-emerald/10 border border-emerald/20">
+                        <Check className="h-4 w-4 text-emerald" />
+                        <span className="text-sm text-emerald font-medium">Budget added — enter another below</span>
+                      </div>
+                    )}
+                    <div className="flex items-end gap-3">
+                      <div className="flex-1">
+                        <CategoryCombobox
+                          value={form.category}
+                          onChange={(val) => { setForm({ ...form, category: val }); setBudgetAdded(false); }}
+                          categories={allCats}
+                          placeholder="Category"
+                          onCategoryCreated={fetchCategories}
+                        />
+                      </div>
+                      <div className="w-28">
+                        <Input type="number" step="0.01" min="0" placeholder="£0.00" value={form.limit}
+                          onChange={(e) => { setForm({ ...form, limit: e.target.value }); setBudgetAdded(false); }} required className="text-right" />
+                      </div>
+                      <Button type="submit" variant="primary" size="pill" className="shrink-0 h-11 px-4">
+                        <Plus className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <div className="w-28">
-                      <Input type="number" step="0.01" min="0" placeholder="£0.00" value={form.limit}
-                        onChange={(e) => setForm({ ...form, limit: e.target.value })} required className="text-right" />
-                    </div>
-                    <Button type="submit" variant="primary" size="pill" className="shrink-0 h-11 px-4">
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  </>
                 ) : (
                   <>
                     {!form.event_group_id ? (
