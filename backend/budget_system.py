@@ -331,18 +331,25 @@ def build_router() -> APIRouter:
             )
             day_occasions = result.scalars().all()
 
+            # Batch fetch categories for all day-to-day occasions
+            day_occ_cats = {}
+            if day_occasions:
+                occ_ids = [o.id for o in day_occasions]
+                cat_result = await session.execute(
+                    select(BudgetOccasionCategory).where(
+                        BudgetOccasionCategory.occasion_id.in_(occ_ids),
+                    )
+                )
+                for cat in cat_result.scalars().all():
+                    day_occ_cats.setdefault(cat.occasion_id, []).append(cat)
+
             day_to_day_cats = []
             total_budgeted = 0
             total_actual = 0
             total_forecast = 0
 
             for occ in day_occasions:
-                cat_result = await session.execute(
-                    select(BudgetOccasionCategory).where(
-                        BudgetOccasionCategory.occasion_id == occ.id,
-                    )
-                )
-                cats = cat_result.scalars().all()
+                cats = day_occ_cats.get(occ.id, [])
                 for cat in cats:
                     total_budgeted += cat.budgeted_amount
                     total_actual += cat.actual_amount
@@ -412,16 +419,24 @@ def build_router() -> APIRouter:
                 ).order_by(BudgetOccasion.event_date)
             )
             holiday_occasions = holiday_occ_result.scalars().all()
+
+            # Batch fetch categories for holiday occasions
+            holiday_occ_cats = {}
+            if holiday_occasions:
+                occ_ids = [o.id for o in holiday_occasions]
+                cat_result = await session.execute(
+                    select(BudgetOccasionCategory).where(
+                        BudgetOccasionCategory.occasion_id.in_(occ_ids),
+                    )
+                )
+                for cat in cat_result.scalars().all():
+                    holiday_occ_cats.setdefault(cat.occasion_id, []).append(cat)
+
             holiday_occ_list = []
             holiday_total_budgeted = 0
             holiday_total_actual = 0
             for ho in holiday_occasions:
-                cat_result = await session.execute(
-                    select(BudgetOccasionCategory).where(
-                        BudgetOccasionCategory.occasion_id == ho.id,
-                    )
-                )
-                cats = cat_result.scalars().all()
+                cats = holiday_occ_cats.get(ho.id, [])
                 holiday_occ_list.append({
                     "id": ho.id,
                     "name": ho.name,
@@ -447,16 +462,24 @@ def build_router() -> APIRouter:
                 ).order_by(BudgetOccasion.event_date)
             )
             simcha_occasions = simcha_result.scalars().all()
+
+            # Batch fetch categories for simcha occasions
+            simcha_occ_cats = {}
+            if simcha_occasions:
+                occ_ids = [o.id for o in simcha_occasions]
+                cat_result = await session.execute(
+                    select(BudgetOccasionCategory).where(
+                        BudgetOccasionCategory.occasion_id.in_(occ_ids),
+                    )
+                )
+                for cat in cat_result.scalars().all():
+                    simcha_occ_cats.setdefault(cat.occasion_id, []).append(cat)
+
             simcha_occ_list = []
             simcha_total_budgeted = 0
             simcha_total_actual = 0
             for so in simcha_occasions:
-                cat_result = await session.execute(
-                    select(BudgetOccasionCategory).where(
-                        BudgetOccasionCategory.occasion_id == so.id,
-                    )
-                )
-                cats = cat_result.scalars().all()
+                cats = simcha_occ_cats.get(so.id, [])
                 simcha_occ_list.append({
                     "id": so.id,
                     "name": so.name,
@@ -482,16 +505,24 @@ def build_router() -> APIRouter:
                 ).order_by(BudgetOccasion.event_date)
             )
             other_occasions = other_result.scalars().all()
+
+            # Batch fetch categories for other occasions
+            other_occ_cats = {}
+            if other_occasions:
+                occ_ids = [o.id for o in other_occasions]
+                cat_result = await session.execute(
+                    select(BudgetOccasionCategory).where(
+                        BudgetOccasionCategory.occasion_id.in_(occ_ids),
+                    )
+                )
+                for cat in cat_result.scalars().all():
+                    other_occ_cats.setdefault(cat.occasion_id, []).append(cat)
+
             other_occ_list = []
             other_total_budgeted = 0
             other_total_actual = 0
             for oo in other_occasions:
-                cat_result = await session.execute(
-                    select(BudgetOccasionCategory).where(
-                        BudgetOccasionCategory.occasion_id == oo.id,
-                    )
-                )
-                cats = cat_result.scalars().all()
+                cats = other_occ_cats.get(oo.id, [])
                 other_occ_list.append({
                     "id": oo.id,
                     "name": oo.name,
@@ -600,14 +631,21 @@ def build_router() -> APIRouter:
                     BudgetOccasion.status == "approved",
                 ).order_by(BudgetOccasion.sort_order)
             )
+            d2d_occasions = d2d_result.scalars().all()
+            d2d_cats_by_occ = {}
+            if d2d_occasions:
+                d2d_ids = [o.id for o in d2d_occasions]
+                cat_rows = await session.execute(
+                    select(BudgetOccasionCategory).where(BudgetOccasionCategory.occasion_id.in_(d2d_ids))
+                )
+                for cat in cat_rows.scalars().all():
+                    d2d_cats_by_occ.setdefault(cat.occasion_id, []).append(cat)
+
             day_categories = []
             total_budgeted = 0
             total_actual = 0
-            for occ in d2d_result.scalars().all():
-                cat_result = await session.execute(
-                    select(BudgetOccasionCategory).where(BudgetOccasionCategory.occasion_id == occ.id)
-                )
-                for cat in cat_result.scalars().all():
+            for occ in d2d_occasions:
+                for cat in d2d_cats_by_occ.get(occ.id, []):
                     total_budgeted += cat.budgeted_amount
                     total_actual += cat.actual_amount
                     day_categories.append({
@@ -630,14 +668,21 @@ def build_router() -> APIRouter:
                     BudgetOccasion.event_date <= end_dt,
                 ).order_by(BudgetOccasion.event_date)
             )
+            ev_occasions = event_result.scalars().all()
+            ev_cats_by_occ = {}
+            if ev_occasions:
+                ev_ids = [o.id for o in ev_occasions]
+                cat_rows = await session.execute(
+                    select(BudgetOccasionCategory).where(BudgetOccasionCategory.occasion_id.in_(ev_ids))
+                )
+                for cat in cat_rows.scalars().all():
+                    ev_cats_by_occ.setdefault(cat.occasion_id, []).append(cat)
+
             events = []
             total_event_budgeted = 0
             total_event_actual = 0
-            for ev in event_result.scalars().all():
-                cat_result = await session.execute(
-                    select(BudgetOccasionCategory).where(BudgetOccasionCategory.occasion_id == ev.id)
-                )
-                cats = cat_result.scalars().all()
+            for ev in ev_occasions:
+                cats = ev_cats_by_occ.get(ev.id, [])
                 events.append({
                     "id": ev.id,
                     "name": ev.name,

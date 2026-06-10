@@ -160,6 +160,12 @@ async def create_tables():
             """))
             await conn.execute(text("DROP INDEX IF EXISTS uq_budgets_everyday_user_cat"))
             await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_budgets_everyday_user_cat_month ON budgets(user_id, category, month) WHERE budget_type = 'everyday'"))
+            # Performance indexes
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category)"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_transactions_source ON transactions(source)"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_transactions_pending ON transactions(pending)"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_maaser_ledger_tx ON maaser_ledger(transaction_id)"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_transactions_user_cat ON transactions(user_id, category)"))
 
 
 async def get_session() -> AsyncSession:

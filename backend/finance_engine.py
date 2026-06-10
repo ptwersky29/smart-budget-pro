@@ -2388,80 +2388,105 @@ Output ONLY valid JSON, no markdown, no explanation:
         sm = request.app.state.db
         async with sm() as session:
             now = datetime.now(timezone.utc)
+            current_month_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+            first_month_start = current_month_start - timedelta(days=30 * (months - 1))
+            first_month_start = datetime(first_month_start.year, first_month_start.month, 1, tzinfo=timezone.utc)
+
+            month_keys = []
+            month_ranges = []
+            cursor = first_month_start
+            while len(month_keys) < months:
+                y, m_val = cursor.year, cursor.month
+                m_start = datetime(y, m_val, 1, tzinfo=timezone.utc)
+                m_end = datetime(y + 1, 1, 1, tzinfo=timezone.utc) if m_val == 12 else datetime(y, m_val + 1, 1, tzinfo=timezone.utc)
+                month_keys.append(f"{y}-{m_val:02d}")
+                month_ranges.append((m_start, m_end))
+                cursor = m_end
 
             # Determine which categories to fetch
-            cats_to_fetch = []
+            cats_to_fetch = None
             if all_categories:
                 result = await session.execute(
-                    select(Budget).where(Budget.user_id == user["user_id"], Budget.budget_type != "event")
+                    select(Budget.category).where(Budget.user_id == user["user_id"], Budget.budget_type != "event").distinct()
                 )
-                cats_to_fetch = [b.category for b in result.scalars().all()]
+                cats_to_fetch = [row[0] for row in result.all()]
                 if not cats_to_fetch:
-                    return {"trends": {}, "months": []}
+                    return {"trends": {}, "months": month_keys}
             elif category and category.lower() != "all":
                 cats_to_fetch = [category.lower()]
 
-            if not cats_to_fetch:
-                # No category filter — return total aggregate
-                cats_to_fetch = None
+            # Get current budgets for the category lookup
+            budget_result = await session.execute(
+                select(Budget.category, Budget.amount).where(Budget.user_id == user["user_id"], Budget.budget_type != "event")
+            )
+            budget_map = {row[0]: float(row[1]) for row in budget_result.all()}
 
-            # Build month list
-            month_keys = []
-            month_ranges = []
-            for i in range(months - 1, -1, -1):
-                first_of_month = datetime(now.year, now.month, 1, tzinfo=timezone.utc) - timedelta(days=30 * i)
-                y_m, m_m = first_of_month.year, first_of_month.month
-                m_start = datetime(y_m, m_m, 1, tzinfo=timezone.utc)
-                m_end = datetime(y_m + 1, 1, 1, tzinfo=timezone.utc) if m_m == 12 else datetime(y_m, m_m + 1, 1, tzinfo=timezone.utc)
-                month_keys.append(f"{y_m}-{m_m:02d}")
-                month_ranges.append((m_start, m_end))
-
-            if not cats_to_fetch:
-                # Total aggregate across all categories
-                trends = []
-                for i, mk in enumerate(month_keys):
-                    tx_q = select(Transaction).where(
+            # Build month condition list for CASE expressions
+            if cats_to_fetch:
+                # Per-category: single GROUP BY query
+                spent_rows = await session.execute(
+                    select(
+                        Transaction.category,
+                        func.date_trunc('month', Transaction.date).label('month_trunc'),
+                        func.sum(-Transaction.amount).label('spent'),
+                    ).where(
                         Transaction.user_id == user["user_id"],
                         Transaction.amount < 0,
-                        Transaction.date >= month_ranges[i][0],
-                        Transaction.date < month_ranges[i][1],
+                        Transaction.date >= first_month_start,
+                        Transaction.date < month_ranges[-1][1],
+                        Transaction.category.in_(cats_to_fetch),
+                    ).group_by(
+                        Transaction.category,
+                        func.date_trunc('month', Transaction.date),
+                    ).order_by(
+                        Transaction.category,
+                        func.date_trunc('month', Transaction.date),
                     )
-                    tx_result = await session.execute(tx_q)
-                    txs = tx_result.scalars().all()
-                    spent = round(sum(-t.amount for t in txs), 2)
-                    trends.append({"month": mk, "budget": 0, "spent": spent})
-                return {"trends": {"_total": trends}, "months": month_keys}
-            else:
-                # Per-category data
-                result_map = {}
-                # Get current budgets
-                budget_result = await session.execute(
-                    select(Budget).where(Budget.user_id == user["user_id"], Budget.budget_type != "event")
                 )
-                budget_map = {b.category: float(b.amount) for b in budget_result.scalars().all()}
+                result_map = {cat: [] for cat in cats_to_fetch}
+                # Spent lookup: (category, month_key) → spent
+                spent_lookup = {}
+                for row in spent_rows.all():
+                    cat_key = row[0]
+                    mk = row[1].strftime("%Y-%m") if row[1] else ""
+                    spent_lookup[(cat_key, mk)] = float(row[2])
 
                 for cat in cats_to_fetch:
                     cat_trends = []
-                    for i, mk in enumerate(month_keys):
-                        tx_q = select(Transaction).where(
-                            Transaction.user_id == user["user_id"],
-                            Transaction.amount < 0,
-                            Transaction.date >= month_ranges[i][0],
-                            Transaction.date < month_ranges[i][1],
-                            Transaction.category == cat,
-                        )
-                        tx_result = await session.execute(tx_q)
-                        txs = tx_result.scalars().all()
-                        spent = round(sum(-t.amount for t in txs), 2)
-                        budget_val = round(budget_map.get(cat, 0), 2)
-                        cat_trends.append({
-                            "month": mk,
-                            "budget": budget_val,
-                            "spent": spent,
-                        })
+                    budget_val = round(budget_map.get(cat, 0), 2)
+                    for mk in month_keys:
+                        spent = round(spent_lookup.get((cat, mk), 0.0), 2)
+                        cat_trends.append({"month": mk, "budget": budget_val, "spent": spent})
                     result_map[cat] = cat_trends
 
                 return {"trends": result_map, "months": month_keys}
+            else:
+                # Total aggregate across all categories
+                spent_rows = await session.execute(
+                    select(
+                        func.date_trunc('month', Transaction.date).label('month_trunc'),
+                        func.sum(-Transaction.amount).label('spent'),
+                    ).where(
+                        Transaction.user_id == user["user_id"],
+                        Transaction.amount < 0,
+                        Transaction.date >= first_month_start,
+                        Transaction.date < month_ranges[-1][1],
+                    ).group_by(
+                        func.date_trunc('month', Transaction.date),
+                    ).order_by(
+                        func.date_trunc('month', Transaction.date),
+                    )
+                )
+                spent_lookup = {}
+                for row in spent_rows.all():
+                    mk = row[0].strftime("%Y-%m") if row[0] else ""
+                    spent_lookup[mk] = float(row[1])
+
+                trends = []
+                for mk in month_keys:
+                    spent = round(spent_lookup.get(mk, 0.0), 2)
+                    trends.append({"month": mk, "budget": 0, "spent": spent})
+                return {"trends": {"_total": trends}, "months": month_keys}
 
     # ── Budget Alerts ───────────────────────────────────────────────
 

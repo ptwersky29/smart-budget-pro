@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseISO, isBefore } from "date-fns";
 import {
   RefreshCw, Wallet, ShoppingCart, Calendar, Plus, Pencil, Trash2,
@@ -62,7 +62,8 @@ function Sparkline({ data, color }) {
 }
 
 export default React.memo(function BudgetPage() {
-  const now = new Date();
+  const [now, setNow] = useState(new Date());
+  useEffect(() => { const id = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(id); }, []);
   const [month, setMonth] = useState(fmtMonth(now.getFullYear(), now.getMonth() + 1));
   const [budgets, setBudgets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -294,9 +295,9 @@ export default React.memo(function BudgetPage() {
     }
   };
 
-  const criticalAlerts = alerts.filter((a) => a.severity === "critical");
-  const warningAlerts = alerts.filter((a) => a.severity === "warning");
-  const spikeAlerts = alerts.filter((a) => a.severity === "spike");
+  const criticalAlerts = useMemo(() => alerts.filter((a) => a.severity === "critical"), [alerts]);
+  const warningAlerts = useMemo(() => alerts.filter((a) => a.severity === "warning"), [alerts]);
+  const spikeAlerts = useMemo(() => alerts.filter((a) => a.severity === "spike"), [alerts]);
 
   const renderBudgetCard = (b, showDate = false) => {
     const over = (b.progress_pct || 0) >= 100;
