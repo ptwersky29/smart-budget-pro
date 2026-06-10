@@ -2028,92 +2028,103 @@ Output ONLY valid JSON, no markdown, no explanation:
     ):
         sm = request.app.state.db
         async with sm() as session:
-            if month:
-                try:
-                    y, m = int(month[:4]), int(month[5:7])
-                    if not (1 <= m <= 12):
-                        raise ValueError
-                except (ValueError, IndexError):
-                    raise HTTPException(400, "Invalid month format, use YYYY-MM")
-            else:
-                now = datetime.now(timezone.utc)
-                y, m = now.year, now.month
-            month_start = datetime(y, m, 1, tzinfo=timezone.utc)
-            if m == 12:
-                month_end = datetime(y + 1, 1, 1, tzinfo=timezone.utc)
-            else:
-                month_end = datetime(y, m + 1, 1, tzinfo=timezone.utc)
+            try:
+                if month:
+                    try:
+                        y, m = int(month[:4]), int(month[5:7])
+                        if not (1 <= m <= 12):
+                            raise ValueError
+                    except (ValueError, IndexError):
+                        raise HTTPException(400, "Invalid month format, use YYYY-MM")
+                else:
+                    now = datetime.now(timezone.utc)
+                    y, m = now.year, now.month
+                month_start = datetime(y, m, 1, tzinfo=timezone.utc)
+                if m == 12:
+                    month_end = datetime(y + 1, 1, 1, tzinfo=timezone.utc)
+                else:
+                    month_end = datetime(y, m + 1, 1, tzinfo=timezone.utc)
 
-            q = select(Budget).where(Budget.user_id == user["user_id"])
-            if type:
-                q = q.where(Budget.budget_type == type)
-            q = q.order_by(Budget.category)
-            result = await session.execute(q)
-            budgets = result.scalars().all()
+                q = select(Budget).where(Budget.user_id == user["user_id"])
+                if type:
+                    q = q.where(Budget.budget_type == type)
+                q = q.order_by(Budget.category)
+                result = await session.execute(q)
+                budgets = result.scalars().all()
 
-            # Fast spent lookup via SQL aggregation (O(n) instead of O(n*m))
-            spent_rows = await session.execute(
-                select(
-                    Transaction.category,
-                    func.sum(-Transaction.amount).label("spent"),
-                ).where(
-                    Transaction.user_id == user["user_id"],
-                    Transaction.date >= month_start,
-                    Transaction.date < month_end,
-                    Transaction.amount < 0,
-                ).group_by(Transaction.category)
-            )
-            spent_map = {row.category: float(row.spent) for row in spent_rows}
+                # Fast spent lookup via SQL aggregation
+                spent_rows = await session.execute(
+                    select(
+                        Transaction.category,
+                        func.sum(-Transaction.amount).label("spent"),
+                    ).where(
+                        Transaction.user_id == user["user_id"],
+                        Transaction.date >= month_start,
+                        Transaction.date < month_end,
+                        Transaction.amount < 0,
+                    ).group_by(Transaction.category)
+                )
+                spent_map = {row.category: float(row.spent) for row in spent_rows}
 
-            result_list = []
-            total_budgeted = 0.0
-            total_spent = 0.0
-            for b in budgets:
-                spent = spent_map.get(b.category, 0.0)
-                limit_val = float(b.amount)
-                total_budgeted += limit_val
-                total_spent += spent
-                entry = {
-                    **_budget_to_dict(b),
-                    "spent": round(spent, 2),
-                    "remaining": round(limit_val - spent, 2),
-                    "progress_pct": round(min(100, (spent / limit_val * 100) if limit_val else 0), 1),
+                result_list = []
+                total_budgeted = 0.0
+                total_spent = 0.0
+                for b in budgets:
+                    spent = spent_map.get(b.category, 0.0)
+                    limit_val = float(b.amount)
+                    total_budgeted += limit_val
+                    total_spent += spent
+                    entry = {
+                        **_budget_to_dict(b),
+                        "spent": round(spent, 2),
+                        "remaining": round(limit_val - spent, 2),
+                        "progress_pct": round(min(100, (spent / limit_val * 100) if limit_val else 0), 1),
+                    }
+                    result_list.append(entry)
+
+                event_groups = {}
+                if type == "event" or not type:
+                    event_items = [e for e in result_list if e.get("budget_type") == "event"]
+                    for e in event_items:
+                        gid = e.get("event_group_id") or e["budget_id"]
+                        if gid not in event_groups:
+                            event_groups[gid] = {
+                                "event_group_id": gid,
+                                "event_group_name": e.get("event_group_name") or e["category"],
+                                "category": e["category"],
+                                "event_date": e.get("event_date"),
+                                "items": [],
+                                "total_limit": 0.0,
+                                "total_spent": 0.0,
+                                "item_count": 0,
+                            }
+                        event_groups[gid]["items"].append(e)
+                        event_groups[gid]["total_limit"] += e["limit"]
+                        event_groups[gid]["total_spent"] += e["spent"]
+                        event_groups[gid]["item_count"] += 1
+
+                result_list.sort(key=lambda x: (x.get("event_date") or "9999", x["category"]) if x.get("budget_type") == "event" else (x["category"],))
+
+                return {
+                    "budgets": result_list,
+                    "event_groups": event_groups,
+                    "month": f"{y}-{m:02d}",
+                    "total_budgeted": round(total_budgeted, 2),
+                    "total_spent": round(total_spent, 2),
+                    "total_remaining": round(total_budgeted - total_spent, 2),
                 }
-                result_list.append(entry)
-
-            # Build grouped events structure
-            event_groups = {}
-            if type == "event" or not type:
-                event_items = [e for e in result_list if e.get("budget_type") == "event"]
-                for e in event_items:
-                    gid = e.get("event_group_id") or e["budget_id"]
-                    if gid not in event_groups:
-                        event_groups[gid] = {
-                            "event_group_id": gid,
-                            "event_group_name": e.get("event_group_name") or e["category"],
-                            "category": e["category"],
-                            "event_date": e.get("event_date"),
-                            "items": [],
-                            "total_limit": 0.0,
-                            "total_spent": 0.0,
-                            "item_count": 0,
-                        }
-                    event_groups[gid]["items"].append(e)
-                    event_groups[gid]["total_limit"] += e["limit"]
-                    event_groups[gid]["total_spent"] += e["spent"]
-                    event_groups[gid]["item_count"] += 1
-
-            # Sort everyday by category, events by date
-            result_list.sort(key=lambda x: (x.get("event_date") or "9999", x["category"]) if x.get("budget_type") == "event" else (x["category"],))
-
-            return {
-                "budgets": result_list,
-                "event_groups": event_groups,
-                "month": f"{y}-{m:02d}",
-                "total_budgeted": round(total_budgeted, 2),
-                "total_spent": round(total_spent, 2),
-                "total_remaining": round(total_budgeted - total_spent, 2),
-            }
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.warning("Budget list failed (possible missing columns, awaiting migration): %s", str(e))
+                return {
+                    "budgets": [],
+                    "event_groups": {},
+                    "month": month or f"{datetime.now(timezone.utc).year}-{datetime.now(timezone.utc).month:02d}",
+                    "total_budgeted": 0,
+                    "total_spent": 0,
+                    "total_remaining": 0,
+                }
 
     @router.post("/budgets")
     async def create_budget(payload: BudgetIn, request: Request, user: dict = Depends(get_current_user)):
@@ -2238,8 +2249,12 @@ Output ONLY valid JSON, no markdown, no explanation:
         from budget_system import seed_default_budget_entries
         sm = request.app.state.db
         async with sm() as session:
-            created = await seed_default_budget_entries(session, user["user_id"])
-            return {"status": "ok", "created": created, "message": f"{created} default budgets seeded"}
+            try:
+                created = await seed_default_budget_entries(session, user["user_id"])
+                return {"status": "ok", "created": created, "message": f"{created} default budgets seeded"}
+            except Exception as e:
+                logger.warning("Seed defaults failed: %s", str(e))
+                raise HTTPException(500, f"Failed to seed defaults: {str(e)}")
 
     # ── AI Budget Insights ─────────────────────────────────────────
 
