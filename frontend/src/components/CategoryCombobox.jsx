@@ -107,12 +107,12 @@ export default function CategoryCombobox({
             role="combobox"
             aria-expanded={open}
             className={cn(
-              "flex h-11 w-full items-center justify-between rounded-xl bg-secondary/50 border border-transparent px-4 text-sm transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+              "flex h-12 w-full items-center justify-between rounded-xl bg-secondary/50 border border-transparent px-4 text-[15px] transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50",
               !value && "text-muted-foreground",
               className
             )}
           >
-            <span className="truncate">
+            <span className="break-all line-clamp-2">
               {value
                 ? selected
                   ? selected.name
@@ -130,7 +130,7 @@ export default function CategoryCombobox({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search categories…"
-                className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground"
+                className="flex h-11 w-full rounded-md bg-transparent py-3 text-[15px] outline-none placeholder:text-muted-foreground"
               />
             </div>
             <CommandList>
@@ -162,7 +162,7 @@ export default function CategoryCombobox({
                             <Check className="h-3 w-3" />
                           )}
                         </div>
-                        <span className="truncate">{c.name}</span>
+                        <span className="break-all">{c.name}</span>
                         {c.source === "Custom" && (
                           <span className="ml-auto text-[10px] px-1 py-0.5 rounded-full bg-topaz/10 text-topaz shrink-0">
                             Custom

@@ -280,7 +280,7 @@ export default React.memo(function BudgetPage() {
       <div key={b.budget_id} className="rounded-xl border border-border bg-card/50 p-4 density-pad hover:border-muted-foreground/20 transition-all group">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="min-w-0">
-            <h3 className="text-sm font-medium capitalize truncate">{b.category}</h3>
+            <h3 className="text-[15px] font-medium capitalize break-all">{b.category}</h3>
             {showDate && b.event_date && (
               <p className="text-xs text-muted-foreground mt-0.5">
                 {formatDate(b.event_date)}
