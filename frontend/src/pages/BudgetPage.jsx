@@ -7,7 +7,6 @@ import {
 } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
-import { PageHeader, MetricCard } from "../components/ui/layout";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import ConfirmModal from "../components/ui/ConfirmModal";
@@ -31,6 +30,19 @@ const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
+
+function ProgressRing({ pct, size = 40, stroke = 3.5, color }) {
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (Math.min(pct, 100) / 100) * circ;
+  return (
+    <svg width={size} height={size} className="shrink-0 -rotate-90">
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="currentColor" strokeWidth={stroke} className="text-muted/30" />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color || (pct >= 100 ? "#e5484d" : "#30a46c")} strokeWidth={stroke} strokeLinecap="round"
+        strokeDasharray={circ} strokeDashoffset={offset} style={{ transition: "stroke-dashoffset 0.5s ease" }} />
+    </svg>
+  );
+}
 
 function Sparkline({ data, color }) {
   if (!data || data.length < 2) return null;
@@ -290,10 +302,15 @@ export default React.memo(function BudgetPage() {
     const over = (b.progress_pct || 0) >= 100;
     const isEditing = editingId === b.budget_id;
     const catTrends = trends[b.category];
+    const progressColor = over ? "#e5484d" : (b.progress_pct || 0) >= 80 ? "#e8a838" : "#30a46c";
+    const daysInMonth = new Date(year, mNum, 0).getDate();
+    const dayOfMonth = now.getDate();
+    const expectedPct = (dayOfMonth / daysInMonth) * 100;
+    const pace = b.progress_pct > expectedPct * 1.15 ? "ahead" : b.progress_pct < expectedPct * 0.85 ? "behind" : "on_track";
 
     if (isEditing) {
       return (
-        <div key={b.budget_id} className="rounded-xl border border-border bg-card/50 p-4 density-pad space-y-3">
+        <div key={b.budget_id} className="rounded-xl border border-border bg-card/50 p-4 space-y-3">
           <div className="flex flex-col sm:flex-row gap-2">
             <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="flex-1" />
             <Input type="number" step="0.01" value={form.limit} onChange={(e) => setForm({ ...form, limit: e.target.value })} className="w-full sm:w-28" />
@@ -309,55 +326,72 @@ export default React.memo(function BudgetPage() {
 
     const isSelected = bulkSelected.has(b.budget_id);
     return (
-      <div key={b.budget_id} className={`rounded-xl border ${isSelected ? "border-emerald bg-emerald/5" : "border-border bg-card/50"} p-4 density-pad hover:border-muted-foreground/20 transition-all group`}>
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <input type="checkbox" checked={isSelected} onChange={() => {
-              const next = new Set(bulkSelected);
-              if (isSelected) next.delete(b.budget_id); else next.add(b.budget_id);
-              setBulkSelected(next);
-            }} className="shrink-0 mt-0.5 rounded border-border text-emerald focus:ring-emerald/30" />
-            <div className="min-w-0">
-              <h3 className="text-[15px] font-medium capitalize break-all">{b.category}</h3>
-              {showDate && b.event_date && (
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {formatDate(b.event_date)}
-                  {!isBefore(parseISO(b.event_date), now) && (
-                    <span className="ml-2">· {daysUntil(b.event_date)} days away</span>
-                  )}
-                </p>
-              )}
+      <div key={b.budget_id} className={`rounded-2xl border ${isSelected ? "border-emerald bg-emerald/5" : "border-border bg-card/80"} p-4 hover:border-muted-foreground/20 hover:shadow-sm transition-all group`}>
+        <div className="flex items-start gap-3">
+          <input type="checkbox" checked={isSelected} onChange={() => {
+            const next = new Set(bulkSelected);
+            if (isSelected) next.delete(b.budget_id); else next.add(b.budget_id);
+            setBulkSelected(next);
+          }} className="mt-1 shrink-0 rounded border-border text-emerald focus:ring-emerald/30" />
+          {/* Ring indicator */}
+          <div className="relative shrink-0">
+            <ProgressRing pct={b.progress_pct || 0} size={44} stroke={4} color={progressColor} />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-[10px] font-bold tabular-nums">{Math.round(b.progress_pct || 0)}%</span>
             </div>
           </div>
-          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-            <button onClick={() => startEdit(b)} className="p-1 rounded hover:bg-secondary text-muted-foreground"><Pencil className="h-3 w-3" /></button>
-            <button onClick={() => setConfirmDelete(b.budget_id)} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-ruby"><Trash2 className="h-3 w-3" /></button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="text-[15px] font-medium capitalize break-all leading-tight">{b.category}</h3>
+                {showDate && b.event_date && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {formatDate(b.event_date)}
+                    {!isBefore(parseISO(b.event_date), now) && (
+                      <span className="ml-2">· {daysUntil(b.event_date)} days away</span>
+                    )}
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                <button onClick={() => startEdit(b)} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>
+                <button onClick={() => setConfirmDelete(b.budget_id)} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-ruby"><Trash2 className="h-3.5 w-3.5" /></button>
+              </div>
+            </div>
+            <div className="flex items-baseline gap-1.5 mt-1.5">
+              <span className={`text-base font-semibold tabular-nums ${over ? "text-ruby" : "text-foreground"}`}>
+                £{b.spent}
+              </span>
+              <span className="text-xs text-muted-foreground">/ £{b.limit}</span>
+              {over && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-ruby/10 text-ruby font-medium">Over</span>}
+            </div>
+            {/* Spending pace */}
+            {!over && (
+              <div className="flex items-center gap-2 mt-1">
+                <div className="h-1.5 flex-1 rounded-full bg-muted/40 overflow-hidden">
+                  <div className="h-full rounded-full bg-gradient-to-r from-emerald via-topaz to-ruby" style={{ width: `${Math.min(100, b.progress_pct || 0)}%` }} />
+                </div>
+                <span className={`text-[10px] font-medium ${
+                  pace === "ahead" ? "text-topaz" : pace === "behind" ? "text-emerald" : "text-muted-foreground"
+                }`}>
+                  {pace === "ahead" ? "Ahead" : pace === "behind" ? "Under" : "On track"}
+                </span>
+              </div>
+            )}
+            {over && (
+              <div className="h-1.5 rounded-full bg-ruby/20 overflow-hidden mt-1">
+                <div className="h-full rounded-full bg-ruby" style={{ width: `${Math.min(100, b.progress_pct || 0)}%` }} />
+              </div>
+            )}
+            <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+              <span>£{Math.max(0, b.remaining || 0).toFixed(2)} remaining</span>
+            </div>
           </div>
-        </div>
-
-        <div className="flex items-baseline gap-1.5 mb-1.5">
-          <span className={`text-lg font-semibold tabular-nums ${over ? "text-ruby" : "text-foreground"}`}>
-            £{b.spent}
-          </span>
-          <span className="text-sm text-muted-foreground">/ £{b.limit}</span>
-          {over && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-ruby/10 text-ruby font-medium">Over</span>}
-        </div>
-
-        <div className="h-2 rounded-full bg-muted/50 overflow-hidden mb-1">
-          <div
-            className={`h-full rounded-full transition-all ${over ? "bg-ruby" : "bg-emerald"}`}
-            style={{ width: `${Math.min(100, b.progress_pct || 0)}%` }}
-          />
-        </div>
-
-        <div className="flex justify-between text-xs text-muted-foreground mb-1">
-          <span>{b.progress_pct}% used</span>
-          <span>£{Math.max(0, b.remaining || 0).toFixed(2)} left</span>
         </div>
 
         {catTrends && catTrends.length >= 2 && (
-          <div className="mt-0.5 -mx-1">
-            <Sparkline data={catTrends} color={over ? "#e5484d" : "#30a46c"} />
+          <div className="mt-2 -mx-1">
+            <Sparkline data={catTrends} color={progressColor} />
           </div>
         )}
       </div>
@@ -369,58 +403,74 @@ export default React.memo(function BudgetPage() {
     const totalSpent = g.total_spent || 0;
     const pct = totalLimit ? Math.min(100, (totalSpent / totalLimit) * 100) : 0;
     const over = pct >= 100;
+    const eventColor = over ? "#e5484d" : pct >= 80 ? "#e8a838" : "#30a46c";
     return (
-      <div key={g.event_group_id} className="rounded-xl border border-border bg-card/50 p-4 density-pad hover:border-muted-foreground/20 transition-all">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="min-w-0">
-            <h3 className="text-[15px] font-medium break-all">{g.event_group_name || g.category}</h3>
-            {g.event_date && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {formatDate(g.event_date)}
-                {!isBefore(parseISO(g.event_date), now) && (
-                  <span className="ml-2">· {daysUntil(g.event_date)} days away</span>
+      <div key={g.event_group_id} className="rounded-2xl border border-border bg-card/80 p-4 hover:border-muted-foreground/20 hover:shadow-sm transition-all">
+        <div className="flex items-start gap-3">
+          {/* Date badge */}
+          {g.event_date && (
+            <div className="shrink-0 flex flex-col items-center w-10 pt-0.5">
+              <span className="text-[10px] uppercase font-bold text-muted-foreground">{parseISO(g.event_date).toLocaleDateString("en-GB", { month: "short" })}</span>
+              <span className="text-lg font-bold leading-none">{parseISO(g.event_date).getDate()}</span>
+            </div>
+          )}
+          <div className="relative shrink-0">
+            <ProgressRing pct={pct} size={40} stroke={3.5} color={eventColor} />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-[9px] font-bold tabular-nums">{Math.round(pct)}%</span>
+            </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="text-[15px] font-medium break-all leading-tight">{g.event_group_name || g.category}</h3>
+                {g.event_date && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {formatDate(g.event_date)}
+                    {!isBefore(parseISO(g.event_date), now) && (
+                      <span className="ml-2">· {daysUntil(g.event_date)} days away</span>
+                    )}
+                  </p>
                 )}
-              </p>
-            )}
+              </div>
+              <div className="flex gap-1 shrink-0">
+                <button onClick={() => {
+                  if (window.confirm(`Delete entire event "${g.event_group_name}" and all ${g.item_count} items?`)) {
+                    api.delete(`/budgets/group/${g.event_group_id}`).then(() => { fetchData(); toast.success("Event deleted"); }).catch(() => toast.error("Could not delete event"));
+                  }
+                }} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-ruby"><Trash2 className="h-3.5 w-3.5" /></button>
+              </div>
+            </div>
+            <div className="flex items-baseline gap-1.5 mt-1.5">
+              <span className={`text-base font-semibold tabular-nums ${over ? "text-ruby" : "text-foreground"}`}>
+                £{totalSpent.toFixed(2)}
+              </span>
+              <span className="text-xs text-muted-foreground">/ £{totalLimit.toFixed(2)}</span>
+              <span className="text-xs text-muted-foreground ml-auto">{g.item_count} items</span>
+            </div>
           </div>
-          <div className="flex gap-1 shrink-0">
-            <button onClick={() => {
-              if (window.confirm(`Delete entire event "${g.event_group_name}" and all ${g.item_count} items?`)) {
-                api.delete(`/budgets/group/${g.event_group_id}`).then(() => { fetchData(); toast.success("Event deleted"); }).catch(() => toast.error("Could not delete event"));
-              }
-            }} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-ruby"><Trash2 className="h-3 w-3" /></button>
-          </div>
-        </div>
-
-        <div className="flex items-baseline gap-1.5 mb-1.5">
-          <span className={`text-lg font-semibold tabular-nums ${over ? "text-ruby" : "text-foreground"}`}>
-            £{totalSpent.toFixed(2)}
-          </span>
-          <span className="text-sm text-muted-foreground">/ £{totalLimit.toFixed(2)}</span>
-          <span className="text-xs text-muted-foreground ml-auto">{g.item_count} items</span>
-        </div>
-
-        <div className="h-2 rounded-full bg-muted/50 overflow-hidden mb-2">
-          <div className={`h-full rounded-full ${over ? "bg-ruby" : "bg-emerald"}`} style={{ width: `${Math.min(100, pct)}%` }} />
         </div>
 
         {/* Sub-items */}
-        <div className="space-y-1.5 mt-3">
-          {g.items.map((item) => {
-            const itemPct = item.limit ? Math.min(100, (item.spent / item.limit) * 100) : 0;
-            return (
-              <div key={item.budget_id} className="flex items-center gap-2 text-xs">
-                <span className="flex-1 truncate text-muted-foreground">{item.category}</span>
-                <span className="tabular-nums">£{item.spent.toFixed(2)}</span>
-                <span className="text-muted-foreground">/ £{item.limit.toFixed(2)}</span>
-                <div className="w-16 h-1.5 rounded-full bg-muted/50 overflow-hidden shrink-0">
-                  <div className={`h-full rounded-full ${itemPct >= 100 ? "bg-ruby" : "bg-emerald"}`} style={{ width: `${Math.min(100, itemPct)}%` }} />
+        {g.items && g.items.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-border space-y-1.5">
+            {g.items.map((item) => {
+              const itemPct = item.limit ? Math.min(100, (item.spent / item.limit) * 100) : 0;
+              return (
+                <div key={item.budget_id} className="flex items-center gap-2 text-xs py-0.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
+                  <span className="flex-1 truncate text-muted-foreground">{item.category}</span>
+                  <span className="tabular-nums font-medium">£{item.spent.toFixed(2)}</span>
+                  <span className="text-muted-foreground">/ £{item.limit.toFixed(2)}</span>
+                  <div className="w-12 h-1 rounded-full bg-muted/40 overflow-hidden shrink-0">
+                    <div className={`h-full rounded-full ${itemPct >= 100 ? "bg-ruby" : "bg-emerald"}`} style={{ width: `${Math.min(100, itemPct)}%` }} />
+                  </div>
+                  <button onClick={() => setConfirmDelete(item.budget_id)} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-ruby"><X className="h-3 w-3" /></button>
                 </div>
-                <button onClick={() => setConfirmDelete(item.budget_id)} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-ruby"><X className="h-3 w-3" /></button>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Add item inline */}
         <div className="mt-3 pt-3 border-t border-border">
@@ -444,12 +494,12 @@ export default React.memo(function BudgetPage() {
             } catch { toast.error("Could not add item"); }
           }} className="flex items-end gap-2">
             <div className="flex-1">
-              <input name="newItemCat" placeholder="Category" className="w-full h-8 rounded-lg bg-secondary/50 border border-transparent px-2 text-xs placeholder:text-muted-foreground focus:border-ring focus:outline-none" />
+              <input name="newItemCat" placeholder="Category" className="w-full h-7 rounded-lg bg-secondary/40 border border-transparent px-2 text-xs placeholder:text-muted-foreground focus:border-ring focus:outline-none" />
             </div>
             <div className="w-20">
-              <input name="newItemAmt" type="number" step="0.01" min="0.01" placeholder="£0" className="w-full h-8 rounded-lg bg-secondary/50 border border-transparent px-2 text-xs text-right placeholder:text-muted-foreground focus:border-ring focus:outline-none" />
+              <input name="newItemAmt" type="number" step="0.01" min="0.01" placeholder="£0" className="w-full h-7 rounded-lg bg-secondary/40 border border-transparent px-2 text-xs text-right placeholder:text-muted-foreground focus:border-ring focus:outline-none" />
             </div>
-            <button type="submit" className="h-8 px-2 rounded-lg bg-emerald text-white text-xs hover:bg-emerald/90"><Plus className="h-3 w-3" /></button>
+            <button type="submit" className="h-7 px-2 rounded-lg bg-emerald text-white text-xs hover:bg-emerald/90"><Plus className="h-3 w-3" /></button>
           </form>
         </div>
       </div>
@@ -468,29 +518,14 @@ export default React.memo(function BudgetPage() {
   };
 
   return (
-    <div className="space-y-6 density-gap-y">
-      <PageHeader
-        eyebrow="Finance"
-        title="Budgets"
-        description="Set spending limits and track where your money goes."
-        actions={
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleSeedDefaults} disabled={seeding || loading}>
-              <Download className={`h-4 w-4 mr-1.5 ${seeding ? "animate-pulse" : ""}`} /> {seeding ? "Loading..." : "Load defaults"}
-            </Button>
-            <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
-              <RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-            </Button>
-          </div>
-        }
-      />
+    <div className="space-y-5">
 
       {/* Smart Alerts Banner */}
       {alerts.length > 0 && (
-        <div className="density-gap-y">
+        <div className="space-y-3">
           {criticalAlerts.length > 0 && criticalAlerts.map((a) => (
             !dismissedAlerts.has(a.category + a.severity) && (
-              <div key={`critical-${a.category}`} className="flex items-start gap-3 rounded-xl border border-ruby/30 bg-ruby/5 p-3 density-pad">
+              <div key={`critical-${a.category}`} className="flex items-start gap-3 rounded-xl border border-ruby/30 bg-ruby/5 p-3">
                 <AlertTriangle className="h-5 w-5 text-ruby shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-ruby">{a.message}</p>
@@ -506,10 +541,10 @@ export default React.memo(function BudgetPage() {
                 <TrendingUp className="h-4 w-4" />
                 <span>{warningAlerts.filter((a) => !dismissedAlerts.has(a.category + a.severity)).length} budgets nearing limit</span>
               </summary>
-              <div className="mt-2 density-gap-y">
+              <div className="mt-2 space-y-2">
                 {warningAlerts.map((a) => (
                   !dismissedAlerts.has(a.category + a.severity) && (
-                    <div key={`warning-${a.category}`} className="flex items-start gap-3 rounded-xl border border-topaz/30 bg-topaz/5 p-3 density-pad">
+                    <div key={`warning-${a.category}`} className="flex items-start gap-3 rounded-xl border border-topaz/30 bg-topaz/5 p-3">
                       <TrendingUp className="h-5 w-5 text-topaz shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium">{a.message}</p>
@@ -528,10 +563,10 @@ export default React.memo(function BudgetPage() {
                 <Zap className="h-4 w-4" />
                 <span>{spikeAlerts.filter((a) => !dismissedAlerts.has(a.category + a.severity)).length} spending spikes</span>
               </summary>
-              <div className="mt-2 density-gap-y">
+              <div className="mt-2 space-y-2">
                 {spikeAlerts.map((a) => (
                   !dismissedAlerts.has(a.category + a.severity) && (
-                    <div key={`spike-${a.category}`} className="flex items-start gap-3 rounded-xl border border-chart-1/30 bg-chart-1/5 p-3 density-pad">
+                    <div key={`spike-${a.category}`} className="flex items-start gap-3 rounded-xl border border-chart-1/30 bg-chart-1/5 p-3">
                       <Zap className="h-5 w-5 text-chart-1 shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium">{a.message}</p>
@@ -547,40 +582,79 @@ export default React.memo(function BudgetPage() {
         </div>
       )}
 
-      {/* Month selector + summary */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 density-gap">
-        <div className="flex items-center gap-2">
-          <button onClick={() => setMonth(addMonth(month, -1))} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground">
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-          <span className="text-lg font-semibold min-w-[140px] text-center">{monthLabel}</span>
-          <button onClick={() => setMonth(addMonth(month, 1))} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground">
-            <ChevronRight className="h-5 w-5" />
-          </button>
-          {!isCurrentMonth && (
-            <Button variant="ghost" size="pill" onClick={() => setMonth(fmtMonth(now.getFullYear(), now.getMonth() + 1))}>
-              Back to today
+      {/* Dashboard overview */}
+      <div className="rounded-2xl border border-border bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-xl p-5 sm:p-6 shadow-card">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
+          {/* Large progress ring */}
+          <div className="relative shrink-0">
+            <ProgressRing pct={summary.totalPlanned ? (summary.totalSpent / summary.totalPlanned) * 100 : 0} size={80} stroke={5}
+              color={summary.overCount > 0 ? "#e5484d" : summary.totalSpent > summary.totalPlanned * 0.8 ? "#e8a838" : "#30a46c"} />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-lg font-bold tabular-nums">{summary.totalPlanned ? Math.round((summary.totalSpent / summary.totalPlanned) * 100) : 0}%</span>
+            </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2">
+              <button onClick={() => setMonth(addMonth(month, -1))} className="p-1 rounded-lg hover:bg-secondary text-muted-foreground transition-colors">
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="text-base font-semibold min-w-[130px] text-center">{monthLabel}</span>
+              <button onClick={() => setMonth(addMonth(month, 1))} className="p-1 rounded-lg hover:bg-secondary text-muted-foreground transition-colors">
+                <ChevronRight className="h-4 w-4" />
+              </button>
+              {!isCurrentMonth && (
+                <button onClick={() => setMonth(fmtMonth(now.getFullYear(), now.getMonth() + 1))}
+                  className="text-xs text-muted-foreground hover:text-foreground ml-1 underline underline-offset-2">
+                  Back to today
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+              <span className="text-muted-foreground">Budgeted <strong className="text-foreground">£{summary.totalPlanned.toLocaleString()}</strong></span>
+              <span className="text-muted-foreground">Spent <strong className={summary.overCount > 0 ? "text-ruby" : "text-emerald"}>£{summary.totalSpent.toLocaleString()}</strong></span>
+              {summary.totalPlanned > 0 && (
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  summary.overCount > 0 ? "bg-ruby/10 text-ruby" :
+                  summary.totalSpent > summary.totalPlanned * 0.8 ? "bg-topaz/10 text-topaz" :
+                  "bg-emerald/10 text-emerald"
+                }`}>
+                  {summary.overCount > 0 ? `${summary.overCount} over budget` :
+                   summary.totalSpent > summary.totalPlanned * 0.8 ? "Nearing limit" : "On track"}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Button variant="outline" size="sm" onClick={handleSeedDefaults} disabled={seeding || loading}>
+              <Download className={`h-4 w-4 mr-1.5 ${seeding ? "animate-pulse" : ""}`} /> {seeding ? "Loading..." : "Defaults"}
             </Button>
-          )}
-        </div>
-        <div className="flex items-center gap-3 text-sm text-muted-foreground ml-auto">
-          <span>Budgeted <strong className="text-foreground">£{summary.totalPlanned.toLocaleString()}</strong></span>
-          <span>Spent <strong className={summary.overCount > 0 ? "text-ruby" : "text-emerald"}>£{summary.totalSpent.toLocaleString()}</strong></span>
-          {summary.overCount > 0 && <span className="text-ruby">{summary.overCount} over</span>}
+            <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+              <RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Metric cards */}
-      <div className="grid grid-cols-3 gap-3 sm:gap-4 density-gap">
-        <MetricCard label="Budgets" value={String(summary.count)} icon={Wallet} tone="emerald" />
-        <MetricCard label="Budgeted" value={`£${summary.totalPlanned.toLocaleString()}`} icon={Target} tone="topaz" />
-        <MetricCard label="Spent" value={`£${summary.totalSpent.toLocaleString()}`} icon={TrendingDown} tone={summary.overCount > 0 ? "ruby" : "emerald"} />
+      {/* Quick stats row */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-xl border border-border bg-card/80 p-3 sm:p-4 text-center">
+          <p className="text-xs text-muted-foreground mb-0.5">Budgets</p>
+          <p className="text-xl sm:text-2xl font-semibold">{summary.count}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card/80 p-3 sm:p-4 text-center">
+          <p className="text-xs text-muted-foreground mb-0.5">Budgeted</p>
+          <p className="text-xl sm:text-2xl font-semibold tabular-nums">£{summary.totalPlanned.toLocaleString()}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card/80 p-3 sm:p-4 text-center">
+          <p className="text-xs text-muted-foreground mb-0.5">Spent</p>
+          <p className={`text-xl sm:text-2xl font-semibold tabular-nums ${summary.overCount > 0 ? "text-ruby" : "text-emerald"}`}>£{summary.totalSpent.toLocaleString()}</p>
+        </div>
       </div>
 
       {/* Loading */}
       {loading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 density-gap">
-          {[...Array(6)].map((_, i) => <div key={i} className="h-32 rounded-xl bg-muted/50 animate-pulse" />)}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => <div key={i} className="h-32 rounded-2xl bg-muted/40 animate-pulse" />)}
         </div>
       )}
 
@@ -613,13 +687,20 @@ export default React.memo(function BudgetPage() {
       )}
 
       {!loading && budgets.length === 0 && (
-        <div className="text-center py-16 text-muted-foreground">
-          <Wallet className="h-10 w-10 mx-auto mb-3 opacity-40" />
-          <p className="text-sm font-medium">No budgets yet</p>
-          <p className="text-xs mt-1 mb-4">Create your first spending limit or planned event.</p>
-          <Button variant="primary" size="pill" onClick={() => { setAddTab("budget"); setShowAdd(true); }}>
-            <Plus className="h-4 w-4 mr-1.5" /> Create budget
-          </Button>
+        <div className="rounded-2xl border border-dashed border-border bg-card/60 p-12 text-center">
+          <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-emerald/10 text-emerald">
+            <Wallet className="h-7 w-7" />
+          </div>
+          <h3 className="text-xl font-medium">No budgets yet</h3>
+          <p className="text-sm text-muted-foreground mt-1.5 mb-6 max-w-sm mx-auto">Create your first spending limit or planned event to start tracking.</p>
+          <div className="flex items-center justify-center gap-3">
+            <Button variant="primary" size="pill" onClick={() => { setAddTab("budget"); setShowAdd(true); }}>
+              <Plus className="h-4 w-4 mr-1.5" /> Create budget
+            </Button>
+            <Button variant="outlinePill" size="pill" onClick={handleSeedDefaults} disabled={seeding}>
+              <Download className={`h-4 w-4 mr-1.5 ${seeding ? "animate-pulse" : ""}`} /> {seeding ? "Loading..." : "Load defaults"}
+            </Button>
+          </div>
         </div>
       )}
 
@@ -641,7 +722,7 @@ export default React.memo(function BudgetPage() {
                   <span className="text-xs text-muted-foreground">{everyday.length} budgets</span>
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 density-gap">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {everyday.map((b) => renderBudgetCard(b))}
               </div>
               {trendsLoading && everyday.length > 0 && (
@@ -658,9 +739,15 @@ export default React.memo(function BudgetPage() {
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                   Upcoming Events
                 </h2>
-                <span className="text-xs text-muted-foreground">{upcomingEventGroups.length} events</span>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => { setAddTab("budget"); setShowAdd(true); setForm((prev) => ({ ...prev, budget_type: "event", event_group_id: "", event_group_name: "" })); }}
+                    className="h-6 w-6 rounded-full bg-topaz/10 text-topaz hover:bg-topaz/20 flex items-center justify-center transition-all" aria-label="Add event">
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                  <span className="text-xs text-muted-foreground">{upcomingEventGroups.length} events</span>
+                </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 density-gap">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {upcomingEventGroups.map((g) => renderEventGroup(g))}
               </div>
             </section>
@@ -675,7 +762,7 @@ export default React.memo(function BudgetPage() {
                   Past Events
                 </h2>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 density-gap">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {pastEventGroups.map((g) => renderEventGroup(g))}
               </div>
             </section>
@@ -689,7 +776,7 @@ export default React.memo(function BudgetPage() {
                   Planned Events
                 </h2>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 density-gap">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {Object.values(eventGroups).filter((g) => !g.event_date).map((g) => renderEventGroup(g))}
               </div>
             </section>
@@ -709,12 +796,12 @@ export default React.memo(function BudgetPage() {
             <span className="text-xs text-muted-foreground font-normal">({insights.length} suggestions)</span>
           </button>
           {showInsights && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 density-gap">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {insights.map((ins) => {
                 const hasBudget = ins.current_budget > 0;
                 const needsChange = ins.suggested_budget !== ins.current_budget;
                 return (
-                  <div key={ins.category} className="rounded-xl border border-border bg-card/50 p-4 density-pad">
+                  <div key={ins.category} className="rounded-xl border border-border bg-card/50 p-4">
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <h4 className="text-sm font-medium capitalize">{ins.category}</h4>
                       {!hasBudget && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-topaz/10 text-topaz font-medium">No budget</span>}
@@ -751,7 +838,7 @@ export default React.memo(function BudgetPage() {
       {!loading && !showAdd && (
         <button
           onClick={() => { setAddTab("expense"); setShowAdd(true); setBudgetAdded(false); }}
-          className="fixed bottom-6 right-6 z-20 h-14 w-14 rounded-full bg-emerald text-white shadow-lg hover:bg-emerald/90 active:scale-95 transition-all flex items-center justify-center"
+          className="fixed bottom-6 right-6 z-20 h-14 w-14 rounded-full bg-gradient-to-br from-emerald to-emerald/80 text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center"
           aria-label="Quick add"
         >
           <Plus className="h-6 w-6" />
