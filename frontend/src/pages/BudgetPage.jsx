@@ -631,7 +631,13 @@ export default React.memo(function BudgetPage() {
                   <ShoppingCart className="h-4 w-4 text-muted-foreground" />
                   Monthly Spending Limits
                 </h2>
-                <span className="text-xs text-muted-foreground">{everyday.length} budgets</span>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => { setAddTab("budget"); setShowAdd(true); setForm((prev) => ({ ...prev, budget_type: "everyday" })); }}
+                    className="h-6 w-6 rounded-full bg-emerald/10 text-emerald hover:bg-emerald/20 flex items-center justify-center transition-all" aria-label="Add monthly budget">
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                  <span className="text-xs text-muted-foreground">{everyday.length} budgets</span>
+                </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 density-gap">
                 {everyday.map((b) => renderBudgetCard(b))}
