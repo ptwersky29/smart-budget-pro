@@ -2151,6 +2151,15 @@ Output ONLY valid JSON, no markdown, no explanation:
             await session.refresh(b)
             return _budget_to_dict(b)
 
+    @router.post("/budgets/seed-defaults")
+    async def seed_defaults(request: Request, user: dict = Depends(get_current_user)):
+        """Seed default monthly budgets for the current user (idempotent — skips existing)."""
+        from budget_system import seed_default_budget_entries
+        sm = request.app.state.db
+        async with sm() as session:
+            created = await seed_default_budget_entries(session, user["user_id"])
+            return {"status": "ok", "created": created, "message": f"{created} default budgets seeded"}
+
     # ── AI Budget Insights ─────────────────────────────────────────
 
     @router.get("/budgets/insights")

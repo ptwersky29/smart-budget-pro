@@ -153,6 +153,34 @@ DEFAULT_MONTHLY_BUDGETS = {
 }
 
 
+async def seed_default_budget_entries(session, user_id: str):
+    """Seed DEFAULT_MONTHLY_BUDGETS into the Budget table (used by finance_engine)."""
+    from db import Budget
+    created = 0
+    for category, amount in DEFAULT_MONTHLY_BUDGETS.items():
+        result = await session.execute(
+            select(Budget).where(
+                Budget.user_id == user_id,
+                Budget.category == category,
+            )
+        )
+        if result.scalar_one_or_none():
+            continue
+        b = Budget(
+            budget_id=str(uuid.uuid4()),
+            user_id=user_id,
+            category=category,
+            amount=amount,
+            period="monthly",
+            budget_type="everyday",
+        )
+        session.add(b)
+        created += 1
+    if created:
+        await session.commit()
+    return created
+
+
 async def seed_default_budgets_for_user(session, user_id: str):
     """
     Seed default monthly budget with smart category limits for a new user.

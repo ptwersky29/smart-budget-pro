@@ -3,7 +3,7 @@ import { parseISO, isBefore } from "date-fns";
 import {
   RefreshCw, Wallet, ShoppingCart, Calendar, Plus, Pencil, Trash2,
   Check, X, Target, TrendingDown, ChevronLeft, ChevronRight,
-  Sparkles, AlertTriangle, TrendingUp, Zap,
+  Sparkles, AlertTriangle, TrendingUp, Zap, Download,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
@@ -241,6 +241,16 @@ export default React.memo(function BudgetPage() {
     } catch { toast.error("Could not delete"); }
   };
 
+  const handleSeedDefaults = async () => {
+    try {
+      await api.post("/budgets/seed-defaults");
+      toast.success("Default budgets loaded");
+      await fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Could not load defaults");
+    }
+  };
+
   const criticalAlerts = alerts.filter((a) => a.severity === "critical");
   const warningAlerts = alerts.filter((a) => a.severity === "warning");
   const spikeAlerts = alerts.filter((a) => a.severity === "spike");
@@ -333,9 +343,14 @@ export default React.memo(function BudgetPage() {
         title="Budgets"
         description="Set spending limits and track where your money goes."
         actions={
-          <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleSeedDefaults}>
+              <Download className="h-4 w-4 mr-1.5" /> Load defaults
+            </Button>
+            <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+              <RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+            </Button>
+          </div>
         }
       />
 
@@ -578,11 +593,11 @@ export default React.memo(function BudgetPage() {
         </button>
       )}
 
-      {/* Bottom sheet (QuickAdd) */}
+      {/* Bottom sheet — mobile sheet, desktop centered dialog */}
       {showAdd && (
-        <div className="fixed inset-0 z-50 bg-black/40" onClick={() => { setShowAdd(false); resetForm(); resetQuickForm(); }}>
+        <div className="fixed inset-0 z-50 bg-black/40 lg:flex lg:items-start lg:justify-center lg:pt-[10vh]" onClick={() => { setShowAdd(false); resetForm(); resetQuickForm(); }}>
           <div
-            className="absolute bottom-0 left-0 right-0 rounded-t-2xl border border-border bg-card/95 backdrop-blur-xl shadow-modal p-6 max-h-[85vh] overflow-y-auto animate-slide-up"
+            className="absolute bottom-0 left-0 right-0 rounded-t-2xl border border-border bg-card/95 backdrop-blur-xl shadow-modal p-6 max-h-[85vh] overflow-y-auto animate-slide-up lg:relative lg:mx-0 lg:max-w-md lg:rounded-2xl lg:shadow-lg lg:animate-[fadeUp_0.2s_ease-out]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Handle */}

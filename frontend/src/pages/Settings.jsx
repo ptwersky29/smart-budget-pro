@@ -8,6 +8,7 @@ import AutomationSettings from "../components/settings/AutomationSettings";
 import NotificationSettings from "../components/settings/NotificationSettings";
 import AccessibilitySettings from "../components/settings/AccessibilitySettings";
 import AccountSettings from "../components/settings/AccountSettings";
+import CategoryManager from "./CategoryManager";
 
 export default function Settings() {
   useEffect(() => { document.title = "Settings | FinanceAI"; }, []);
@@ -35,6 +36,7 @@ export default function Settings() {
         {activeSection === "notifications" && <NotificationSettings />}
         {activeSection === "accessibility" && <AccessibilitySettings />}
         {activeSection === "account" && <AccountSettings />}
+        {activeSection === "categories" && <CategoryManager />}
       </SettingsLayout>
     </div>
   );

@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  Palette, Layout, Bot, Bell, Accessibility, User, Receipt, Shield,
+  Palette, Layout, Bot, Bell, Accessibility, User, Receipt, Shield, List,
 } from "lucide-react";
 
 const SECTIONS = [
@@ -9,6 +9,7 @@ const SECTIONS = [
   { key: "automation",    label: "Automation",    icon: Bot },
   { key: "notifications", label: "Notifications", icon: Bell },
   { key: "accessibility", label: "Accessibility", icon: Accessibility },
+  { key: "categories",    label: "Categories",    icon: List },
   { key: "account",       label: "Account",       icon: User },
 ];
 
