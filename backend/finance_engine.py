@@ -1065,6 +1065,8 @@ Output ONLY valid JSON, no markdown, no explanation:
             if accrued:
                 doc["maaser_accrued"] = accrued
             _query_cache.delete(f"dash:{user['user_id']}")
+            _query_cache.delete_by_prefix(f"trends:{user['user_id']}:")
+            _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
             return doc
 
     @router.patch("/transactions/{tx_id}")
@@ -1110,6 +1112,8 @@ Output ONLY valid JSON, no markdown, no explanation:
             doc = _tx_to_dict(tx)
             await maaser.maybe_accrue(session, user["user_id"], doc)
             _query_cache.delete(f"dash:{user['user_id']}")
+            _query_cache.delete_by_prefix(f"trends:{user['user_id']}:")
+            _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
             return doc
 
     @router.delete("/transactions/{tx_id}")
@@ -1138,6 +1142,8 @@ Output ONLY valid JSON, no markdown, no explanation:
             await session.delete(tx)
             await session.commit()
             _query_cache.delete(f"dash:{user['user_id']}")
+            _query_cache.delete_by_prefix(f"trends:{user['user_id']}:")
+            _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
             return {"ok": True}
 
     class BulkDeleteByQueryIn(BaseModel):
@@ -1174,6 +1180,8 @@ Output ONLY valid JSON, no markdown, no explanation:
             deleted = len(result.fetchall())
             await session.commit()
             _query_cache.delete(f"dash:{user['user_id']}")
+            _query_cache.delete_by_prefix(f"trends:{user['user_id']}:")
+            _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
             return {"ok": True, "deleted": deleted}
 
     @router.post("/transactions/clear")
@@ -1219,6 +1227,8 @@ Output ONLY valid JSON, no markdown, no explanation:
                 result = None
             await session.commit()
             _query_cache.delete(f"dash:{user['user_id']}")
+            _query_cache.delete_by_prefix(f"trends:{user['user_id']}:")
+            _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
             deleted = result.rowcount if result else 0
             return {"ok": True, "deleted": deleted}
 
@@ -1242,6 +1252,8 @@ Output ONLY valid JSON, no markdown, no explanation:
                 )
                 await session.commit()
             _query_cache.delete(f"dash:{user['user_id']}")
+            _query_cache.delete_by_prefix(f"trends:{user['user_id']}:")
+            _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
             return {"ok": True, "updated": len(payload.transaction_ids)}
 
     @router.post("/transactions/seed-demo")
@@ -1290,6 +1302,8 @@ Output ONLY valid JSON, no markdown, no explanation:
             await session.commit()
             await maaser.backfill_for_user(session, user["user_id"])
             _query_cache.delete(f"dash:{user['user_id']}")
+            _query_cache.delete_by_prefix(f"trends:{user['user_id']}:")
+            _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
             return {"ok": True, "inserted": len(sample)}
 
     # ── Split transactions ───────────────────────────────────────────
@@ -1542,6 +1556,10 @@ Output ONLY valid JSON, no markdown, no explanation:
 
     @router.get("/categories")
     async def list_categories(request: Request, user: dict = Depends(get_current_user)):
+        cache_key = f"cats:{user['user_id']}"
+        cached = _query_cache.get(cache_key)
+        if cached:
+            return cached
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
@@ -1569,10 +1587,12 @@ Output ONLY valid JSON, no markdown, no explanation:
                  "section": SECTION_FOR_CATEGORY.get(c.name, "Other")}
                 for c in cats
             ]
-            return {"categories": defaults + user_cats, "hierarchy": {
+            payload = {"categories": defaults + user_cats, "hierarchy": {
                 section: [name for name, _ in items]
                 for section, items in CATEGORY_HIERARCHY.items()
             }}
+            _query_cache.set(cache_key, payload, ttl=120)
+            return payload
 
     @router.post("/categories")
     async def create_category(payload: dict, request: Request, user: dict = Depends(get_current_user)):
@@ -1596,6 +1616,7 @@ Output ONLY valid JSON, no markdown, no explanation:
             session.add(cat)
             await session.commit()
             await session.refresh(cat)
+            _query_cache.delete_by_prefix(f"cats:{user['user_id']}")
             return {"category_id": cat.category_id, "name": cat.name}
 
     @router.patch("/categories/{category_id}")
@@ -1614,6 +1635,7 @@ Output ONLY valid JSON, no markdown, no explanation:
             if "budget" in payload:
                 cat.budget = payload["budget"]
             await session.commit()
+            _query_cache.delete_by_prefix(f"cats:{user['user_id']}")
             return {"ok": True}
 
     @router.delete("/categories/{category_id}")
@@ -1628,6 +1650,7 @@ Output ONLY valid JSON, no markdown, no explanation:
                 raise HTTPException(404, "Category not found")
             await session.delete(cat)
             await session.commit()
+            _query_cache.delete_by_prefix(f"cats:{user['user_id']}")
             return {"ok": True}
 
     # ── Learned category rules ────────────────────────────────────────
@@ -1743,6 +1766,8 @@ Output ONLY valid JSON, no markdown, no explanation:
             if updated:
                 await session.commit()
                 _query_cache.delete(f"dash:{user['user_id']}")
+            _query_cache.delete_by_prefix(f"trends:{user['user_id']}:")
+            _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
             return {"updated": updated}
 
     @router.post("/category-rules/learn")
@@ -1826,6 +1851,10 @@ Output ONLY valid JSON, no markdown, no explanation:
 
     @router.get("/analytics/spending-trends")
     async def spending_trends(request: Request, user: dict = Depends(get_current_user), months: int = 12):
+        cache_key = f"trends:{user['user_id']}:{months}"
+        cached = _query_cache.get(cache_key)
+        if cached:
+            return cached
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
@@ -1842,7 +1871,9 @@ Output ONLY valid JSON, no markdown, no explanation:
                 monthly[key]["spend"] += abs(t.amount) if t.amount < 0 else 0
                 monthly[key]["net"] += t.amount
             trends = sorted([{"month": k, **v} for k, v in monthly.items()], key=lambda x: x["month"])[-months:]
-            return {"trends": trends}
+            payload = {"trends": trends}
+            _query_cache.set(cache_key, payload, ttl=120)
+            return payload
 
     @router.get("/analytics/budget-comparison")
     async def budget_comparison(request: Request, user: dict = Depends(get_current_user)):
@@ -2029,6 +2060,10 @@ Output ONLY valid JSON, no markdown, no explanation:
         type: str = Query(None, description="Filter: everyday | event"),
         month: str = Query(None, description="YYYY-MM — defaults to current month"),
     ):
+        cache_key = f"budgets:{user['user_id']}:{month or ''}:{type or ''}"
+        cached = _query_cache.get(cache_key)
+        if cached:
+            return cached
         sm = request.app.state.db
         async with sm() as session:
             try:
@@ -2118,7 +2153,7 @@ Output ONLY valid JSON, no markdown, no explanation:
 
                 result_list.sort(key=lambda x: (x.get("event_date") or "9999", x["category"]) if x.get("budget_type") == "event" else (x["category"],))
 
-                return {
+                payload = {
                     "budgets": result_list,
                     "event_groups": event_groups,
                     "month": f"{y}-{m:02d}",
@@ -2126,11 +2161,13 @@ Output ONLY valid JSON, no markdown, no explanation:
                     "total_spent": round(total_spent, 2),
                     "total_remaining": round(total_budgeted - total_spent, 2),
                 }
+                _query_cache.set(cache_key, payload, ttl=15)
+                return payload
             except HTTPException:
                 raise
             except Exception as e:
                 logger.warning("Budget list failed (possible missing columns, awaiting migration): %s", str(e))
-                return {
+                payload = {
                     "budgets": [],
                     "event_groups": {},
                     "month": month or f"{datetime.now(timezone.utc).year}-{datetime.now(timezone.utc).month:02d}",
@@ -2138,6 +2175,7 @@ Output ONLY valid JSON, no markdown, no explanation:
                     "total_spent": 0,
                     "total_remaining": 0,
                 }
+                return payload
 
     @router.post("/budgets")
     async def create_budget(payload: BudgetIn, request: Request, user: dict = Depends(get_current_user)):
@@ -2171,6 +2209,7 @@ Output ONLY valid JSON, no markdown, no explanation:
             session.add(b)
             await session.commit()
             await session.refresh(b)
+            _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
             return _budget_to_dict(b)
 
     @router.delete("/budgets/{budget_id}")
@@ -2188,6 +2227,7 @@ Output ONLY valid JSON, no markdown, no explanation:
                 raise HTTPException(404, "Not found")
             await session.delete(b)
             await session.commit()
+            _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
             return {"ok": True}
 
     @router.patch("/budgets/{budget_id}")
@@ -2225,6 +2265,7 @@ Output ONLY valid JSON, no markdown, no explanation:
                 b.month = payload.month
             await session.commit()
             await session.refresh(b)
+            _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
             return _budget_to_dict(b)
 
     @router.post("/budgets/bulk-delete")
@@ -2242,6 +2283,7 @@ Output ONLY valid JSON, no markdown, no explanation:
             for b in budgets:
                 await session.delete(b)
             await session.commit()
+            _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
             return {"ok": True, "deleted": deleted}
 
     @router.delete("/budgets/group/{event_group_id}")
@@ -2261,6 +2303,7 @@ Output ONLY valid JSON, no markdown, no explanation:
             for b in budgets:
                 await session.delete(b)
             await session.commit()
+            _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
             return {"ok": True, "deleted": deleted, "event_group_id": event_group_id}
 
     @router.post("/budgets/seed-defaults")
@@ -2271,6 +2314,7 @@ Output ONLY valid JSON, no markdown, no explanation:
         async with sm() as session:
             try:
                 created = await seed_default_budget_entries(session, user["user_id"])
+                _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
                 return {"status": "ok", "created": created, "message": f"{created} default budgets seeded"}
             except Exception as e:
                 logger.warning("Seed defaults failed: %s", str(e))
@@ -2493,6 +2537,10 @@ Output ONLY valid JSON, no markdown, no explanation:
     @router.get("/budgets/alerts")
     async def budget_alerts(request: Request, user: dict = Depends(get_current_user)):
         """Return budgets that are over threshold, or have unusual spending spikes."""
+        cache_key = f"budgets:{user['user_id']}:alerts"
+        cached = _query_cache.get(cache_key)
+        if cached:
+            return cached
         sm = request.app.state.db
         async with sm() as session:
             now = datetime.now(timezone.utc)
@@ -2584,7 +2632,9 @@ Output ONLY valid JSON, no markdown, no explanation:
                         "progress_pct": pct,
                     })
 
-            return {"alerts": alerts}
+            payload = {"alerts": alerts}
+            _query_cache.set(cache_key, payload, ttl=30)
+            return payload
 
     # ── Transaction system health check ─────────────────────────────
 

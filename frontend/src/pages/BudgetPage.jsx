@@ -3,14 +3,13 @@ import { parseISO, isBefore } from "date-fns";
 import {
   RefreshCw, Wallet, ShoppingCart, Calendar, Plus, Pencil, Trash2,
   Check, X, Target, TrendingDown, ChevronLeft, ChevronRight,
-  Sparkles, AlertTriangle, TrendingUp, Zap, Download,
+  Sparkles, AlertTriangle, TrendingUp, Zap, Download, Search, Copy,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import ConfirmModal from "../components/ui/ConfirmModal";
-import { Area, AreaChart, ResponsiveContainer } from "recharts";
 import CategoryCombobox from "../components/CategoryCombobox";
 
 function fmtMonth(y, m) { return `${y}-${String(m).padStart(2, "0")}`; }
@@ -44,20 +43,18 @@ function ProgressRing({ pct, size = 40, stroke = 3.5, color }) {
   );
 }
 
-function Sparkline({ data, color }) {
+function Sparkline({ data, color, height = 28 }) {
   if (!data || data.length < 2) return null;
+  const w = 60;
+  const values = data.map((d) => d.spent);
+  const mn = Math.min(...values);
+  const mx = Math.max(...values);
+  const range = mx - mn || 1;
+  const pts = values.map((v, i) => `${(i / (values.length - 1)) * w},${height - ((v - mn) / range) * (height - 2) - 1}`).join(" ");
   return (
-    <ResponsiveContainer width="100%" height={32}>
-      <AreaChart data={data} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-        <defs>
-          <linearGradient id={`grad-${color}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity={0.25} />
-            <stop offset="100%" stopColor={color} stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <Area type="monotone" dataKey="spent" stroke={color} strokeWidth={1.5} fill={`url(#grad-${color})`} dot={false} />
-      </AreaChart>
-    </ResponsiveContainer>
+    <svg width={w} height={height} className="w-full overflow-visible">
+      <polyline fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" points={pts} />
+    </svg>
   );
 }
 
@@ -80,12 +77,12 @@ export default React.memo(function BudgetPage() {
   const [dismissedAlerts, setDismissedAlerts] = useState(new Set());
   const [insights, setInsights] = useState([]);
   const [insightsLoading, setInsightsLoading] = useState(false);
-  const [trends, setTrends] = useState({});
-  const [trendsLoading, setTrendsLoading] = useState(false);
   const [showInsights, setShowInsights] = useState(false);
   const [applyingInsight, setApplyingInsight] = useState(null);
   const [seeding, setSeeding] = useState(false);
   const [eventGroups, setEventGroups] = useState({});
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryHierarchy, setCategoryHierarchy] = useState({});
 
   const { year, month: mNum } = parseMonth(month);
   const monthLabel = `${MONTH_NAMES[mNum - 1]} ${year}`;
@@ -120,6 +117,41 @@ export default React.memo(function BudgetPage() {
     return { count: budgets.length, totalPlanned, totalSpent, overCount };
   }, [budgets]);
 
+  const sectionForCategory = useMemo(() => {
+    const map = {};
+    Object.entries(categoryHierarchy).forEach(([section, names]) => {
+      if (Array.isArray(names)) names.forEach((n) => { if (typeof n === "string") map[n] = section; });
+    });
+    // Also map from allCats which includes custom categories
+    allCats.forEach((c) => { if (c.section) map[c.name] = c.section; });
+    return map;
+  }, [categoryHierarchy, allCats]);
+
+  const filteredEveryday = useMemo(() => {
+    let items = everyday;
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      items = items.filter((b) => b.category.toLowerCase().includes(q));
+    }
+    return items;
+  }, [everyday, searchQuery]);
+
+  const sectionsForDisplay = useMemo(() => {
+    const groups = {};
+    filteredEveryday.forEach((b) => {
+      const sec = sectionForCategory[b.category] || "Other";
+      if (!groups[sec]) groups[sec] = [];
+      groups[sec].push(b);
+    });
+    // Maintain hierarchy order + append custom sections
+    const ordered = {};
+    Object.keys(categoryHierarchy).forEach((sec) => {
+      if (groups[sec]) { ordered[sec] = groups[sec]; delete groups[sec]; }
+    });
+    Object.entries(groups).forEach(([sec, items]) => { ordered[sec] = items; });
+    return ordered;
+  }, [filteredEveryday, sectionForCategory, categoryHierarchy]);
+
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -138,6 +170,7 @@ export default React.memo(function BudgetPage() {
     try {
       const { data } = await api.get("/categories");
       setAllCats(data.categories || []);
+      setCategoryHierarchy(data.hierarchy || {});
     } catch {}
   }, []);
 
@@ -158,22 +191,10 @@ export default React.memo(function BudgetPage() {
     }
   }, []);
 
-  const fetchTrends = useCallback(async () => {
-    if (everyday.length === 0) return;
-    setTrendsLoading(true);
-    try {
-      const { data } = await api.get("/budgets/trends", { params: { all: true, months: 6 } });
-      setTrends(data.trends || {});
-    } catch {} finally {
-      setTrendsLoading(false);
-    }
-  }, [everyday.length]);
-
   useEffect(() => { fetchData(); }, [fetchData]);
   useEffect(() => { fetchCategories(); }, []);
   useEffect(() => { fetchAlerts(); }, []);
   useEffect(() => { fetchInsights(); }, []);
-  useEffect(() => { if (!loading && everyday.length > 0) fetchTrends(); }, [loading, everyday.length, fetchTrends]);
 
   const resetForm = () => setForm({ category: "", limit: "", budget_type: "everyday", event_date: "", event_group_id: "", event_group_name: "" });
   const resetQuickForm = () => setQuickForm({ amount: "", description: "", category: "" });
@@ -295,6 +316,30 @@ export default React.memo(function BudgetPage() {
     }
   };
 
+  const handleCopyPreviousMonth = async () => {
+    const prevMonth = addMonth(month, -1);
+    try {
+      const { data } = await api.get("/budgets", { params: { month: prevMonth } });
+      const prevBudgets = (data.budgets || []).filter((b) => (b.budget_type || "everyday") !== "event");
+      if (prevBudgets.length === 0) { toast.info("No budgets to copy from previous month"); return; }
+      let copied = 0;
+      for (const b of prevBudgets) {
+        const existing = budgets.find((eb) => eb.category === b.category);
+        if (existing) continue;
+        await api.post("/budgets", {
+          category: b.category,
+          limit: Number(b.limit),
+          period: "monthly",
+          budget_type: "everyday",
+          month,
+        });
+        copied++;
+      }
+      toast.success(`Copied ${copied} budget(s) from ${prevMonth}`);
+      if (copied > 0) await fetchData();
+    } catch { toast.error("Could not copy budgets"); }
+  };
+
   const criticalAlerts = useMemo(() => alerts.filter((a) => a.severity === "critical"), [alerts]);
   const warningAlerts = useMemo(() => alerts.filter((a) => a.severity === "warning"), [alerts]);
   const spikeAlerts = useMemo(() => alerts.filter((a) => a.severity === "spike"), [alerts]);
@@ -302,24 +347,16 @@ export default React.memo(function BudgetPage() {
   const renderBudgetCard = (b, showDate = false) => {
     const over = (b.progress_pct || 0) >= 100;
     const isEditing = editingId === b.budget_id;
-    const catTrends = trends[b.category];
     const progressColor = over ? "#e5484d" : (b.progress_pct || 0) >= 80 ? "#e8a838" : "#30a46c";
-    const daysInMonth = new Date(year, mNum, 0).getDate();
-    const dayOfMonth = now.getDate();
-    const expectedPct = (dayOfMonth / daysInMonth) * 100;
-    const pace = b.progress_pct > expectedPct * 1.15 ? "ahead" : b.progress_pct < expectedPct * 0.85 ? "behind" : "on_track";
 
     if (isEditing) {
       return (
-        <div key={b.budget_id} className="rounded-xl border border-border bg-card/50 p-4 space-y-3">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="flex-1" />
-            <Input type="number" step="0.01" value={form.limit} onChange={(e) => setForm({ ...form, limit: e.target.value })} className="w-full sm:w-28" />
-            {showDate && <Input type="date" value={form.event_date} onChange={(e) => setForm({ ...form, event_date: e.target.value })} className="w-full sm:w-36" />}
-          </div>
-          <div className="flex gap-2">
-            <Button variant="primary" size="pill" onClick={() => handleUpdate(b.budget_id)}><Check className="h-3.5 w-3.5 mr-1" /> Save</Button>
-            <Button variant="outlinePill" size="pill" onClick={cancelEdit}><X className="h-3.5 w-3.5 mr-1" /> Cancel</Button>
+        <div key={b.budget_id} className="rounded-lg border border-border bg-card/50 p-2 space-y-1.5">
+          <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full text-xs rounded border border-border bg-transparent px-1.5 py-1" />
+          <input type="number" step="0.01" value={form.limit} onChange={(e) => setForm({ ...form, limit: e.target.value })} className="w-full text-xs rounded border border-border bg-transparent px-1.5 py-1" />
+          <div className="flex gap-1">
+            <button onClick={() => handleUpdate(b.budget_id)} className="text-[10px] px-2 py-1 rounded bg-emerald text-white"><Check className="h-3 w-3" /></button>
+            <button onClick={cancelEdit} className="text-[10px] px-2 py-1 rounded bg-muted text-muted-foreground"><X className="h-3 w-3" /></button>
           </div>
         </div>
       );
@@ -327,74 +364,37 @@ export default React.memo(function BudgetPage() {
 
     const isSelected = bulkSelected.has(b.budget_id);
     return (
-      <div key={b.budget_id} className={`rounded-2xl border ${isSelected ? "border-emerald bg-emerald/5" : "border-border bg-card/80"} p-4 hover:border-muted-foreground/20 hover:shadow-sm transition-all group`}>
-        <div className="flex items-start gap-3">
-          <input type="checkbox" checked={isSelected} onChange={() => {
-            const next = new Set(bulkSelected);
-            if (isSelected) next.delete(b.budget_id); else next.add(b.budget_id);
-            setBulkSelected(next);
-          }} className="mt-1 shrink-0 rounded border-border text-emerald focus:ring-emerald/30" />
-          {/* Ring indicator */}
+      <div key={b.budget_id} className={`rounded-lg border ${isSelected ? "border-emerald bg-emerald/5" : "border-border bg-card/80"} p-2.5 hover:border-muted-foreground/20 hover:shadow-sm transition-all group relative`}>
+        {isSelected && <div className="absolute inset-0 rounded-lg border-2 border-emerald/40 pointer-events-none" />}
+        <div className="flex items-center gap-2">
           <div className="relative shrink-0">
-            <ProgressRing pct={b.progress_pct || 0} size={44} stroke={4} color={progressColor} />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-[10px] font-bold tabular-nums">{Math.round(b.progress_pct || 0)}%</span>
+            <input type="checkbox" checked={isSelected} onChange={() => {
+              const next = new Set(bulkSelected);
+              if (isSelected) next.delete(b.budget_id); else next.add(b.budget_id);
+              setBulkSelected(next);
+            }} className="absolute -left-1 -top-1 z-10 w-3.5 h-3.5 rounded border-border text-emerald focus:ring-emerald/30" />
+            <ProgressRing pct={b.progress_pct || 0} size={32} stroke={3} color={progressColor} />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <span className="text-[8px] font-bold tabular-nums">{Math.round(b.progress_pct || 0)}%</span>
             </div>
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <h3 className="text-[15px] font-medium capitalize break-all leading-tight">{b.category}</h3>
-                {showDate && b.event_date && (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {formatDate(b.event_date)}
-                    {!isBefore(parseISO(b.event_date), now) && (
-                      <span className="ml-2">· {daysUntil(b.event_date)} days away</span>
-                    )}
-                  </p>
-                )}
-              </div>
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                <button onClick={() => startEdit(b)} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>
-                <button onClick={() => setConfirmDelete(b.budget_id)} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-ruby"><Trash2 className="h-3.5 w-3.5" /></button>
-              </div>
-            </div>
-            <div className="flex items-baseline gap-1.5 mt-1.5">
-              <span className={`text-base font-semibold tabular-nums ${over ? "text-ruby" : "text-foreground"}`}>
+            <h3 className="text-[13px] font-medium capitalize truncate leading-tight">{b.category}</h3>
+            <div className="flex items-baseline gap-1">
+              <span className={`text-xs font-semibold tabular-nums ${over ? "text-ruby" : "text-foreground"}`}>
                 £{b.spent}
               </span>
-              <span className="text-xs text-muted-foreground">/ £{b.limit}</span>
-              {over && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-ruby/10 text-ruby font-medium">Over</span>}
+              <span className="text-[10px] text-muted-foreground">/ £{b.limit}</span>
             </div>
-            {/* Spending pace */}
-            {!over && (
-              <div className="flex items-center gap-2 mt-1">
-                <div className="h-1.5 flex-1 rounded-full bg-muted/40 overflow-hidden">
-                  <div className="h-full rounded-full bg-gradient-to-r from-emerald via-topaz to-ruby" style={{ width: `${Math.min(100, b.progress_pct || 0)}%` }} />
-                </div>
-                <span className={`text-[10px] font-medium ${
-                  pace === "ahead" ? "text-topaz" : pace === "behind" ? "text-emerald" : "text-muted-foreground"
-                }`}>
-                  {pace === "ahead" ? "Ahead" : pace === "behind" ? "Under" : "On track"}
-                </span>
-              </div>
-            )}
-            {over && (
-              <div className="h-1.5 rounded-full bg-ruby/20 overflow-hidden mt-1">
-                <div className="h-full rounded-full bg-ruby" style={{ width: `${Math.min(100, b.progress_pct || 0)}%` }} />
-              </div>
-            )}
-            <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
-              <span>£{Math.max(0, b.remaining || 0).toFixed(2)} remaining</span>
+            <div className="h-1 rounded-full bg-muted/30 overflow-hidden mt-1">
+              <div className={`h-full rounded-full ${over ? "bg-ruby" : "bg-gradient-to-r from-emerald via-topaz to-ruby"}`} style={{ width: `${Math.min(100, b.progress_pct || 0)}%` }} />
             </div>
+          </div>
+          <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+            <button onClick={() => startEdit(b)} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground"><Pencil className="h-3 w-3" /></button>
+            <button onClick={() => setConfirmDelete(b.budget_id)} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-ruby"><Trash2 className="h-3 w-3" /></button>
           </div>
         </div>
-
-        {catTrends && catTrends.length >= 2 && (
-          <div className="mt-2 -mx-1">
-            <Sparkline data={catTrends} color={progressColor} />
-          </div>
-        )}
       </div>
     );
   };
@@ -406,117 +406,87 @@ export default React.memo(function BudgetPage() {
     const over = pct >= 100;
     const eventColor = over ? "#e5484d" : pct >= 80 ? "#e8a838" : "#30a46c";
     return (
-      <div key={g.event_group_id} className="rounded-2xl border border-border bg-card/80 p-4 hover:border-muted-foreground/20 hover:shadow-sm transition-all">
-        <div className="flex items-start gap-3">
-          {/* Date badge */}
+      <div key={g.event_group_id} className="rounded-lg border border-border bg-card/80 p-2.5 hover:border-muted-foreground/20 hover:shadow-sm transition-all">
+        <div className="flex items-center gap-2">
           {g.event_date && (
-            <div className="shrink-0 flex flex-col items-center w-10 pt-0.5">
-              <span className="text-[10px] uppercase font-bold text-muted-foreground">{parseISO(g.event_date).toLocaleDateString("en-GB", { month: "short" })}</span>
-              <span className="text-lg font-bold leading-none">{parseISO(g.event_date).getDate()}</span>
+            <div className="shrink-0 flex flex-col items-center w-7">
+              <span className="text-[8px] uppercase font-bold text-muted-foreground leading-tight">{parseISO(g.event_date).toLocaleDateString("en-GB", { month: "short" })}</span>
+              <span className="text-xs font-bold leading-none">{parseISO(g.event_date).getDate()}</span>
             </div>
           )}
           <div className="relative shrink-0">
-            <ProgressRing pct={pct} size={40} stroke={3.5} color={eventColor} />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-[9px] font-bold tabular-nums">{Math.round(pct)}%</span>
+            <ProgressRing pct={pct} size={28} stroke={3} color={eventColor} />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <span className="text-[7px] font-bold tabular-nums">{Math.round(pct)}%</span>
             </div>
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <h3 className="text-[15px] font-medium break-all leading-tight">{g.event_group_name || g.category}</h3>
-                {g.event_date && (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {formatDate(g.event_date)}
-                    {!isBefore(parseISO(g.event_date), now) && (
-                      <span className="ml-2">· {daysUntil(g.event_date)} days away</span>
-                    )}
-                  </p>
-                )}
-              </div>
-              <div className="flex gap-1 shrink-0">
-                <button onClick={() => {
-                  if (window.confirm(`Delete entire event "${g.event_group_name}" and all ${g.item_count} items?`)) {
-                    api.delete(`/budgets/group/${g.event_group_id}`).then(() => { fetchData(); toast.success("Event deleted"); }).catch(() => toast.error("Could not delete event"));
-                  }
-                }} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-ruby"><Trash2 className="h-3.5 w-3.5" /></button>
-              </div>
-            </div>
-            <div className="flex items-baseline gap-1.5 mt-1.5">
-              <span className={`text-base font-semibold tabular-nums ${over ? "text-ruby" : "text-foreground"}`}>
-                £{totalSpent.toFixed(2)}
-              </span>
-              <span className="text-xs text-muted-foreground">/ £{totalLimit.toFixed(2)}</span>
-              <span className="text-xs text-muted-foreground ml-auto">{g.item_count} items</span>
+            <h3 className="text-[13px] font-medium truncate leading-tight">{g.event_group_name || g.category}</h3>
+            <div className="flex items-baseline gap-1">
+              <span className={`text-xs font-semibold tabular-nums ${over ? "text-ruby" : "text-foreground"}`}>£{totalSpent.toFixed(2)}</span>
+              <span className="text-[10px] text-muted-foreground">/ £{totalLimit.toFixed(2)}</span>
             </div>
           </div>
+          <button onClick={() => {
+            if (window.confirm(`Delete entire event "${g.event_group_name}" and all ${g.item_count} items?`)) {
+              api.delete(`/budgets/group/${g.event_group_id}`).then(() => { fetchData(); toast.success("Event deleted"); }).catch(() => toast.error("Could not delete event"));
+            }
+          }} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-ruby shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="h-3 w-3" /></button>
         </div>
 
-        {/* Sub-items */}
         {g.items && g.items.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-border space-y-1.5">
+          <div className="mt-1.5 pt-1.5 border-t border-border space-y-0.5">
             {g.items.map((item) => {
               const itemPct = item.limit ? Math.min(100, (item.spent / item.limit) * 100) : 0;
               return (
-                <div key={item.budget_id} className="flex items-center gap-2 text-xs py-0.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
+                <div key={item.budget_id} className="flex items-center gap-1 text-[10px] py-0.5">
+                  <div className="w-1 h-1 rounded-full bg-muted-foreground/30 shrink-0" />
                   <span className="flex-1 truncate text-muted-foreground">{item.category}</span>
-                  <span className="tabular-nums font-medium">£{item.spent.toFixed(2)}</span>
-                  <span className="text-muted-foreground">/ £{item.limit.toFixed(2)}</span>
-                  <div className="w-12 h-1 rounded-full bg-muted/40 overflow-hidden shrink-0">
+                  <span className="tabular-nums text-muted-foreground">£{item.spent.toFixed(2)}</span>
+                  <div className="w-8 h-1 rounded-full bg-muted/40 overflow-hidden shrink-0">
                     <div className={`h-full rounded-full ${itemPct >= 100 ? "bg-ruby" : "bg-emerald"}`} style={{ width: `${Math.min(100, itemPct)}%` }} />
                   </div>
-                  <button onClick={() => setConfirmDelete(item.budget_id)} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-ruby"><X className="h-3 w-3" /></button>
+                  <button onClick={() => setConfirmDelete(item.budget_id)} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-ruby"><X className="h-2.5 w-2.5" /></button>
                 </div>
               );
             })}
           </div>
         )}
 
-        {/* Add item inline */}
-        <div className="mt-3 pt-3 border-t border-border">
-          <form onSubmit={async (e) => {
-            e.preventDefault();
-            const input = e.target.elements.namedItem("newItemCat");
-            const amt = e.target.elements.namedItem("newItemAmt");
-            if (!input?.value || !amt?.value) return;
-            try {
-              await api.post("/budgets", {
-                category: input.value.toLowerCase().trim(),
-                limit: parseFloat(amt.value),
-                budget_type: "event",
-                event_date: g.event_date,
-                event_group_id: g.event_group_id,
-                event_group_name: g.event_group_name,
-              });
-              toast.success("Item added");
-              input.value = ""; amt.value = "";
-              await fetchData();
-            } catch { toast.error("Could not add item"); }
-          }} className="flex items-end gap-2">
-            <div className="flex-1">
-              <input name="newItemCat" placeholder="Category" className="w-full h-7 rounded-lg bg-secondary/40 border border-transparent px-2 text-xs placeholder:text-muted-foreground focus:border-ring focus:outline-none" />
-            </div>
-            <div className="w-20">
-              <input name="newItemAmt" type="number" step="0.01" min="0.01" placeholder="£0" className="w-full h-7 rounded-lg bg-secondary/40 border border-transparent px-2 text-xs text-right placeholder:text-muted-foreground focus:border-ring focus:outline-none" />
-            </div>
-            <button type="submit" className="h-7 px-2 rounded-lg bg-emerald text-white text-xs hover:bg-emerald/90"><Plus className="h-3 w-3" /></button>
-          </form>
-        </div>
+        <div className="mt-1.5 pt-1.5 border-t border-border">
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const input = e.target.elements.namedItem("newItemCat");
+              const amt = e.target.elements.namedItem("newItemAmt");
+              if (!input?.value || !amt?.value) return;
+              try {
+                await api.post("/budgets", {
+                  category: input.value.toLowerCase().trim(),
+                  limit: parseFloat(amt.value),
+                  budget_type: "event",
+                  event_date: g.event_date,
+                  event_group_id: g.event_group_id,
+                  event_group_name: g.event_group_name,
+                });
+                toast.success("Item added");
+                input.value = ""; amt.value = "";
+                await fetchData();
+              } catch { toast.error("Could not add item"); }
+            }} className="flex items-end gap-1">
+              <div className="flex-1">
+                <input name="newItemCat" placeholder="Category" className="w-full h-6 rounded bg-secondary/30 border border-transparent px-1.5 text-[10px] placeholder:text-muted-foreground focus:border-ring focus:outline-none" />
+              </div>
+              <div className="w-14">
+                <input name="newItemAmt" type="number" step="0.01" min="0.01" placeholder="£0" className="w-full h-6 rounded bg-secondary/30 border border-transparent px-1.5 text-[10px] text-right placeholder:text-muted-foreground focus:border-ring focus:outline-none" />
+              </div>
+              <button type="submit" className="h-6 px-1.5 rounded bg-emerald text-white text-[10px] hover:bg-emerald/90"><Plus className="h-2.5 w-2.5" /></button>
+            </form>
+          </div>
+        )}
       </div>
     );
   };
 
-  const formatDate = (d) => {
-    if (!d) return "";
-    const dt = parseISO(d);
-    return dt.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-  };
-
-  const daysUntil = (d) => {
-    const diff = parseISO(d).getTime() - Date.now();
-    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-  };
 
   return (
     <div className="space-y-5">
@@ -625,12 +595,23 @@ export default React.memo(function BudgetPage() {
               )}
             </div>
           </div>
-          <div className="flex gap-2 shrink-0">
-            <Button variant="outline" size="sm" onClick={handleSeedDefaults} disabled={seeding || loading}>
-              <Download className={`h-4 w-4 mr-1.5 ${seeding ? "animate-pulse" : ""}`} /> {seeding ? "Loading..." : "Defaults"}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <div className="relative w-full sm:w-40 lg:w-48">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+              <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-8 pl-7 pr-2 rounded-lg bg-secondary/40 border border-transparent text-xs placeholder:text-muted-foreground focus:border-ring focus:outline-none" />
+            </div>
+            <Button variant="primary" size="pillSm" onClick={() => { setAddTab("budget"); setShowAdd(true); setForm((prev) => ({ ...prev, budget_type: "everyday" })); }}>
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add
             </Button>
-            <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
-              <RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? "animate-spin" : ""}`} />
+            <Button variant="outlinePill" size="pillSm" onClick={handleCopyPreviousMonth} title="Copy budgets from previous month">
+              <Copy className="h-3.5 w-3.5 mr-1" /> Copy Previous
+            </Button>
+            <Button variant="outlinePill" size="pillSm" onClick={handleSeedDefaults} disabled={seeding || loading}>
+              <Download className={`h-3.5 w-3.5 mr-1 ${seeding ? "animate-pulse" : ""}`} /> {seeding ? "..." : "Defaults"}
+            </Button>
+            <Button variant="outlinePill" size="pillSm" onClick={fetchData} disabled={loading}>
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             </Button>
           </div>
         </div>
@@ -654,8 +635,8 @@ export default React.memo(function BudgetPage() {
 
       {/* Loading */}
       {loading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[...Array(6)].map((_, i) => <div key={i} className="h-32 rounded-2xl bg-muted/40 animate-pulse" />)}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          {[...Array(12)].map((_, i) => <div key={i} className="h-28 rounded-xl bg-muted/40 animate-pulse" />)}
         </div>
       )}
 
@@ -707,30 +688,27 @@ export default React.memo(function BudgetPage() {
 
       {!loading && budgets.length > 0 && (
         <>
-          {/* Everyday Spending */}
-          {everyday.length > 0 && (
-            <section>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                  <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-                  Monthly Spending Limits
-                </h2>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => { setAddTab("budget"); setShowAdd(true); setForm((prev) => ({ ...prev, budget_type: "everyday" })); }}
-                    className="h-6 w-6 rounded-full bg-emerald/10 text-emerald hover:bg-emerald/20 flex items-center justify-center transition-all" aria-label="Add monthly budget">
-                    <Plus className="h-3.5 w-3.5" />
-                  </button>
-                  <span className="text-xs text-muted-foreground">{everyday.length} budgets</span>
+          {/* Budget Sections */}
+          <section>
+            {Object.entries(sectionsForDisplay).length === 0 && searchQuery.trim() && (
+              <div className="rounded-xl border border-dashed border-border bg-card/40 p-6 text-center">
+                <p className="text-sm text-muted-foreground">No budgets match "{searchQuery}"</p>
+              </div>
+            )}
+            {Object.entries(sectionsForDisplay).map(([section, items]) => (
+              <div key={section} className="mb-5">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70 flex items-center gap-1.5">
+                    {section}
+                    <span className="text-[10px] font-normal text-muted-foreground/50 normal-case">({items.length})</span>
+                  </h3>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+                  {items.map((b) => renderBudgetCard(b))}
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {everyday.map((b) => renderBudgetCard(b))}
-              </div>
-              {trendsLoading && everyday.length > 0 && (
-                <p className="text-xs text-muted-foreground mt-2">Loading trends...</p>
-              )}
-            </section>
-          )}
+            ))}
+          </section>
 
           {/* Upcoming Event Groups */}
           {upcomingEventGroups.length > 0 && (
@@ -748,7 +726,7 @@ export default React.memo(function BudgetPage() {
                   <span className="text-xs text-muted-foreground">{upcomingEventGroups.length} events</span>
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
                 {upcomingEventGroups.map((g) => renderEventGroup(g))}
               </div>
             </section>
@@ -763,7 +741,7 @@ export default React.memo(function BudgetPage() {
                   Past Events
                 </h2>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
                 {pastEventGroups.map((g) => renderEventGroup(g))}
               </div>
             </section>
@@ -777,7 +755,7 @@ export default React.memo(function BudgetPage() {
                   Planned Events
                 </h2>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
                 {Object.values(eventGroups).filter((g) => !g.event_date).map((g) => renderEventGroup(g))}
               </div>
             </section>
@@ -833,17 +811,6 @@ export default React.memo(function BudgetPage() {
             </div>
           )}
         </section>
-      )}
-
-      {/* FAB */}
-      {!loading && !showAdd && (
-        <button
-          onClick={() => { setAddTab("expense"); setShowAdd(true); setBudgetAdded(false); }}
-          className="fixed bottom-6 right-6 z-20 h-14 w-14 rounded-full bg-gradient-to-br from-emerald to-emerald/80 text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center"
-          aria-label="Quick add"
-        >
-          <Plus className="h-6 w-6" />
-        </button>
       )}
 
       {/* Bottom sheet — mobile sheet, desktop centered dialog */}

@@ -28,6 +28,12 @@ class TTLCache:
     def clear(self) -> None:
         self._store.clear()
 
+    def delete_by_prefix(self, prefix: str) -> int:
+        keys = [k for k in self._store if k.startswith(prefix)]
+        for k in keys:
+            del self._store[k]
+        return len(keys)
+
 
 market_cache = TTLCache(ttl=120)
 audit_cache = TTLCache(ttl=10)
