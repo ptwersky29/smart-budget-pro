@@ -4,7 +4,7 @@ from datetime import date, datetime, timezone
 from typing import Optional, List
 from sqlalchemy import (
     String, Boolean, Integer, Float, Numeric, DateTime, Date, Text, Enum as SAEnum,
-    ForeignKey, UniqueConstraint, Index, JSON,
+    ForeignKey, UniqueConstraint, Index, JSON, text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
@@ -411,9 +411,14 @@ class Budget(Base, TimestampMixin):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     budget_type: Mapped[str] = mapped_column(String(16), default="everyday")  # "everyday" | "event"
     event_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    event_group_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    event_group_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     __table_args__ = (
         Index("idx_budgets_user_category", "user_id", "category"),
+        Index("idx_budgets_event_group", "event_group_id"),
+        Index("uq_budgets_everyday_user_cat", "user_id", "category", unique=True,
+              postgresql_where=text("budget_type = 'everyday'")),
     )
 
 

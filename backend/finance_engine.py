@@ -335,6 +335,8 @@ class BudgetIn(BaseModel):
     period: str = "monthly"
     budget_type: str = "everyday"
     event_date: Optional[str] = None
+    event_group_id: Optional[str] = None
+    event_group_name: Optional[str] = None
 
 
 class BudgetUpdate(BaseModel):
@@ -343,6 +345,12 @@ class BudgetUpdate(BaseModel):
     period: Optional[str] = None
     budget_type: Optional[str] = None
     event_date: Optional[str] = None
+    event_group_id: Optional[str] = None
+    event_group_name: Optional[str] = None
+
+
+class BulkDeleteIn(BaseModel):
+    budget_ids: list[str]
 
 
 
@@ -396,6 +404,8 @@ def _budget_to_dict(b: Budget) -> dict:
         "period": b.period,
         "budget_type": b.budget_type or "everyday",
         "event_date": b.event_date.isoformat() if b.event_date else None,
+        "event_group_id": b.event_group_id,
+        "event_group_name": b.event_group_name,
         "start_date": b.start_date.isoformat() if b.start_date else None,
         "end_date": b.end_date.isoformat() if b.end_date else None,
         "notes": b.notes,
@@ -2018,7 +2028,6 @@ Output ONLY valid JSON, no markdown, no explanation:
     ):
         sm = request.app.state.db
         async with sm() as session:
-            # Determine the month range (default: current month)
             if month:
                 try:
                     y, m = int(month[:4]), int(month[5:7])
@@ -2038,22 +2047,29 @@ Output ONLY valid JSON, no markdown, no explanation:
             q = select(Budget).where(Budget.user_id == user["user_id"])
             if type:
                 q = q.where(Budget.budget_type == type)
+            q = q.order_by(Budget.category)
             result = await session.execute(q)
             budgets = result.scalars().all()
 
-            tx_result = await session.execute(
-                select(Transaction).where(
+            # Fast spent lookup via SQL aggregation (O(n) instead of O(n*m))
+            spent_rows = await session.execute(
+                select(
+                    Transaction.category,
+                    func.sum(-Transaction.amount).label("spent"),
+                ).where(
                     Transaction.user_id == user["user_id"],
                     Transaction.date >= month_start,
                     Transaction.date < month_end,
-                )
+                    Transaction.amount < 0,
+                ).group_by(Transaction.category)
             )
-            txs = tx_result.scalars().all()
+            spent_map = {row.category: float(row.spent) for row in spent_rows}
+
             result_list = []
-            total_budgeted = 0
-            total_spent = 0
+            total_budgeted = 0.0
+            total_spent = 0.0
             for b in budgets:
-                spent = sum(-t.amount for t in txs if t.amount < 0 and t.category == b.category)
+                spent = spent_map.get(b.category, 0.0)
                 limit_val = float(b.amount)
                 total_budgeted += limit_val
                 total_spent += spent
@@ -2065,14 +2081,34 @@ Output ONLY valid JSON, no markdown, no explanation:
                 }
                 result_list.append(entry)
 
-            # Sort: everyday by category, events by date then category
-            result_list.sort(key=lambda x: (
-                x.get("event_date") or "9999",
-                x["category"],
-            ) if type == "event" else (x["category"],))
+            # Build grouped events structure
+            event_groups = {}
+            if type == "event" or not type:
+                event_items = [e for e in result_list if e.get("budget_type") == "event"]
+                for e in event_items:
+                    gid = e.get("event_group_id") or e["budget_id"]
+                    if gid not in event_groups:
+                        event_groups[gid] = {
+                            "event_group_id": gid,
+                            "event_group_name": e.get("event_group_name") or e["category"],
+                            "category": e["category"],
+                            "event_date": e.get("event_date"),
+                            "items": [],
+                            "total_limit": 0.0,
+                            "total_spent": 0.0,
+                            "item_count": 0,
+                        }
+                    event_groups[gid]["items"].append(e)
+                    event_groups[gid]["total_limit"] += e["limit"]
+                    event_groups[gid]["total_spent"] += e["spent"]
+                    event_groups[gid]["item_count"] += 1
+
+            # Sort everyday by category, events by date
+            result_list.sort(key=lambda x: (x.get("event_date") or "9999", x["category"]) if x.get("budget_type") == "event" else (x["category"],))
 
             return {
                 "budgets": result_list,
+                "event_groups": event_groups,
                 "month": f"{y}-{m:02d}",
                 "total_budgeted": round(total_budgeted, 2),
                 "total_spent": round(total_spent, 2),
@@ -2089,6 +2125,9 @@ Output ONLY valid JSON, no markdown, no explanation:
                     event_date = datetime.fromisoformat(payload.event_date)
                 except ValueError:
                     raise HTTPException(400, "Invalid event_date format, use ISO 8601")
+            event_group_id = payload.event_group_id
+            if payload.budget_type == "event" and not event_group_id:
+                event_group_id = str(uuid.uuid4())
             b = Budget(
                 budget_id=f"bud_{uuid.uuid4().hex[:12]}",
                 user_id=user["user_id"],
@@ -2097,6 +2136,8 @@ Output ONLY valid JSON, no markdown, no explanation:
                 period=payload.period,
                 budget_type=payload.budget_type,
                 event_date=event_date,
+                event_group_id=event_group_id,
+                event_group_name=payload.event_group_name,
             )
             session.add(b)
             await session.commit()
@@ -2147,9 +2188,49 @@ Output ONLY valid JSON, no markdown, no explanation:
                     b.event_date = datetime.fromisoformat(payload.event_date)
                 except ValueError:
                     raise HTTPException(400, "Invalid event_date format, use ISO 8601")
+            if payload.event_group_id is not None:
+                b.event_group_id = payload.event_group_id
+            if payload.event_group_name is not None:
+                b.event_group_name = payload.event_group_name
             await session.commit()
             await session.refresh(b)
             return _budget_to_dict(b)
+
+    @router.post("/budgets/bulk-delete")
+    async def bulk_delete_budgets(payload: BulkDeleteIn, request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(Budget).where(
+                    Budget.budget_id.in_(payload.budget_ids),
+                    Budget.user_id == user["user_id"],
+                )
+            )
+            budgets = result.scalars().all()
+            deleted = len(budgets)
+            for b in budgets:
+                await session.delete(b)
+            await session.commit()
+            return {"ok": True, "deleted": deleted}
+
+    @router.delete("/budgets/group/{event_group_id}")
+    async def delete_event_group(event_group_id: str, request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(Budget).where(
+                    Budget.event_group_id == event_group_id,
+                    Budget.user_id == user["user_id"],
+                )
+            )
+            budgets = result.scalars().all()
+            if not budgets:
+                raise HTTPException(404, "Event group not found")
+            deleted = len(budgets)
+            for b in budgets:
+                await session.delete(b)
+            await session.commit()
+            return {"ok": True, "deleted": deleted, "event_group_id": event_group_id}
 
     @router.post("/budgets/seed-defaults")
     async def seed_defaults(request: Request, user: dict = Depends(get_current_user)):

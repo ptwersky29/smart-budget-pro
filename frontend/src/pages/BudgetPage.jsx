@@ -56,10 +56,11 @@ export default React.memo(function BudgetPage() {
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [bulkSelected, setBulkSelected] = useState(new Set());
   const [allCats, setAllCats] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
   const [addTab, setAddTab] = useState("expense");
-  const [form, setForm] = useState({ category: "", limit: "", budget_type: "everyday", event_date: "" });
+  const [form, setForm] = useState({ category: "", limit: "", budget_type: "everyday", event_date: "", event_group_id: "", event_group_name: "" });
   const [quickForm, setQuickForm] = useState({ amount: "", description: "", category: "" });
   const [alerts, setAlerts] = useState([]);
   const [dismissedAlerts, setDismissedAlerts] = useState(new Set());
@@ -69,6 +70,7 @@ export default React.memo(function BudgetPage() {
   const [trendsLoading, setTrendsLoading] = useState(false);
   const [showInsights, setShowInsights] = useState(false);
   const [applyingInsight, setApplyingInsight] = useState(null);
+  const [seeding, setSeeding] = useState(false);
 
   const { year, month: mNum } = parseMonth(month);
   const monthLabel = `${MONTH_NAMES[mNum - 1]} ${year}`;
@@ -76,6 +78,15 @@ export default React.memo(function BudgetPage() {
 
   const everyday = useMemo(() => budgets.filter((b) => (b.budget_type || "everyday") !== "event"), [budgets]);
   const events = useMemo(() => budgets.filter((b) => b.budget_type === "event"), [budgets]);
+  const upcomingEventGroups = useMemo(() =>
+    Object.values(eventGroups).filter((g) => g.event_date && !isBefore(parseISO(g.event_date), now))
+      .sort((a, b) => (a.event_date || "").localeCompare(b.event_date || "")),
+    [eventGroups, now],
+  );
+  const pastEventGroups = useMemo(() =>
+    Object.values(eventGroups).filter((g) => g.event_date && isBefore(parseISO(g.event_date), now)),
+    [eventGroups, now],
+  );
   const upcomingEvents = useMemo(() =>
     events
       .filter((b) => b.event_date && !isBefore(parseISO(b.event_date), now))
@@ -94,11 +105,14 @@ export default React.memo(function BudgetPage() {
     return { count: budgets.length, totalPlanned, totalSpent, overCount };
   }, [budgets]);
 
+  const [eventGroups, setEventGroups] = useState({});
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await api.get("/budgets", { params: { month } });
       setBudgets(data.budgets || []);
+      setEventGroups(data.event_groups || {});
     } catch {
       toast.error("Failed to load budgets");
     } finally {
@@ -147,7 +161,7 @@ export default React.memo(function BudgetPage() {
   useEffect(() => { fetchInsights(); }, []);
   useEffect(() => { if (!loading && everyday.length > 0) fetchTrends(); }, [loading, everyday.length, fetchTrends]);
 
-  const resetForm = () => setForm({ category: "", limit: "", budget_type: "everyday", event_date: "" });
+  const resetForm = () => setForm({ category: "", limit: "", budget_type: "everyday", event_date: "", event_group_id: "", event_group_name: "" });
   const resetQuickForm = () => setQuickForm({ amount: "", description: "", category: "" });
 
   const handleCreate = async (e) => {
@@ -157,13 +171,21 @@ export default React.memo(function BudgetPage() {
       const payload = {
         category: form.category.toLowerCase().trim(),
         limit: parseFloat(form.limit),
+        period: "monthly",
         budget_type: form.budget_type,
       };
-      if (form.budget_type === "event" && form.event_date) payload.event_date = form.event_date;
+      if (form.budget_type === "event") {
+        if (form.event_date) payload.event_date = form.event_date;
+        if (form.event_group_id) payload.event_group_id = form.event_group_id;
+        if (form.event_group_name) payload.event_group_name = form.event_group_name.trim();
+      }
       await api.post("/budgets", payload);
-      toast.success(form.budget_type === "event" ? "Event created" : "Budget created");
-      resetForm();
-      setShowAdd(false);
+      toast.success(form.budget_type === "event" ? "Item added to event" : "Budget created");
+      if (form.budget_type === "event") {
+        setForm((prev) => ({ ...prev, category: "", limit: "" }));
+      } else {
+        resetForm();
+      }
       await fetchData();
     } catch (err) { toast.error(err.response?.data?.detail || "Could not save"); }
   };
@@ -215,6 +237,8 @@ export default React.memo(function BudgetPage() {
       limit: String(b.limit),
       budget_type: b.budget_type || "everyday",
       event_date: b.event_date ? b.event_date.slice(0, 10) : "",
+      event_group_id: b.event_group_id || "",
+      event_group_name: b.event_group_name || "",
     });
   };
 
@@ -242,12 +266,15 @@ export default React.memo(function BudgetPage() {
   };
 
   const handleSeedDefaults = async () => {
+    setSeeding(true);
     try {
-      await api.post("/budgets/seed-defaults");
-      toast.success("Default budgets loaded");
+      const { data } = await api.post("/budgets/seed-defaults");
+      toast.success(data.message || "Default budgets loaded");
       await fetchData();
     } catch (err) {
       toast.error(err.response?.data?.detail || "Could not load defaults");
+    } finally {
+      setSeeding(false);
     }
   };
 
@@ -276,19 +303,27 @@ export default React.memo(function BudgetPage() {
       );
     }
 
+    const isSelected = bulkSelected.has(b.budget_id);
     return (
-      <div key={b.budget_id} className="rounded-xl border border-border bg-card/50 p-4 density-pad hover:border-muted-foreground/20 transition-all group">
+      <div key={b.budget_id} className={`rounded-xl border ${isSelected ? "border-emerald bg-emerald/5" : "border-border bg-card/50"} p-4 density-pad hover:border-muted-foreground/20 transition-all group`}>
         <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="min-w-0">
-            <h3 className="text-[15px] font-medium capitalize break-all">{b.category}</h3>
-            {showDate && b.event_date && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {formatDate(b.event_date)}
-                {!isBefore(parseISO(b.event_date), now) && (
-                  <span className="ml-2">· {daysUntil(b.event_date)} days away</span>
-                )}
-              </p>
-            )}
+          <div className="flex items-center gap-2 min-w-0">
+            <input type="checkbox" checked={isSelected} onChange={() => {
+              const next = new Set(bulkSelected);
+              if (isSelected) next.delete(b.budget_id); else next.add(b.budget_id);
+              setBulkSelected(next);
+            }} className="shrink-0 mt-0.5 rounded border-border text-emerald focus:ring-emerald/30" />
+            <div className="min-w-0">
+              <h3 className="text-[15px] font-medium capitalize break-all">{b.category}</h3>
+              {showDate && b.event_date && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {formatDate(b.event_date)}
+                  {!isBefore(parseISO(b.event_date), now) && (
+                    <span className="ml-2">· {daysUntil(b.event_date)} days away</span>
+                  )}
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
             <button onClick={() => startEdit(b)} className="p-1 rounded hover:bg-secondary text-muted-foreground"><Pencil className="h-3 w-3" /></button>
@@ -325,6 +360,98 @@ export default React.memo(function BudgetPage() {
     );
   };
 
+  const renderEventGroup = (g) => {
+    const totalLimit = g.total_limit || 0;
+    const totalSpent = g.total_spent || 0;
+    const pct = totalLimit ? Math.min(100, (totalSpent / totalLimit) * 100) : 0;
+    const over = pct >= 100;
+    return (
+      <div key={g.event_group_id} className="rounded-xl border border-border bg-card/50 p-4 density-pad hover:border-muted-foreground/20 transition-all">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="min-w-0">
+            <h3 className="text-[15px] font-medium break-all">{g.event_group_name || g.category}</h3>
+            {g.event_date && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {formatDate(g.event_date)}
+                {!isBefore(parseISO(g.event_date), now) && (
+                  <span className="ml-2">· {daysUntil(g.event_date)} days away</span>
+                )}
+              </p>
+            )}
+          </div>
+          <div className="flex gap-1 shrink-0">
+            <button onClick={() => {
+              if (window.confirm(`Delete entire event "${g.event_group_name}" and all ${g.item_count} items?`)) {
+                api.delete(`/budgets/group/${g.event_group_id}`).then(() => { fetchData(); toast.success("Event deleted"); }).catch(() => toast.error("Could not delete event"));
+              }
+            }} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-ruby"><Trash2 className="h-3 w-3" /></button>
+          </div>
+        </div>
+
+        <div className="flex items-baseline gap-1.5 mb-1.5">
+          <span className={`text-lg font-semibold tabular-nums ${over ? "text-ruby" : "text-foreground"}`}>
+            £{totalSpent.toFixed(2)}
+          </span>
+          <span className="text-sm text-muted-foreground">/ £{totalLimit.toFixed(2)}</span>
+          <span className="text-xs text-muted-foreground ml-auto">{g.item_count} items</span>
+        </div>
+
+        <div className="h-2 rounded-full bg-muted/50 overflow-hidden mb-2">
+          <div className={`h-full rounded-full ${over ? "bg-ruby" : "bg-emerald"}`} style={{ width: `${Math.min(100, pct)}%` }} />
+        </div>
+
+        {/* Sub-items */}
+        <div className="space-y-1.5 mt-3">
+          {g.items.map((item) => {
+            const itemPct = item.limit ? Math.min(100, (item.spent / item.limit) * 100) : 0;
+            return (
+              <div key={item.budget_id} className="flex items-center gap-2 text-xs">
+                <span className="flex-1 truncate text-muted-foreground">{item.category}</span>
+                <span className="tabular-nums">£{item.spent.toFixed(2)}</span>
+                <span className="text-muted-foreground">/ £{item.limit.toFixed(2)}</span>
+                <div className="w-16 h-1.5 rounded-full bg-muted/50 overflow-hidden shrink-0">
+                  <div className={`h-full rounded-full ${itemPct >= 100 ? "bg-ruby" : "bg-emerald"}`} style={{ width: `${Math.min(100, itemPct)}%` }} />
+                </div>
+                <button onClick={() => setConfirmDelete(item.budget_id)} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-ruby"><X className="h-3 w-3" /></button>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Add item inline */}
+        <div className="mt-3 pt-3 border-t border-border">
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            const input = e.target.elements.namedItem("newItemCat");
+            const amt = e.target.elements.namedItem("newItemAmt");
+            if (!input?.value || !amt?.value) return;
+            try {
+              await api.post("/budgets", {
+                category: input.value.toLowerCase().trim(),
+                limit: parseFloat(amt.value),
+                budget_type: "event",
+                event_date: g.event_date,
+                event_group_id: g.event_group_id,
+                event_group_name: g.event_group_name,
+              });
+              toast.success("Item added");
+              input.value = ""; amt.value = "";
+              await fetchData();
+            } catch { toast.error("Could not add item"); }
+          }} className="flex items-end gap-2">
+            <div className="flex-1">
+              <input name="newItemCat" placeholder="Category" className="w-full h-8 rounded-lg bg-secondary/50 border border-transparent px-2 text-xs placeholder:text-muted-foreground focus:border-ring focus:outline-none" />
+            </div>
+            <div className="w-20">
+              <input name="newItemAmt" type="number" step="0.01" min="0.01" placeholder="£0" className="w-full h-8 rounded-lg bg-secondary/50 border border-transparent px-2 text-xs text-right placeholder:text-muted-foreground focus:border-ring focus:outline-none" />
+            </div>
+            <button type="submit" className="h-8 px-2 rounded-lg bg-emerald text-white text-xs hover:bg-emerald/90"><Plus className="h-3 w-3" /></button>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
   const formatDate = (d) => {
     if (!d) return "";
     const dt = parseISO(d);
@@ -344,8 +471,8 @@ export default React.memo(function BudgetPage() {
         description="Set spending limits and track where your money goes."
         actions={
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleSeedDefaults}>
-              <Download className="h-4 w-4 mr-1.5" /> Load defaults
+            <Button variant="outline" size="sm" onClick={handleSeedDefaults} disabled={seeding || loading}>
+              <Download className={`h-4 w-4 mr-1.5 ${seeding ? "animate-pulse" : ""}`} /> {seeding ? "Loading..." : "Load defaults"}
             </Button>
             <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? "animate-spin" : ""}`} /> Refresh
@@ -453,6 +580,34 @@ export default React.memo(function BudgetPage() {
         </div>
       )}
 
+      {/* Bulk actions toolbar */}
+      {!loading && bulkSelected.size > 0 && (
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald/5 border border-emerald/20">
+          <span className="text-sm text-muted-foreground">{bulkSelected.size} selected</span>
+          <button onClick={() => setBulkSelected(new Set())} className="text-xs text-muted-foreground hover:text-foreground">Clear</button>
+          <div className="ml-auto flex gap-2">
+            <Button variant="outlinePill" size="pillSm" onClick={() => {
+              if (budgets.length === 0) return;
+              const all = new Set(budgets.map((b) => b.budget_id));
+              setBulkSelected(all.size === bulkSelected.size ? new Set() : all);
+            }}>
+              {bulkSelected.size === budgets.length ? "Deselect all" : "Select all"}
+            </Button>
+            <Button variant="primary" size="pillSm" className="bg-ruby hover:bg-ruby/90" onClick={async () => {
+              if (!window.confirm(`Delete ${bulkSelected.size} budget(s)?`)) return;
+              try {
+                await api.post("/budgets/bulk-delete", { budget_ids: [...bulkSelected] });
+                toast.success(`${bulkSelected.size} budget(s) deleted`);
+                setBulkSelected(new Set());
+                await fetchData();
+              } catch { toast.error("Could not delete"); }
+            }}>
+              <Trash2 className="h-3 w-3 mr-1" /> Delete {bulkSelected.size}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {!loading && budgets.length === 0 && (
         <div className="text-center py-16 text-muted-foreground">
           <Wallet className="h-10 w-10 mx-auto mb-3 opacity-40" />
@@ -485,24 +640,24 @@ export default React.memo(function BudgetPage() {
             </section>
           )}
 
-          {/* Upcoming Events */}
-          {upcomingEvents.length > 0 && (
+          {/* Upcoming Event Groups */}
+          {upcomingEventGroups.length > 0 && (
             <section>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                   Upcoming Events
                 </h2>
-                <span className="text-xs text-muted-foreground">{upcomingEvents.length} events</span>
+                <span className="text-xs text-muted-foreground">{upcomingEventGroups.length} events</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 density-gap">
-                {upcomingEvents.map((b) => renderBudgetCard(b, true))}
+                {upcomingEventGroups.map((g) => renderEventGroup(g))}
               </div>
             </section>
           )}
 
-          {/* Past events for current month */}
-          {pastEvents.length > 0 && isCurrentMonth && (
+          {/* Past event groups */}
+          {pastEventGroups.length > 0 && isCurrentMonth && (
             <section>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -511,12 +666,12 @@ export default React.memo(function BudgetPage() {
                 </h2>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 density-gap">
-                {pastEvents.map((b) => renderBudgetCard(b, true))}
+                {pastEventGroups.map((g) => renderEventGroup(g))}
               </div>
             </section>
           )}
 
-          {events.length > 0 && upcomingEvents.length === 0 && pastEvents.length === 0 && (
+          {Object.keys(eventGroups).length > 0 && upcomingEventGroups.length === 0 && pastEventGroups.length === 0 && (
             <section>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -525,7 +680,7 @@ export default React.memo(function BudgetPage() {
                 </h2>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 density-gap">
-                {events.map((b) => renderBudgetCard(b, true))}
+                {Object.values(eventGroups).filter((g) => !g.event_date).map((g) => renderEventGroup(g))}
               </div>
             </section>
           )}
@@ -595,7 +750,7 @@ export default React.memo(function BudgetPage() {
 
       {/* Bottom sheet — mobile sheet, desktop centered dialog */}
       {showAdd && (
-        <div className="fixed inset-0 z-50 bg-black/40 lg:flex lg:items-start lg:justify-center lg:pt-[10vh]" onClick={() => { setShowAdd(false); resetForm(); resetQuickForm(); }}>
+        <div className="fixed inset-0 z-50 bg-black/40 lg:flex lg:items-start lg:justify-center lg:pt-[10vh]" onClick={() => { setShowAdd(false); resetForm(); resetQuickForm(); if (addTab === "budget") setForm((prev) => ({ ...prev, event_group_id: "", event_group_name: "" })); }}>
           <div
             className="absolute bottom-0 left-0 right-0 rounded-t-2xl border border-border bg-card/95 backdrop-blur-xl shadow-modal p-6 max-h-[85vh] overflow-y-auto animate-slide-up lg:relative lg:mx-0 lg:max-w-md lg:rounded-2xl lg:shadow-lg lg:animate-[fadeUp_0.2s_ease-out]"
             onClick={(e) => e.stopPropagation()}
@@ -663,7 +818,7 @@ export default React.memo(function BudgetPage() {
                 {/* Type toggle */}
                 <div className="flex gap-2 p-1 rounded-xl bg-muted/50 mb-4">
                   <button type="button"
-                    onClick={() => setForm({ ...form, budget_type: "everyday", event_date: "" })}
+                    onClick={() => setForm({ ...form, budget_type: "everyday", event_date: "", event_group_id: "", event_group_name: "" })}
                     className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${form.budget_type === "everyday" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}>
                     <ShoppingCart className="h-3.5 w-3.5 inline mr-1.5" /> Monthly
                   </button>
@@ -695,34 +850,85 @@ export default React.memo(function BudgetPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="flex items-end gap-3">
-                      <div className="flex-[2]">
-                        <Input placeholder="Event name (e.g. Pesach 2026)" value={form.category}
-                          onChange={(e) => setForm({ ...form, category: e.target.value })} required />
-                      </div>
-                      <div className="w-28">
-                        <Input type="number" step="0.01" min="0" placeholder="£0.00" value={form.limit}
-                          onChange={(e) => setForm({ ...form, limit: e.target.value })} required className="text-right" />
-                      </div>
-                    </div>
-                    <div className="flex items-end gap-3 mt-3">
-                      <div className="flex-1">
-                        <Input type="date" value={form.event_date}
-                          onChange={(e) => setForm({ ...form, event_date: e.target.value })}
-                          className="text-sm" />
-                      </div>
-                      <Button type="submit" variant="primary" size="pill" className="shrink-0 h-11 px-4">
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {!form.event_group_id ? (
+                      <>
+                        <div className="flex items-end gap-3">
+                          <div className="flex-[2]">
+                            <Input placeholder="Event name (e.g. Pesach 2026)" value={form.event_group_name}
+                              onChange={(e) => setForm({ ...form, event_group_name: e.target.value })} required />
+                          </div>
+                          <div className="w-auto">
+                            <Input type="date" value={form.event_date}
+                              onChange={(e) => setForm({ ...form, event_date: e.target.value })}
+                              className="text-sm" />
+                          </div>
+                        </div>
+                        <div className="mt-3 p-3 rounded-xl bg-secondary/20 border border-border">
+                          <p className="text-xs text-muted-foreground mb-2">First budget item</p>
+                          <div className="flex items-end gap-3">
+                            <div className="flex-1">
+                              <CategoryCombobox
+                                value={form.category}
+                                onChange={(val) => setForm({ ...form, category: val })}
+                                categories={allCats}
+                                placeholder="Item category"
+                                onCategoryCreated={fetchCategories}
+                              />
+                            </div>
+                            <div className="w-28">
+                              <Input type="number" step="0.01" min="0" placeholder="£0.00" value={form.limit}
+                                onChange={(e) => setForm({ ...form, limit: e.target.value })} required className="text-right" />
+                            </div>
+                            <Button type="submit" variant="primary" size="pill" className="shrink-0 h-11 px-4">
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2 p-2 rounded-xl bg-secondary/20 border border-border mb-3">
+                          <span className="text-xs text-muted-foreground">Adding to:</span>
+                          <span className="text-sm font-medium">{form.event_group_name}</span>
+                          <button type="button" onClick={() => { setForm({ category: "", limit: "", budget_type: "event", event_date: "", event_group_id: "", event_group_name: "" }); }}
+                            className="ml-auto text-xs text-muted-foreground hover:text-foreground">
+                            New event
+                          </button>
+                        </div>
+                        <div className="flex items-end gap-3">
+                          <div className="flex-1">
+                            <CategoryCombobox
+                              value={form.category}
+                              onChange={(val) => setForm({ ...form, category: val })}
+                              categories={allCats}
+                              placeholder="Item category"
+                              onCategoryCreated={fetchCategories}
+                            />
+                          </div>
+                          <div className="w-28">
+                            <Input type="number" step="0.01" min="0" placeholder="£0.00" value={form.limit}
+                              onChange={(e) => setForm({ ...form, limit: e.target.value })} required className="text-right" />
+                          </div>
+                          <Button type="submit" variant="primary" size="pill" className="shrink-0 h-11 px-4">
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </>
                 )}
 
-                <div className="flex justify-end mt-2">
+                <div className="flex justify-end gap-2 mt-2">
                   <button type="button" onClick={() => { setShowAdd(false); resetForm(); }}
                     className="text-xs text-muted-foreground hover:text-foreground transition-colors">
                     Cancel
                   </button>
+                  {form.budget_type === "event" && form.event_group_id && (
+                    <button type="button" onClick={() => { setShowAdd(false); resetForm(); }}
+                      className="text-xs font-medium text-emerald hover:text-emerald/80 transition-colors">
+                      Done — close
+                    </button>
+                  )}
                 </div>
               </form>
             )}
