@@ -156,26 +156,30 @@ DEFAULT_MONTHLY_BUDGETS = {
 async def seed_default_budget_entries(session, user_id: str):
     """Seed DEFAULT_MONTHLY_BUDGETS into the Budget table (idempotent)."""
     from db import Budget
-    from sqlalchemy.dialects.postgresql import insert as pg_insert
-    from sqlalchemy import text
+    result = await session.execute(
+        select(Budget).where(Budget.user_id == user_id)
+    )
+    existing = {b.category for b in result.scalars().all()}
     created = 0
     for category, amount in DEFAULT_MONTHLY_BUDGETS.items():
-        stmt = pg_insert(Budget).values(
+        if category in existing:
+            continue
+        b = Budget(
             budget_id=str(uuid.uuid4()),
             user_id=user_id,
             category=category,
             amount=amount,
             period="monthly",
             budget_type="everyday",
-        ).on_conflict_do_nothing(
-            index_elements=["user_id", "category"],
-            index_where=text("budget_type = 'everyday'"),
         )
-        result = await session.execute(stmt)
-        if result.rowcount > 0:
-            created += 1
+        session.add(b)
+        created += 1
     if created:
-        await session.commit()
+        try:
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            return 0
     return created
 
 
