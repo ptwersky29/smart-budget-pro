@@ -554,10 +554,12 @@ export default React.memo(function BudgetPage() {
       )}
 
       {/* Dashboard overview */}
-      <div className="rounded-2xl border border-border bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-xl p-5 sm:p-6 shadow-card">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
-          {/* Large progress ring */}
-          <div className="relative shrink-0">
+      <div className="relative rounded-2xl border border-border bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-xl p-5 sm:p-6 shadow-card overflow-hidden">
+        {/* Glow effect */}
+        <div className="absolute -top-10 -left-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 relative">
+          {/* Large progress ring with subtle shadow */}
+          <div className="relative shrink-0 drop-shadow-[0_0_8px_rgba(48,164,108,0.4)]">
             <ProgressRing pct={summary.totalPlanned ? (summary.totalSpent / summary.totalPlanned) * 100 : 0} size={80} stroke={5}
               color={summary.overCount > 0 ? "#e5484d" : summary.totalSpent > summary.totalPlanned * 0.8 ? "#e8a838" : "#30a46c"} />
             <div className="absolute inset-0 flex items-center justify-center">
@@ -696,15 +698,22 @@ export default React.memo(function BudgetPage() {
               </div>
             )}
             {Object.entries(sectionsForDisplay).map(([section, items]) => (
-              <div key={section} className="mb-5">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70 flex items-center gap-1.5">
+              <div key={section} className="mb-6">
+                <div className="flex items-center justify-between mb-3 bg-secondary/30 px-4 py-2 rounded-xl border border-border/50">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                     {section}
-                    <span className="text-[10px] font-normal text-muted-foreground/50 normal-case">({items.length})</span>
+                    <span className="text-[10px] font-normal text-muted-foreground/60 bg-muted/50 px-1.5 py-0.5 rounded">
+                      {items.length} items · £{items.reduce((s, b) => s + Number(b.limit || 0), 0).toFixed(0)}
+                    </span>
                   </h3>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
                   {items.map((b) => renderBudgetCard(b))}
+                  <button onClick={() => { setAddTab("budget"); setShowAdd(true); setForm((prev) => ({ ...prev, category: "", limit: "", budget_type: "everyday" })); }}
+                    className="rounded-lg border-2 border-dashed border-border/50 hover:border-emerald/40 hover:bg-emerald/5 hover:text-emerald text-muted-foreground/60 transition-all flex flex-col items-center justify-center p-2.5 h-[88px] w-full">
+                    <Plus className="h-4 w-4 mb-1" />
+                    <span className="text-[10px] font-medium">Add {section}</span>
+                  </button>
                 </div>
               </div>
             ))}
