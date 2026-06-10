@@ -174,11 +174,13 @@ export default React.memo(function BudgetPage() {
         limit: parseFloat(form.limit),
         period: "monthly",
         budget_type: form.budget_type,
+        month: month,
       };
       if (form.budget_type === "event") {
         if (form.event_date) payload.event_date = form.event_date;
         if (form.event_group_id) payload.event_group_id = form.event_group_id;
         if (form.event_group_name) payload.event_group_name = form.event_group_name.trim();
+        delete payload.month;
       }
       await api.post("/budgets", payload);
       toast.success(form.budget_type === "event" ? "Item added to event" : "Budget added");

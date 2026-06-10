@@ -143,6 +143,23 @@ async def create_tables():
             await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS balance NUMERIC(14,2)"))
             await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS balance_currency VARCHAR(3) DEFAULT 'GBP'"))
             await conn.execute(text("ALTER TABLE bank_connections ADD COLUMN IF NOT EXISTS balance_updated_at TIMESTAMPTZ"))
+            # Per-month budgets
+            await conn.execute(text("ALTER TABLE budgets ADD COLUMN IF NOT EXISTS month VARCHAR(7)"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_budgets_month ON budgets(user_id, month)"))
+            # Backfill existing everyday budgets to current month
+            await conn.execute(text("UPDATE budgets SET month = TO_CHAR(NOW() AT TIME ZONE 'UTC', 'YYYY-MM') WHERE budget_type = 'everyday' AND month IS NULL"))
+            # Remove duplicates (keep row with smallest id) before creating unique index
+            await conn.execute(text("""
+                DELETE FROM budgets a USING budgets b
+                WHERE a.id > b.id
+                  AND a.user_id = b.user_id
+                  AND a.category = b.category
+                  AND a.month = b.month
+                  AND a.budget_type = 'everyday'
+                  AND b.budget_type = 'everyday'
+            """))
+            await conn.execute(text("DROP INDEX IF EXISTS uq_budgets_everyday_user_cat"))
+            await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_budgets_everyday_user_cat_month ON budgets(user_id, category, month) WHERE budget_type = 'everyday'"))
 
 
 async def get_session() -> AsyncSession:
@@ -416,11 +433,13 @@ class Budget(Base, TimestampMixin):
     event_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     event_group_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     event_group_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    month: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)  # "YYYY-MM"
 
     __table_args__ = (
         Index("idx_budgets_user_category", "user_id", "category"),
         Index("idx_budgets_event_group", "event_group_id"),
-        Index("uq_budgets_everyday_user_cat", "user_id", "category", unique=True,
+        Index("idx_budgets_month", "user_id", "month"),
+        Index("uq_budgets_everyday_user_cat_month", "user_id", "category", "month", unique=True,
               postgresql_where=text("budget_type = 'everyday'")),
     )
 

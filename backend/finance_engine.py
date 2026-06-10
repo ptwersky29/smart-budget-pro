@@ -337,6 +337,7 @@ class BudgetIn(BaseModel):
     event_date: Optional[str] = None
     event_group_id: Optional[str] = None
     event_group_name: Optional[str] = None
+    month: Optional[str] = None  # "YYYY-MM" — required for everyday budgets
 
 
 class BudgetUpdate(BaseModel):
@@ -347,6 +348,7 @@ class BudgetUpdate(BaseModel):
     event_date: Optional[str] = None
     event_group_id: Optional[str] = None
     event_group_name: Optional[str] = None
+    month: Optional[str] = None
 
 
 class BulkDeleteIn(BaseModel):
@@ -409,6 +411,7 @@ def _budget_to_dict(b: Budget) -> dict:
         "start_date": b.start_date.isoformat() if b.start_date else None,
         "end_date": b.end_date.isoformat() if b.end_date else None,
         "notes": b.notes,
+        "month": getattr(b, "month", None),
         "created_at": b.created_at.isoformat() if b.created_at else None,
     }
 
@@ -2045,9 +2048,19 @@ Output ONLY valid JSON, no markdown, no explanation:
                 else:
                     month_end = datetime(y, m + 1, 1, tzinfo=timezone.utc)
 
+                period = f"{y}-{m:02d}"
                 q = select(Budget).where(Budget.user_id == user["user_id"])
                 if type:
                     q = q.where(Budget.budget_type == type)
+                    if type == "everyday":
+                        q = q.where(Budget.month == period)
+                else:
+                    q = q.where(
+                        or_(
+                            Budget.budget_type == "event",
+                            Budget.month == period,
+                        )
+                    )
                 q = q.order_by(Budget.category)
                 result = await session.execute(q)
                 budgets = result.scalars().all()
@@ -2139,6 +2152,10 @@ Output ONLY valid JSON, no markdown, no explanation:
             event_group_id = payload.event_group_id
             if payload.budget_type == "event" and not event_group_id:
                 event_group_id = str(uuid.uuid4())
+            budget_month = payload.month
+            if payload.budget_type != "event" and not budget_month:
+                now_dt = datetime.now(timezone.utc)
+                budget_month = f"{now_dt.year}-{now_dt.month:02d}"
             b = Budget(
                 budget_id=f"bud_{uuid.uuid4().hex[:12]}",
                 user_id=user["user_id"],
@@ -2149,6 +2166,7 @@ Output ONLY valid JSON, no markdown, no explanation:
                 event_date=event_date,
                 event_group_id=event_group_id,
                 event_group_name=payload.event_group_name,
+                month=budget_month,
             )
             session.add(b)
             await session.commit()
@@ -2203,6 +2221,8 @@ Output ONLY valid JSON, no markdown, no explanation:
                 b.event_group_id = payload.event_group_id
             if payload.event_group_name is not None:
                 b.event_group_name = payload.event_group_name
+            if payload.month is not None:
+                b.month = payload.month
             await session.commit()
             await session.refresh(b)
             return _budget_to_dict(b)

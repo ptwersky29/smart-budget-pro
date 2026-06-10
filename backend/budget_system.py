@@ -156,8 +156,15 @@ DEFAULT_MONTHLY_BUDGETS = {
 async def seed_default_budget_entries(session, user_id: str):
     """Seed DEFAULT_MONTHLY_BUDGETS into the Budget table (idempotent)."""
     from db import Budget
+    from datetime import datetime, timezone
+    now_dt = datetime.now(timezone.utc)
+    month = f"{now_dt.year}-{now_dt.month:02d}"
     result = await session.execute(
-        select(Budget).where(Budget.user_id == user_id)
+        select(Budget).where(
+            Budget.user_id == user_id,
+            Budget.budget_type == "everyday",
+            Budget.month == month,
+        )
     )
     existing = {b.category for b in result.scalars().all()}
     created = 0
@@ -171,6 +178,7 @@ async def seed_default_budget_entries(session, user_id: str):
             amount=amount,
             period="monthly",
             budget_type="everyday",
+            month=month,
         )
         session.add(b)
         created += 1
