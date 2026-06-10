@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
-import { Plus, Trash2, Loader2, Pencil, Search, ArrowUpDown, Sparkles, Filter, ChevronLeft, ChevronRight, X, BarChart3, Star, Receipt, Download, MoreHorizontal } from "lucide-react";
+import { Plus, Trash2, Loader2, Pencil, Search, Sparkles, Filter, ChevronLeft, ChevronRight, X, BarChart3, Star, Receipt, Download, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
-import { EmptyState, PageHeader, SectionCard } from "../components/ui/layout";
+import { EmptyState } from "../components/ui/layout";
 import { SkeletonTable } from "../components/ui/Skeleton";
 import { withUndo } from "../lib/undo";
 import ConfirmModal from "../components/ui/ConfirmModal";
@@ -442,19 +442,149 @@ const Transactions = React.memo(function Transactions() {
   }, [txs, aiResults]);
 
   return (
-    <div className="space-y-6" data-testid="transactions-root">
-      <PageHeader
-        eyebrow="Money"
-        title="Every penny."
-        description="Search, sort, and edit your transactions."
-        actions={
-          <div className="flex items-center gap-2">
-            {someSelected && (
+    <div className="space-y-4" data-testid="transactions-root">
+
+      {/* ─── Compact toolbar: search, sort, filters, actions ─── */}
+      <div className="rounded-xl border border-border bg-card/90 backdrop-blur-xl p-3 shadow-card">
+        {/* Row 1: Search + Sort + Filter + Add + More */}
+        <div className="flex items-center gap-2">
+          <label className="flex-1 flex items-center gap-2 rounded-lg border border-border bg-background/70 px-3 h-9">
+            <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <input ref={searchRef} value={searchInput} onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
+              placeholder="Search transactions... (/)"
+              className="w-full bg-transparent outline-none text-xs" />
+            {filters.search && <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>}
+          </label>
+
+          <select aria-label="Sort" value={`${filters.sort}-${filters.order}`} onChange={(e) => { const [s, o] = e.target.value.split("-"); setFilters(p => ({ ...p, sort: s, order: o })); }}
+            className="h-9 rounded-lg bg-secondary/40 border border-transparent px-2.5 text-xs outline-none focus:border-ring">
+            <option value="date-desc">Newest</option>
+            <option value="date-asc">Oldest</option>
+            <option value="amount-desc">Largest</option>
+            <option value="amount-asc">Smallest</option>
+          </select>
+
+          <Sheet>
+            <SheetTrigger asChild>
+              <button className={`h-9 px-3 rounded-lg border ${activeFilters.length > 0 ? "border-emerald text-emerald" : "border-border text-muted-foreground"} bg-card/80 hover:bg-secondary/60 text-xs font-medium transition-colors`}>
+                <Filter className="h-3.5 w-3.5 mr-1" /> Filters{activeFilters.length > 0 && <span className="ml-1">({activeFilters.length})</span>}
+              </button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-full sm:max-w-md">
+              <SheetHeader>
+                <SheetTitle>Filters</SheetTitle>
+                <SheetDescription className="text-xs sm:text-sm">Refine your transaction list</SheetDescription>
+              </SheetHeader>
+              <div className="mt-4 sm:mt-6 space-y-4 sm:space-y-5">
+                <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                  <select value={filters.tx_type} onChange={(e) => toggleFilter("tx_type", e.target.value)} className="h-10 px-4 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors">
+                    <option value="">All types</option><option value="income">Income</option><option value="expense">Expense</option>
+                  </select>
+                  <select value={filters.source} onChange={(e) => toggleFilter("source", e.target.value)} className="h-10 px-4 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors">
+                    <option value="">All sources</option>
+                    {Object.entries(SOURCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </select>
+                  <CategoryCombobox
+                    value={filters.category}
+                    onChange={(val) => toggleFilter("category", val)}
+                    categories={selectedCats}
+                    placeholder="All categories"
+                    allowClear
+                    onCategoryCreated={loadCats}
+                  />
+                  <Input type="number" min="0" step="0.01" placeholder="Min £" value={filters.amount_min}
+                    onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_min: e.target.value })); }}
+                    className="text-sm h-10" />
+                  <Input type="number" min="0" step="0.01" placeholder="Max £" value={filters.amount_max}
+                    onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_max: e.target.value })); }}
+                    className="text-sm h-10" />
+                  <Input type="date" value={filters.date_from} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_from: e.target.value })); }} className="text-sm h-10" />
+                  <Input type="date" value={filters.date_to} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_to: e.target.value })); }} className="text-sm h-10" />
+                </div>
+
+                <div className="border-t border-border pt-4 space-y-3">
+                  <p className="text-xs font-medium text-muted-foreground">AI search</p>
+                  <div className="flex items-center gap-2">
+                    <Input value={aiQuery} onChange={(e) => setAiQuery(e.target.value)}
+                      placeholder="e.g. 'grocery spending last month'"
+                      className="flex-1 text-sm h-10" onKeyDown={(e) => e.key === "Enter" && runAiSearch()} />
+                    <Button onClick={runAiSearch} disabled={aiLoading || !aiQuery.trim()} variant="outlinePill" size="pillSm">
+                      {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                      Search
+                    </Button>
+                  </div>
+                  {aiResults && (
+                    <div className="rounded-xl border border-emerald/30 bg-emerald/5 p-3 text-sm">
+                      <p className="font-medium text-emerald mb-1">AI results for &ldquo;{aiResults.query}&rdquo; ({aiResults.total} matches)</p>
+                      <button onClick={() => { setAiResults(null); setAiQuery(""); }} className="text-xs text-muted-foreground hover:text-foreground">Clear</button>
+                    </div>
+                  )}
+                </div>
+
+                {(filters.source || filters.category || filters.tx_type || filters.search) && total > 0 && (
+                  <div className="border-t border-border pt-4 flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      {total} transaction{total !== 1 ? "s" : ""} match current filters
+                    </p>
+                    <button onClick={clearAllMatching}
+                      className="text-xs px-3 py-1.5 rounded-full border border-ruby/40 text-ruby hover:bg-ruby/5 transition-colors">
+                      <Trash2 className="h-3 w-3 inline mr-1" />
+                      Delete all {total}
+                    </button>
+                  </div>
+                )}
+
+                <div className="border-t border-border pt-4 flex justify-end">
+                  <button onClick={clearAllFilters} className="text-sm text-muted-foreground hover:text-foreground">
+                    Clear all filters
+                  </button>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
+
+          <button onClick={openAdd} className="h-9 px-3 rounded-lg bg-emerald text-white text-xs font-medium hover:bg-emerald/90 transition-colors" data-testid="add-transaction">
+            <Plus className="h-3.5 w-3.5 mr-1" /> Add
+          </button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="h-9 w-9 rounded-lg border border-border bg-card/80 hover:bg-secondary/60 grid place-items-center text-muted-foreground">
+                <MoreHorizontal className="h-3.5 w-3.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => setCompareOpen(true)}>
+                <BarChart3 className="h-4 w-4 mr-2" /> Compare periods
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportCsv}>
+                <Download className="h-4 w-4 mr-2" /> Export CSV
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Summary + Bulk actions */}
+        {(!someSelected) ? (
+          <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border text-xs text-muted-foreground">
+            <span>Income <span className="text-emerald font-medium tabular-nums">{fmt(incomeTotal)}</span></span>
+            <span className="text-muted-foreground/30">|</span>
+            <span>Expenses <span className="text-ruby font-medium tabular-nums">{fmt(expenseTotal)}</span></span>
+            <span className="text-muted-foreground/30">|</span>
+            <span>Net <span className={`font-medium tabular-nums ${netTotal >= 0 ? "text-emerald" : "text-ruby"}`}>{netTotal >= 0 ? "+" : ""}{fmt(netTotal)}</span></span>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-border">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground">{selectedIds.size} selected</span>
+              <button onClick={() => setSelectedIds(new Set())} className="text-muted-foreground hover:text-foreground">Clear</button>
+            </div>
+            <div className="flex items-center gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="danger" size="pill">
-                    <Trash2 className="h-4 w-4" /> Bulk ({selectedIds.size})
-                  </Button>
+                  <button className="text-xs px-2.5 py-1 rounded-full border border-ruby/40 text-ruby hover:bg-ruby/5 transition-colors">
+                    <Trash2 className="h-3 w-3 inline mr-1" /> Bulk ({selectedIds.size})
+                  </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   <DropdownMenuSub>
@@ -480,39 +610,35 @@ const Transactions = React.memo(function Transactions() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="chip">
-                  <MoreHorizontal className="h-3.5 w-3.5" /> Actions
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={openAdd} data-testid="add-transaction">
-                  <Plus className="h-4 w-4 mr-2" /> Add transaction
-                  <span className="ml-auto text-[10px] text-muted-foreground">N</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setCompareOpen(true)}>
-                  <BarChart3 className="h-4 w-4 mr-2" /> Compare periods
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={exportCsv}>
-                  <Download className="h-4 w-4 mr-2" /> Export CSV
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            </div>
           </div>
-        }
-      />
+        )}
 
-      {/* Tabs */}
-      <div className="flex gap-2 flex-wrap border-b border-border pb-2">
+        {/* Active filter chips */}
+        {activeFilters.length > 0 && (
+          <div className="mt-2 pt-2 border-t border-border flex flex-wrap gap-1.5">
+            {activeFilters.map((chip) => (
+              <span key={chip.key} className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald/10 text-emerald border border-emerald/20">
+                {chip.label}
+                <button onClick={() => { setFilter(chip.key, ""); setOffset(0); }} className="hover:text-emerald/80"><X className="h-2.5 w-2.5" /></button>
+              </span>
+            ))}
+            <button onClick={clearAllFilters} className="text-[10px] px-2 py-0.5 rounded-full border border-border text-muted-foreground hover:text-foreground">Clear</button>
+          </div>
+        )}
+      </div>
+
+      {/* ─── Tabs ─── */}
+      <div className="flex gap-1 border-b border-border">
         {[
           { key: "ledger", label: "Ledger", icon: BarChart3 },
           { key: "maaser", label: "Maaser", icon: Star },
         ].map(tab => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-            className={`inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-t-lg transition-colors capitalize ${activeTab === tab.key ? "bg-card border-b-2 border-emerald font-medium" : "text-muted-foreground hover:text-foreground"}`}>
-            <tab.icon className="h-4 w-4" />
+            className={`inline-flex items-center gap-1.5 text-xs px-3 py-2 -mb-px border-b-2 transition-colors capitalize ${
+              activeTab === tab.key ? "border-emerald text-foreground font-medium" : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}>
+            <tab.icon className="h-3.5 w-3.5" />
             {tab.label}
           </button>
         ))}
@@ -520,137 +646,10 @@ const Transactions = React.memo(function Transactions() {
 
       {/* ───── Ledger tab ───── */}
       {activeTab === "ledger" && <>
-        {/* Unified filters card */}
-        <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card">
-          {/* Row 1: Search + Sort + Filters trigger */}
-          <div className="flex items-center gap-3 p-4">
-            <label className="flex-1 flex items-center gap-3 rounded-xl border border-border bg-background/70 px-4 h-11">
-              <Search className="h-4 w-4 text-muted-foreground shrink-0" />
-              <input ref={searchRef} value={searchInput} onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
-                placeholder="Search descriptions, merchants, categories... (/ to focus)"
-                className="w-full bg-transparent outline-none text-sm" />
-              {filters.search && <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>}
-            </label>
-
-            <label className="flex items-center gap-2 rounded-xl border border-border bg-background/70 px-3 h-11 text-sm">
-              <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-              <select aria-label="Sort transactions" value={`${filters.sort}-${filters.order}`} onChange={(e) => { const [s, o] = e.target.value.split("-"); setFilters(p => ({ ...p, sort: s, order: o })); }}
-                className="bg-transparent outline-none">
-                <option value="date-desc">Newest</option>
-                <option value="date-asc">Oldest</option>
-                <option value="amount-desc">Largest</option>
-                <option value="amount-asc">Smallest</option>
-              </select>
-            </label>
-
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="outlinePill" size="pill" className={activeFilters.length > 0 ? "border-emerald text-emerald" : ""}>
-                  <Filter className="h-4 w-4" /> Filters
-                  {activeFilters.length > 0 && <span className="ml-1">({activeFilters.length})</span>}
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-full sm:max-w-md">
-                <SheetHeader>
-                  <SheetTitle>Filters</SheetTitle>
-                  <SheetDescription className="text-xs sm:text-sm">Refine your transaction list</SheetDescription>
-                </SheetHeader>
-                <div className="mt-4 sm:mt-6 space-y-4 sm:space-y-5">
-                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                    <select value={filters.tx_type} onChange={(e) => toggleFilter("tx_type", e.target.value)} className="h-10 px-4 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors">
-                      <option value="">All types</option><option value="income">Income</option><option value="expense">Expense</option>
-                    </select>
-                    <select value={filters.source} onChange={(e) => toggleFilter("source", e.target.value)} className="h-10 px-4 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors">
-                      <option value="">All sources</option>
-                      {Object.entries(SOURCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                    </select>
-                    <CategoryCombobox
-                      value={filters.category}
-                      onChange={(val) => toggleFilter("category", val)}
-                      categories={selectedCats}
-                      placeholder="All categories"
-                      allowClear
-                      onCategoryCreated={loadCats}
-                    />
-                    <Input type="number" min="0" step="0.01" placeholder="Min £" value={filters.amount_min}
-                      onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_min: e.target.value })); }}
-                      className="text-sm h-10" />
-                    <Input type="number" min="0" step="0.01" placeholder="Max £" value={filters.amount_max}
-                      onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_max: e.target.value })); }}
-                      className="text-sm h-10" />
-                    <Input type="date" value={filters.date_from} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_from: e.target.value })); }} className="text-sm h-10" />
-                    <Input type="date" value={filters.date_to} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_to: e.target.value })); }} className="text-sm h-10" />
-                  </div>
-
-                  <div className="border-t border-border pt-4 space-y-3">
-                    <p className="text-xs font-medium text-muted-foreground">AI search</p>
-                    <div className="flex items-center gap-2">
-                      <Input value={aiQuery} onChange={(e) => setAiQuery(e.target.value)}
-                        placeholder="e.g. 'grocery spending last month'"
-                        className="flex-1 text-sm h-10" onKeyDown={(e) => e.key === "Enter" && runAiSearch()} />
-                      <Button onClick={runAiSearch} disabled={aiLoading || !aiQuery.trim()} variant="outlinePill" size="pillSm">
-                        {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                        Search
-                      </Button>
-                    </div>
-                    {aiResults && (
-                      <div className="rounded-xl border border-emerald/30 bg-emerald/5 p-3 text-sm">
-                        <p className="font-medium text-emerald mb-1">AI results for &ldquo;{aiResults.query}&rdquo; ({aiResults.total} matches)</p>
-                        <button onClick={() => { setAiResults(null); setAiQuery(""); }} className="text-xs text-muted-foreground hover:text-foreground">Clear</button>
-                      </div>
-                    )}
-                  </div>
-
-                  {(filters.source || filters.category || filters.tx_type || filters.search) && total > 0 && (
-                    <div className="border-t border-border pt-4 flex items-center justify-between">
-                      <p className="text-xs text-muted-foreground">
-                        {total} transaction{total !== 1 ? "s" : ""} match current filters
-                      </p>
-                      <button onClick={clearAllMatching}
-                        className="text-xs px-3 py-1.5 rounded-full border border-ruby/40 text-ruby hover:bg-ruby/5 transition-colors">
-                        <Trash2 className="h-3 w-3 inline mr-1" />
-                        Delete all {total}
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="border-t border-border pt-4 flex justify-end">
-                    <button onClick={clearAllFilters} className="text-sm text-muted-foreground hover:text-foreground">
-                      Clear all filters
-                    </button>
-                  </div>
-                </div>
-              </SheetContent>
-            </Sheet>
-          </div>
-
-          {/* Active filter chips */}
-          {activeFilters.length > 0 && (
-            <div className="px-4 pb-3 flex flex-wrap gap-1.5">
-              {activeFilters.map((chip) => (
-                <span key={chip.key} className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald/10 text-emerald border border-emerald/20">
-                  {chip.label}
-                  <button onClick={() => { setFilter(chip.key, ""); setOffset(0); }} className="hover:text-emerald/80"><X className="h-3 w-3" /></button>
-                </span>
-              ))}
-              <button onClick={clearAllFilters} className="text-xs px-2 py-0.5 rounded-full border border-border text-muted-foreground hover:text-foreground">Clear</button>
-            </div>
-          )}
-
-          {/* Compact summary stat line */}
-          <div className="border-t border-border px-4 py-3 flex items-center justify-end gap-4 text-sm">
-            <span>Income <span className="text-emerald font-medium tabular-nums">{fmt(incomeTotal)}</span></span>
-            <span className="text-muted-foreground">|</span>
-            <span>Expenses <span className="text-ruby font-medium tabular-nums">{fmt(expenseTotal)}</span></span>
-            <span className="text-muted-foreground">|</span>
-            <span>Net <span className={`font-medium tabular-nums ${netTotal >= 0 ? "text-emerald" : "text-ruby"}`}>{netTotal >= 0 ? "+" : ""}{fmt(netTotal)}</span></span>
-          </div>
-        </div>
-
         {/* Transaction table */}
-        <SectionCard eyebrow="Ledger" title={`Transactions (${total})`}>
+        <div className="rounded-xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden">
           {loading ? (
-            <SkeletonTable rows={5} className="p-4" />
+            <SkeletonTable rows={8} className="p-3" />
           ) : (aiResults?.transactions || txs).length === 0 ? (
             <EmptyState icon={Receipt}
               title={filters.search || filters.category || aiResults ? "No matching transactions" : "No transactions yet"}
@@ -659,17 +658,14 @@ const Transactions = React.memo(function Transactions() {
           ) : (
             <>
               {/* Desktop keyboard shortcut hints */}
-              <div className="hidden sm:flex items-center gap-3 px-4 py-2 text-[11px] text-muted-foreground border-b border-border">
-                <span><kbd className="px-1 rounded bg-secondary font-mono text-[10px]">j</kbd> <kbd className="px-1 rounded bg-secondary font-mono text-[10px]">k</kbd> navigate</span>
-                <span><kbd className="px-1 rounded bg-secondary font-mono text-[10px]">n</kbd> new</span>
-                <span><kbd className="px-1 rounded bg-secondary font-mono text-[10px]">b</kbd> bulk</span>
-                <span><kbd className="px-1 rounded bg-secondary font-mono text-[10px]">/</kbd> search</span>
-                <span><kbd className="px-1 rounded bg-secondary font-mono text-[10px]">[</kbd> <kbd className="px-1 rounded bg-secondary font-mono text-[10px]">]</kbd> pages</span>
-                <span><kbd className="px-1 rounded bg-secondary font-mono text-[10px]">⌘⌫</kbd> delete</span>
-                <span><kbd className="px-1 rounded bg-secondary font-mono text-[10px]">?</kbd> help</span>
-                <span className="ml-auto">
-                  <span className="px-1 py-0.5 rounded bg-secondary/50">{currentPage}/{totalPages}</span>
-                </span>
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 text-[10px] text-muted-foreground/60 border-b border-border">
+                <span><kbd className="px-1 rounded bg-secondary font-mono text-[9px]">j</kbd><kbd className="px-1 rounded bg-secondary font-mono text-[9px]">k</kbd> navigate</span>
+                <span><kbd className="px-1 rounded bg-secondary font-mono text-[9px]">n</kbd> new</span>
+                <span><kbd className="px-1 rounded bg-secondary font-mono text-[9px]">b</kbd> bulk</span>
+                <span><kbd className="px-1 rounded bg-secondary font-mono text-[9px]">/</kbd> search</span>
+                <span><kbd className="px-1 rounded bg-secondary font-mono text-[9px]">[</kbd><kbd className="px-1 rounded bg-secondary font-mono text-[9px]">]</kbd> pages</span>
+                <span><kbd className="px-1 rounded bg-secondary font-mono text-[9px]">⌘⌫</kbd> delete</span>
+                <span className="ml-auto text-muted-foreground/40">{currentPage}/{totalPages}</span>
               </div>
               {/* Mobile card view with swipe to delete */}
               <div className="block sm:hidden">
@@ -686,15 +682,15 @@ const Transactions = React.memo(function Transactions() {
                   />
                 ))}
               </div>
-              {/* Desktop table with TransactionRow (⋮ actions handled by component) */}
+              {/* Desktop table */}
               <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead><tr className="text-left text-xs text-muted-foreground border-b border-border">
-                    <th className="px-4 py-3 w-10">
+                  <thead><tr className="text-left text-[11px] text-muted-foreground border-b border-border">
+                    <th className="px-3 py-2.5 w-10">
                       <input type="checkbox" checked={allDisplayedSelected} onChange={toggleSelectAll}
-                        className="h-4 w-4 rounded border-border accent-emerald cursor-pointer" />
+                        className="h-3.5 w-3.5 rounded border-border accent-emerald cursor-pointer" />
                     </th>
-                    <th className="px-6 py-3">Date</th><th className="px-6 py-3">Description</th><th className="px-6 py-3">Category</th><th className="px-6 py-3 text-right">Amount</th><th className="px-6 py-3 w-12"></th>
+                    <th className="px-4 py-2.5">Date</th><th className="px-4 py-2.5">Description</th><th className="px-4 py-2.5">Category</th><th className="px-4 py-2.5 text-right">Amount</th><th className="px-4 py-2.5 w-10"></th>
                   </tr></thead>
                   <tbody>
                     {(aiResults?.transactions || txs).map((t, idx) => (
@@ -709,24 +705,24 @@ const Transactions = React.memo(function Transactions() {
               </div>
 
               {!aiResults && totalPages > 1 && (
-                <div className="px-6 py-4 border-t border-border flex items-center justify-between text-sm">
+                <div className="px-4 py-3 border-t border-border flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">Showing {offset + 1}–{Math.min(offset + limit, total)} of {total}</span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <button onClick={() => setOffset(Math.max(0, offset - limit))} disabled={offset === 0}
-                      className="h-10 w-10 rounded-full grid place-items-center border border-border hover:bg-secondary disabled:opacity-30" aria-label="Previous page" title="Previous page ([)">
-                      <ChevronLeft className="h-4 w-4" />
+                      className="h-7 w-7 rounded-lg grid place-items-center border border-border hover:bg-secondary disabled:opacity-30 text-muted-foreground" aria-label="Previous page">
+                      <ChevronLeft className="h-3.5 w-3.5" />
                     </button>
-                    <span className="text-muted-foreground min-w-[4rem] text-center">{currentPage} / {totalPages}</span>
+                    <span className="text-muted-foreground min-w-[3rem] text-center">{currentPage} / {totalPages}</span>
                     <button onClick={() => setOffset(Math.min((totalPages - 1) * limit, offset + limit))} disabled={offset + limit >= total}
-                      className="h-10 w-10 rounded-full grid place-items-center border border-border hover:bg-secondary disabled:opacity-30" aria-label="Next page" title="Next page (])">
-                      <ChevronRight className="h-4 w-4" />
+                      className="h-7 w-7 rounded-lg grid place-items-center border border-border hover:bg-secondary disabled:opacity-30 text-muted-foreground" aria-label="Next page">
+                      <ChevronRight className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
               )}
             </>
           )}
-        </SectionCard>
+        </div>
       </>}
 
       {/* ───── Maaser tab ───── */}
