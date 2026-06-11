@@ -27,12 +27,18 @@ export default function TransactionForm({
   return (
     <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={onClose} role="dialog" aria-modal="true" aria-label={editingId ? "Edit transaction" : "New transaction"}>
       <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-xl tracking-tight font-medium mb-4">{editingId ? "Edit transaction" : "New transaction"}</h3>
-        <form onSubmit={onSubmit} className="space-y-3">
-          <Input data-testid="tx-desc" required placeholder="Description" value={form.description}
-            onChange={(e) => { setForm({ ...form, description: e.target.value }); if (onClearClassification) onClearClassification(); }} />
-          <Input data-testid="tx-amount" required type="number" step="0.01" placeholder="Amount (£)" value={form.amount}
-            onChange={(e) => { setForm({ ...form, amount: e.target.value }); if (onClearClassification) onClearClassification(); }} />
+        <h3 className="text-xl tracking-tight font-medium mb-4" id="transaction-form-title">{editingId ? "Edit transaction" : "New transaction"}</h3>
+        <form onSubmit={onSubmit} className="space-y-3" aria-labelledby="transaction-form-title">
+          <div>
+            <label htmlFor="tx-desc" className="sr-only">Description</label>
+            <Input id="tx-desc" data-testid="tx-desc" required placeholder="Description" value={form.description}
+              onChange={(e) => { setForm({ ...form, description: e.target.value }); if (onClearClassification) onClearClassification(); }} />
+          </div>
+          <div>
+            <label htmlFor="tx-amount" className="sr-only">Amount in pounds</label>
+            <Input id="tx-amount" data-testid="tx-amount" required type="number" step="0.01" placeholder="Amount (£)" value={form.amount}
+              onChange={(e) => { setForm({ ...form, amount: e.target.value }); if (onClearClassification) onClearClassification(); }} />
+          </div>
 
           {/* Category selector — grouped by section, add custom category */}
           <CategoryCombobox
@@ -64,7 +70,8 @@ export default function TransactionForm({
             </div>
           )}
 
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.is_income} onChange={(e) => setForm({ ...form, is_income: e.target.checked })} /> This is income</label>
+          <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={form.is_income} onChange={(e) => setForm({ ...form, is_income: e.target.checked })} className="accent-emerald h-4 w-4" aria-describedby={form.is_income ? "income-hint" : undefined} /> <span>This is income</span></label>
+          <span id="income-hint" className="sr-only">Check if this transaction represents money coming in</span>
 
           {/* Classify button */}
           {!editingId && (

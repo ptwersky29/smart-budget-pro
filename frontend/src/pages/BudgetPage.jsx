@@ -35,7 +35,7 @@ function ProgressRing({ pct, size = 40, stroke = 3.5, color }) {
   const circ = 2 * Math.PI * r;
   const offset = circ - (Math.min(pct, 100) / 100) * circ;
   return (
-    <svg width={size} height={size} className="shrink-0 -rotate-90">
+    <svg width={size} height={size} className="shrink-0 -rotate-90" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label={`${Math.round(pct)}% used`}>
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="currentColor" strokeWidth={stroke} className="text-muted/30" />
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color || (pct >= 100 ? "#e5484d" : "#30a46c")} strokeWidth={stroke} strokeLinecap="round"
         strokeDasharray={circ} strokeDashoffset={offset} style={{ transition: "stroke-dashoffset 0.5s ease" }} />
@@ -355,8 +355,8 @@ export default React.memo(function BudgetPage() {
           <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full text-xs rounded border border-border bg-transparent px-1.5 py-1" />
           <input type="number" step="0.01" value={form.limit} onChange={(e) => setForm({ ...form, limit: e.target.value })} className="w-full text-xs rounded border border-border bg-transparent px-1.5 py-1" />
           <div className="flex gap-1">
-            <button onClick={() => handleUpdate(b.budget_id)} className="text-[10px] px-2 py-1 rounded bg-emerald text-white"><Check className="h-3 w-3" /></button>
-            <button onClick={cancelEdit} className="text-[10px] px-2 py-1 rounded bg-muted text-muted-foreground"><X className="h-3 w-3" /></button>
+            <button onClick={() => handleUpdate(b.budget_id)} className="text-[10px] px-2 py-1 rounded bg-emerald text-white" aria-label="Save changes"><Check className="h-3 w-3" /></button>
+            <button onClick={cancelEdit} className="text-[10px] px-2 py-1 rounded bg-muted text-muted-foreground" aria-label="Cancel edit"><X className="h-3 w-3" /></button>
           </div>
         </div>
       );
@@ -391,8 +391,8 @@ export default React.memo(function BudgetPage() {
             </div>
           </div>
           <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-            <button onClick={() => startEdit(b)} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground"><Pencil className="h-3 w-3" /></button>
-            <button onClick={() => setConfirmDelete(b.budget_id)} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-ruby"><Trash2 className="h-3 w-3" /></button>
+            <button onClick={() => startEdit(b)} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground" aria-label={`Edit ${b.category} budget`}><Pencil className="h-3 w-3" /></button>
+            <button onClick={() => setConfirmDelete(b.budget_id)} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-ruby" aria-label={`Delete ${b.category} budget`}><Trash2 className="h-3 w-3" /></button>
           </div>
         </div>
       </div>
@@ -431,7 +431,7 @@ export default React.memo(function BudgetPage() {
             if (window.confirm(`Delete entire event "${g.event_group_name}" and all ${g.item_count} items?`)) {
               api.delete(`/budgets/group/${g.event_group_id}`).then(() => { fetchData(); toast.success("Event deleted"); }).catch(() => toast.error("Could not delete event"));
             }
-          }} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-ruby shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="h-3 w-3" /></button>
+          }} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-ruby shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" aria-label={`Delete event ${g.event_group_name}`}><Trash2 className="h-3 w-3" /></button>
         </div>
 
         {g.items && g.items.length > 0 && (
@@ -446,7 +446,7 @@ export default React.memo(function BudgetPage() {
                   <div className="w-8 h-1 rounded-full bg-muted/40 overflow-hidden shrink-0">
                     <div className={`h-full rounded-full ${itemPct >= 100 ? "bg-ruby" : "bg-emerald"}`} style={{ width: `${Math.min(100, itemPct)}%` }} />
                   </div>
-                  <button onClick={() => setConfirmDelete(item.budget_id)} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-ruby"><X className="h-2.5 w-2.5" /></button>
+                  <button onClick={() => setConfirmDelete(item.budget_id)} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-ruby" aria-label={`Remove ${item.category} from event`}><X className="h-2.5 w-2.5" /></button>
                 </div>
               );
             })}
@@ -502,7 +502,7 @@ export default React.memo(function BudgetPage() {
                   <p className="text-sm font-medium text-ruby">{a.message}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">£{a.spent} of £{a.budget} used</p>
                 </div>
-                <button onClick={() => setDismissedAlerts(new Set([...dismissedAlerts, a.category + a.severity]))} className="p-1 rounded hover:bg-ruby/10 text-ruby/60 hover:text-ruby"><X className="h-4 w-4" /></button>
+                <button onClick={() => setDismissedAlerts(new Set([...dismissedAlerts, a.category + a.severity]))} className="p-1 rounded hover:bg-ruby/10 text-ruby/60 hover:text-ruby" aria-label="Dismiss alert"><X className="h-4 w-4" /></button>
               </div>
             )
           ))}
@@ -521,7 +521,7 @@ export default React.memo(function BudgetPage() {
                         <p className="text-sm font-medium">{a.message}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">£{a.spent} of £{a.budget} used</p>
                       </div>
-                      <button onClick={() => setDismissedAlerts(new Set([...dismissedAlerts, a.category + a.severity]))} className="p-1 rounded hover:bg-topaz/10 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+                      <button onClick={() => setDismissedAlerts(new Set([...dismissedAlerts, a.category + a.severity]))} className="p-1 rounded hover:bg-topaz/10 text-muted-foreground hover:text-foreground" aria-label="Dismiss warning"><X className="h-4 w-4" /></button>
                     </div>
                   )
                 ))}
@@ -543,7 +543,7 @@ export default React.memo(function BudgetPage() {
                         <p className="text-sm font-medium">{a.message}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">3-month avg: £{a.avg_3m}</p>
                       </div>
-                      <button onClick={() => setDismissedAlerts(new Set([...dismissedAlerts, a.category + a.severity]))} className="p-1 rounded hover:bg-chart-1/10 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+                      <button onClick={() => setDismissedAlerts(new Set([...dismissedAlerts, a.category + a.severity]))} className="p-1 rounded hover:bg-chart-1/10 text-muted-foreground hover:text-foreground" aria-label="Dismiss spike alert"><X className="h-4 w-4" /></button>
                     </div>
                   )
                 ))}
@@ -568,11 +568,11 @@ export default React.memo(function BudgetPage() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2">
-              <button onClick={() => setMonth(addMonth(month, -1))} className="p-1 rounded-lg hover:bg-secondary text-muted-foreground transition-colors">
+              <button onClick={() => setMonth(addMonth(month, -1))} className="p-1 rounded-lg hover:bg-secondary text-muted-foreground transition-colors" aria-label="Previous month">
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <span className="text-base font-semibold min-w-[130px] text-center">{monthLabel}</span>
-              <button onClick={() => setMonth(addMonth(month, 1))} className="p-1 rounded-lg hover:bg-secondary text-muted-foreground transition-colors">
+              <button onClick={() => setMonth(addMonth(month, 1))} className="p-1 rounded-lg hover:bg-secondary text-muted-foreground transition-colors" aria-label="Next month">
                 <ChevronRight className="h-4 w-4" />
               </button>
               {!isCurrentMonth && (

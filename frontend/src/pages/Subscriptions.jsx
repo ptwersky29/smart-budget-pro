@@ -235,8 +235,8 @@ export default function Subscriptions() {
                     {s.merchant && <p className="text-xs text-muted-foreground truncate">{s.merchant}</p>}
                   </div>
                   <div className="flex gap-1 shrink-0">
-                    <button onClick={() => openEdit(s)} className="p-2 text-muted-foreground hover:text-emerald" title="Edit"><Pencil className="h-4 w-4" /></button>
-                    <button onClick={() => del(s.subscription_id)} className="p-2 text-muted-foreground hover:text-ruby" title="Delete"><Trash2 className="h-4 w-4" /></button>
+                    <button onClick={() => openEdit(s)} className="p-2 text-muted-foreground hover:text-emerald" aria-label={`Edit ${s.name}`}><Pencil className="h-4 w-4" /></button>
+                    <button onClick={() => del(s.subscription_id)} className="p-2 text-muted-foreground hover:text-ruby" aria-label={`Delete ${s.name}`}><Trash2 className="h-4 w-4" /></button>
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
@@ -269,8 +269,8 @@ export default function Subscriptions() {
                       </button>
                     </td>
                     <td className="px-6 py-3 text-right whitespace-nowrap">
-                      <button onClick={() => openEdit(s)} className="p-2 text-muted-foreground hover:text-emerald" title="Edit"><Pencil className="h-4 w-4" /></button>
-                      <button onClick={() => del(s.subscription_id)} className="p-2 text-muted-foreground hover:text-ruby" title="Delete"><Trash2 className="h-4 w-4" /></button>
+                      <button onClick={() => openEdit(s)} className="p-2 text-muted-foreground hover:text-emerald" aria-label={`Edit ${s.name}`}><Pencil className="h-4 w-4" /></button>
+                      <button onClick={() => del(s.subscription_id)} className="p-2 text-muted-foreground hover:text-ruby" aria-label={`Delete ${s.name}`}><Trash2 className="h-4 w-4" /></button>
                     </td>
                   </tr>
                 ))}

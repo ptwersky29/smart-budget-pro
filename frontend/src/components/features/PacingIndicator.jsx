@@ -57,10 +57,10 @@ export default React.memo(function PacingIndicator({ totalBudgeted, totalSpent, 
 
   if (compact) {
     return (
-      <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${cfg.bg} ${cfg.border} border`}>
-        <Icon className={`h-3.5 w-3.5 ${cfg.color}`} />
+      <div role="region" aria-label={`Budget pace: ${cfg.label}`} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${cfg.bg} ${cfg.border} border`}>
+        <Icon className={`h-3.5 w-3.5 ${cfg.color}`} aria-hidden="true" />
         <span className={`text-xs font-medium ${cfg.color}`}>{cfg.label}</span>
-        <span className="text-[10px] text-muted-foreground ml-auto tabular-nums">
+        <span className="text-[10px] text-muted-foreground ml-auto tabular-nums" aria-label={`Month ${Math.round(monthPct * 100)} percent complete, ${Math.round(budgetPct)} percent of budget spent`}>
           {Math.round(monthPct * 100)}% month · {Math.round(budgetPct)}% spent
         </span>
       </div>
@@ -68,34 +68,33 @@ export default React.memo(function PacingIndicator({ totalBudgeted, totalSpent, 
   }
 
   return (
-    <div className={`rounded-xl border ${cfg.border} ${cfg.bg} p-4`}>
+    <div role="region" aria-label={`Budget pace: ${cfg.label}`} className={`rounded-xl border ${cfg.border} ${cfg.bg} p-4`}>
       <div className="flex items-center gap-3">
-        <span className={`grid h-10 w-10 place-items-center rounded-full ${cfg.bg}`}>
-          <Icon className={`h-5 w-5 ${cfg.color}`} />
+        <span className={`grid h-10 w-10 place-items-center rounded-full ${cfg.bg}`} aria-hidden="true">
+          <Icon className={`h-5 w-5 ${cfg.color}`} aria-hidden="true" />
         </span>
         <div className="flex-1 min-w-0">
-          <p className={`text-sm font-medium ${cfg.color}`}>{cfg.label}</p>
+          <p className={`text-sm font-medium ${cfg.color}`} role="status">{cfg.label}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{cfg.detail}</p>
         </div>
       </div>
 
-      {/* Double progress bars: month vs budget */}
       <div className="mt-3 space-y-2">
         <div>
           <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
-            <span>Month elapsed</span>
+            <span id="pacing-label-month">Month elapsed</span>
             <span className="tabular-nums">{Math.round(monthPct * 100)}%</span>
           </div>
-          <div className="h-1.5 rounded-full bg-muted/40 overflow-hidden">
+          <div className="h-1.5 rounded-full bg-muted/40 overflow-hidden" role="progressbar" aria-valuenow={Math.round(monthPct * 100)} aria-valuemin={0} aria-valuemax={100} aria-labelledby="pacing-label-month">
             <div className="h-full rounded-full bg-muted-foreground/40" style={{ width: `${monthPct * 100}%` }} />
           </div>
         </div>
         <div>
           <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
-            <span>Budget used</span>
+            <span id="pacing-label-budget">Budget used</span>
             <span className="tabular-nums">{Math.round(budgetPct)}%</span>
           </div>
-          <div className="h-1.5 rounded-full bg-muted/40 overflow-hidden">
+          <div className="h-1.5 rounded-full bg-muted/40 overflow-hidden" role="progressbar" aria-valuenow={Math.round(budgetPct)} aria-valuemin={0} aria-valuemax={100} aria-labelledby="pacing-label-budget">
             <div className={`h-full rounded-full transition-all ${pace === "over" ? "bg-ruby" : pace === "on-track" ? "bg-topaz" : "bg-emerald"}`}
               style={{ width: `${Math.min(budgetPct, 100)}%` }} />
           </div>
