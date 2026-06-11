@@ -19,6 +19,7 @@ import {
   DropdownMenuItem,
 } from "../components/ui/dropdown-menu";
 import { Button } from "../components/ui/button";
+import PacingIndicator from "../components/features/PacingIndicator";
 
 const TOOLTIP_STYLE = { backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px" };
 
@@ -224,17 +225,20 @@ const Dashboard = React.memo(function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Budgets */}
         <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className="label-overline">Budgets</p>
-              <p className="text-sm font-medium mt-0.5">
-                {currentMonthBudget
-                  ? `${currentMonthBudget.pct}% of limit used`
-                  : "No budgets set"}
-              </p>
-            </div>
+          <div className="flex items-center justify-between mb-3">
+            <p className="label-overline">Budgets</p>
             <Link to="/budgets" className="text-xs text-emerald font-medium hover:underline shrink-0">Manage</Link>
           </div>
+
+          {currentMonthBudget && (
+            <div className="mb-4">
+              <PacingIndicator
+                totalBudgeted={currentMonthBudget.total}
+                totalSpent={currentMonthBudget.spent}
+                compact
+              />
+            </div>
+          )}
           {budgets.length === 0 ? (
             <Link to="/budgets" className="flex items-center gap-3 p-3 rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:text-foreground hover:border-emerald/40 transition-colors">
               <PiggyBank className="h-4 w-4" />

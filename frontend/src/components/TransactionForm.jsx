@@ -82,39 +82,65 @@ export default function TransactionForm({
             </div>
           )}
 
-          {/* AI Classification result — show all 4 suggestions */}
+          {/* AI Classification result — show all suggestions with confidence bars */}
           {suggestions.length > 0 && (
             <div className="rounded-xl border-2 border-emerald/20 bg-emerald/5 p-3 text-sm space-y-2 animate-[fadeUp_0.2s_ease-out]">
               <div className="flex items-center gap-2">
                 <Brain className="h-3.5 w-3.5 text-emerald" />
                 <span className="text-xs font-medium text-emerald">AI Suggestions</span>
-                <span className="text-xs px-1.5 py-0.5 rounded-full bg-emerald/10 text-emerald ml-auto">
-                  Top: {Math.round(topSuggestion?.confidence * 100)}%
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ml-auto ${
+                  topSuggestion?.confidence >= 0.9 ? "bg-emerald/10 text-emerald" :
+                  topSuggestion?.confidence >= 0.7 ? "bg-topaz/10 text-topaz" : "bg-ruby/10 text-ruby"
+                }`}>
+                  {Math.round(topSuggestion?.confidence * 100)}% confidence
                 </span>
               </div>
               <div className="space-y-1.5">
-                {suggestions.map((s, i) => (
-                  <div key={i} className={`flex items-center justify-between gap-2 rounded-lg p-2 transition-colors ${form.category === s.category ? "bg-emerald/10 border border-emerald/30" : "bg-black/5 dark:bg-white/5"}`}>
-                    <div className="flex items-center gap-2 min-w-0">
+                {suggestions.map((s, i) => {
+                  const isSelected = form.category === s.category;
+                  const confPct = Math.round(s.confidence * 100);
+                  return (
+                    <div key={i} className={`rounded-lg transition-all ${
+                      isSelected
+                        ? "bg-emerald/10 ring-1 ring-emerald/30 shadow-sm"
+                        : "bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10"
+                    }`}>
                       <button
                         type="button"
                         onClick={() => setForm({ ...form, category: s.category, budget_type: s.budget_type || "", occasion: s.occasion || "", merchant: s.merchant || "" })}
-                        className={`flex items-center gap-2 min-w-0 ${form.category === s.category ? "text-emerald font-medium" : "text-foreground"}`}
+                        className="w-full text-left p-2"
                       >
-                        {form.category === s.category ? <Check className="h-3.5 w-3.5 shrink-0" /> : <span className="w-3.5 h-3.5 shrink-0" />}
-                        <span className="text-xs capitalize truncate">{s.category}</span>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {isSelected
+                              ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald" />
+                              : <span className={`w-3.5 h-3.5 shrink-0 rounded-full border-2 ${confPct >= 90 ? "border-emerald/40" : confPct >= 70 ? "border-topaz/40" : "border-ruby/40"}`} />
+                            }
+                            <span className={`text-xs capitalize truncate ${isSelected ? "text-emerald font-medium" : "text-foreground"}`}>{s.category}</span>
+                            {s.merchant && <span className="text-[10px] text-muted-foreground truncate hidden sm:inline">· {s.merchant}</span>}
+                            {s.source === "historical" && <span className="text-[10px] px-1 rounded bg-topaz/10 text-topaz shrink-0">Learned</span>}
+                          </div>
+                        </div>
+                        {/* Confidence bar */}
+                        <div className="mt-1 flex items-center gap-2">
+                          <div className="flex-1 h-1 rounded-full bg-muted/40 overflow-hidden">
+                            <div className={`h-full rounded-full ${
+                              confPct >= 90 ? "bg-emerald" : confPct >= 70 ? "bg-topaz" : "bg-ruby"
+                            }`} style={{ width: `${confPct}%` }} />
+                          </div>
+                          <span className={`text-[10px] tabular-nums shrink-0 ${
+                            confPct >= 90 ? "text-emerald" : confPct >= 70 ? "text-topaz" : "text-ruby"
+                          }`}>{confPct}%</span>
+                        </div>
                       </button>
-                      {s.merchant && <span className="text-[10px] text-muted-foreground truncate">· {s.merchant}</span>}
-                      {s.source === "historical" && <span className="text-[10px] px-1 rounded bg-topaz/10 text-topaz shrink-0">Learned</span>}
                     </div>
-                    <span className="text-[10px] text-muted-foreground shrink-0">{Math.round(s.confidence * 100)}%</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               {topSuggestion?.recurring && (
-                <label className="flex items-center gap-2 pt-1 border-t border-emerald/10 text-xs">
-                  <input type="checkbox" checked={saveAsRecurring} onChange={(e) => setSaveAsRecurring(e.target.checked)} className="accent-emerald" />
-                  Save as recurring transaction
+                <label className="flex items-center gap-2 pt-2 border-t border-emerald/10 text-xs">
+                  <input type="checkbox" checked={saveAsRecurring} onChange={(e) => setSaveAsRecurring(e.target.checked)} className="rounded border-border accent-emerald h-3.5 w-3.5" />
+                  <span className="text-muted-foreground">Save as recurring transaction</span>
                 </label>
               )}
             </div>

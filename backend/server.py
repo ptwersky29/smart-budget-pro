@@ -48,6 +48,7 @@ import analytics
 import empty_states
 import budget_system
 import notifications
+from exceptions import FinanceAIError
 from rate_limit import RateLimiter, RateLimitMiddleware, CsrfProtectionMiddleware
 from middleware import ErrorMonitorMiddleware, RequestTimerMiddleware, RequestIdMiddleware, SecurityHeadersMiddleware
 from security import generate_csrf_token, _require_jwt_secret
@@ -213,13 +214,22 @@ async def http_exception_handler(request: StarletteRequest, exc: HTTPException):
         headers=_cors_headers(request),
     )
 
+# FinanceAIError handler
+@app.exception_handler(FinanceAIError)
+async def financeai_exception_handler(request: StarletteRequest, exc: FinanceAIError):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.message},
+        headers=_cors_headers(request),
+    )
+
 # Global exception handler — catches every unhandled error and logs it
 @app.exception_handler(Exception)
 async def global_exception_handler(request: StarletteRequest, exc: Exception):
     logger.exception("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
     return JSONResponse(
         status_code=500,
-        content={"detail": f"Server error: {type(exc).__name__}: {exc}"},
+        content={"detail": "An internal server error occurred. Please try again later."},
         headers=_cors_headers(request),
     )
 
