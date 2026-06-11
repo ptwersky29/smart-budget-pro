@@ -271,6 +271,7 @@ export default function OnboardingWizard() {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [finished, setFinished] = useState(false);
 
   useEffect(() => {
     api.get("/onboarding/progress")
@@ -286,32 +287,35 @@ export default function OnboardingWizard() {
       .finally(() => setLoading(false));
   }, [navigate]);
 
-  const markStep = async (id, next) => {
-    try {
-      await api.post("/onboarding/progress", { step: id, completed_steps: { [id]: true } });
-      if (next !== undefined) {
-        await api.post("/onboarding/progress", { step: STEPS[next]?.id || "complete" });
-      }
-    } catch { /* best-effort */ }
+  const markStep = async (id) => {
+    await api.post("/onboarding/progress", { step: id });
   };
 
   const advance = async () => {
     const currentId = STEPS[step].id;
-    if (step < STEPS.length - 1) {
-      await markStep(currentId, step + 1);
-      setStep((s) => s + 1);
-    } else {
-      setBusy(true);
-      try {
-        await api.post("/onboarding/progress", { step: "complete" });
-        toast.success("You're all set — welcome to FinanceAI!");
-        navigate("/dashboard");
-      } catch {
-        navigate("/dashboard");
-      } finally {
-        setBusy(false);
+    setBusy(true);
+    try {
+      await markStep(currentId);
+      if (step < STEPS.length - 1) {
+        setStep((s) => s + 1);
+      } else {
+        setFinished(true);
       }
+    } catch {
+      // best-effort
+    } finally {
+      setBusy(false);
     }
+  };
+
+  const finishOnboarding = async () => {
+    try {
+      await api.post("/onboarding/progress", { step: "complete" });
+      toast.success("You're all set — welcome to FinanceAI!");
+    } catch {
+      // best-effort
+    }
+    navigate("/dashboard");
   };
 
   const skipAll = async () => {
@@ -326,6 +330,32 @@ export default function OnboardingWizard() {
           <Skeleton className="h-6 w-48" />
           <Skeleton className="h-4 w-full" />
           <Skeleton className="h-48 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (finished) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="w-full max-w-lg text-center space-y-6">
+            <div className="mx-auto w-20 h-20 rounded-full gradient-emerald flex items-center justify-center shadow-lg shadow-emerald/20">
+              <Check className="h-10 w-10 text-white" />
+            </div>
+            <h1 className="text-3xl tracking-tight font-semibold">You're all set!</h1>
+            <p className="text-muted-foreground max-w-sm mx-auto leading-relaxed">
+              Your FinanceAI workspace is ready. Start by exploring your dashboard or adding more data.
+            </p>
+            <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto">
+              <Button variant="primary" size="pill" onClick={finishOnboarding} disabled={busy}>
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Go to dashboard"}
+              </Button>
+              <Button variant="outlinePill" size="pill" onClick={skipAll}>
+                Start over
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     );

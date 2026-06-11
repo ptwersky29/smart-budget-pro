@@ -45,7 +45,12 @@ export default function Login() {
     try {
       await login(email, password, rememberMe);
       toast.success("Welcome back");
-      navigate("/dashboard");
+      const { data: me } = await api.get("/auth/me");
+      if (!me.onboarded) {
+        navigate("/onboarding");
+      } else {
+        navigate("/dashboard");
+      }
     } catch (err) {
       const status = err.response?.status;
       const detail = err.response?.data?.detail;

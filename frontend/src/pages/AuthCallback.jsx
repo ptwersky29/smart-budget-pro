@@ -37,8 +37,8 @@ export default function AuthCallback() {
           if (access_token) setToken("access_token", access_token, true);
           if (refresh_token) setToken("refresh_token", refresh_token, true);
           setUser(userData);
-          window.history.replaceState(null, "", "/dashboard");
-          navigate("/dashboard", { replace: true, state: { user: userData } });
+          window.history.replaceState(null, "", userData.onboarded ? "/dashboard" : "/onboarding");
+          navigate(userData.onboarded ? "/dashboard" : "/onboarding", { replace: true, state: { user: userData } });
         } catch (e) {
           const status = e?.response?.status;
           const detail = e?.response?.data?.detail;
@@ -62,8 +62,8 @@ export default function AuthCallback() {
         if (access_token) setToken("access_token", access_token, true);
         if (refresh_token) setToken("refresh_token", refresh_token, true);
         setUser(userData);
-        window.history.replaceState(null, "", "/dashboard");
-        navigate("/dashboard", { replace: true, state: { user: userData } });
+        window.history.replaceState(null, "", userData.onboarded ? "/dashboard" : "/onboarding");
+        navigate(userData.onboarded ? "/dashboard" : "/onboarding", { replace: true, state: { user: userData } });
       } catch (e) {
         const status = e?.response?.status;
         const detail = e?.response?.data?.detail;
