@@ -8,6 +8,8 @@ export function useApiQuery(url, params = {}, options = {}) {
   const [error, setError] = useState(null);
   const signalRef = useRef(null);
   const mountedRef = useRef(true);
+  const paramsRef = useRef(params);
+  paramsRef.current = params;
 
   const load = useCallback(async () => {
     if (!enabled) return;
@@ -20,9 +22,9 @@ export function useApiQuery(url, params = {}, options = {}) {
     try {
       let result;
       if (options.cache !== false) {
-        result = await api.cachedGet(url, params, ttl);
+        result = await api.cachedGet(url, paramsRef.current, ttl);
       } else {
-        const { data: d } = await api.get(url, { params, signal: controller.signal });
+        const { data: d } = await api.get(url, { params: paramsRef.current, signal: controller.signal });
         result = d;
       }
       if (mountedRef.current) {
@@ -36,7 +38,7 @@ export function useApiQuery(url, params = {}, options = {}) {
         setLoading(false);
       }
     }
-  }, [url, JSON.stringify(params), enabled, ttl, options.cache]);
+  }, [url, enabled, ttl, options.cache]);
 
   useEffect(() => {
     mountedRef.current = true;

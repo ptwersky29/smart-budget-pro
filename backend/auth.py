@@ -9,6 +9,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
+import asyncio
 import bcrypt
 import jwt as pyjwt
 from fastapi import APIRouter, HTTPException, Request, Response, Depends
@@ -40,11 +41,19 @@ def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
+async def hash_password_async(password: str) -> str:
+    return await asyncio.to_thread(hash_password, password)
+
+
 def verify_password(plain: str, hashed: str) -> bool:
     try:
         return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
     except Exception:
         return False
+
+
+async def verify_password_async(plain: str, hashed: str) -> bool:
+    return await asyncio.to_thread(verify_password, plain, hashed)
 
 
 def create_access_token(user_id: str, email: str, jti: str = None) -> str:
@@ -305,7 +314,7 @@ def build_router() -> APIRouter:
                 user_id=user_id,
                 email=email,
                 name=payload.name or email.split("@")[0],
-                hashed_password=hash_password(payload.password),
+                hashed_password=await hash_password_async(payload.password),
                 free_trial_end=free_trial_end,
                 trial_started=True,
                 password_changed_at=datetime.now(timezone.utc),
@@ -351,7 +360,7 @@ def build_router() -> APIRouter:
                 user.locked_until = None
                 user.login_attempts = 0
 
-            if not user or not verify_password(payload.password, user.hashed_password):
+            if not user or not await verify_password_async(payload.password, user.hashed_password):
                 if user:
                     user.login_attempts = (user.login_attempts or 0) + 1
                     if user.login_attempts >= 5:
@@ -719,7 +728,7 @@ def build_router() -> APIRouter:
                     name=name,
                     picture=picture,
                     google_sub=google_sub,
-                    hashed_password=hash_password(secrets.token_urlsafe(16)),
+                    hashed_password=await hash_password_async(secrets.token_urlsafe(16)),
                     free_trial_end=free_trial_end,
                     trial_started=True,
                     email_verified=True,
@@ -781,9 +790,9 @@ def build_router() -> APIRouter:
             db_user = result.scalar_one_or_none()
             if not db_user:
                 raise HTTPException(404, "User not found")
-            if not verify_password(payload.current_password, db_user.hashed_password):
+            if not await verify_password_async(payload.current_password, db_user.hashed_password):
                 raise HTTPException(400, "Current password is incorrect")
-            db_user.hashed_password = hash_password(payload.new_password)
+            db_user.hashed_password = await hash_password_async(payload.new_password)
             db_user.password_changed_at = datetime.now(timezone.utc)
             session_token = request.cookies.get("session_token", "")
             await session.execute(
@@ -815,7 +824,7 @@ def build_router() -> APIRouter:
                 raise HTTPException(400, "Token expired")
             await session.execute(
                 update(User).where(User.user_id == rec.user_id).values(
-                    hashed_password=hash_password(payload.new_password),
+                    hashed_password=await hash_password_async(payload.new_password),
                     password_changed_at=datetime.now(timezone.utc),
                 )
             )
@@ -848,7 +857,7 @@ async def seed_admin(session):
             user_id=f"user_{uuid.uuid4().hex[:12]}",
             email=email,
             name="Admin",
-            hashed_password=hash_password(password),
+            hashed_password=await hash_password_async(password),
             role="admin",
             is_admin=True,
             tier="premium",
@@ -866,8 +875,8 @@ async def seed_admin(session):
             existing.role = "admin"
             existing.subscription_status = "active"
             changed = True
-        if not verify_password(password, existing.hashed_password):
-            existing.hashed_password = hash_password(password)
+        if not await verify_password_async(password, existing.hashed_password):
+            existing.hashed_password = await hash_password_async(password)
             changed = True
         if changed:
             await session.commit()

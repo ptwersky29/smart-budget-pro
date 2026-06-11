@@ -284,4 +284,6 @@ async def startup():
 
 @app.on_event("shutdown")
 async def shutdown():
+    from llm import close_llm_client
+    await close_llm_client()
     await dispose_engine()

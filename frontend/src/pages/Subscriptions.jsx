@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
+import { withUndo } from "../lib/undo";
 import { Loader2, Plus, Trash2, Pencil, RefreshCcw, Sparkles, Bell, ChevronDown, RefreshCw } from "lucide-react";
 import { EmptyState, SectionCard } from "../components/ui/layout";
 import {
@@ -19,6 +20,8 @@ const emptyForm = { name: "", amount: "", category: "", frequency: "monthly", me
 export default function Subscriptions() {
   useEffect(() => { document.title = "Subscriptions | FinanceAI"; }, []);
   const [subs, setSubs] = useState([]);
+  const subsRef = useRef(subs);
+  subsRef.current = subs;
   const [detected, setDetected] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -48,18 +51,24 @@ export default function Subscriptions() {
   };
 
   const addFromDetected = async (item) => {
+    const optimisticSub = { subscription_id: `optimistic-${Date.now()}`, name: item.normalized_merchant || item.description, amount: item.amount, category: item.category, frequency: item.frequency === "monthly" ? "monthly" : item.frequency, active: true, merchant: item.normalized_merchant };
+    setSubs(prev => [...prev, optimisticSub]);
+    setDetected((prev) => prev.filter((d) => d !== item));
     try {
-      await api.post("/subscriptions", {
+      const { data } = await api.post("/subscriptions", {
         name: item.normalized_merchant || item.description,
         amount: item.amount,
         category: item.category,
         frequency: item.frequency === "monthly" ? "monthly" : item.frequency,
         merchant: item.normalized_merchant,
       });
+      setSubs(prev => prev.map(s => s.subscription_id === optimisticSub.subscription_id ? data : s));
       toast.success("Subscription saved");
-      setDetected((prev) => prev.filter((d) => d !== item));
-      await load();
-    } catch (e) { toast.error(formatApiError(e) || "Could not save"); }
+    } catch (e) {
+      setSubs(prev => prev.filter(s => s.subscription_id !== optimisticSub.subscription_id));
+      setDetected((prev) => [...prev, item]);
+      toast.error(formatApiError(e) || "Could not save");
+    }
   };
 
   const openAdd = () => { setEditingId(null); setForm(emptyForm); setOpen(true); };
@@ -71,28 +80,57 @@ export default function Subscriptions() {
 
   const submit = async (e) => {
     e.preventDefault();
-    try {
-      const payload = { name: form.name, amount: parseFloat(form.amount), category: form.category || undefined, frequency: form.frequency, merchant: form.merchant || undefined, notes: form.notes || undefined };
-      if (editingId) {
-        await api.patch(`/subscriptions/${editingId}`, payload);
-        toast.success("Updated");
-      } else {
-        await api.post("/subscriptions", payload);
-        toast.success("Added");
+    const payload = { name: form.name, amount: parseFloat(form.amount), category: form.category || undefined, frequency: form.frequency, merchant: form.merchant || undefined, notes: form.notes || undefined };
+    setOpen(false); setEditingId(null); setForm(emptyForm);
+    if (editingId) {
+      const old = subsRef.current.find(s => s.subscription_id === editingId);
+      setSubs(prev => prev.map(s => s.subscription_id === editingId ? { ...s, ...payload } : s));
+      withUndo({
+        action: () => api.patch(`/subscriptions/${editingId}`, payload),
+        undo: async () => { if (old) setSubs(prev => prev.map(s => s.subscription_id === editingId ? old : s)); await load(); },
+        onError: () => { if (old) setSubs(prev => prev.map(s => s.subscription_id === editingId ? old : s)); },
+        successMsg: "Subscription updated",
+        errorMsg: "Could not update",
+      });
+    } else {
+      const optimisticSub = { subscription_id: `optimistic-${Date.now()}`, ...payload, active: true };
+      setSubs(prev => [...prev, optimisticSub]);
+      try {
+        const { data } = await api.post("/subscriptions", payload);
+        setSubs(prev => prev.map(s => s.subscription_id === optimisticSub.subscription_id ? data : s));
+        toast.success("Subscription added");
+      } catch (e) {
+        setSubs(prev => prev.filter(s => s.subscription_id !== optimisticSub.subscription_id));
+        toast.error(formatApiError(e) || "Could not save");
       }
-      setOpen(false); setEditingId(null); setForm(emptyForm); await load();
-    } catch (e) { toast.error(formatApiError(e) || "Could not save"); }
+    }
   };
 
   const toggleActive = async (s) => {
-    try { await api.patch(`/subscriptions/${s.subscription_id}`, { active: !s.active }); toast.success(s.active ? "Paused" : "Activated"); await load(); }
-    catch (e) { toast.error(formatApiError(e) || "Could not update"); }
+    setSubs(prev => prev.map(sub => sub.subscription_id === s.subscription_id ? { ...sub, active: !sub.active } : sub));
+    try {
+      await api.patch(`/subscriptions/${s.subscription_id}`, { active: !s.active });
+      toast.success(s.active ? "Paused" : "Activated");
+    } catch (e) {
+      setSubs(prev => prev.map(sub => sub.subscription_id === s.subscription_id ? { ...sub, active: !!s.active } : sub));
+      toast.error(formatApiError(e) || "Could not update");
+    }
   };
 
   const del = async (id) => {
-    const sub = subs.find(s => s.subscription_id === id);
-    try { await api.delete(`/subscriptions/${id}`); toast("Subscription deleted", { action: { label: "Undo", onClick: async () => { await api.post("/subscriptions", { name: sub.name, amount: Math.abs(sub.amount), category: sub.category, frequency: sub.frequency, merchant: sub.merchant, notes: sub.notes }); toast.success("Restored"); await load(); } }, duration: 6000 }); await load(); }
-    catch (e) { toast.error(formatApiError(e) || "Could not delete"); }
+    const sub = subsRef.current.find(s => s.subscription_id === id);
+    if (!sub) return;
+    setSubs(prev => prev.filter(s => s.subscription_id !== id));
+    withUndo({
+      action: () => api.delete(`/subscriptions/${id}`),
+      undo: async () => {
+        setSubs(prev => [...prev, sub]);
+        await api.post("/subscriptions", { name: sub.name, amount: Math.abs(sub.amount), category: sub.category, frequency: sub.frequency, merchant: sub.merchant, notes: sub.notes });
+      },
+      onError: () => setSubs(prev => [...prev, sub]),
+      successMsg: "Subscription deleted",
+      errorMsg: "Could not delete",
+    });
   };
 
   const monthlyTotal = subs.filter((s) => s.active).reduce((sum, s) => sum + Math.abs(s.amount), 0);

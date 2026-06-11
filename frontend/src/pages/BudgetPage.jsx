@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
+import { withUndo } from "../lib/undo";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import ConfirmModal from "../components/ui/ConfirmModal";
@@ -63,6 +64,8 @@ export default React.memo(function BudgetPage() {
   useEffect(() => { const id = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(id); }, []);
   const [month, setMonth] = useState(fmtMonth(now.getFullYear(), now.getMonth() + 1));
   const [budgets, setBudgets] = useState([]);
+  const budgetsRef = useRef(budgets);
+  budgetsRef.current = budgets;
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -202,30 +205,30 @@ export default React.memo(function BudgetPage() {
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!form.category.trim() || !form.limit) { toast.error("Enter a category and amount"); return; }
+    const payload = {
+      category: form.category.toLowerCase().trim(),
+      limit: parseFloat(form.limit),
+      period: "monthly",
+      budget_type: form.budget_type,
+      month: month,
+    };
+    if (form.budget_type === "event") {
+      if (form.event_date) payload.event_date = form.event_date;
+      if (form.event_group_id) payload.event_group_id = form.event_group_id;
+      if (form.event_group_name) payload.event_group_name = form.event_group_name.trim();
+      delete payload.month;
+    }
+    const optimisticBudget = { budget_id: `optimistic-${Date.now()}`, ...payload, spent: 0, progress_pct: 0 };
+    setBudgets(prev => [...prev, optimisticBudget]);
+    setForm((prev) => ({ ...prev, category: "", limit: "" }));
     try {
-      const payload = {
-        category: form.category.toLowerCase().trim(),
-        limit: parseFloat(form.limit),
-        period: "monthly",
-        budget_type: form.budget_type,
-        month: month,
-      };
-      if (form.budget_type === "event") {
-        if (form.event_date) payload.event_date = form.event_date;
-        if (form.event_group_id) payload.event_group_id = form.event_group_id;
-        if (form.event_group_name) payload.event_group_name = form.event_group_name.trim();
-        delete payload.month;
-      }
-      await api.post("/budgets", payload);
+      const { data } = await api.post("/budgets", payload);
+      setBudgets(prev => prev.map(b => b.budget_id === optimisticBudget.budget_id ? data : b));
       toast.success(form.budget_type === "event" ? "Item added to event" : "Budget added");
-      setBudgetAdded(true);
-      if (form.budget_type === "event") {
-        setForm((prev) => ({ ...prev, category: "", limit: "" }));
-      } else {
-        setForm((prev) => ({ ...prev, category: "", limit: "" }));
-      }
-      await fetchData();
-    } catch (err) { toast.error(err.response?.data?.detail || "Could not save"); }
+    } catch (err) {
+      setBudgets(prev => prev.filter(b => b.budget_id !== optimisticBudget.budget_id));
+      toast.error(err.response?.data?.detail || "Could not save");
+    }
   };
 
   const handleQuickExpense = async (e) => {
@@ -284,23 +287,38 @@ export default React.memo(function BudgetPage() {
 
   const handleUpdate = async (id) => {
     if (!form.category.trim() || !form.limit) { toast.error("Enter a category and amount"); return; }
-    try {
-      const payload = { category: form.category.toLowerCase().trim(), limit: parseFloat(form.limit) };
-      if (form.budget_type === "event") payload.event_date = form.event_date || null;
-      await api.patch(`/budgets/${id}`, payload);
-      toast.success("Updated");
-      cancelEdit();
-      await fetchData();
-    } catch { toast.error("Could not update"); }
+    const payload = { category: form.category.toLowerCase().trim(), limit: parseFloat(form.limit) };
+    if (form.budget_type === "event") payload.event_date = form.event_date || null;
+    const old = budgetsRef.current.find(b => b.budget_id === id);
+    setBudgets(prev => prev.map(b => b.budget_id === id ? { ...b, ...payload } : b));
+    cancelEdit();
+    withUndo({
+      action: () => api.patch(`/budgets/${id}`, payload),
+      undo: async () => {
+        if (old) setBudgets(prev => prev.map(b => b.budget_id === id ? old : b));
+        await fetchData();
+      },
+      onError: () => { if (old) setBudgets(prev => prev.map(b => b.budget_id === id ? old : b)); },
+      successMsg: "Budget updated",
+      errorMsg: "Could not update",
+    });
   };
 
   const handleDelete = async (id) => {
-    try {
-      await api.delete(`/budgets/${id}`);
-      toast.success("Removed");
-      setConfirmDelete(null);
-      await fetchData();
-    } catch { toast.error("Could not delete"); }
+    const old = budgetsRef.current.find(b => b.budget_id === id);
+    if (!old) return;
+    setBudgets(prev => prev.filter(b => b.budget_id !== id));
+    setConfirmDelete(null);
+    withUndo({
+      action: () => api.delete(`/budgets/${id}`),
+      undo: async () => {
+        setBudgets(prev => [...prev, old]);
+        await api.post("/budgets", old);
+      },
+      onError: () => setBudgets(prev => [...prev, old]),
+      successMsg: "Budget removed",
+      errorMsg: "Could not delete",
+    });
   };
 
   const handleSeedDefaults = async () => {

@@ -1,7 +1,7 @@
 """In-memory rate limiter using a sliding window per user/IP + CSRF middleware."""
 import time
 import logging
-from collections import defaultdict
+from collections import defaultdict, deque
 from fastapi import HTTPException, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -17,7 +17,7 @@ class RateLimiter:
     def __init__(self, limit: int = DEFAULT_LIMIT, window: int = DEFAULT_WINDOW):
         self.limit = limit
         self.window = window
-        self._buckets: dict[str, list[float]] = defaultdict(list)
+        self._buckets: dict[str, deque] = defaultdict(deque)
 
     def _key(self, request: Request) -> str:
         user_id = getattr(request.state, "user_id", None)
@@ -32,7 +32,7 @@ class RateLimiter:
         bucket = self._buckets[key]
         cutoff = now - self.window
         while bucket and bucket[0] < cutoff:
-            bucket.pop(0)
+            bucket.popleft()
         if len(bucket) >= self.limit:
             return False
         bucket.append(now)

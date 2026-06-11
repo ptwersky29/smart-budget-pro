@@ -224,24 +224,32 @@ const Transactions = React.memo(function Transactions() {
 
   const submit = useCallback(async (e) => {
     e.preventDefault();
-    try {
-      const amt = parseFloat(form.amount);
-      const signed = form.is_income ? Math.abs(amt) : -Math.abs(amt);
-      if (editingId) {
-        const payload = { description: form.description, amount: signed, category: form.category || undefined, is_income: form.is_income };
-        const old = txsRef.current.find(t => t.transaction_id === editingId);
-        await api.patch(`/transactions/${editingId}`, payload);
-        toast("Transaction updated", {
-          action: { label: "Undo", onClick: async () => { if (old) { await api.patch(`/transactions/${editingId}`, { description: old.description, amount: old.amount, category: old.category || undefined, is_income: old.is_income }); toast.success("Restored"); await load(); } } },
-          duration: 6000,
-        });
-      } else if (classification || form.budget_type) {
-        // Use AI or manual classification
-        const suggestions = classification?.suggestions || [];
-        const chosenIdx = suggestions.findIndex(s => s.category === form.category);
+    const amt = parseFloat(form.amount);
+    const signed = form.is_income ? Math.abs(amt) : -Math.abs(amt);
+    if (editingId) {
+      const payload = { description: form.description, amount: signed, category: form.category || undefined, is_income: form.is_income };
+      const old = txsRef.current.find(t => t.transaction_id === editingId);
+      setTxs(prev => prev.map(t => t.transaction_id === editingId ? { ...t, ...payload } : t));
+      setOpen(false); setEditingId(null);
+      withUndo({
+        action: () => api.patch(`/transactions/${editingId}`, payload),
+        undo: async () => {
+          if (old) { await api.patch(`/transactions/${editingId}`, { description: old.description, amount: old.amount, category: old.category || undefined, is_income: old.is_income }); }
+          await load();
+        },
+        onError: () => { if (old) setTxs(prev => prev.map(t => t.transaction_id === editingId ? old : t)); load(); },
+        successMsg: "Transaction updated",
+        errorMsg: "Could not update",
+      });
+    } else if (classification || form.budget_type) {
+      const suggestions = classification?.suggestions || [];
+      const chosenIdx = suggestions.findIndex(s => s.category === form.category);
+      setOpen(false); setEditingId(null);
+      const optimisticTx = { transaction_id: `optimistic-${Date.now()}`, description: form.description, amount: signed, category: form.category, date: new Date().toISOString(), source: "manual" };
+      setTxs(prev => [optimisticTx, ...prev]);
+      try {
         await api.post("/budget-system/approve", {
-          description: form.description.trim(),
-          amount: signed,
+          description: form.description.trim(), amount: signed,
           budget_type: form.budget_type || suggestions[0]?.budget_type || "day_to_day",
           occasion: form.occasion || suggestions[0]?.occasion || "Monthly Living",
           category: form.category || suggestions[0]?.category || "uncategorized",
@@ -251,17 +259,30 @@ const Transactions = React.memo(function Transactions() {
           save_as_recurring: saveAsRecurring,
         });
         toast.success("Transaction added");
-      } else {
-        // Standard add
-        const payload = { description: form.description, amount: signed, category: form.category || undefined, is_income: form.is_income };
-        const { data } = await api.post("/transactions", payload);
-        toast("Transaction added", {
-          action: { label: "Undo", onClick: async () => { await api.delete(`/transactions/${data.transaction_id}`); toast.success("Undone"); await load(); } },
-          duration: 6000,
-        });
+        await load();
+      } catch {
+        setTxs(prev => prev.filter(t => t.transaction_id !== optimisticTx.transaction_id));
+        toast.error("Could not add");
       }
-      setOpen(false); setEditingId(null); setForm(emptyForm); setClassification(null); setSaveAsRecurring(false); await load();
-    } catch { toast.error(editingId ? "Could not update" : "Could not add"); }
+    } else {
+      const payload = { description: form.description, amount: signed, category: form.category || undefined, is_income: form.is_income };
+      setOpen(false); setEditingId(null);
+      const optimisticTx = { transaction_id: `optimistic-${Date.now()}`, ...payload, date: new Date().toISOString(), source: "manual" };
+      setTxs(prev => [optimisticTx, ...prev]);
+      withUndo({
+        action: async () => {
+          const { data } = await api.post("/transactions", payload);
+          setTxs(prev => prev.map(t => t.transaction_id === optimisticTx.transaction_id ? data : t));
+        },
+        undo: async () => {
+          await load();
+        },
+        onError: () => setTxs(prev => prev.filter(t => t.transaction_id !== optimisticTx.transaction_id)),
+        successMsg: "Transaction added",
+        errorMsg: "Could not add",
+      });
+    }
+    setForm(emptyForm); setClassification(null); setSaveAsRecurring(false);
   }, [editingId, form, load, classification, saveAsRecurring]);
 
   const clearClassification = useCallback(() => { setClassification(null); setSaveAsRecurring(false); }, []);
@@ -400,6 +421,7 @@ const Transactions = React.memo(function Transactions() {
         setTxs(prev => [...prev, tx]);
         await api.post("/transactions", tx);
       },
+      onError: () => setTxs(prev => [...prev, tx]),
       successMsg: "Transaction deleted",
       errorMsg: "Could not delete",
     });

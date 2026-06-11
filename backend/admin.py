@@ -1,4 +1,5 @@
 """Phase 9 — Admin dashboard: system stats, user management, feature flags."""
+import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -29,75 +30,77 @@ def build_router() -> APIRouter:
     async def admin_dashboard(request: Request, user: dict = Depends(require_admin)):
         sm = request.app.state.db
         async with sm() as session:
-            total_users = (await session.execute(select(func.count()).select_from(User))).scalar() or 0
-            from sqlalchemy import distinct
-            active_users = len(set((await session.execute(
-                select(AuditLog.user_id).where(
-                    AuditLog.created_at >= datetime.now(timezone.utc) - timedelta(days=30),
-                    AuditLog.user_id.isnot(None),
-                )
-            )).scalars().all()))
-            total_tx = (await session.execute(select(func.count()).select_from(Transaction))).scalar() or 0
-            total_value = (await session.execute(select(func.sum(Transaction.amount).where(Transaction.amount > 0)))).scalar() or 0
-            total_spend = abs((await session.execute(select(func.sum(Transaction.amount).where(Transaction.amount < 0)))).scalar() or 0)
-            open_tickets = (await session.execute(
-                select(func.count()).select_from(SupportTicket).where(SupportTicket.status.in_(["open", "in_progress"]))
-            )).scalar() or 0
-            flags_count = (await session.execute(select(func.count()).select_from(FeatureFlag))).scalar() or 0
-            recent_logs = (await session.execute(
-                select(AuditLog).order_by(AuditLog.created_at.desc()).limit(10)
-            )).scalars().all()
-
-            # SMS stats
             now = datetime.now(timezone.utc)
             today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
             month_start = now.replace(day=1)
-            sms_total = (await session.execute(select(func.count()).select_from(SmsMessage))).scalar() or 0
-            sms_today = (await session.execute(
-                select(func.count()).select_from(SmsMessage).where(SmsMessage.created_at >= today_start)
-            )).scalar() or 0
-            sms_month = (await session.execute(
-                select(func.count()).select_from(SmsMessage).where(SmsMessage.created_at >= month_start)
-            )).scalar() or 0
-            sms_inbound = (await session.execute(
-                select(func.count()).select_from(SmsMessage).where(SmsMessage.direction == "inbound")
-            )).scalar() or 0
-            sms_outbound = (await session.execute(
-                select(func.count()).select_from(SmsMessage).where(SmsMessage.direction == "outbound")
-            )).scalar() or 0
-            sms_orphans = (await session.execute(
-                select(func.count()).select_from(SmsMessage).where(SmsMessage.user_id == "orphan")
-            )).scalar() or 0
-            sender_count = (await session.execute(select(func.count()).select_from(SmsSender))).scalar() or 0
-            sms_success = (await session.execute(
-                select(func.count()).select_from(SmsMessage).where(
-                    SmsMessage.status == "delivered", SmsMessage.direction == "outbound"
-                )
-            )).scalar() or 0
-            sms_failed = (await session.execute(
-                select(func.count()).select_from(SmsMessage).where(
-                    SmsMessage.status == "failed", SmsMessage.direction == "outbound"
-                )
-            )).scalar() or 0
+            thirty_days_ago = now - timedelta(days=30)
 
-            # Top merchants across all users
-            top_merchants_result = await session.execute(
-                select(Transaction.normalized_merchant, func.sum(func.abs(Transaction.amount)).label("total"))
-                .where(Transaction.normalized_merchant.isnot(None), Transaction.normalized_merchant != "",
-                       Transaction.amount < 0)
-                .group_by(Transaction.normalized_merchant)
-                .order_by(func.sum(func.abs(Transaction.amount)).desc())
-                .limit(10)
+            from sqlalchemy import distinct
+
+            async def _scalar(q):
+                return (await session.execute(q)).scalar() or 0
+
+            (
+                total_users,
+                active_user_ids,
+                total_tx,
+                total_value,
+                total_spend_raw,
+                open_tickets,
+                flags_count,
+                recent_logs,
+                sms_total,
+                sms_today,
+                sms_month,
+                sms_inbound,
+                sms_outbound,
+                sms_orphans,
+                sender_count,
+                sms_success,
+                sms_failed,
+                sms_tx_count,
+                top_merchants_result,
+            ) = await asyncio.gather(
+                _scalar(select(func.count()).select_from(User)),
+                session.execute(
+                    select(AuditLog.user_id).where(
+                        AuditLog.created_at >= thirty_days_ago,
+                        AuditLog.user_id.isnot(None),
+                    )
+                ),
+                _scalar(select(func.count()).select_from(Transaction)),
+                _scalar(select(func.sum(Transaction.amount).where(Transaction.amount > 0))),
+                _scalar(select(func.sum(Transaction.amount).where(Transaction.amount < 0))),
+                _scalar(select(func.count()).select_from(SupportTicket).where(SupportTicket.status.in_(["open", "in_progress"]))),
+                _scalar(select(func.count()).select_from(FeatureFlag)),
+                session.execute(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(10)),
+                _scalar(select(func.count()).select_from(SmsMessage)),
+                _scalar(select(func.count()).select_from(SmsMessage).where(SmsMessage.created_at >= today_start)),
+                _scalar(select(func.count()).select_from(SmsMessage).where(SmsMessage.created_at >= month_start)),
+                _scalar(select(func.count()).select_from(SmsMessage).where(SmsMessage.direction == "inbound")),
+                _scalar(select(func.count()).select_from(SmsMessage).where(SmsMessage.direction == "outbound")),
+                _scalar(select(func.count()).select_from(SmsMessage).where(SmsMessage.user_id == "orphan")),
+                _scalar(select(func.count()).select_from(SmsSender)),
+                _scalar(select(func.count()).select_from(SmsMessage).where(SmsMessage.status == "delivered", SmsMessage.direction == "outbound")),
+                _scalar(select(func.count()).select_from(SmsMessage).where(SmsMessage.status == "failed", SmsMessage.direction == "outbound")),
+                _scalar(select(func.count()).select_from(Transaction).where(Transaction.source == "sms")),
+                session.execute(
+                    select(Transaction.normalized_merchant, func.sum(func.abs(Transaction.amount)).label("total"))
+                    .where(Transaction.normalized_merchant.isnot(None), Transaction.normalized_merchant != "",
+                           Transaction.amount < 0)
+                    .group_by(Transaction.normalized_merchant)
+                    .order_by(func.sum(func.abs(Transaction.amount)).desc())
+                    .limit(10)
+                ),
             )
+
+            active_users = len(set(active_user_ids.scalars().all()))
+            total_spend = abs(total_spend_raw)
+            recent_logs_list = recent_logs.scalars().all()
             top_merchants = [
                 {"merchant": row.normalized_merchant, "total_spend": round(float(row.total), 2)}
                 for row in top_merchants_result
             ]
-
-            # SMS source transactions count
-            sms_tx_count = (await session.execute(
-                select(func.count()).select_from(Transaction).where(Transaction.source == "sms")
-            )).scalar() or 0
 
             return {
                 "stats": {
@@ -125,7 +128,7 @@ def build_router() -> APIRouter:
                 "top_merchants": top_merchants,
                 "recent_activity": [
                     {"action": a.action, "user_id": a.user_id, "resource": a.resource, "at": a.created_at.isoformat() if a.created_at else None}
-                    for a in recent_logs
+                    for a in recent_logs_list
                 ],
             }
 

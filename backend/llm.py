@@ -12,6 +12,22 @@ logger = logging.getLogger(__name__)
 
 OPENROUTER_API = "https://openrouter.ai/api/v1/chat/completions"
 
+_llm_client: httpx.AsyncClient | None = None
+
+
+async def get_llm_client() -> httpx.AsyncClient:
+    global _llm_client
+    if _llm_client is None:
+        _llm_client = httpx.AsyncClient(timeout=90.0)
+    return _llm_client
+
+
+async def close_llm_client():
+    global _llm_client
+    if _llm_client:
+        await _llm_client.aclose()
+        _llm_client = None
+
 MODEL_COSTS = {
     "google/gemini-2.0-flash-lite-001": {"input": 0.075e-6, "output": 0.3e-6},
     "google/gemini-2.0-flash-001": {"input": 0.15e-6, "output": 0.6e-6},
@@ -68,20 +84,20 @@ async def call_llm(
     if json_mode:
         body["response_format"] = {"type": "json_object"}
 
-    async with httpx.AsyncClient(timeout=90.0) as client:
-        # Retry up to 3 times with exponential backoff on 429
-        for attempt in range(4):
-            resp = await client.post(OPENROUTER_API, headers=headers, json=body)
-            if resp.status_code == 429 and attempt < 3:
-                wait = 2 ** attempt
-                logger.warning(f"LLM rate-limited (429), retrying in {wait}s (attempt {attempt + 1}/3)")
-                await asyncio.sleep(wait)
-                continue
-            if resp.status_code != 200:
-                logger.error(f"OpenRouter error {resp.status_code}: {resp.text[:500]}")
-                raise RuntimeError(f"LLM call failed ({resp.status_code})")
-            break
-        data = resp.json()
+    client = await get_llm_client()
+    # Retry up to 3 times with exponential backoff on 429
+    for attempt in range(4):
+        resp = await client.post(OPENROUTER_API, headers=headers, json=body)
+        if resp.status_code == 429 and attempt < 3:
+            wait = 2 ** attempt
+            logger.warning(f"LLM rate-limited (429), retrying in {wait}s (attempt {attempt + 1}/3)")
+            await asyncio.sleep(wait)
+            continue
+        if resp.status_code != 200:
+            logger.error(f"OpenRouter error {resp.status_code}: {resp.text[:500]}")
+            raise RuntimeError(f"LLM call failed ({resp.status_code})")
+        break
+    data = resp.json()
 
     choices = data.get("choices", [])
     if not choices:

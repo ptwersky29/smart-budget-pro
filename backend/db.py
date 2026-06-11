@@ -161,11 +161,12 @@ async def create_tables():
             await conn.execute(text("DROP INDEX IF EXISTS uq_budgets_everyday_user_cat"))
             await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_budgets_everyday_user_cat_month ON budgets(user_id, category, month) WHERE budget_type = 'everyday'"))
             # Performance indexes
-            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category)"))
-            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_transactions_source ON transactions(source)"))
-            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_transactions_pending ON transactions(pending)"))
-            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_maaser_ledger_tx ON maaser_ledger(transaction_id)"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_transactions_user_date_desc ON transactions(user_id, date DESC)"))
             await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_transactions_user_cat ON transactions(user_id, category)"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_transactions_merchant ON transactions(merchant_name)"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_maaser_ledger_tx ON maaser_ledger(transaction_id)"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_audit_user_created ON audit_logs(user_id, created_at)"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_ai_usage_user_date ON ai_usage(user_id, date)"))
 
 
 async def get_session() -> AsyncSession:
@@ -191,8 +192,8 @@ class User(Base, TimestampMixin):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     picture: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -226,9 +227,9 @@ class User(Base, TimestampMixin):
     email_verification_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # relationships
-    sessions: Mapped[List["UserSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    bank_connections: Mapped[List["BankConnection"]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    support_tickets: Mapped[List["SupportTicket"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    sessions: Mapped[List["UserSession"]] = relationship(back_populates="user", cascade="all, delete-orphan", lazy="selectin")
+    bank_connections: Mapped[List["BankConnection"]] = relationship(back_populates="user", cascade="all, delete-orphan", lazy="selectin")
+    support_tickets: Mapped[List["SupportTicket"]] = relationship(back_populates="user", cascade="all, delete-orphan", lazy="selectin")
 
 
 class UserSession(Base, TimestampMixin):
@@ -276,8 +277,8 @@ class TrueLayerState(Base):
     __tablename__ = "truelayer_states"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    state: Mapped[str] = mapped_column(String(128), unique=True, nullable=False, index=True)
-    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False)
+    state: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     redirect_uri: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     meta: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -369,7 +370,7 @@ class Transaction(Base, TimestampMixin):
     __tablename__ = "transactions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    transaction_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    transaction_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.user_id"), nullable=False, index=True)
     account_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     connection_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
@@ -381,7 +382,7 @@ class Transaction(Base, TimestampMixin):
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     tags: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    merchant_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    merchant_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     normalized_merchant: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     pending: Mapped[bool] = mapped_column(Boolean, default=False)
     tx_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
@@ -393,6 +394,9 @@ class Transaction(Base, TimestampMixin):
 
     __table_args__ = (
         Index("idx_transactions_user_date", "user_id", "date"),
+        Index("idx_transactions_user_date_desc", "user_id", text("date DESC")),
+        Index("idx_transactions_user_cat", "user_id", "category"),
+        Index("idx_transactions_user_merchant", "user_id", "merchant_name"),
     )
 
 

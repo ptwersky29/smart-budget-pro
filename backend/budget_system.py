@@ -1252,15 +1252,21 @@ def build_router() -> APIRouter:
             occasions = occ_result.scalars().all()
             total_budgeted = 0
             total_actual = 0
-            for occ in occasions:
-                cat_result = await session.execute(
+            if occasions:
+                occasion_ids = [occ.id for occ in occasions]
+                cats_result = await session.execute(
                     select(BudgetOccasionCategory).where(
-                        BudgetOccasionCategory.occasion_id == occ.id,
+                        BudgetOccasionCategory.occasion_id.in_(occasion_ids),
                     )
                 )
-                for cat in cat_result.scalars().all():
-                    total_budgeted += cat.budgeted_amount
-                    total_actual += cat.actual_amount
+                from collections import defaultdict
+                cats_by_occasion = defaultdict(list)
+                for cat in cats_result.scalars().all():
+                    cats_by_occasion[cat.occasion_id].append(cat)
+                for occ in occasions:
+                    for cat in cats_by_occasion.get(occ.id, []):
+                        total_budgeted += cat.budgeted_amount
+                        total_actual += cat.actual_amount
 
             if total_budgeted > 0:
                 adherence_pct = min(100, (total_actual / total_budgeted) * 100)

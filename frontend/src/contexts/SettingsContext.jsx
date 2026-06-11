@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
@@ -30,14 +30,13 @@ function applyToDOM(preferences) {
   root.dataset.highContrast = acc.high_contrast ? "true" : "false";
   root.dataset.reduceMotion = acc.reduce_motion ? "true" : "false";
   root.dataset.enhancedFocus = acc.enhanced_focus ? "true" : "false";
-  
-  // Apply CSS classes for high contrast and enhanced focus
+
   if (acc.high_contrast) {
     root.classList.add("high-contrast-mode");
   } else {
     root.classList.remove("high-contrast-mode");
   }
-  
+
   if (acc.enhanced_focus) {
     root.classList.add("enhanced-focus");
   } else {
@@ -53,8 +52,10 @@ export function SettingsProvider({ children }) {
   });
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const debounceTimer = useRef(null);
 
-  // Apply defaults to DOM immediately on mount so settings take effect even before API loads
   useEffect(() => {
     applyToDOM(DEFAULTS);
   }, []);
@@ -75,19 +76,31 @@ export function SettingsProvider({ children }) {
   useEffect(() => { load(); }, [load]);
 
   const updateSettings = useCallback(async (patch) => {
-    setSaving(true);
-    try {
-      const { data } = await api.put("/settings/app", patch);
-      setSettings(data);
-      if (patch.theme) setTheme(patch.theme);
-      applyToDOM(data.preferences);
-      return data;
-    } catch (err) {
-      toast.error("Failed to save settings");
-      throw err;
-    } finally {
-      setSaving(false);
-    }
+    const prev = settingsRef.current;
+    const merged = { ...prev, ...patch, preferences: { ...prev.preferences, ...patch.preferences } };
+    setSettings(merged);
+    if (patch.theme) setTheme(patch.theme);
+    applyToDOM(merged.preferences || DEFAULTS);
+
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    return new Promise((resolve, reject) => {
+      debounceTimer.current = setTimeout(async () => {
+        setSaving(true);
+        try {
+          const { data } = await api.put("/settings/app", patch);
+          setSettings(data);
+          resolve(data);
+        } catch (err) {
+          setSettings(prev);
+          if (prev.theme) setTheme(prev.theme);
+          applyToDOM(prev.preferences || DEFAULTS);
+          toast.error("Failed to save settings");
+          reject(err);
+        } finally {
+          setSaving(false);
+        }
+      }, 300);
+    });
   }, [setTheme]);
 
   const value = useMemo(() => ({
