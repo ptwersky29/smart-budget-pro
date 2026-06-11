@@ -121,32 +121,37 @@ async def root():
 @api.get("/health")
 async def health():
     stripe_vars = ["STRIPE_API_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_MONTHLY_PRICE_ID", "STRIPE_YEARLY_PRICE_ID"]
+    checks = {"database": "unavailable", "version": app.version, "uptime": None}
+    db_ok = False
     try:
         sm = get_session_maker()
         async with sm() as session:
             await session.execute(text("SELECT 1"))
-            return {
-                "status": "ok",
-                "version": app.version,
-                "commit": GIT_COMMIT,
-                "database": "connected",
-                "auth_configured": bool(os.environ.get("JWT_SECRET")),
-                "frontend_url_set": bool(os.environ.get("FRONTEND_URL")),
-                "stripe_configured": all(os.environ.get(v) for v in stripe_vars),
-                "routers": len(api.routes),
-            }
+            db_ok = True
+            checks["database"] = "connected"
     except Exception as e:
-        return {
-            "status": "error",
-            "version": app.version,
-            "commit": GIT_COMMIT,
-            "detail": str(e),
-            "database": "unavailable",
-            "auth_configured": bool(os.environ.get("JWT_SECRET")),
-            "frontend_url_set": bool(os.environ.get("FRONTEND_URL")),
-            "stripe_configured": all(os.environ.get(v) for v in stripe_vars),
-            "routers": len(api.routes),
-        }
+        checks["database"] = f"error: {str(e)[:60]}"
+
+    try:
+        import time
+        if not hasattr(app.state, "started_at"):
+            app.state.started_at = time.time()
+        checks["uptime"] = round(time.time() - app.state.started_at, 1)
+    except Exception:
+        checks["uptime"] = None
+
+    status = "ok" if db_ok else "degraded"
+    return {
+        "status": status,
+        "version": app.version,
+        "commit": GIT_COMMIT,
+        "checks": checks,
+        "auth_configured": bool(os.environ.get("JWT_SECRET")),
+        "frontend_url_set": bool(os.environ.get("FRONTEND_URL")),
+        "stripe_configured": all(os.environ.get(v) for v in stripe_vars),
+        "sentry_configured": bool(os.environ.get("SENTRY_DSN")),
+        "routers": len(api.routes),
+    }
 
 
 @api.get("/csrf-token")

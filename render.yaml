@@ -1,14 +1,27 @@
+# Render Blueprint — Smart Budget Pro
+# Preview environments inherit envVars from master branch
+
+databases:
+  - name: financeai-db
+    databaseName: financeai
+    region: frankfurt
+    plan: starter
+    ipAllowList: []
+
 services:
   - type: web
     name: financeai-api
     env: python
+    region: frankfurt
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT --workers 2
     healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: financeai-db
+          property: connectionString
       - key: JWT_SECRET
         generateValue: true
       - key: FRONTEND_URL
@@ -25,3 +38,39 @@ services:
         sync: false
       - key: OPENROUTER_API_KEY
         sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: JSON_LOG
+        value: "true"
+      - key: LOG_LEVEL
+        value: info
+
+  - type: worker
+    name: financeai-worker
+    env: python
+    region: frankfurt
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -c "
+import asyncio, os, logging
+logging.basicConfig(level=getattr(logging, os.environ.get('LOG_LEVEL', 'INFO').upper()))
+logger = logging.getLogger('worker')
+async def run():
+    from server import startup
+    await startup()
+    logger.info('Worker started — running background tasks')
+    while True:
+        await asyncio.sleep(3600)
+asyncio.run(run())
+"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: financeai-db
+          property: connectionString
+      - key: JWT_SECRET
+        sync: false
+      - key: JSON_LOG
+        value: "true"
+      - key: LOG_LEVEL
+        value: info
