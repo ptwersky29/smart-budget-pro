@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-06-08T15:59:03.797316",
+    "timestamp": "2026-06-11T12:49:19.484392",
     "root_path": "D:\\Users\\PC\\Downloads\\smart-budget-pro-main (1)\\smart-budget-pro-main",
-    "duration_seconds": 2.2163329124450684
+    "duration_seconds": 5.534759044647217
   },
   "backend": {
     "environment": {
@@ -43,10 +43,10 @@
         "detail": "JWT_SECRET length: 64 chars"
       },
       "database_url": {
-        "passed": false,
+        "passed": true,
         "exists": true,
-        "valid_format": false,
-        "detail": "Invalid format. Expected: postgresql://user:pass@host:port/db"
+        "valid_format": true,
+        "detail": "PostgreSQL URL configured: postgresql+asyncpg://neondb_owner:npg_DEn4SXe1YkWV@***:***@ep-silent-water-ab6f94vy.eu-west-2.aws.neon.tech/neondb?ssl=require"
       }
     },
     "file_structure": {
@@ -152,14 +152,14 @@
       "connection": {
         "passed": false,
         "connected": false,
-        "error": "invalid DSN: scheme is expected to be either \"postgresql\" or \"postgres\", got 'postgresql+asyncpg'",
-        "detail": "Connection failed: invalid DSN: scheme is expected to be either \"postgresql\" or \"postgres\", got 'postgresql+asyncpg'"
+        "error": "unexpected connection_lost() call",
+        "detail": "Connection failed: unexpected connection_lost() call"
       },
       "tables": {
         "passed": false,
         "tables": [],
         "missing": [],
-        "error": "invalid DSN: scheme is expected to be either \"postgresql\" or \"postgres\", got 'postgresql+asyncpg'"
+        "error": "unexpected connection_lost() call"
       }
     }
   },
@@ -239,10 +239,11 @@
         "missing": []
       },
       "component_count": {
-        "count": 17,
+        "count": 18,
         "jsx_files": [
           "AccessibilityOverlay.jsx",
           "AIInsightPanel.jsx",
+          "CategoryCombobox.jsx",
           "CommandPalette.jsx",
           "ComparePeriods.jsx",
           "ConsentBanner.jsx",
@@ -259,7 +260,7 @@
           "TransactionRow.jsx",
           "YearEndJewishReport.jsx"
         ],
-        "detail": "17 component files found"
+        "detail": "18 component files found"
       },
       "test_coverage": {
         "test_dir_exists": true,
@@ -530,12 +531,12 @@
       },
       "frontend_usage": {
         "used_endpoints": [
+          "/api/auth/login",
           "/api/settings",
-          "/api/auth/logout",
           "/api/transactions",
           "/api/auth/me",
           "/api/budgets",
-          "/api/auth/login"
+          "/api/auth/logout"
         ],
         "unused_endpoints": []
       },

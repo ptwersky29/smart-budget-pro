@@ -142,7 +142,7 @@ class EnvironmentValidator:
         }
         
         if db_url:
-            result['valid_format'] = db_url.startswith('postgresql://') or db_url.startswith('postgres://')
+            result['valid_format'] = db_url.startswith('postgresql://') or db_url.startswith('postgres://') or db_url.startswith('postgresql+asyncpg://')
             result['passed'] = result['valid_format']
             if result['valid_format']:
                 # Mask password in display
@@ -277,15 +277,16 @@ class DatabaseValidator:
         
         if not self.db_url:
             return result
-        
+
         try:
             import asyncpg
             try:
-                # Parse connection string
-                conn = await asyncpg.connect(self.db_url, command_timeout=10)
+                import re
+                pg_url = re.sub(r'^postgresql\+asyncpg://', 'postgresql://', self.db_url)
+                conn = await asyncpg.connect(pg_url, command_timeout=10)
                 version = await conn.fetchval('SELECT version()')
                 await conn.close()
-                
+
                 result['passed'] = True
                 result['connected'] = True
                 result['detail'] = f"PostgreSQL connected successfully"
@@ -310,21 +311,23 @@ class DatabaseValidator:
         
         if not self.db_url:
             return result
-        
+
         try:
             import asyncpg
             try:
-                conn = await asyncpg.connect(self.db_url, command_timeout=10)
-                
+                import re
+                pg_url = re.sub(r'^postgresql\+asyncpg://', 'postgresql://', self.db_url)
+                conn = await asyncpg.connect(pg_url, command_timeout=10)
+
                 # Query information schema
                 tables = await conn.fetch("""
                     SELECT table_name FROM information_schema.tables 
                     WHERE table_schema = 'public'
                 """)
-                
+
                 result['tables'] = [t['table_name'] for t in tables]
                 result['passed'] = len(result['tables']) > 0
-                
+
                 await conn.close()
             except Exception as e:
                 result['error'] = str(e)[:100]
