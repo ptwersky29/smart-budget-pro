@@ -4,6 +4,7 @@ import { PageHeader } from "../components/ui/layout";
 import SettingsLayout from "../components/SettingsLayout";
 import AppearanceSettings from "../components/settings/AppearanceSettings";
 import DashboardSettings from "../components/settings/DashboardSettings";
+import FinanceSettings from "../components/settings/FinanceSettings";
 import AutomationSettings from "../components/settings/AutomationSettings";
 import NotificationSettings from "../components/settings/NotificationSettings";
 import AccessibilitySettings from "../components/settings/AccessibilitySettings";
@@ -32,6 +33,7 @@ export default function Settings() {
       <SettingsLayout active={activeSection} onChange={setSection}>
         {activeSection === "appearance" && <AppearanceSettings />}
         {activeSection === "dashboard" && <DashboardSettings />}
+        {activeSection === "finance" && <FinanceSettings />}
         {activeSection === "automation" && <AutomationSettings />}
         {activeSection === "notifications" && <NotificationSettings />}
         {activeSection === "accessibility" && <AccessibilitySettings />}

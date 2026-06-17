@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
+import { useSettings } from "../contexts/SettingsContext";
 import { toast } from "sonner";
 import AIInsightPanel from "../components/AIInsightPanel";
 import { EmptyState } from "../components/ui/layout";
@@ -25,6 +26,7 @@ import {
 
 const Dashboard = React.memo(function Dashboard() {
   const { user } = useAuth();
+  const { settings } = useSettings();
   const navigate = useNavigate();
   useEffect(() => { document.title = "Dashboard | FinanceAI"; }, []);
   const [overview, setOverview] = useState(null);
@@ -33,6 +35,12 @@ const Dashboard = React.memo(function Dashboard() {
   const [upcoming, setUpcoming] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const dashboardPrefs = settings.preferences?.dashboard || {};
+  const activeWidgets = dashboardPrefs.widgets || [];
+  const widgetOrder = dashboardPrefs.widget_order || [];
+  const chartStyle = dashboardPrefs.chart_style || "smooth";
+  const showWidget = (key) => activeWidgets.includes(key);
 
   const loadAll = useCallback(async (silent) => {
     if (!silent) setLoading(true);
@@ -168,10 +176,10 @@ const Dashboard = React.memo(function Dashboard() {
       {!empty && <>
       {/* KPI row */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-        <NetWorthCard overview={overview} trendData={trendData} />
-        <IncomeCard overview={overview} />
-        <SpendingCard overview={overview} />
-        <HealthScoreCard overview={overview} />
+        {showWidget("net_worth") && <NetWorthCard overview={overview} trendData={trendData} />}
+        {showWidget("income") && <IncomeCard overview={overview} />}
+        {showWidget("spending") && <SpendingCard overview={overview} />}
+        {showWidget("health_score") && <HealthScoreCard overview={overview} />}
       </div>
 
       {/* Alerts + Upcoming */}
@@ -212,22 +220,24 @@ const Dashboard = React.memo(function Dashboard() {
 
       {/* 3-column: Budgets | Cash Flow | Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <BudgetsOverview budgets={budgets} currentMonthBudget={currentMonthBudget} />
-        <CashFlowChart overview={overview} />
-        <QuickActionsPanel />
+        {showWidget("budgets_overview") && <BudgetsOverview budgets={budgets} currentMonthBudget={currentMonthBudget} />}
+        {showWidget("cash_flow") && <CashFlowChart overview={overview} chartStyle={chartStyle} />}
+        {showWidget("quick_actions") && <QuickActionsPanel />}
       </div>
 
       {/* AI Insights */}
-      <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card p-5">
-        <AIInsightPanel
-          title="AI Insights"
-          subtitle="What's happening with your money"
-          endpoint="/ai/insights/dashboard"
-        />
-      </div>
+      {showWidget("ai_insights") && (
+        <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card p-5">
+          <AIInsightPanel
+            title="AI Insights"
+            subtitle="What's happening with your money"
+            endpoint="/ai/insights/dashboard"
+          />
+        </div>
+      )}
 
       {/* Recent transactions */}
-      <RecentTransactions overview={overview} />
+      {showWidget("recent_transactions") && <RecentTransactions overview={overview} />}
       </>}
     </div>
   );

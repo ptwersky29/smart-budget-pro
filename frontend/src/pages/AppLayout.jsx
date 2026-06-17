@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { useSettings } from "../contexts/SettingsContext";
 import { useTheme } from "next-themes";
 import { useKeyboardShortcut } from "../hooks/useKeyboardShortcut";
 import KeyboardShortcutsHelp from "../components/KeyboardShortcutsHelp";
@@ -21,9 +22,11 @@ import { LogOut, Menu, X, MoonStar, Sun, Crown, ArrowRight } from "lucide-react"
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
+  const { settings } = useSettings();
   const location = useLocation();
   const navigate = useNavigate();
   const { theme, setTheme, resolvedTheme } = useTheme();
+  const noAnim = settings.preferences?.dashboard?.animations === false || settings.preferences?.accessibility?.reduce_motion === true;
   const [open, setOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
@@ -196,7 +199,7 @@ export default function AppLayout() {
           {/* Route loading progress bar */}
           {routeLoading && (
             <div className="absolute top-0 left-0 right-0 h-0.5 z-50 overflow-hidden">
-              <div className="h-full bg-emerald animate-[routeProgress_0.4s_ease-out_forwards]" />
+              <div className={`h-full bg-emerald ${noAnim ? "" : "animate-[routeProgress_0.4s_ease-out_forwards]"}`} />
             </div>
           )}
           {/* Visually hidden page title for screen readers */}
@@ -259,7 +262,7 @@ export default function AppLayout() {
                 {routeMeta.primary && <Button asChild variant="primary" size="pill"><Link to={routeMeta.primary.to}>{routeMeta.primary.label}</Link></Button>}
               </div>
             </div>
-            <div key={location.pathname} className="animate-[slideInRight_0.3s_ease-out]">
+            <div key={location.pathname} className={noAnim ? "" : "animate-[slideInRight_0.3s_ease-out]"}>
               <Outlet />
             </div>
           </div>

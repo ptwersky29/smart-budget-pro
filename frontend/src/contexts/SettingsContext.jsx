@@ -3,14 +3,31 @@ import { api } from "../lib/api";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 
+const LS_KEY = "financeai_settings";
+
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveToStorage(data) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch {}
+}
+
 const SettingsContext = createContext(null);
 
 const DEFAULTS = {
   appearance: { density: "comfortable", font_size: "medium" },
   dashboard: {
     layout: "default",
-    widgets: ["overview", "recent_transactions", "budget_summary", "ai_insights", "spending_chart", "upcoming_events"],
+    widgets: ["net_worth", "income", "spending", "health_score", "cash_flow", "budgets_overview", "quick_actions", "ai_insights", "recent_transactions"],
+    widget_order: ["net_worth", "income", "spending", "health_score", "cash_flow", "budgets_overview", "quick_actions", "ai_insights", "recent_transactions"],
+    animations: true,
+    chart_style: "smooth",
   },
+  finance: { currency: "GBP", default_time_range: "6m" },
   automation: { ai_enabled: true, auto_categorize: true, predict_budget: true },
   notifications: {
     email_alerts: true, push_alerts: true, sms_alerts: false,
@@ -46,7 +63,8 @@ function applyToDOM(preferences) {
 
 export function SettingsProvider({ children }) {
   const { setTheme } = useTheme();
-  const [settings, setSettings] = useState({
+  const cached = useMemo(() => loadFromStorage(), []);
+  const [settings, setSettings] = useState(cached || {
     language: "en", theme: "system", currency: "GBP",
     onboarding_completed: false, preferences: DEFAULTS,
   });
@@ -64,10 +82,11 @@ export function SettingsProvider({ children }) {
     try {
       const { data } = await api.get("/settings/app");
       setSettings(data);
+      saveToStorage(data);
       if (data.theme) setTheme(data.theme);
       applyToDOM(data.preferences || DEFAULTS);
     } catch {
-      // offline-safe - defaults already applied above
+      // offline-safe — localStorage or defaults already applied
     } finally {
       setLoaded(true);
     }
@@ -89,9 +108,11 @@ export function SettingsProvider({ children }) {
         try {
           const { data } = await api.put("/settings/app", patch);
           setSettings(data);
+          saveToStorage(data);
           resolve(data);
         } catch (err) {
           setSettings(prev);
+          saveToStorage(prev);
           if (prev.theme) setTheme(prev.theme);
           applyToDOM(prev.preferences || DEFAULTS);
           toast.error("Failed to save settings");
