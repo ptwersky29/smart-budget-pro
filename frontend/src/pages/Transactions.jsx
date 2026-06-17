@@ -501,32 +501,37 @@ const Transactions = React.memo(function Transactions() {
   }, [txs, aiResults]);
 
   return (
-    <div className="space-y-4" data-testid="transactions-root">
+    <div className="space-y-3" data-testid="transactions-root">
 
       {/* ─── Header ─── */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold tracking-tight">Transactions</h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowSearch((s) => !s)}
-            className={`h-9 w-9 rounded-lg border grid place-items-center text-xs transition-colors ${
-              showSearch || filters.search
-                ? "border-emerald text-emerald bg-emerald/5"
-                : "border-border text-muted-foreground bg-card/80 hover:bg-secondary/60"
-            }`}
-            aria-label="Search"
-          >
-            <Search className="h-3.5 w-3.5" />
-          </button>
+      <div className="rounded-2xl border border-border bg-card/60 backdrop-blur-xl px-5 py-3 shadow-sm">
+        <div className="flex items-center justify-between">
+          <h1 className="text-lg font-semibold tracking-tight">Transactions</h1>
+          <div className="flex items-center gap-1.5">
+            {/* Search toggle */}
+            <button
+              onClick={() => setShowSearch((s) => !s)}
+              className={`h-8 w-8 rounded-full grid place-items-center transition-all duration-200 ${
+                showSearch || filters.search
+                  ? "bg-emerald text-white shadow-sm"
+                  : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+              }`}
+              aria-label="Search"
+            >
+              <Search className="h-3.5 w-3.5" />
+            </button>
 
-          <Sheet>
-            <SheetTrigger asChild>
-              <button className={`h-9 px-3 rounded-lg border ${
-                activeFilters.length > 0 ? "border-emerald text-emerald" : "border-border text-muted-foreground"
-              } bg-card/80 hover:bg-secondary/60 text-xs font-medium transition-colors`}>
-                <Filter className="h-3.5 w-3.5 mr-1" /> Filters{activeFilters.length > 0 && <span className="ml-1">({activeFilters.length})</span>}
-              </button>
-            </SheetTrigger>
+            {/* Filter */}
+            <Sheet>
+              <SheetTrigger asChild>
+                <button className={`h-8 px-3 rounded-full text-xs font-medium transition-all duration-200 ${
+                  activeFilters.length > 0
+                    ? "bg-emerald/10 text-emerald border border-emerald/20"
+                    : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                }`}>
+                  <Filter className="h-3 w-3 mr-1 inline" /> Filters{activeFilters.length > 0 && <span className="ml-1">{activeFilters.length}</span>}
+                </button>
+              </SheetTrigger>
             <SheetContent side="right" className="w-full sm:max-w-md">
               <SheetHeader>
                 <SheetTitle>Filters</SheetTitle>
@@ -600,13 +605,13 @@ const Transactions = React.memo(function Transactions() {
             </SheetContent>
           </Sheet>
 
-          <button onClick={openAdd} className="h-9 px-3 rounded-lg bg-emerald text-white text-xs font-medium hover:bg-emerald/90 transition-colors" data-testid="add-transaction">
-            <Plus className="h-3.5 w-3.5 mr-1" /> Add
+          <button onClick={openAdd} className="h-8 px-3.5 rounded-full bg-emerald text-white text-xs font-medium hover:bg-emerald/90 active:scale-95 transition-all duration-200 shadow-sm" data-testid="add-transaction">
+            <Plus className="h-3 w-3 mr-1 inline" /> Add
           </button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="h-9 w-9 rounded-lg border border-border bg-card/80 hover:bg-secondary/60 grid place-items-center text-muted-foreground">
+              <button className="h-8 w-8 rounded-full grid place-items-center text-muted-foreground hover:bg-secondary/60 hover:text-foreground transition-all duration-200">
                 <MoreHorizontal className="h-3.5 w-3.5" />
               </button>
             </DropdownMenuTrigger>
@@ -624,12 +629,12 @@ const Transactions = React.memo(function Transactions() {
 
       {/* Inline search bar */}
       {showSearch && (
-        <div className="flex items-center gap-2 rounded-xl border border-border bg-card/50 px-3 h-10 backdrop-blur-xl">
+        <div className="flex items-center gap-2 rounded-full border border-border bg-card/70 backdrop-blur-xl px-4 h-9 shadow-sm transition-all duration-200">
           <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           <input ref={searchRef} value={searchInput} onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
             placeholder="Search transactions... (/)"
             className="w-full bg-transparent outline-none text-xs" />
-          {filters.search && <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>}
+          {filters.search && <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="text-muted-foreground hover:text-foreground transition-colors"><X className="h-3.5 w-3.5" /></button>}
         </div>
       )}
 
