@@ -1,14 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
-import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
 import { toast } from "sonner";
 import AIInsightPanel from "../components/AIInsightPanel";
-import { EmptyState, MetricCard } from "../components/ui/layout";
+import { EmptyState } from "../components/ui/layout";
 import Skeleton, { SkeletonCard } from "../components/ui/Skeleton";
 import {
-  Wallet, ArrowDownRight, ArrowUpRight, HeartPulse, RefreshCw, Plus,
-  AlertTriangle, CalendarDays, PiggyBank, Building2, TrendingUp,
+  Wallet, RefreshCw, Plus,
+  AlertTriangle, CalendarDays, Building2,
   ArrowRight, MoreHorizontal,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -19,9 +18,10 @@ import {
   DropdownMenuItem,
 } from "../components/ui/dropdown-menu";
 import { Button } from "../components/ui/button";
-import PacingIndicator from "../components/features/PacingIndicator";
-
-const TOOLTIP_STYLE = { backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px" };
+import {
+  NetWorthCard, IncomeCard, SpendingCard, HealthScoreCard,
+  CashFlowChart, BudgetsOverview, QuickActionsPanel, RecentTransactions,
+} from "../widgets";
 
 const Dashboard = React.memo(function Dashboard() {
   const { user } = useAuth();
@@ -168,21 +168,10 @@ const Dashboard = React.memo(function Dashboard() {
       {!empty && <>
       {/* KPI row */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-        <MetricCard label="Net Worth" value={`£${overview.balance.toLocaleString()}`} icon={Wallet} tone="emerald"
-          detail={trendData ? <span className={`flex items-center gap-1 text-xs ${trendData.direction === "up" ? "text-emerald" : "text-ruby"}`}>{trendData.direction === "up" ? "▲" : "▼"} {trendData.direction === "up" ? "+" : ""}£{Math.abs(trendData.values[trendData.values.length - 1] - trendData.values[0]).toLocaleString()} vs 6mo ago</span> : null} />
-        <MetricCard label="Income" value={`£${overview.income.toLocaleString()}`} icon={ArrowUpRight} tone="emerald"
-          detail={<span className="text-xs text-muted-foreground">this month</span>} />
-        <MetricCard label="Spending" value={`£${overview.spend.toLocaleString()}`} icon={ArrowDownRight} tone="ruby"
-          detail={<span className="text-xs text-muted-foreground">this month</span>} />
-        <MetricCard label="Health" value={`${overview.health_score}`} icon={HeartPulse} tone="topaz"
-          detail={
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs text-muted-foreground">/ 100</span>
-              <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden max-w-[80px]">
-                <div className="h-full rounded-full bg-gradient-to-r from-emerald to-topaz" style={{ width: `${overview.health_score}%` }} />
-              </div>
-            </div>
-          } />
+        <NetWorthCard overview={overview} trendData={trendData} />
+        <IncomeCard overview={overview} />
+        <SpendingCard overview={overview} />
+        <HealthScoreCard overview={overview} />
       </div>
 
       {/* Alerts + Upcoming */}
@@ -223,99 +212,9 @@ const Dashboard = React.memo(function Dashboard() {
 
       {/* 3-column: Budgets | Cash Flow | Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Budgets */}
-        <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="label-overline">Budgets</p>
-            <Link to="/budgets" className="text-xs text-emerald font-medium hover:underline shrink-0">Manage</Link>
-          </div>
-
-          {currentMonthBudget && (
-            <div className="mb-4">
-              <PacingIndicator
-                totalBudgeted={currentMonthBudget.total}
-                totalSpent={currentMonthBudget.spent}
-                compact
-              />
-            </div>
-          )}
-          {budgets.length === 0 ? (
-            <Link to="/budgets" className="flex items-center gap-3 p-3 rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:text-foreground hover:border-emerald/40 transition-colors">
-              <PiggyBank className="h-4 w-4" />
-              <span>Set your first budget</span>
-              <ArrowRight className="h-4 w-4 ml-auto" />
-            </Link>
-          ) : (
-            <div className="space-y-3">
-              {budgets.slice(0, 4).map((b) => {
-                const pct = Math.min(b.progress_pct || 0, 100);
-                const over = (b.progress_pct || 0) >= 100;
-                return (
-                  <div key={b.budget_id}>
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="font-medium capitalize truncate">{b.category}</span>
-                      <span className={`tabular-nums ${over ? "text-ruby font-medium" : "text-muted-foreground"}`}>
-                        £{Math.abs(b.spent || 0).toFixed(0)} / £{b.limit.toFixed(0)}
-                      </span>
-                    </div>
-                    <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full transition-all ${over ? "bg-ruby" : "bg-gradient-to-r from-emerald to-emerald/70"}`} style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Cash Flow */}
-        <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card p-5 lg:col-span-1">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <p className="label-overline">Cash flow</p>
-              <p className="text-sm font-medium mt-0.5">Last 6 months</p>
-            </div>
-            <Link to="/reports" className="text-xs text-emerald font-medium hover:underline shrink-0">Details</Link>
-          </div>
-          <div className="h-48">
-            {overview.monthly_flow?.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={overview.monthly_flow}>
-                  <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={10} tickMargin={4} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickMargin={4} />
-                  <Tooltip contentStyle={TOOLTIP_STYLE} />
-                  <Line type="monotone" dataKey="income" stroke="hsl(var(--emerald))" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="spend" stroke="hsl(var(--topaz))" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full grid place-items-center text-sm text-muted-foreground">No data yet</div>
-            )}
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card p-5">
-          <p className="label-overline mb-3">Quick actions</p>
-          <div className="grid grid-cols-2 gap-3">
-            <Link to="/transactions" className="flex flex-col items-center gap-1.5 p-4 rounded-xl border border-border hover:border-emerald/30 bg-secondary/20 hover:bg-emerald/5 transition-colors text-center">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-emerald/10 text-emerald"><Plus className="h-4 w-4" /></span>
-              <span className="text-xs font-medium leading-tight">Add transaction</span>
-            </Link>
-            <Link to="/import" className="flex flex-col items-center gap-1.5 p-4 rounded-xl border border-border hover:border-emerald/30 bg-secondary/20 hover:bg-emerald/5 transition-colors text-center">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-emerald/10 text-emerald"><Building2 className="h-4 w-4" /></span>
-              <span className="text-xs font-medium leading-tight">Connect bank</span>
-            </Link>
-            <Link to="/budgets" className="flex flex-col items-center gap-1.5 p-4 rounded-xl border border-border hover:border-topaz/30 bg-secondary/20 hover:bg-topaz/5 transition-colors text-center">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-topaz/10 text-topaz"><PiggyBank className="h-4 w-4" /></span>
-              <span className="text-xs font-medium leading-tight">Budgets</span>
-            </Link>
-            <Link to="/investments" className="flex flex-col items-center gap-1.5 p-4 rounded-xl border border-border hover:border-topaz/30 bg-secondary/20 hover:bg-topaz/5 transition-colors text-center">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-topaz/10 text-topaz"><TrendingUp className="h-4 w-4" /></span>
-              <span className="text-xs font-medium leading-tight">Investments</span>
-            </Link>
-          </div>
-        </div>
+        <BudgetsOverview budgets={budgets} currentMonthBudget={currentMonthBudget} />
+        <CashFlowChart overview={overview} />
+        <QuickActionsPanel />
       </div>
 
       {/* AI Insights */}
@@ -328,51 +227,7 @@ const Dashboard = React.memo(function Dashboard() {
       </div>
 
       {/* Recent transactions */}
-      <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border/70">
-          <div>
-            <p className="label-overline">Recent</p>
-            <p className="text-sm font-medium mt-0.5">Transactions</p>
-          </div>
-          <Link to="/transactions" className="text-xs text-emerald font-medium hover:underline">View all</Link>
-        </div>
-        <div className="block sm:hidden divide-y divide-border/60">
-          {overview.recent.slice(0, 5).map((t) => (
-            <div key={t.transaction_id} className="px-5 py-3 flex items-center justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs text-muted-foreground">{t.date?.slice(0, 10)}</p>
-                <p className="text-sm font-medium truncate">{t.description}</p>
-                <span className="text-xs text-muted-foreground capitalize">{t.category}</span>
-              </div>
-              <span className={`shrink-0 font-medium tabular-nums text-sm ${t.amount > 0 ? "text-emerald" : ""}`}>
-                {t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}
-              </span>
-            </div>
-          ))}
-        </div>
-        <div className="hidden sm:block overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-muted-foreground border-b border-border/60 bg-secondary/20">
-                <th className="px-5 py-3 font-medium">Date</th>
-                <th className="px-5 py-3 font-medium">Description</th>
-                <th className="px-5 py-3 font-medium">Category</th>
-                <th className="px-5 py-3 font-medium text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {overview.recent.slice(0, 5).map((t) => (
-                <tr key={t.transaction_id} className="border-b border-border/40 last:border-0 hover:bg-secondary/20">
-                  <td className="px-5 py-3 text-muted-foreground text-xs">{t.date?.slice(0, 10)}</td>
-                  <td className="px-5 py-3 font-medium truncate max-w-[200px]">{t.description}</td>
-                  <td className="px-5 py-3"><span className="text-xs px-2 py-0.5 rounded-full bg-secondary capitalize">{t.category || "uncategorized"}</span></td>
-                  <td className={`px-5 py-3 text-right font-medium tabular-nums ${t.amount > 0 ? "text-emerald" : ""}`}>{t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <RecentTransactions overview={overview} />
       </>}
     </div>
   );

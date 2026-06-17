@@ -7,6 +7,8 @@ import KeyboardShortcutsHelp from "../components/KeyboardShortcutsHelp";
 import CommandPalette from "../components/CommandPalette";
 import NotificationCenter from "../components/NotificationCenter";
 import QuickAddWidget from "../components/QuickAddWidget";
+import { BOTTOM_NAV, NAV_SECTIONS, ROUTE_META, getRouteMeta, KEYBOARD_GOTO } from "../data/navigation";
+import { APP_NAME, APP_TAGLINE } from "../data/constants";
 import { Button } from "../components/ui/button";
 import {
   DropdownMenu,
@@ -15,137 +17,7 @@ import {
   DropdownMenuItem,
 } from "../components/ui/dropdown-menu";
 
-import {
-  LayoutDashboard, Receipt, PiggyBank, Building2, TrendingUp, Star,
-  Landmark, FileText, Settings, LogOut, Menu, X, MoonStar, Sun, Crown, ArrowRight, RefreshCcw, MoreHorizontal
-} from "lucide-react";
-
-const BOTTOM_NAV = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/transactions", label: "Transactions", icon: Receipt },
-  { to: "/budgets", label: "Budgets", icon: PiggyBank },
-  { to: "/settings", label: "More", icon: MoreHorizontal, isMore: true },
-];
-
-const NAV_SECTIONS = [
-  {
-    label: "Overview",
-    items: [
-      { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { to: "/reports", label: "Reports", icon: FileText },
-    ],
-  },
-  {
-    label: "Finance",
-    items: [
-      { to: "/transactions", label: "Transactions", icon: Receipt },
-      { to: "/budgets", label: "Budgets", icon: PiggyBank },
-      { to: "/subscriptions", label: "Subscriptions", icon: RefreshCcw },
-    ],
-  },
-  {
-    label: "Connect",
-    items: [
-      { to: "/import", label: "Bank & Statements", icon: Building2 },
-      { to: "/investments", label: "Investments", icon: TrendingUp },
-    ],
-  },
-  {
-    label: "More",
-    items: [
-      { to: "/jewish", label: "Jewish Tools", icon: Star },
-      { to: "/uk-tools", label: "UK Benefits", icon: Landmark },
-      { to: "/settings", label: "Settings", icon: Settings },
-    ],
-  },
-];
-
-const ROUTE_META = [
-  {
-    paths: ["/dashboard"],
-    eyebrow: "Overview",
-    title: "Dashboard",
-    description: "A clean snapshot of your money, cash flow, and what needs attention next.",
-    primary: { label: "Add transaction", to: "/transactions" },
-    secondary: { label: "Import data", to: "/import" },
-  },
-  {
-    paths: ["/transactions"],
-    eyebrow: "Finance",
-    title: "Transactions",
-    description: "Search, edit, and organize every transaction in one place.",
-    primary: { label: "Add transaction", to: "/transactions" },
-    secondary: { label: "Budgets", to: "/budgets" },
-  },
-  {
-    paths: ["/budgets"],
-    eyebrow: "Finance",
-    title: "Budgets",
-    description: "Set simple limits, track progress, and keep spending easy to understand.",
-    primary: { label: "Add budget", to: "/budgets" },
-    secondary: { label: "View reports", to: "/reports" },
-  },
-  {
-    paths: ["/subscriptions"],
-    eyebrow: "Finance",
-    title: "Subscriptions",
-    description: "Track recurring payments, detect subscriptions from your transactions, and manage them in one place.",
-    primary: { label: "Add subscription", to: "/subscriptions" },
-    secondary: { label: "Transactions", to: "/transactions" },
-  },
-  {
-    paths: ["/import"],
-    eyebrow: "Connect",
-    title: "Bank & Statements",
-    description: "Connect your bank via TrueLayer, upload CSV/PDF statements, or manage existing connections.",
-    primary: { label: "Connect bank", to: "/import" },
-    secondary: { label: "Settings", to: "/settings" },
-  },
-  {
-    paths: ["/investments"],
-    eyebrow: "Connect",
-    title: "Investments",
-    description: "Look at future scenarios, growth trends, and simple projection planning.",
-    primary: { label: "Reports", to: "/reports" },
-    secondary: { label: "Dashboard", to: "/dashboard" },
-  },
-  {
-    paths: ["/jewish"],
-    eyebrow: "More",
-    title: "Jewish Finance",
-    description: "Maaser, Tzedakah, and holiday planning with a clean modern layout.",
-    primary: { label: "Reports", to: "/reports" },
-    secondary: { label: "Budgets", to: "/budgets" },
-  },
-  {
-    paths: ["/uk-tools"],
-    eyebrow: "More",
-    title: "UK Benefits",
-    description: "Simple UK finance helpers, calculators, and planning tools.",
-    primary: { label: "Settings", to: "/settings" },
-    secondary: { label: "Reports", to: "/reports" },
-  },
-  {
-    paths: ["/reports"],
-    eyebrow: "Overview",
-    title: "Reports",
-    description: "Review the story behind your money with clearer summaries and exportable reports.",
-    primary: { label: "Download report", to: "/reports" },
-    secondary: { label: "Dashboard", to: "/dashboard" },
-  },
-  {
-    paths: ["/settings"],
-    eyebrow: "More",
-    title: "Settings",
-    description: "Manage your account, subscription, AI providers, integrations, and SMS settings.",
-    primary: { label: "Pricing", to: "/pricing" },
-    secondary: { label: "Import data", to: "/import" },
-  },
-];
-
-function getRouteMeta(pathname) {
-  return ROUTE_META.find((meta) => meta.paths.some((path) => pathname === path || pathname.startsWith(`${path}/`))) || ROUTE_META[0];
-}
+import { LogOut, Menu, X, MoonStar, Sun, Crown, ArrowRight } from "lucide-react";
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
@@ -196,8 +68,7 @@ export default function AppLayout() {
       }
       if (leaderBuffer.current.length === 1 && leaderBuffer.current[0] === "g") {
         leaderBuffer.current = [];
-        const map = { d: "/dashboard", t: "/transactions", b: "/budgets", s: "/subscriptions", r: "/reports", i: "/import", g: "/settings" };
-        if (map[key]) { e.preventDefault(); navigate(map[key]); }
+        if (KEYBOARD_GOTO[key]) { e.preventDefault(); navigate(KEYBOARD_GOTO[key]); }
       }
     };
     document.addEventListener("keydown", onKeyDown);
@@ -244,8 +115,8 @@ export default function AppLayout() {
           <Link to="/dashboard" className="flex items-center gap-3" data-testid="sidebar-logo">
             <div className="w-9 h-9 rounded-2xl gradient-emerald grid place-items-center text-white font-bold shadow-lg shadow-emerald/20">£</div>
             <div>
-              <span className="block font-semibold tracking-tight leading-none">FinanceAI</span>
-              <span className="block text-[11px] text-muted-foreground mt-1">Premium money workspace</span>
+              <span className="block font-semibold tracking-tight leading-none">{APP_NAME}</span>
+              <span className="block text-[11px] text-muted-foreground mt-1">{APP_TAGLINE}</span>
             </div>
           </Link>
           <button className="lg:hidden h-11 w-11 rounded-full grid place-items-center hover:bg-secondary" onClick={() => setOpen(false)} data-testid="sidebar-close" aria-label="Close navigation menu">
@@ -329,7 +200,7 @@ export default function AppLayout() {
             </div>
           )}
           {/* Visually hidden page title for screen readers */}
-          <h1 className="sr-only">{routeMeta.title} — FinanceAI</h1>
+          <h1 className="sr-only">{routeMeta.title} — {APP_NAME}</h1>
           <div className="flex items-center justify-between gap-4 px-4 lg:px-8 h-16">
             <div className="flex items-center gap-3 min-w-0">
               <button className="lg:hidden h-11 w-11 rounded-full grid place-items-center border border-border bg-card/80" onClick={() => setOpen(true)} data-testid="sidebar-open" aria-label="Open navigation menu">
