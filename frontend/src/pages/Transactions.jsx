@@ -626,6 +626,7 @@ const Transactions = React.memo(function Transactions() {
           </DropdownMenu>
         </div>
       </div>
+    </div>
 
       {/* Inline search bar */}
       {showSearch && (
