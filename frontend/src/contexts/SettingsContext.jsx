@@ -22,8 +22,8 @@ const DEFAULTS = {
   appearance: { density: "comfortable", font_size: "medium" },
   dashboard: {
     layout: "default",
-    widgets: ["net_worth", "income", "spending", "health_score", "cash_flow", "budgets_overview", "quick_actions", "ai_insights", "recent_transactions"],
-    widget_order: ["net_worth", "income", "spending", "health_score", "cash_flow", "budgets_overview", "quick_actions", "ai_insights", "recent_transactions"],
+    widgets: ["net_worth", "income", "spending", "health_score", "cash_flow", "budgets_overview", "quick_actions", "ai_insights", "maaser_balance", "recent_transactions"],
+    widget_order: ["net_worth", "income", "spending", "health_score", "cash_flow", "budgets_overview", "quick_actions", "ai_insights", "maaser_balance", "recent_transactions"],
     animations: true,
     chart_style: "smooth",
   },

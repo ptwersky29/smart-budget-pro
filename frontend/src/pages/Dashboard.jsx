@@ -21,7 +21,7 @@ import {
 import { Button } from "../components/ui/button";
 import {
   NetWorthCard, IncomeCard, SpendingCard, HealthScoreCard,
-  CashFlowChart, BudgetsOverview, QuickActionsPanel, RecentTransactions,
+  CashFlowChart, BudgetsOverview, QuickActionsPanel, RecentTransactions, MaaserBalanceWidget,
 } from "../widgets";
 
 const Dashboard = React.memo(function Dashboard() {
@@ -181,6 +181,9 @@ const Dashboard = React.memo(function Dashboard() {
         {showWidget("spending") && <SpendingCard overview={overview} />}
         {showWidget("health_score") && <HealthScoreCard overview={overview} />}
       </div>
+
+      {/* Maaser Balance */}
+      {showWidget("maaser_balance") && <MaaserBalanceWidget />}
 
       {/* Alerts + Upcoming */}
       {(topAlerts.length > 0 || topUpcoming.length > 0) && (

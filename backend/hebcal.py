@@ -1,169 +1,215 @@
-"""Hebrew calendar + Zmanim widget via Hebcal (keyless)."""
+"""Built-in Hebrew calendar — no external API calls."""
 import logging
-import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone, timedelta
 from typing import Optional
+from zoneinfo import ZoneInfo
 
-import httpx
+from astral import LocationInfo, SunDirection
+from astral.sun import sun as astral_sun, time_at_elevation
 from fastapi import APIRouter, HTTPException, Query
+from pyluach import dates as pl_dates
 
 logger = logging.getLogger("hebcal")
 
-# Common UK + Jewish-population city geonameids for Hebcal
-CITIES = {
-    "london": 2643743,
-    "manchester": 2643123,
-    "gateshead": 2647928,
-    "leeds": 2644688,
-    "edinburgh": 2650225,
-    "glasgow": 2648579,
-    "stamford-hill": 2643743,  # same lat/lon as London
-    "jerusalem": 281184,
-    "tel-aviv": 293397,
-    "new-york": 5128581,
-    "monsey": 5128217,
-    "lakewood": 5101798,
-    "los-angeles": 5368361,
-    "miami": 4164138,
+CITIES: dict[str, tuple[float, float, str]] = {
+    "london": (51.5, -0.1, "Europe/London"),
+    "manchester": (53.5, -2.2, "Europe/London"),
+    "gateshead": (54.9, -1.6, "Europe/London"),
+    "leeds": (53.8, -1.5, "Europe/London"),
+    "edinburgh": (55.9, -3.1, "Europe/London"),
+    "glasgow": (55.8, -4.2, "Europe/London"),
+    "stamford-hill": (51.5, -0.1, "Europe/London"),
+    "jerusalem": (31.8, 35.2, "Asia/Jerusalem"),
+    "tel-aviv": (32.1, 34.8, "Asia/Jerusalem"),
+    "new-york": (40.7, -74.0, "America/New_York"),
+    "monsey": (41.1, -74.1, "America/New_York"),
+    "lakewood": (40.1, -74.2, "America/New_York"),
+    "los-angeles": (34.0, -118.2, "America/Los_Angeles"),
+    "miami": (25.8, -80.2, "America/New_York"),
 }
 
-_cache = {}  # key -> (data, ts)
-_TTL = 1800  # 30 min
+ZMAN_ANGLE_KEYS = [
+    ("alotHaShachar", "Alos HaShachar", -16.1, SunDirection.RISING),
+    ("misheyakir", "Misheyakir", -10.2, SunDirection.RISING),
+    ("tzeit7083deg", "Tzeis (8.5\u00b0)", -8.5, SunDirection.SETTING),
+]
 
 
-def _ck(parts) -> str:
-    return "|".join(str(p) for p in parts)
+def _get_zman_times(
+    observer: LocationInfo, dt: date, tz: ZoneInfo,
+) -> dict[str, str]:
+    s = astral_sun(observer, dt, tzinfo=tz)
+    sunrise = s["sunrise"]
+    sunset = s["sunset"]
+    noon = s["noon"]
+    dawn = s["dawn"]
+
+    shaah = (sunset - sunrise) / 12
+
+    times: dict[str, str] = {}
+
+    # Elevation-based times
+    for key, label, angle, direction in ZMAN_ANGLE_KEYS:
+        try:
+            t = time_at_elevation(observer, angle, dt, tzinfo=tz, direction=direction)
+            times[key] = t.strftime("%H:%M")
+        except Exception:
+            pass
+
+    # Derived times using sha'ot zmaniyot
+    times["sunrise"] = sunrise.strftime("%H:%M")
+    times["sofZmanShmaMGA"] = (dawn + 3 * shaah).strftime("%H:%M")
+    times["sofZmanShma"] = (sunrise + 3 * shaah).strftime("%H:%M")
+    times["sofZmanTfilla"] = (sunrise + 4 * shaah).strftime("%H:%M")
+    times["chatzot"] = noon.strftime("%H:%M")
+    times["minchaGedola"] = (noon + timedelta(hours=0.5)).strftime("%H:%M")
+    times["minchaKetana"] = (sunrise + 9.5 * shaah).strftime("%H:%M")
+    times["plagHaMincha"] = (sunrise + 10.75 * shaah).strftime("%H:%M")
+    times["sunset"] = sunset.strftime("%H:%M")
+
+    return times
 
 
-def _cached(key):
-    rec = _cache.get(key)
-    if rec and time.time() - rec[1] < _TTL:
-        return rec[0]
-    return None
+ZMAN_KEY_LABEL = [
+    ("alotHaShachar", "Alos HaShachar"),
+    ("misheyakir", "Misheyakir"),
+    ("sunrise", "Sunrise"),
+    ("sofZmanShmaMGA", "Krias Shma (MGA)"),
+    ("sofZmanShma", "Krias Shma (GRA)"),
+    ("sofZmanTfilla", "Sof Zman Tefilla"),
+    ("chatzot", "Chatzos"),
+    ("minchaGedola", "Mincha Gedolah"),
+    ("minchaKetana", "Mincha Ketanah"),
+    ("plagHaMincha", "Plag HaMincha"),
+    ("sunset", "Shkiah"),
+    ("tzeit7083deg", "Tzeis (8.5\u00b0)"),
+]
 
 
-def _store(key, val):
-    _cache[key] = (val, time.time())
+def _collect_holidays(start: date, end: date) -> list[dict]:
+    results: list[dict] = []
+    seen = set()
+    current = start
+    while current <= end:
+        gd = pl_dates.GregorianDate(current.year, current.month, current.day)
+        hd = gd.to_heb()
+        holiday_name = hd.holiday()
 
+        is_rosh_chodesh = hd.day in (1, 30)
 
-async def _fetch_json(url: str, params: dict) -> dict:
-    async with httpx.AsyncClient(timeout=15.0,
-                                 headers={"User-Agent": "FinanceAI/1.0 (UK Jewish budgeting)"}) as client:
-        r = await client.get(url, params=params)
-    if r.status_code != 200:
-        raise HTTPException(502, f"Hebcal error {r.status_code}")
-    return r.json()
+        if holiday_name:
+            dedup_key = (current.isoformat(), holiday_name)
+            if dedup_key not in seen:
+                seen.add(dedup_key)
+                results.append({
+                    "date": current.isoformat(),
+                    "title": holiday_name,
+                    "hebrew": f"{hd.day} {hd.month_name()} {hd.year}",
+                    "category": "holiday",
+                    "subcat": None,
+                    "is_upcoming": current >= date.today(),
+                })
+
+        if is_rosh_chodesh and not holiday_name:
+            if hd.day == 30:
+                tomorrow = current + timedelta(days=1)
+                tmr_gd = pl_dates.GregorianDate(tomorrow.year, tomorrow.month, tomorrow.day)
+                tmr_hd = tmr_gd.to_heb()
+                month_name = tmr_hd.month_name()
+            else:
+                month_name = hd.month_name()
+            title = f"Rosh Chodesh {month_name}"
+            dedup_key = (current.isoformat(), title)
+            if dedup_key not in seen:
+                seen.add(dedup_key)
+                results.append({
+                    "date": current.isoformat(),
+                    "title": title,
+                    "hebrew": f"{hd.day} {hd.month_name()} {hd.year}",
+                    "category": "roshchodesh",
+                    "subcat": None,
+                    "is_upcoming": current >= date.today(),
+                })
+
+        current += timedelta(days=1)
+    return results
 
 
 def build_router() -> APIRouter:
     router = APIRouter(prefix="/jewish/hebcal", tags=["jewish"])
 
     @router.get("/today")
-    async def today(date: Optional[str] = None):
-        """Convert today (or `date=YYYY-MM-DD`) to Hebrew calendar."""
-        if date:
+    async def today(gregorian_date: Optional[str] = Query(None, alias="date")):
+        if gregorian_date:
             try:
-                dt = datetime.strptime(date, "%Y-%m-%d")
+                dt = datetime.strptime(gregorian_date, "%Y-%m-%d").date()
             except ValueError:
                 raise HTTPException(400, "date must be YYYY-MM-DD")
         else:
-            dt = datetime.now(timezone.utc)
-        key = _ck(["today", dt.strftime("%Y-%m-%d")])
-        cached = _cached(key)
-        if cached:
-            return cached
-        data = await _fetch_json(
-            "https://www.hebcal.com/converter",
-            {"cfg": "json", "gy": dt.year, "gm": dt.month, "gd": dt.day, "g2h": 1, "strict": 1},
-        )
-        result = {
-            "gregorian_date": dt.strftime("%Y-%m-%d"),
-            "hebrew_date": data.get("hebrew"),
-            "hd": data.get("hd"),
-            "hm": data.get("hm"),
-            "hy": data.get("hy"),
-            "events": data.get("events", []) or [],
+            dt = date.today()
+
+        hd = pl_dates.GregorianDate(dt.year, dt.month, dt.day).to_heb()
+
+        events: list[str] = []
+        holiday_name = hd.holiday()
+        if holiday_name:
+            events.append(holiday_name)
+
+        return {
+            "gregorian_date": dt.isoformat(),
+            "hebrew_date": f"{hd.day} {hd.month_name()} {hd.year}",
+            "hd": hd.day,
+            "hm": hd.month,
+            "hy": hd.year,
+            "events": events,
         }
-        _store(key, result)
-        return result
 
     @router.get("/zmanim")
-    async def zmanim(city: str = Query("london"), date: Optional[str] = None):
-        """Sunrise, sunset, candle lighting, havdalah, etc."""
+    async def zmanim(city: str = Query("london"), target_date: Optional[str] = None):
         city_key = city.lower().strip()
-        geonameid = CITIES.get(city_key)
-        if not geonameid:
-            raise HTTPException(400, f"Unknown city '{city}'. Supported: {', '.join(CITIES.keys())}")
-        target_date = date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        key = _ck(["zmanim", geonameid, target_date])
-        cached = _cached(key)
-        if cached:
-            return cached
-        data = await _fetch_json(
-            "https://www.hebcal.com/zmanim",
-            {"cfg": "json", "geonameid": geonameid, "date": target_date},
-        )
-        times = data.get("times", {})
-        # Pretty-format a curated set
-        keys = [
-            ("alotHaShachar", "Alos HaShachar"),
-            ("misheyakir", "Misheyakir"),
-            ("sunrise", "Sunrise"),
-            ("sofZmanShmaMGA", "Krias Shma (MGA)"),
-            ("sofZmanShma", "Krias Shma (GRA)"),
-            ("sofZmanTfilla", "Sof Zman Tefilla"),
-            ("chatzot", "Chatzos"),
-            ("minchaGedola", "Mincha Gedolah"),
-            ("minchaKetana", "Mincha Ketanah"),
-            ("plagHaMincha", "Plag HaMincha"),
-            ("sunset", "Shkiah"),
-            ("tzeit7083deg", "Tzeis (8.5°)"),
-        ]
+        coords = CITIES.get(city_key)
+        if not coords:
+            raise HTTPException(
+                400,
+                f"Unknown city '{city}'. Supported: {', '.join(sorted(CITIES.keys()))}",
+            )
+
+        lat, lon, tz_name = coords
+        tz = ZoneInfo(tz_name)
+        dt = date.today() if target_date is None else datetime.strptime(target_date, "%Y-%m-%d").date()
+
+        loc = LocationInfo(city_key, "", tz_name, lat, lon)
+
+        try:
+            times_map = _get_zman_times(loc.observer, dt, tz)
+        except Exception as exc:
+            raise HTTPException(502, f"Failed to compute zmanim: {exc}")
+
         rows = []
-        for k, label in keys:
-            v = times.get(k)
-            if v:
-                rows.append({"key": k, "label": label, "time": v[11:16]})  # HH:MM from ISO
-        result = {
+        for key, label in ZMAN_KEY_LABEL:
+            val = times_map.get(key)
+            if val:
+                rows.append({"key": key, "label": label, "time": val})
+
+        return {
             "city": city_key,
-            "date": target_date,
-            "location": data.get("location", {}),
+            "date": dt.isoformat(),
+            "location": {"lat": lat, "lng": lon, "tzid": tz_name},
             "times": rows,
         }
-        _store(key, result)
-        return result
 
     @router.get("/upcoming-holidays")
     async def upcoming_holidays(year: Optional[int] = None):
-        """Major Jewish holidays for the calendar year (Gregorian)."""
-        y = year or datetime.now(timezone.utc).year
-        key = _ck(["hol", y])
-        cached = _cached(key)
-        if cached:
-            return cached
-        data = await _fetch_json(
-            "https://www.hebcal.com/hebcal",
-            {"v": 1, "cfg": "json", "maj": "on", "min": "on", "mod": "on", "year": y, "month": "x", "i": "off"},
-        )
-        items = data.get("items", []) or []
-        # Filter to holidays (not parsha or candle-lighting)
-        clean = []
-        today_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        for it in items:
-            if it.get("category") in ("holiday", "roshchodesh"):
-                clean.append({
-                    "date": it.get("date"),
-                    "title": it.get("title"),
-                    "hebrew": it.get("hebrew"),
-                    "category": it.get("category"),
-                    "subcat": it.get("subcat"),
-                    "is_upcoming": (it.get("date", "") >= today_iso),
-                })
-        # Show the next 12 upcoming
-        upcoming = [c for c in clean if c["is_upcoming"]][:12]
-        result = {"year": y, "upcoming": upcoming, "count_total": len(clean)}
-        _store(key, result)
-        return result
+        today_dt = date.today()
+        y = year if year else today_dt.year
+
+        start = date(y, 1, 1)
+        end = date(y, 12, 31)
+
+        all_holidays = _collect_holidays(start, end)
+
+        upcoming = [h for h in all_holidays if h["is_upcoming"]][:12]
+        return {"year": y, "upcoming": upcoming, "count_total": len(all_holidays)}
 
     @router.get("/cities")
     async def list_cities():

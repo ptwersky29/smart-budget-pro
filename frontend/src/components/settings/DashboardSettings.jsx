@@ -21,6 +21,7 @@ const WIDGETS = [
   { key: "budgets_overview", label: "Budgets Overview", desc: "Budget progress bars" },
   { key: "quick_actions", label: "Quick Actions", desc: "Shortcut action buttons" },
   { key: "ai_insights", label: "AI Insights", desc: "Smart spending suggestions" },
+  { key: "maaser_balance", label: "Maaser Balance", desc: "Monthly Maaser obligation and balance" },
   { key: "recent_transactions", label: "Recent Transactions", desc: "Latest 5 transactions" },
 ];
 

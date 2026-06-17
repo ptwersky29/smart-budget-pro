@@ -62,6 +62,9 @@ INCOME_CATEGORIES = {"salary", "income"}
 class MaaserSettingsIn(BaseModel):
     enabled: bool
     percent: float = 10.0
+    reset_day: Optional[int] = None
+    included_categories: Optional[list[str]] = None
+    excluded_categories: Optional[list[str]] = None
 
 class TzedakahEntryIn(BaseModel):
     amount: float
@@ -188,7 +191,13 @@ def build_router() -> APIRouter:
         sm = request.app.state.db
         async with sm() as session:
             s = await _get_pref(session, user["user_id"], "maaser", {})
-            return {"enabled": bool(s.get("enabled")), "percent": float(s.get("percent", 10))}
+            return {
+                "enabled": bool(s.get("enabled")),
+                "percent": float(s.get("percent", 10)),
+                "reset_day": s.get("reset_day", 1),
+                "included_categories": s.get("included_categories", list(INCOME_CATEGORIES)),
+                "excluded_categories": s.get("excluded_categories", []),
+            }
 
     @router.put("/maaser/settings")
     async def set_settings(payload: MaaserSettingsIn, request: Request, user: dict = Depends(get_current_user)):
@@ -196,7 +205,16 @@ def build_router() -> APIRouter:
             raise HTTPException(400, "Percent must be between 0 and 100")
         sm = request.app.state.db
         async with sm() as session:
-            await _set_pref(session, user["user_id"], "maaser", {"enabled": payload.enabled, "percent": payload.percent})
+            s = await _get_pref(session, user["user_id"], "maaser", {})
+            s["enabled"] = payload.enabled
+            s["percent"] = payload.percent
+            if payload.reset_day is not None:
+                s["reset_day"] = payload.reset_day
+            if payload.included_categories is not None:
+                s["included_categories"] = payload.included_categories
+            if payload.excluded_categories is not None:
+                s["excluded_categories"] = payload.excluded_categories
+            await _set_pref(session, user["user_id"], "maaser", s)
             backfill = {"created": 0, "skipped": 0, "total_amount": 0}
             if payload.enabled:
                 backfill = await maaser_mod.backfill_for_user(session, user["user_id"])
@@ -264,6 +282,7 @@ def build_router() -> APIRouter:
                 "obligation": obligation, "given_total": round(given_total, 2),
                 "tx_given": round(tx_given, 2), "ledger_given": round(manual_given, 2),
                 "accrued_pending": round(accrued_pending, 2), "balance_owed": balance_owed, "credit": credit,
+                "enabled": bool(s.get("enabled")),
             }
 
     @router.get("/maaser/ledger")

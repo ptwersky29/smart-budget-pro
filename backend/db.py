@@ -24,7 +24,11 @@ _async_session_maker = None
 
 def init_engine(database_url: str, echo: bool = False):
     global _engine, _async_session_maker
-    _engine = create_async_engine(database_url, echo=echo, pool_pre_ping=True)
+    if database_url.startswith("sqlite"):
+        from sqlalchemy.ext.asyncio import create_async_engine as _create
+        _engine = _create(database_url, echo=echo)
+    else:
+        _engine = create_async_engine(database_url, echo=echo, pool_pre_ping=True)
     _async_session_maker = async_sessionmaker(_engine, expire_on_commit=False)
 
 
@@ -44,6 +48,8 @@ async def create_tables():
     if _engine:
         async with _engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            if _engine.url.drivername.startswith("sqlite"):
+                return
             from sqlalchemy import text
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS picture VARCHAR(512)"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub VARCHAR(128)"))

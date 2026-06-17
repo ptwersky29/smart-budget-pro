@@ -7,3 +7,4 @@ export { default as CashFlowChart } from "./CashFlowChart";
 export { default as BudgetsOverview } from "./BudgetsOverview";
 export { default as QuickActionsPanel } from "./QuickActionsPanel";
 export { default as RecentTransactions } from "./RecentTransactions";
+export { default as MaaserBalanceWidget } from "./MaaserBalanceWidget";

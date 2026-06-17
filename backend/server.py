@@ -4,6 +4,7 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
+load_dotenv(ROOT_DIR / ".env.local", override=True)
 
 import os
 import sys
@@ -88,8 +89,8 @@ logger = logging.getLogger("financeai")
 
 database_url = os.environ.get("DATABASE_URL")
 if not database_url:
-    logger.error("DATABASE_URL environment variable is not set!")
-    raise RuntimeError("DATABASE_URL environment variable is required")
+    database_url = "sqlite+aiosqlite:///financeai.db"
+    logger.info("No DATABASE_URL set — using local SQLite: %s", database_url)
 
 # Validate JWT_SECRET early — will raise if missing/weak
 _require_jwt_secret()
