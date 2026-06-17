@@ -101,12 +101,14 @@ const Dashboard = React.memo(function Dashboard() {
   if (loading) return (
     <div className="space-y-8" data-testid="dashboard-root">
       <Skeleton className="h-12 w-full rounded-2xl" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">{[1,2,3,4].map(i => <SkeletonCard key={i} />)}</div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 space-y-4"><Skeleton className="h-32 rounded-2xl" /><Skeleton className="h-64 rounded-2xl" /></div>
-        <div className="space-y-4"><Skeleton className="h-32 rounded-2xl" /><Skeleton className="h-32 rounded-2xl" /></div>
+        <div className="lg:col-span-2 space-y-4">
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">{[1,2,3,4].map(i => <SkeletonCard key={i} />)}</div>
+          <Skeleton className="h-32 rounded-2xl" />
+          <Skeleton className="h-64 rounded-2xl" />
+        </div>
+        <div className="space-y-4"><Skeleton className="h-full min-h-[500px] rounded-2xl" /></div>
       </div>
-      <Skeleton className="h-48 rounded-2xl" />
     </div>
   );
 
@@ -174,73 +176,80 @@ const Dashboard = React.memo(function Dashboard() {
       )}
 
       {!empty && <>
-      {/* KPI row */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-        {showWidget("net_worth") && <NetWorthCard overview={overview} trendData={trendData} />}
-        {showWidget("income") && <IncomeCard overview={overview} />}
-        {showWidget("spending") && <SpendingCard overview={overview} />}
-        {showWidget("health_score") && <HealthScoreCard overview={overview} />}
-      </div>
-
-      {/* Maaser Balance */}
-      {showWidget("maaser_balance") && <MaaserBalanceWidget />}
-
-      {/* Alerts + Upcoming */}
-      {(topAlerts.length > 0 || topUpcoming.length > 0) && (
-        <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden">
-          {topAlerts.length > 0 && (
-            <div className="divide-y divide-border/60">
-              {topAlerts.map((a, i) => (
-                <div key={i} className="px-5 py-3 flex items-center gap-3 text-sm">
-                  <AlertTriangle className={`h-4 w-4 shrink-0 ${a.severity === "critical" || a.severity === "danger" ? "text-ruby" : a.severity === "warning" ? "text-topaz" : "text-emerald"}`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{a.title || a.message}</p>
-                    {a.description && <p className="text-xs text-muted-foreground truncate">{a.description}</p>}
-                  </div>
-                  {a.action_url && <Link to={a.action_url} className="text-xs text-emerald font-medium shrink-0 hover:underline">Fix</Link>}
-                </div>
-              ))}
-            </div>
-          )}
-          {topUpcoming.length > 0 && (
-            <div className="border-t border-border/60 divide-y divide-border/60">
-              {topUpcoming.map((u, i) => (
-                <div key={i} className="px-5 py-3 flex items-center gap-3 text-sm">
-                  <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{u.description || u.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {u.date ? new Date(u.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : ""}
-                      {u.amount ? ` · £${Number(u.amount).toFixed(2)}` : ""}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 3-column: Budgets | Cash Flow | Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {showWidget("budgets_overview") && <BudgetsOverview budgets={budgets} currentMonthBudget={currentMonthBudget} />}
-        {showWidget("cash_flow") && <CashFlowChart overview={overview} chartStyle={chartStyle} />}
-        {showWidget("quick_actions") && <QuickActionsPanel />}
-      </div>
+        {/* LEFT COLUMN — widgets */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* KPI row */}
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+            {showWidget("net_worth") && <NetWorthCard overview={overview} trendData={trendData} />}
+            {showWidget("income") && <IncomeCard overview={overview} />}
+            {showWidget("spending") && <SpendingCard overview={overview} />}
+            {showWidget("health_score") && <HealthScoreCard overview={overview} />}
+          </div>
 
-      {/* AI Insights */}
-      {showWidget("ai_insights") && (
-        <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card p-5">
-          <AIInsightPanel
-            title="AI Insights"
-            subtitle="What's happening with your money"
-            endpoint="/ai/insights/dashboard"
-          />
+          {/* Maaser Balance */}
+          {showWidget("maaser_balance") && <MaaserBalanceWidget />}
+
+          {/* Alerts + Upcoming */}
+          {(topAlerts.length > 0 || topUpcoming.length > 0) && (
+            <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden">
+              {topAlerts.length > 0 && (
+                <div className="divide-y divide-border/60">
+                  {topAlerts.map((a, i) => (
+                    <div key={i} className="px-5 py-3 flex items-center gap-3 text-sm">
+                      <AlertTriangle className={`h-4 w-4 shrink-0 ${a.severity === "critical" || a.severity === "danger" ? "text-ruby" : a.severity === "warning" ? "text-topaz" : "text-emerald"}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{a.title || a.message}</p>
+                        {a.description && <p className="text-xs text-muted-foreground truncate">{a.description}</p>}
+                      </div>
+                      {a.action_url && <Link to={a.action_url} className="text-xs text-emerald font-medium shrink-0 hover:underline">Fix</Link>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {topUpcoming.length > 0 && (
+                <div className="border-t border-border/60 divide-y divide-border/60">
+                  {topUpcoming.map((u, i) => (
+                    <div key={i} className="px-5 py-3 flex items-center gap-3 text-sm">
+                      <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{u.description || u.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {u.date ? new Date(u.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : ""}
+                          {u.amount ? ` · £${Number(u.amount).toFixed(2)}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 3-column: Budgets | Cash Flow | Quick Actions */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {showWidget("budgets_overview") && <BudgetsOverview budgets={budgets} currentMonthBudget={currentMonthBudget} />}
+            {showWidget("cash_flow") && <CashFlowChart overview={overview} chartStyle={chartStyle} />}
+            {showWidget("quick_actions") && <QuickActionsPanel />}
+          </div>
+
+          {/* AI Insights */}
+          {showWidget("ai_insights") && (
+            <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card p-5">
+              <AIInsightPanel
+                title="AI Insights"
+                subtitle="What's happening with your money"
+                endpoint="/ai/insights/dashboard"
+              />
+            </div>
+          )}
         </div>
-      )}
 
-      {/* Recent transactions */}
-      {showWidget("recent_transactions") && <RecentTransactions overview={overview} />}
+        {/* RIGHT COLUMN — transactions sidebar */}
+        <div className="lg:col-span-1">
+          {showWidget("recent_transactions") && <RecentTransactions overview={overview} />}
+        </div>
+      </div>
       </>}
     </div>
   );

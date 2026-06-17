@@ -28,6 +28,7 @@ import {
 } from "../components/ui/sheet";
 import ComparePeriods from "../components/ComparePeriods";
 import MaaserPanel from "../components/MaaserPanel";
+import MonthStrip from "../components/MonthStrip";
 import TransactionRow from "../components/TransactionRow";
 import TransactionForm from "../components/TransactionForm";
 import { Button } from "../components/ui/button";
@@ -78,6 +79,8 @@ const Transactions = React.memo(function Transactions() {
   const [saveAsRecurring, setSaveAsRecurring] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("ledger");
+  const [hebrewMonths, setHebrewMonths] = useState([]);
+  const [selectedHebrewMonth, setSelectedHebrewMonth] = useState(null);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const defaultFilters = useMemo(() => ({ search: "", category: "", source: "", tx_type: "", date_from: firstOfMonth(), date_to: today(), amount_min: "", amount_max: "", sort: "date", order: "desc" }), []);
@@ -175,6 +178,38 @@ const Transactions = React.memo(function Transactions() {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadCats(); }, [loadCats]);
+
+  const applyHebrewMonth = useCallback((m) => {
+    if (!m) return;
+    setSelectedHebrewMonth(m);
+    setOffset(0);
+    setFilters((prev) => ({
+      ...prev,
+      date_from: m.gregorian_start,
+      date_to: m.gregorian_end,
+    }));
+  }, []);
+
+  // Load Hebrew months and select current month (only if no date params in URL)
+  useEffect(() => {
+    api.get("/jewish/hebcal/months")
+      .then(({ data }) => {
+        const ms = data.months || [];
+        setHebrewMonths(ms);
+        const hasCustomDates = searchParams.get("date_from") || searchParams.get("date_to");
+        if (!hasCustomDates) {
+          const current = ms.find((m) => m.is_current);
+          if (current) applyHebrewMonth(current);
+        } else {
+          const firstOfMonth = ms.find((m) =>
+            filters.date_from === m.gregorian_start &&
+            filters.date_to === m.gregorian_end
+          );
+          if (firstOfMonth) setSelectedHebrewMonth(firstOfMonth);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const activeFilters = useMemo(() => {
     const chips = [];
@@ -440,6 +475,7 @@ const Transactions = React.memo(function Transactions() {
   }, [aiQuery]);
 
   const netTotal = incomeTotal - expenseTotal;
+  const [showSearch, setShowSearch] = useState(false);
 
   const exportCsv = useCallback(() => {
     const rows = aiResults?.transactions || txs;
@@ -466,29 +502,27 @@ const Transactions = React.memo(function Transactions() {
   return (
     <div className="space-y-4" data-testid="transactions-root">
 
-      {/* ─── Compact toolbar: search, sort, filters, actions ─── */}
-      <div className="rounded-xl border border-border bg-card/90 backdrop-blur-xl p-3 shadow-card">
-        {/* Row 1: Search + Sort + Filter + Add + More */}
+      {/* ─── Header ─── */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold tracking-tight">Transactions</h1>
         <div className="flex items-center gap-2">
-          <label className="flex-1 flex items-center gap-2 rounded-lg border border-border bg-background/70 px-3 h-9">
-            <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <input ref={searchRef} value={searchInput} onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
-              placeholder="Search transactions... (/)"
-              className="w-full bg-transparent outline-none text-xs" />
-            {filters.search && <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>}
-          </label>
-
-          <select aria-label="Sort" value={`${filters.sort}-${filters.order}`} onChange={(e) => { const [s, o] = e.target.value.split("-"); setFilters(p => ({ ...p, sort: s, order: o })); }}
-            className="h-9 rounded-lg bg-secondary/40 border border-transparent px-2.5 text-xs outline-none focus:border-ring">
-            <option value="date-desc">Newest</option>
-            <option value="date-asc">Oldest</option>
-            <option value="amount-desc">Largest</option>
-            <option value="amount-asc">Smallest</option>
-          </select>
+          <button
+            onClick={() => setShowSearch((s) => !s)}
+            className={`h-9 w-9 rounded-lg border grid place-items-center text-xs transition-colors ${
+              showSearch || filters.search
+                ? "border-emerald text-emerald bg-emerald/5"
+                : "border-border text-muted-foreground bg-card/80 hover:bg-secondary/60"
+            }`}
+            aria-label="Search"
+          >
+            <Search className="h-3.5 w-3.5" />
+          </button>
 
           <Sheet>
             <SheetTrigger asChild>
-              <button className={`h-9 px-3 rounded-lg border ${activeFilters.length > 0 ? "border-emerald text-emerald" : "border-border text-muted-foreground"} bg-card/80 hover:bg-secondary/60 text-xs font-medium transition-colors`}>
+              <button className={`h-9 px-3 rounded-lg border ${
+                activeFilters.length > 0 ? "border-emerald text-emerald" : "border-border text-muted-foreground"
+              } bg-card/80 hover:bg-secondary/60 text-xs font-medium transition-colors`}>
                 <Filter className="h-3.5 w-3.5 mr-1" /> Filters{activeFilters.length > 0 && <span className="ml-1">({activeFilters.length})</span>}
               </button>
             </SheetTrigger>
@@ -520,8 +554,8 @@ const Transactions = React.memo(function Transactions() {
                   <Input type="number" min="0" step="0.01" placeholder="Max £" value={filters.amount_max}
                     onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_max: e.target.value })); }}
                     className="text-sm h-10" />
-                  <Input type="date" value={filters.date_from} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_from: e.target.value })); }} className="text-sm h-10" />
-                  <Input type="date" value={filters.date_to} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_to: e.target.value })); }} className="text-sm h-10" />
+                  <Input type="date" value={filters.date_from} onChange={(e) => { if (!e.target.value) { setSelectedHebrewMonth(null); } setOffset(0); setFilters(p => ({ ...p, date_from: e.target.value })); }} className="text-sm h-10" />
+                  <Input type="date" value={filters.date_to} onChange={(e) => { if (!e.target.value) { setSelectedHebrewMonth(null); } setOffset(0); setFilters(p => ({ ...p, date_to: e.target.value })); }} className="text-sm h-10" />
                 </div>
 
                 <div className="border-t border-border pt-4 space-y-3">
@@ -585,70 +619,85 @@ const Transactions = React.memo(function Transactions() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-
-        {/* Summary + Bulk actions */}
-        {(!someSelected) ? (
-          <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border text-xs text-muted-foreground">
-            <span>Income <span className="text-emerald font-medium tabular-nums">{fmt(incomeTotal)}</span></span>
-            <span className="text-muted-foreground/30">|</span>
-            <span>Expenses <span className="text-ruby font-medium tabular-nums">{fmt(expenseTotal)}</span></span>
-            <span className="text-muted-foreground/30">|</span>
-            <span>Net <span className={`font-medium tabular-nums ${netTotal >= 0 ? "text-emerald" : "text-ruby"}`}>{netTotal >= 0 ? "+" : ""}{fmt(netTotal)}</span></span>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between mt-2 pt-2 border-t border-border">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-muted-foreground">{selectedIds.size} selected</span>
-              <button onClick={() => setSelectedIds(new Set())} className="text-muted-foreground hover:text-foreground">Clear</button>
-            </div>
-            <div className="flex items-center gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="text-xs px-2.5 py-1 rounded-full border border-ruby/40 text-ruby hover:bg-ruby/5 transition-colors">
-                    <Trash2 className="h-3 w-3 inline mr-1" /> Bulk ({selectedIds.size})
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>Set category</DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent>
-                      {Object.entries(groupCatsBySection(selectedCats)).map(([section, cats]) => (
-                        <React.Fragment key={section}>
-                          <DropdownMenuLabel className="text-xs text-muted-foreground font-semibold uppercase tracking-wider px-2 py-1">{section}</DropdownMenuLabel>
-                          {cats.map(c => (
-                            <DropdownMenuItem key={c.name} onClick={() => bulkCategory(c.name)}>{c.name}</DropdownMenuItem>
-                          ))}
-                        </React.Fragment>
-                      ))}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => { const c = prompt("New category name:"); if (c) bulkCategory(c.trim().toLowerCase().replace(/\s+/g, "_")); }}>
-                        ➕ Add custom category
-                      </DropdownMenuItem>
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={bulkDelete} className="text-ruby">
-                    <Trash2 className="h-4 w-4 mr-2" /> Delete {selectedIds.size}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        )}
-
-        {/* Active filter chips */}
-        {activeFilters.length > 0 && (
-          <div className="mt-2 pt-2 border-t border-border flex flex-wrap gap-1.5">
-            {activeFilters.map((chip) => (
-              <span key={chip.key} className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald/10 text-emerald border border-emerald/20">
-                {chip.label}
-                <button onClick={() => { setFilter(chip.key, ""); setOffset(0); }} className="hover:text-emerald/80"><X className="h-2.5 w-2.5" /></button>
-              </span>
-            ))}
-            <button onClick={clearAllFilters} className="text-[10px] px-2 py-0.5 rounded-full border border-border text-muted-foreground hover:text-foreground">Clear</button>
-          </div>
-        )}
       </div>
+
+      {/* Inline search bar */}
+      {showSearch && (
+        <div className="flex items-center gap-2 rounded-xl border border-border bg-card/50 px-3 h-10 backdrop-blur-xl">
+          <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <input ref={searchRef} value={searchInput} onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
+            placeholder="Search transactions... (/)"
+            className="w-full bg-transparent outline-none text-xs" />
+          {filters.search && <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>}
+        </div>
+      )}
+
+      {/* ─── Hebrew Month Strip ─── */}
+      <MonthStrip selectedMonth={selectedHebrewMonth} onMonthSelect={applyHebrewMonth} />
+
+      {/* Summary + Bulk actions */}
+      {(!someSelected) ? (
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <span>Income <span className="text-emerald font-medium tabular-nums">{fmt(incomeTotal)}</span></span>
+          <span className="text-muted-foreground/30">|</span>
+          <span>Expenses <span className="text-ruby font-medium tabular-nums">{fmt(expenseTotal)}</span></span>
+          <span className="text-muted-foreground/30">|</span>
+          <span>Net <span className={`font-medium tabular-nums ${netTotal >= 0 ? "text-emerald" : "text-ruby"}`}>{netTotal >= 0 ? "+" : ""}{fmt(netTotal)}</span></span>
+          <span className="ml-auto text-muted-foreground/50">{total} transaction{total !== 1 ? "s" : ""}</span>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground">{selectedIds.size} selected</span>
+            <button onClick={() => setSelectedIds(new Set())} className="text-muted-foreground hover:text-foreground">Clear</button>
+          </div>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="text-xs px-2.5 py-1 rounded-full border border-ruby/40 text-ruby hover:bg-ruby/5 transition-colors">
+                  <Trash2 className="h-3 w-3 inline mr-1" /> Bulk ({selectedIds.size})
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>Set category</DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    {Object.entries(groupCatsBySection(selectedCats)).map(([section, cats]) => (
+                      <React.Fragment key={section}>
+                        <DropdownMenuLabel className="text-xs text-muted-foreground font-semibold uppercase tracking-wider px-2 py-1">{section}</DropdownMenuLabel>
+                        {cats.map(c => (
+                          <DropdownMenuItem key={c.name} onClick={() => bulkCategory(c.name)}>{c.name}</DropdownMenuItem>
+                        ))}
+                      </React.Fragment>
+                    ))}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => { const c = prompt("New category name:"); if (c) bulkCategory(c.trim().toLowerCase().replace(/\s+/g, "_")); }}>
+                      ➕ Add custom category
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={bulkDelete} className="text-ruby">
+                  <Trash2 className="h-4 w-4 mr-2" /> Delete {selectedIds.size}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      )}
+
+      {/* Active filter chips (except date range, handled by month strip) */}
+      {activeFilters.filter(c => c.key !== "date_from" && c.key !== "date_to").length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {activeFilters.filter(c => c.key !== "date_from" && c.key !== "date_to").map((chip) => (
+            <span key={chip.key} className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald/10 text-emerald border border-emerald/20">
+              {chip.label}
+              <button onClick={() => { setFilter(chip.key, ""); setOffset(0); }} className="hover:text-emerald/80"><X className="h-2.5 w-2.5" /></button>
+            </span>
+          ))}
+          <button onClick={clearAllFilters} className="text-[10px] px-2 py-0.5 rounded-full border border-border text-muted-foreground hover:text-foreground">Clear</button>
+        </div>
+      )}
 
       {/* ─── Tabs ─── */}
       <div className="flex gap-1 border-b border-border">

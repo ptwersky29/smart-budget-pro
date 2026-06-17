@@ -8,6 +8,7 @@ from astral import LocationInfo, SunDirection
 from astral.sun import sun as astral_sun, time_at_elevation
 from fastapi import APIRouter, HTTPException, Query
 from pyluach import dates as pl_dates
+from pyluach.hebrewcal import Month, Year
 
 logger = logging.getLogger("hebcal")
 
@@ -135,6 +136,37 @@ def _collect_holidays(start: date, end: date) -> list[dict]:
     return results
 
 
+def _get_hebrew_months() -> list[dict]:
+    today_gd = pl_dates.GregorianDate.today()
+    today_hd = today_gd.to_heb()
+
+    start_gd = date.today() - timedelta(days=540)
+    end_gd = date.today() + timedelta(days=180)
+
+    months: list[dict] = []
+    for hy in range(today_hd.year - 2, today_hd.year + 2):
+        y = Year(hy)
+        for hm in range(1, y.monthscount() + 1):
+            m = Month(hy, hm)
+            days = list(m.iterdates())
+            first = days[0].to_greg().to_pydate()
+            last = days[-1].to_greg().to_pydate()
+            if last < start_gd or first > end_gd:
+                continue
+            months.append({
+                "hebrew_month": hm,
+                "hebrew_year": hy,
+                "month_name": m.month_name(),
+                "gregorian_start": first.isoformat(),
+                "gregorian_end": last.isoformat(),
+                "is_current": hy == today_hd.year and hm == today_hd.month,
+                "is_leap": y.leap,
+                "days": len(days),
+            })
+
+    return months
+
+
 def build_router() -> APIRouter:
     router = APIRouter(prefix="/jewish/hebcal", tags=["jewish"])
 
@@ -214,5 +246,9 @@ def build_router() -> APIRouter:
     @router.get("/cities")
     async def list_cities():
         return {"cities": sorted(CITIES.keys())}
+
+    @router.get("/months")
+    async def list_months():
+        return {"months": _get_hebrew_months()}
 
     return router
