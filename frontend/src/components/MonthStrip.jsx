@@ -2,6 +2,27 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 
+const YIDDISH = {
+  "Nissan": "Nison",
+  "Iyar": "Iyer",
+  "Sivan": "Sivan",
+  "Tammuz": "Tamuz",
+  "Av": "Ov",
+  "Elul": "Elul",
+  "Tishrei": "Tishrei",
+  "Cheshvan": "Marcheshvan",
+  "Kislev": "Kislev",
+  "Teves": "Teves",
+  "Shevat": "Shvat",
+  "Adar": "Adar",
+  "Adar 1": "Adar Rishon",
+  "Adar 2": "Adar Sheni",
+};
+
+function yiddish(english) {
+  return YIDDISH[english] || english;
+}
+
 export default React.memo(function MonthStrip({ selectedMonth, onMonthSelect }) {
   const [months, setMonths] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -75,7 +96,7 @@ export default React.memo(function MonthStrip({ selectedMonth, onMonthSelect }) 
               className={`relative shrink-0 px-4 py-2.5 text-xs font-medium whitespace-nowrap transition-colors
                 ${isSelected ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
             >
-              <span className="tabular-nums">{m.month_name} {m.hebrew_year}</span>
+              <span className="tabular-nums">{yiddish(m.month_name)} {m.hebrew_year}</span>
               {isSelected && (
                 <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-emerald rounded-full" />
               )}

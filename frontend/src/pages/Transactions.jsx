@@ -225,6 +225,7 @@ const Transactions = React.memo(function Transactions() {
 
   const clearAllFilters = useCallback(() => {
     setSearchInput("");
+    setSelectedHebrewMonth(null);
     setFilters(prev => ({ ...prev, search: "", tx_type: "", source: "", category: "", amount_min: "", amount_max: "", date_from: firstOfMonth(), date_to: today() }));
     setOffset(0);
   }, []);
