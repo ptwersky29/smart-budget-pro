@@ -3,25 +3,21 @@ import { api } from "../lib/api";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 
 const YIDDISH = {
-  "Nissan": "Nison",
-  "Iyar": "Iyer",
-  "Sivan": "Sivan",
-  "Tammuz": "Tamuz",
-  "Av": "Ov",
-  "Elul": "Elul",
-  "Tishrei": "Tishrei",
-  "Cheshvan": "Marcheshvan",
-  "Kislev": "Kislev",
-  "Teves": "Teves",
-  "Shevat": "Shvat",
-  "Adar": "Adar",
-  "Adar 1": "Adar Rishon",
-  "Adar 2": "Adar Sheni",
+  "Nissan": "\u05e0\u05d9\u05e1\u05df",
+  "Iyar": "\u05d0\u05d9\u05d9\u05e8",
+  "Sivan": "\u05e1\u05d9\u05d5\u05df",
+  "Tammuz": "\u05ea\u05de\u05d5\u05d6",
+  "Av": "\u05d0\u05d1",
+  "Elul": "\u05d0\u05dc\u05d5\u05dc",
+  "Tishrei": "\u05ea\u05e9\u05e8\u05d9",
+  "Cheshvan": "\u05de\u05e8\u05d7\u05e9\u05d5\u05df",
+  "Kislev": "\u05db\u05e1\u05dc\u05d5",
+  "Teves": "\u05d8\u05d1\u05ea",
+  "Shevat": "\u05e9\u05d1\u05d8",
+  "Adar": "\u05d0\u05d3\u05e8",
+  "Adar 1": "\u05d0\u05d3\u05e8 \u05e8\u05d0\u05e9\u05d5\u05df",
+  "Adar 2": "\u05d0\u05d3\u05e8 \u05e9\u05e0\u05d9",
 };
-
-function yiddish(english) {
-  return YIDDISH[english] || english;
-}
 
 export default React.memo(function MonthStrip({ selectedMonth, onMonthSelect }) {
   const [months, setMonths] = useState([]);
@@ -96,7 +92,10 @@ export default React.memo(function MonthStrip({ selectedMonth, onMonthSelect }) 
               className={`relative shrink-0 px-4 py-2.5 text-xs font-medium whitespace-nowrap transition-colors
                 ${isSelected ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
             >
-              <span className="tabular-nums">{yiddish(m.month_name)} {m.hebrew_year}</span>
+              <span className="tabular-nums">
+                <span dir="rtl" lang="he" className="inline-block">{YIDDISH[m.month_name] || m.month_name}</span>
+                {" "}{m.hebrew_year}
+              </span>
               {isSelected && (
                 <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-emerald rounded-full" />
               )}
