@@ -11,7 +11,7 @@ from sqlalchemy import select, func
 
 from db import Transaction, Budget, AiUsage
 from auth import get_current_user
-from llm import call_llm, parse_json, estimate_cost
+from llm import call_llm, parse_json
 
 logger = logging.getLogger("ai_insights")
 

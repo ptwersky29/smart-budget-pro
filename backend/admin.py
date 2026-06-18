@@ -8,9 +8,9 @@ from fastapi import APIRouter, HTTPException, Request, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 
-from db import User, Transaction, AuditLog, FeatureFlag, SupportTicket, OnboardingProgress
+from db import User, Transaction, AuditLog, FeatureFlag, SupportTicket
 from db import SmsMessage, SmsSender
-from auth import get_current_user, require_admin
+from auth import require_admin
 from audit import log_action
 
 logger = logging.getLogger("admin")
@@ -34,8 +34,6 @@ def build_router() -> APIRouter:
             today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
             month_start = now.replace(day=1)
             thirty_days_ago = now - timedelta(days=30)
-
-            from sqlalchemy import distinct
 
             async def _scalar(q):
                 return (await session.execute(q)).scalar() or 0

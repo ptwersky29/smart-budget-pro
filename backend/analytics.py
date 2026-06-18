@@ -2,12 +2,12 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request, Depends, Query
+from fastapi import APIRouter, Request, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 
 from db import AnalyticsEvent
-from auth import get_current_user, require_admin
+from auth import get_current_user
 
 logger = logging.getLogger("analytics")
 

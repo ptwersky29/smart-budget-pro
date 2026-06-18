@@ -11,7 +11,7 @@ from sqlalchemy import select, func, text
 
 from db import AiMessage, AiUsage, User, Transaction, Budget
 from auth import get_current_user
-from llm import call_llm, parse_json, estimate_cost, track_ai_usage
+from llm import call_llm
 from security import sanitize_input
 
 logger = logging.getLogger("ai")
@@ -133,7 +133,6 @@ def build_router() -> APIRouter:
             if not response_text:
                 raise HTTPException(502, "AI provider returned an empty response")
 
-            now = datetime.now(timezone.utc)
             msgs = [
                 AiMessage(user_id=user["user_id"], session_id=session_id, role="user", content=payload.message),
                 AiMessage(user_id=user["user_id"], session_id=session_id, role="assistant",
