@@ -2,7 +2,7 @@
 import uuid
 import re
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, date, timezone, timedelta
 from typing import Optional
 from collections import defaultdict
 
@@ -2059,43 +2059,88 @@ Output ONLY valid JSON, no markdown, no explanation:
         user: dict = Depends(get_current_user),
         type: str = Query(None, description="Filter: everyday | event"),
         month: str = Query(None, description="YYYY-MM — defaults to current month"),
+        date_from: str = Query(None, description="ISO date — start of range (overrides month)"),
+        date_to: str = Query(None, description="ISO date — end of range, exclusive (overrides month)"),
     ):
-        cache_key = f"budgets:{user['user_id']}:{month or ''}:{type or ''}"
+        cache_key = f"budgets:{user['user_id']}:{month or ''}:{type or ''}:{date_from or ''}:{date_to or ''}"
         cached = _query_cache.get(cache_key)
         if cached:
             return cached
         sm = request.app.state.db
         async with sm() as session:
             try:
-                if month:
-                    try:
-                        y, m = int(month[:4]), int(month[5:7])
-                        if not (1 <= m <= 12):
-                            raise ValueError
-                    except (ValueError, IndexError):
-                        raise HTTPException(400, "Invalid month format, use YYYY-MM")
-                else:
-                    now = datetime.now(timezone.utc)
-                    y, m = now.year, now.month
-                month_start = datetime(y, m, 1, tzinfo=timezone.utc)
-                if m == 12:
-                    month_end = datetime(y + 1, 1, 1, tzinfo=timezone.utc)
-                else:
-                    month_end = datetime(y, m + 1, 1, tzinfo=timezone.utc)
+                if date_from and date_to:
+                    df = date.fromisoformat(date_from)
+                    dt = date.fromisoformat(date_to)
+                    # Find all YYYY-MM periods overlapping [df, dt)
+                    overlapping = set()
+                    cursor = df.replace(day=1)
+                    while cursor < dt:
+                        overlapping.add(f"{cursor.year}-{cursor.month:02d}")
+                        if cursor.month == 12:
+                            cursor = cursor.replace(year=cursor.year + 1, month=1)
+                        else:
+                            cursor = cursor.replace(month=cursor.month + 1)
+                    periods = list(overlapping)
 
-                period = f"{y}-{m:02d}"
-                q = select(Budget).where(Budget.user_id == user["user_id"])
-                if type:
-                    q = q.where(Budget.budget_type == type)
-                    if type == "everyday":
-                        q = q.where(Budget.month == period)
-                else:
-                    q = q.where(
-                        or_(
-                            Budget.budget_type == "event",
-                            Budget.month == period,
+                    y, m = df.year, df.month
+                    month_start = datetime(y, m, 1, tzinfo=timezone.utc)
+                    if m == 12:
+                        month_end = datetime(y + 1, 1, 1, tzinfo=timezone.utc)
+                    else:
+                        month_end = datetime(y, m + 1, 1, tzinfo=timezone.utc)
+
+                    # Budget filtering by overlapping months
+                    q = select(Budget).where(Budget.user_id == user["user_id"])
+                    if type:
+                        q = q.where(Budget.budget_type == type)
+                        if type == "everyday":
+                            q = q.where(Budget.month.in_(periods))
+                    else:
+                        q = q.where(
+                            or_(
+                                Budget.budget_type == "event",
+                                Budget.month.in_(periods),
+                            )
                         )
-                    )
+
+                    # Transaction aggregation uses the full date range
+                    tx_start = df
+                    tx_end = dt
+                else:
+                    if month:
+                        try:
+                            y, m = int(month[:4]), int(month[5:7])
+                            if not (1 <= m <= 12):
+                                raise ValueError
+                        except (ValueError, IndexError):
+                            raise HTTPException(400, "Invalid month format, use YYYY-MM")
+                    else:
+                        now = datetime.now(timezone.utc)
+                        y, m = now.year, now.month
+                    month_start = datetime(y, m, 1, tzinfo=timezone.utc)
+                    if m == 12:
+                        month_end = datetime(y + 1, 1, 1, tzinfo=timezone.utc)
+                    else:
+                        month_end = datetime(y, m + 1, 1, tzinfo=timezone.utc)
+
+                    period = f"{y}-{m:02d}"
+                    q = select(Budget).where(Budget.user_id == user["user_id"])
+                    if type:
+                        q = q.where(Budget.budget_type == type)
+                        if type == "everyday":
+                            q = q.where(Budget.month == period)
+                    else:
+                        q = q.where(
+                            or_(
+                                Budget.budget_type == "event",
+                                Budget.month == period,
+                            )
+                        )
+
+                    tx_start = month_start
+                    tx_end = month_end
+
                 q = q.order_by(Budget.category)
                 result = await session.execute(q)
                 budgets = result.scalars().all()
@@ -2107,8 +2152,8 @@ Output ONLY valid JSON, no markdown, no explanation:
                         func.sum(-Transaction.amount).label("spent"),
                     ).where(
                         Transaction.user_id == user["user_id"],
-                        Transaction.date >= month_start,
-                        Transaction.date < month_end,
+                        Transaction.date >= tx_start,
+                        Transaction.date < tx_end,
                         Transaction.amount < 0,
                     ).group_by(Transaction.category)
                 )

@@ -195,7 +195,13 @@ export default React.memo(function BudgetPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get("/budgets", { params: { month } });
+      let params;
+      if (currentHebrewMonth) {
+        params = { date_from: currentHebrewMonth.gregorian_start, date_to: currentHebrewMonth.gregorian_end };
+      } else {
+        params = { month };
+      }
+      const { data } = await api.get("/budgets", { params });
       setBudgets(data.budgets || []);
       setEventGroups(data.event_groups || {});
     } catch {
@@ -203,7 +209,7 @@ export default React.memo(function BudgetPage() {
     } finally {
       setLoading(false);
     }
-  }, [month]);
+  }, [month, currentHebrewMonth]);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -371,27 +377,36 @@ export default React.memo(function BudgetPage() {
   };
 
   const handleCopyPreviousMonth = async () => {
-    const prevMonth = addMonth(month, -1);
-    try {
+    let prevBudgets;
+    if (currentHebrewMonth) {
+      const idx = hebrewMonths.findIndex((hm) => hm.gregorian_start === currentHebrewMonth.gregorian_start);
+      if (idx <= 0) { toast.info("No previous month to copy from"); return; }
+      const prevMonth = hebrewMonths[idx - 1];
+      const { data } = await api.get("/budgets", {
+        params: { date_from: prevMonth.gregorian_start, date_to: prevMonth.gregorian_end }
+      });
+      prevBudgets = (data.budgets || []).filter((b) => (b.budget_type || "everyday") !== "event");
+    } else {
+      const prevMonth = addMonth(month, -1);
       const { data } = await api.get("/budgets", { params: { month: prevMonth } });
-      const prevBudgets = (data.budgets || []).filter((b) => (b.budget_type || "everyday") !== "event");
-      if (prevBudgets.length === 0) { toast.info("No budgets to copy from previous month"); return; }
-      let copied = 0;
-      for (const b of prevBudgets) {
-        const existing = budgets.find((eb) => eb.category === b.category);
-        if (existing) continue;
-        await api.post("/budgets", {
-          category: b.category,
-          limit: Number(b.limit),
-          period: "monthly",
-          budget_type: "everyday",
-          month,
-        });
-        copied++;
-      }
-      toast.success(`Copied ${copied} budget(s) from ${prevMonth}`);
-      if (copied > 0) await fetchData();
-    } catch { toast.error("Could not copy budgets"); }
+      prevBudgets = (data.budgets || []).filter((b) => (b.budget_type || "everyday") !== "event");
+    }
+    if (prevBudgets.length === 0) { toast.info("No budgets to copy from previous month"); return; }
+    let copied = 0;
+    for (const b of prevBudgets) {
+      const existing = budgets.find((eb) => eb.category === b.category);
+      if (existing) continue;
+      await api.post("/budgets", {
+        category: b.category,
+        limit: Number(b.limit),
+        period: "monthly",
+        budget_type: "everyday",
+        month,
+      });
+      copied++;
+    }
+    toast.success(`Copied ${copied} budget(s)`);
+    if (copied > 0) await fetchData();
   };
 
   const criticalAlerts = useMemo(() => alerts.filter((a) => a.severity === "critical"), [alerts]);
@@ -624,8 +639,22 @@ export default React.memo(function BudgetPage() {
               <div className="flex items-center gap-2 mb-2">
                 <MonthPicker
                   label={monthLabelWithHebrew}
-                  onPrev={() => setMonth(addMonth(month, -1))}
-                  onNext={() => setMonth(addMonth(month, 1))}
+                  onPrev={() => {
+                    if (currentHebrewMonth) {
+                      const idx = hebrewMonths.findIndex((hm) => hm.gregorian_start === currentHebrewMonth.gregorian_start);
+                      if (idx > 0) setMonth(hebrewMonths[idx - 1].gregorian_start.slice(0, 7));
+                    } else {
+                      setMonth(addMonth(month, -1));
+                    }
+                  }}
+                  onNext={() => {
+                    if (currentHebrewMonth) {
+                      const idx = hebrewMonths.findIndex((hm) => hm.gregorian_start === currentHebrewMonth.gregorian_start);
+                      if (idx < hebrewMonths.length - 1) setMonth(hebrewMonths[idx + 1].gregorian_start.slice(0, 7));
+                    } else {
+                      setMonth(addMonth(month, 1));
+                    }
+                  }}
                   onToday={() => setMonth(fmtMonth(now.getFullYear(), now.getMonth() + 1))}
                   isToday={isCurrentMonth}
                 />
