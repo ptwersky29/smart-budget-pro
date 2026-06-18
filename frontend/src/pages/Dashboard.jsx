@@ -8,8 +8,7 @@ import Skeleton from "../components/ui/Skeleton";
 import {
   Wallet, RefreshCw, Plus,
   AlertTriangle, CalendarDays, Building2,
-  ArrowRight, MoreHorizontal, LayoutDashboard,
-  TrendingUp, Zap,
+  ArrowRight, MoreHorizontal,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -185,14 +184,13 @@ const Dashboard = React.memo(function Dashboard() {
         </LiveBalanceHero>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* ──── LEFT COLUMN ──── */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-5">
 
-          {/* Budgeting & Giving */}
+          {/* Budgets + Maaser */}
           {(showWidget("budgets_overview") || showWidget("maaser_balance")) && (
             <div className="space-y-4">
-              <SectionHeading icon={LayoutDashboard} label="Budgeting &amp; Giving" />
               {showWidget("budgets_overview") && <BudgetsOverview budgets={budgets} currentMonthBudget={currentMonthBudget} />}
               {showWidget("maaser_balance") && <MaaserBalanceWidget />}
             </div>
@@ -200,7 +198,7 @@ const Dashboard = React.memo(function Dashboard() {
 
           {/* Alerts + Upcoming */}
           {(topAlerts.length > 0 || topUpcoming.length > 0) && (
-            <div className="space-y-4">
+            <div className="space-y-3">
               <SectionHeading icon={AlertTriangle} label="Alerts &amp; Upcoming" />
               <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden">
                 {topAlerts.length > 0 && (
@@ -237,25 +235,15 @@ const Dashboard = React.memo(function Dashboard() {
             </div>
           )}
 
-          {/* Cash Flow & Trends */}
-          {showWidget("cash_flow") && (
-            <div className="space-y-4">
-              <SectionHeading icon={TrendingUp} label="Cash Flow &amp; Trends" />
-              <CashFlowChart overview={overview} chartStyle={chartStyle} />
-            </div>
-          )}
+          {/* Cash Flow */}
+          {showWidget("cash_flow") && <CashFlowChart overview={overview} chartStyle={chartStyle} />}
 
           {/* Quick Actions */}
-          {showWidget("quick_actions") && (
-            <div className="space-y-4">
-              <SectionHeading icon={Zap} label="Quick Actions" />
-              <QuickActionsPanel />
-            </div>
-          )}
+          {showWidget("quick_actions") && <QuickActionsPanel />}
         </div>
 
         {/* ──── RIGHT COLUMN ──── */}
-        <div className="lg:col-span-1 space-y-6">
+        <div className="lg:col-span-1 space-y-5">
           {showWidget("recent_transactions") && <RecentTransactions overview={overview} />}
         </div>
       </div>
