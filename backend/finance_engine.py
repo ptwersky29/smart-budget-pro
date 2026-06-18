@@ -12,7 +12,7 @@ from sqlalchemy import select, update, delete, func, or_
 
 from db import (
     User, Transaction, Budget, SplitTransaction, AccountNickname,
-    RecurringTransaction, Category, Subscription, get_session_maker,
+    RecurringTransaction, Category, Subscription, BankConnection, get_session_maker,
 )
 from auth import get_current_user
 from llm import call_llm, track_ai_usage, parse_json
@@ -2037,8 +2037,33 @@ Output ONLY valid JSON, no markdown, no explanation:
             for t in txs:
                 sources[t.source or "manual"] += 1
 
+            # Real bank balances from TrueLayer connections
+            conn_result = await session.execute(
+                select(BankConnection).where(
+                    BankConnection.user_id == uid,
+                    BankConnection.status == "active",
+                    BankConnection.balance.isnot(None),
+                )
+            )
+            bank_connections = conn_result.scalars().all()
+            truelayer_balance = sum(c.balance for c in bank_connections if c.balance is not None) or 0
+            accounts = [
+                {
+                    "connection_id": c.connection_id,
+                    "account_name": c.nickname or c.account_name or "Bank Account",
+                    "account_type": c.account_type or "",
+                    "balance": float(c.balance) if c.balance is not None else 0,
+                    "balance_currency": c.balance_currency or "GBP",
+                    "institution": (c.config or {}).get("institution"),
+                    "balance_updated_at": c.balance_updated_at.isoformat() if c.balance_updated_at else None,
+                }
+                for c in bank_connections
+            ]
+
             payload = {
                 "balance": round(balance, 2),
+                "truelayer_balance": round(truelayer_balance, 2),
+                "accounts": accounts,
                 "income": round(income, 2),
                 "spend": round(spend, 2),
                 "savings_rate": round(savings_rate, 1),

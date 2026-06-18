@@ -177,7 +177,7 @@ const Dashboard = React.memo(function Dashboard() {
       {!empty && <>
       {/* LIVE BALANCE HERO */}
       {hasKpi && (
-        <LiveBalanceHero overview={overview} trendData={trendData} loading={refreshing} onRefresh={() => loadAll(true)}>
+        <LiveBalanceHero overview={overview} truelayerBalance={overview.truelayer_balance} accounts={overview.accounts} trendData={trendData} loading={refreshing} onRefresh={() => loadAll(true)}>
           {showWidget("net_worth") && <NetWorthCard overview={overview} trendData={trendData} />}
           {showWidget("income") && <IncomeCard overview={overview} />}
           {showWidget("spending") && <SpendingCard overview={overview} />}

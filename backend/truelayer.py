@@ -478,6 +478,10 @@ def build_router() -> APIRouter:
                 for acc in accounts:
                     provider_info = acc.get("provider") or {}
                     connection_id = f"conn_{uuid.uuid4().hex[:12]}"
+                    provider_name = provider_info.get("display_name")
+                    config = {"account_ids": [acc.get("account_id", "")]} if acc.get("account_id") else {}
+                    if provider_name:
+                        config["institution"] = provider_name
                     conn = BankConnection(
                         connection_id=connection_id, user_id=user_id, provider="truelayer",
                         account_id=acc.get("account_id") or provider_info.get("provider_id", "unknown"),
@@ -487,7 +491,7 @@ def build_router() -> APIRouter:
                         refresh_token=_encrypt(_token_value(token_data.get("refresh_token"))),
                         expires_at=datetime.now(timezone.utc) + timedelta(seconds=token_data.get("expires_in", 3600)),
                         import_start_date=import_from_date,
-                        config={"account_ids": [acc.get("account_id", "")]} if acc.get("account_id") else None,
+                        config=config,
                         status="active",
                         last_sync_status="connected",
                     )
