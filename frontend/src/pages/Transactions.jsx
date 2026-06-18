@@ -28,7 +28,7 @@ import {
 } from "../components/ui/sheet";
 import ComparePeriods from "../components/ComparePeriods";
 import MaaserPanel from "../components/MaaserPanel";
-import MonthStrip from "../components/MonthStrip";
+import MonthPicker, { YIDDISH } from "../components/MonthPicker";
 import TransactionRow from "../components/TransactionRow";
 import TransactionForm from "../components/TransactionForm";
 import { Button } from "../components/ui/button";
@@ -189,6 +189,26 @@ const Transactions = React.memo(function Transactions() {
       date_to: m.gregorian_end,
     }));
   }, []);
+
+  const toggleHebrewMonth = useCallback((dir) => {
+    if (!selectedHebrewMonth || hebrewMonths.length === 0) return;
+    const idx = hebrewMonths.findIndex(
+      (m) => m.hebrew_month === selectedHebrewMonth.hebrew_month && m.hebrew_year === selectedHebrewMonth.hebrew_year
+    );
+    const next = dir === "next" ? idx + 1 : idx - 1;
+    if (next >= 0 && next < hebrewMonths.length) {
+      applyHebrewMonth(hebrewMonths[next]);
+    }
+  }, [selectedHebrewMonth, hebrewMonths, applyHebrewMonth]);
+
+  const isCurrentHebrewMonth = selectedHebrewMonth?.is_current ?? false;
+
+  const hebrewMonthLabel = selectedHebrewMonth ? (
+    <span>
+      <span dir="rtl" lang="he" className="inline-block">{YIDDISH[selectedHebrewMonth.month_name] || selectedHebrewMonth.month_name}</span>
+      {" "}{selectedHebrewMonth.hebrew_year}
+    </span>
+  ) : null;
 
   // Load Hebrew months and select current month (only if no date params in URL)
   useEffect(() => {
@@ -639,8 +659,14 @@ const Transactions = React.memo(function Transactions() {
         </div>
       )}
 
-      {/* ─── Hebrew Month Strip ─── */}
-      <MonthStrip selectedMonth={selectedHebrewMonth} onMonthSelect={applyHebrewMonth} />
+      {/* ─── Hebrew Month Picker ─── */}
+      <MonthPicker
+        label={hebrewMonthLabel}
+        onPrev={() => toggleHebrewMonth("prev")}
+        onNext={() => toggleHebrewMonth("next")}
+        onToday={() => { const c = hebrewMonths.find(m => m.is_current); if (c) applyHebrewMonth(c); }}
+        isToday={isCurrentHebrewMonth}
+      />
 
       {/* Summary + Bulk actions */}
       {(!someSelected) ? (

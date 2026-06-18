@@ -12,6 +12,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import CategoryCombobox from "../components/CategoryCombobox";
+import MonthPicker, { YIDDISH } from "../components/MonthPicker";
 
 function fmtMonth(y, m) { return `${y}-${String(m).padStart(2, "0")}`; }
 
@@ -86,10 +87,39 @@ export default React.memo(function BudgetPage() {
   const [eventGroups, setEventGroups] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryHierarchy, setCategoryHierarchy] = useState({});
+  const [hebrewMonths, setHebrewMonths] = useState([]);
+
+  useEffect(() => {
+    api.get("/jewish/hebcal/months")
+      .then(({ data }) => setHebrewMonths(data.months || []))
+      .catch(() => {});
+  }, []);
 
   const { year, month: mNum } = parseMonth(month);
   const monthLabel = `${MONTH_NAMES[mNum - 1]} ${year}`;
   const isCurrentMonth = month === fmtMonth(now.getFullYear(), now.getMonth() + 1);
+
+  const currentHebrewMonth = useMemo(() => {
+    if (!hebrewMonths.length) return null;
+    const start = `${month}-01`;
+    const [y, m] = parseMonth(month);
+    const nextM = m === 12 ? 1 : m + 1;
+    const nextY = m === 12 ? y + 1 : y;
+    const end = fmtMonth(nextY, nextM);
+    return hebrewMonths.find(
+      (hm) => hm.gregorian_start < end && hm.gregorian_end >= start
+    );
+  }, [hebrewMonths, month]);
+
+  const hebrewSuffix = currentHebrewMonth ? (
+    <span className="text-xs font-normal text-muted-foreground">
+      {" "}·{" "}<span dir="rtl" lang="he">{YIDDISH[currentHebrewMonth.month_name] || currentHebrewMonth.month_name}</span>{" "}{currentHebrewMonth.hebrew_year}
+    </span>
+  ) : null;
+
+  const monthLabelWithHebrew = (
+    <span>{monthLabel}{hebrewSuffix}</span>
+  );
 
   const everyday = useMemo(() => budgets.filter((b) => (b.budget_type || "everyday") !== "event"), [budgets]);
   const events = useMemo(() => budgets.filter((b) => b.budget_type === "event"), [budgets]);
@@ -584,22 +614,16 @@ export default React.memo(function BudgetPage() {
               <span className="text-lg font-bold tabular-nums">{summary.totalPlanned ? Math.round((summary.totalSpent / summary.totalPlanned) * 100) : 0}%</span>
             </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
-              <button onClick={() => setMonth(addMonth(month, -1))} className="p-1 rounded-lg hover:bg-secondary text-muted-foreground transition-colors" aria-label="Previous month">
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <span className="text-base font-semibold min-w-[130px] text-center">{monthLabel}</span>
-              <button onClick={() => setMonth(addMonth(month, 1))} className="p-1 rounded-lg hover:bg-secondary text-muted-foreground transition-colors" aria-label="Next month">
-                <ChevronRight className="h-4 w-4" />
-              </button>
-              {!isCurrentMonth && (
-                <button onClick={() => setMonth(fmtMonth(now.getFullYear(), now.getMonth() + 1))}
-                  className="text-xs text-muted-foreground hover:text-foreground ml-1 underline underline-offset-2">
-                  Back to today
-                </button>
-              )}
-            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-2">
+                <MonthPicker
+                  label={monthLabelWithHebrew}
+                  onPrev={() => setMonth(addMonth(month, -1))}
+                  onNext={() => setMonth(addMonth(month, 1))}
+                  onToday={() => setMonth(fmtMonth(now.getFullYear(), now.getMonth() + 1))}
+                  isToday={isCurrentMonth}
+                />
+              </div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
               <span className="text-muted-foreground">Budgeted <strong className="text-foreground">£{summary.totalPlanned.toLocaleString()}</strong></span>
               <span className="text-muted-foreground">Spent <strong className={summary.overCount > 0 ? "text-ruby" : "text-emerald"}>£{summary.totalSpent.toLocaleString()}</strong></span>
