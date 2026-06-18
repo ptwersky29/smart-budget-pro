@@ -92,17 +92,14 @@ export default function CategoryManager() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight">Category Manager</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {cats.filter(c => c.source === "System").length} system categories · {cats.filter(c => c.source === "Custom").length} custom
-          </p>
-        </div>
-        <Button variant="primary" size="pill" onClick={() => setAdding(true)} disabled={adding}>
-          <Plus className="h-4 w-4 mr-1" /> Add category
-        </Button>
-      </div>
+      <PageHeader eyebrow="Categories" title="Category Manager"
+        description={`${cats.filter(c => c.source === "System").length} system categories · ${cats.filter(c => c.source === "Custom").length} custom`}
+        actions={
+          <Button variant="primary" size="pill" onClick={() => setAdding(true)} disabled={adding}>
+            <Plus className="h-4 w-4 mr-1" /> Add category
+          </Button>
+        }
+      />
 
       {/* Add new custom category */}
       {adding && (

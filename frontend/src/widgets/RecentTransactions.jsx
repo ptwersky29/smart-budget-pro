@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Search, ArrowUpDown } from "lucide-react";
+import { Search, ArrowUpDown, Receipt } from "lucide-react";
 
 const CAT_COLORS = {
   housing: "bg-blue-400",
@@ -24,6 +24,29 @@ function catColor(cat) {
 function formatCurrency(n) {
   const abs = Math.abs(n).toFixed(2);
   return n >= 0 ? `+£${abs}` : `-£${abs}`;
+}
+
+function groupByDate(transactions) {
+  const groups = {};
+  transactions.forEach((t) => {
+    const dateKey = t.date ? t.date.slice(0, 10) : "unknown";
+    if (!groups[dateKey]) groups[dateKey] = [];
+    groups[dateKey].push(t);
+  });
+  return groups;
+}
+
+function formatDateGroup(dateStr) {
+  if (dateStr === "unknown") return "Unknown date";
+  const d = new Date(dateStr + "T00:00:00");
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (d.toDateString() === today.toDateString()) return "Today";
+  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+
+  return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 }
 
 export default React.memo(function RecentTransactions({ overview }) {
@@ -50,20 +73,26 @@ export default React.memo(function RecentTransactions({ overview }) {
     return result.slice(0, 15);
   }, [allTxs, search, sortDir]);
 
+  const grouped = useMemo(() => groupByDate(filtered), [filtered]);
+  const dateKeys = useMemo(() => Object.keys(grouped).sort((a, b) => sortDir === "desc" ? b.localeCompare(a) : a.localeCompare(b)), [grouped, sortDir]);
+
   return (
     <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden lg:sticky lg:top-24">
-      {/* Header */}
       <div className="sticky top-0 z-10 bg-card/95 backdrop-blur-xl border-b border-border/70">
         <div className="flex items-center justify-between px-5 pt-4 pb-2">
-          <div>
-            <p className="label-overline">Recent</p>
-            <p className="text-sm font-medium mt-0.5">Transactions</p>
+          <div className="flex items-center gap-2.5">
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-emerald/10 text-emerald">
+              <Receipt className="h-3.5 w-3.5" />
+            </span>
+            <div>
+              <p className="label-overline">Recent</p>
+              <p className="text-sm font-medium mt-0.5">Transactions</p>
+            </div>
           </div>
           <Link to="/transactions" className="text-xs text-emerald font-medium hover:underline shrink-0">
             View all
           </Link>
         </div>
-        {/* Search */}
         <div className="px-5 pb-3">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
@@ -78,98 +107,58 @@ export default React.memo(function RecentTransactions({ overview }) {
         </div>
       </div>
 
-      {/* Transaction list — scrollable */}
       <div className="max-h-[calc(100vh-18rem)] overflow-y-auto scroll-smooth">
         {filtered.length === 0 ? (
           <div className="px-5 py-10 text-center">
             <p className="text-xs text-muted-foreground">No matching transactions</p>
           </div>
         ) : (
-          <>
-            {/* Desktop table */}
-            <div className="hidden sm:block">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-muted-foreground border-b border-border/40 bg-secondary/10">
-                    <th className="px-5 py-2.5 font-medium">Date</th>
-                    <th className="px-5 py-2.5 font-medium">Description</th>
-                    <th className="px-5 py-2.5 font-medium text-right">
-                      <button
-                        onClick={() => setSortDir((d) => (d === "desc" ? "asc" : "desc"))}
-                        className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
-                      >
-                        Amount
-                        <ArrowUpDown className="h-3 w-3" />
-                      </button>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((t) => (
-                    <tr
-                      key={t.transaction_id}
-                      className="border-b border-border/20 last:border-0 hover:bg-secondary/20 transition-colors"
+          <div className="divide-y divide-border/30">
+            {dateKeys.map((dateKey) => (
+              <div key={dateKey}>
+                <div className="sticky top-0 z-[5] bg-card/95 backdrop-blur-xl px-5 py-2 border-b border-border/20">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {formatDateGroup(dateKey)}
+                    </span>
+                    <button
+                      onClick={() => setSortDir((d) => (d === "desc" ? "asc" : "desc"))}
+                      className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1"
                     >
-                      <td className="px-5 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
-                        {t.date?.slice(0, 10)}
-                      </td>
-                      <td className="px-5 py-2.5">
-                        <div className="flex items-center gap-2.5">
-                          <span
-                            className={`w-2 h-2 rounded-full shrink-0 ${catColor(t.category)}`}
-                          />
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate max-w-[160px]">
-                              {t.description}
-                            </p>
-                            <span className="text-[10px] text-muted-foreground capitalize">
-                              {t.category || "uncategorized"}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td
-                        className={`px-5 py-2.5 text-right text-sm font-medium tabular-nums whitespace-nowrap ${
+                      <ArrowUpDown className="h-3 w-3" />
+                      {sortDir === "desc" ? "Newest" : "Oldest"}
+                    </button>
+                  </div>
+                </div>
+                <div className="divide-y divide-border/10">
+                  {grouped[dateKey].map((t) => (
+                    <div
+                      key={t.transaction_id}
+                      className="flex items-center gap-3 px-5 py-2.5 hover:bg-secondary/20 transition-colors"
+                    >
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${catColor(t.category)}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{t.description}</p>
+                        <span className="text-[10px] text-muted-foreground capitalize">
+                          {t.category || "uncategorized"}
+                        </span>
+                      </div>
+                      <span
+                        className={`shrink-0 text-sm font-medium tabular-nums ${
                           t.amount > 0 ? "text-emerald" : ""
                         }`}
                       >
                         {formatCurrency(t.amount)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile list */}
-            <div className="sm:hidden divide-y divide-border/40">
-              {filtered.map((t) => (
-                <div key={t.transaction_id} className="px-5 py-2.5 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${catColor(t.category)}`} />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{t.description}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {t.date?.slice(0, 10)}
-                        <span className="ml-1.5 capitalize">· {t.category || "uncategorized"}</span>
-                      </p>
+                      </span>
                     </div>
-                  </div>
-                  <span
-                    className={`shrink-0 font-medium tabular-nums text-sm ${
-                      t.amount > 0 ? "text-emerald" : ""
-                    }`}
-                  >
-                    {formatCurrency(t.amount)}
-                  </span>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
-      {/* Bottom link */}
       <div className="border-t border-border/40 px-5 py-2.5 text-center">
         <Link
           to="/transactions"

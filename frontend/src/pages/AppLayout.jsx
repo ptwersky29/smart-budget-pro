@@ -210,7 +210,6 @@ export default function AppLayout() {
                 <Menu className="h-5 w-5" />
               </button>
               <div className="min-w-0">
-                <p className="label-overline text-emerald">{routeMeta.eyebrow}</p>
                 <p className="text-sm font-medium truncate">{routeMeta.title}</p>
               </div>
             </div>
@@ -253,15 +252,6 @@ export default function AppLayout() {
 
         <main className="p-4 sm:p-5 lg:p-8 pb-24 lg:pb-8 max-w-[1680px] mx-auto">
           <div className="space-y-8">
-            <div className="lg:hidden rounded-2xl border border-border bg-card/90 backdrop-blur-xl p-5 shadow-card">
-              <p className="label-overline text-emerald">{routeMeta.eyebrow}</p>
-              <p className="mt-2 text-2xl tracking-tight font-semibold">{routeMeta.title}</p>
-              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{routeMeta.description}</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {routeMeta.secondary && <Button asChild variant="chip"><Link to={routeMeta.secondary.to}>{routeMeta.secondary.label}</Link></Button>}
-                {routeMeta.primary && <Button asChild variant="primary" size="pill"><Link to={routeMeta.primary.to}>{routeMeta.primary.label}</Link></Button>}
-              </div>
-            </div>
             <div key={location.pathname} className={noAnim ? "" : "animate-[slideInRight_0.3s_ease-out]"}>
               <Outlet />
             </div>

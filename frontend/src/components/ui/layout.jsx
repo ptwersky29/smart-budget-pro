@@ -3,18 +3,20 @@ import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { Button } from "./button";
 
-export const PageHeader = React.memo(function PageHeader({ eyebrow, title, description, actions, meta, className = "", ...props }) {
+export const PageHeader = React.memo(function PageHeader({ eyebrow, title, description, actions, meta, children, className = "", ...props }) {
   return (
-    <div {...props} className={`rounded-2xl border border-border bg-card/90 backdrop-blur-xl p-5 sm:p-6 lg:p-8 shadow-modal ${className}`}>
-      <div className="flex flex-col gap-4 lg:gap-6 lg:flex-row lg:items-end lg:justify-between">
+    <div {...props} className={`relative rounded-2xl border border-border bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-xl p-5 sm:p-6 lg:p-8 shadow-card overflow-hidden ${className}`}>
+      <div className="absolute -top-10 -left-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="relative flex flex-col gap-4 lg:gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl space-y-2 lg:space-y-3">
-          {eyebrow && <p className="label-overline text-emerald" aria-hidden="true">{eyebrow}</p>}
-          <p className="text-2xl sm:text-3xl lg:text-5xl tracking-tight font-semibold leading-[1.05]" aria-hidden="true">{title}</p>
+          {eyebrow && <p className="label-overline text-emerald">{eyebrow}</p>}
+          <h1 className="text-2xl sm:text-3xl lg:text-5xl tracking-tight font-semibold leading-[1.05]">{title}</h1>
           {description && <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">{description}</p>}
           {meta && <div className="flex flex-wrap gap-2 pt-1">{meta}</div>}
         </div>
-        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+        {actions && <div className="flex flex-wrap items-center gap-2 shrink-0">{actions}</div>}
       </div>
+      {children}
     </div>
   );
 });

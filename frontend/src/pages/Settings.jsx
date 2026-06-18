@@ -25,7 +25,7 @@ export default function Settings() {
   return (
     <div className="space-y-6" data-testid="settings-root">
       <PageHeader
-        eyebrow="System"
+        eyebrow="Settings"
         title="Settings"
         description="Customize your experience — appearance, automation, notifications, and account."
       />

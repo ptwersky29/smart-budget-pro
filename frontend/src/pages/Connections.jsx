@@ -180,9 +180,23 @@ export default function Connections() {
   return (
     <div className="space-y-8" data-testid="connections-root">
       <PageHeader
-        eyebrow="Accounts"
+        eyebrow="Import"
         title="Bank connections."
         description="Connect your UK bank securely via TrueLayer, keep sync status visible, and reconnect when needed."
+        actions={
+          <div className="flex items-center gap-3">
+            <div>
+              <input type="date" value={importFromDate} onChange={(e) => setImportFromDate(e.target.value)}
+                className="h-10 px-3 rounded-xl bg-secondary/50 border border-transparent text-xs sm:text-sm focus:border-ring focus:outline-none" />
+            </div>
+            <Button onClick={connect} disabled={status === "connecting" || status === "redirecting" || initialSync} data-testid="connect-bank-button" variant="primary" size="pill">
+              {status === "connecting" || status === "redirecting" ? <><Loader2 className="h-4 w-4 animate-spin" /> Working…</> : <>Connect Bank <ArrowRight className="h-4 w-4 ml-2" /></>}
+            </Button>
+            {status === "failed" && (
+              <Button onClick={connect} data-testid="retry-connect" variant="outlinePill" size="pill">Retry</Button>
+            )}
+          </div>
+        }
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -225,40 +239,7 @@ export default function Connections() {
         </div>
       )}
 
-      {!needsSetup && (
-        <SectionCard eyebrow="Connect" title="Add a new bank" contentClassName="pt-0">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl gradient-emerald grid place-items-center"><Building2 className="h-7 w-7 text-white" /></div>
-              <div>
-                <p className="text-xl tracking-tight font-medium">Connect a new bank</p>
-                <p className="text-sm text-muted-foreground">Securely link your UK bank account — read-only access</p>
-              </div>
-            </div>
-            <div className="flex flex-col gap-3 min-w-0 max-w-full">
-              <div>
-                <label className="label-overline">Import start date</label>
-                <input
-                  type="date"
-                  value={importFromDate}
-                  onChange={(e) => setImportFromDate(e.target.value)}
-                  className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none"
-                />
-                <p className="text-xs text-muted-foreground mt-1">FinanceAI will import transactions from this date when you connect.</p>
-              </div>
-              <div className="flex gap-2 justify-end">
-              {status === "failed" && (
-                <Button onClick={connect} data-testid="retry-connect" variant="outlinePill" size="pill">Retry</Button>
-              )}
-              <Button onClick={connect} disabled={status === "connecting" || status === "redirecting" || initialSync} data-testid="connect-bank-button" variant="primary" size="pill">
-                {status === "connecting" || status === "redirecting" ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Working…</> : <>Connect Bank <ArrowRight className="h-4 w-4 ml-2" /></>}
-              </Button>
-              </div>
-            </div>
-          </div>
-          {error && <p className="mt-4 text-sm text-ruby">Failed: {error}</p>}
-        </SectionCard>
-      )}
+      {error && <p className="text-sm text-ruby">Failed: {error}</p>}
 
       <SectionCard eyebrow="Linked accounts" title={`${conns.length} connection${conns.length !== 1 ? "s" : ""}`} contentClassName="p-0">
         <div className="p-6 border-b border-border/70 flex items-center justify-between flex-wrap gap-3">

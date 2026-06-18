@@ -110,7 +110,7 @@ export default function Reports() {
   return (
     <div className="space-y-8" data-testid="reports-root">
       <PageHeader
-        eyebrow="Overview"
+        eyebrow="Reports"
         title="Your financial health, explained."
         description="A cleaner monthly readout with health score, insights, and premium PDF reports."
         actions={

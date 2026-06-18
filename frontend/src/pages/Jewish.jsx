@@ -39,7 +39,7 @@ export default function Jewish() {
   return (
     <div className="space-y-8" data-testid="jewish-root">
       <PageHeader
-        eyebrow="Tools"
+        eyebrow="Jewish"
         title="Maaser & Calendar."
         description="A dedicated space for Jewish finance planning, tzedakah, and zmanim."
       />

@@ -100,7 +100,7 @@ export default function BankStatements() {
   return (
     <div className="space-y-8" data-testid="import-root">
       <PageHeader
-        eyebrow="Connect"
+        eyebrow="Import"
         title="Import your data."
         description="Connect your bank, upload statements, and keep everything in sync."
         actions={

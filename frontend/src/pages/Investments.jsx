@@ -66,7 +66,7 @@ export default function Investments() {
   return (
     <div className="space-y-6" data-testid="investments-root">
       <PageHeader
-        eyebrow="Tools"
+        eyebrow="Investments"
         title="See your future net worth."
         description="Simple investment projections and live market context in a cleaner, easier-to-scan layout."
       />

@@ -3,13 +3,12 @@ import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useSettings } from "../contexts/SettingsContext";
 import { toast } from "sonner";
-import AIInsightPanel from "../components/AIInsightPanel";
-import { EmptyState } from "../components/ui/layout";
-import Skeleton, { SkeletonCard } from "../components/ui/Skeleton";
+import { EmptyState, PageHeader } from "../components/ui/layout";
+import Skeleton from "../components/ui/Skeleton";
 import {
   Wallet, RefreshCw, Plus,
   AlertTriangle, CalendarDays, Building2,
-  ArrowRight, MoreHorizontal,
+  ArrowRight, MoreHorizontal, LayoutDashboard,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -22,6 +21,7 @@ import { Button } from "../components/ui/button";
 import {
   NetWorthCard, IncomeCard, SpendingCard, HealthScoreCard,
   CashFlowChart, BudgetsOverview, QuickActionsPanel, RecentTransactions, MaaserBalanceWidget,
+  LiveBalanceHero, SmartInsightsPanel,
 } from "../widgets";
 
 const Dashboard = React.memo(function Dashboard() {
@@ -38,7 +38,6 @@ const Dashboard = React.memo(function Dashboard() {
 
   const dashboardPrefs = settings.preferences?.dashboard || {};
   const activeWidgets = dashboardPrefs.widgets || [];
-  const widgetOrder = dashboardPrefs.widget_order || [];
   const chartStyle = dashboardPrefs.chart_style || "smooth";
   const showWidget = (key) => activeWidgets.includes(key);
 
@@ -98,14 +97,16 @@ const Dashboard = React.memo(function Dashboard() {
     }
   };
 
+  const hasKpi = showWidget("net_worth") || showWidget("income") || showWidget("spending") || showWidget("health_score");
+
   if (loading) return (
     <div className="space-y-8" data-testid="dashboard-root">
       <Skeleton className="h-12 w-full rounded-2xl" />
+      <Skeleton className="h-44 w-full rounded-[1.75rem]" />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 space-y-4">
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">{[1,2,3,4].map(i => <SkeletonCard key={i} />)}</div>
-          <Skeleton className="h-32 rounded-2xl" />
           <Skeleton className="h-64 rounded-2xl" />
+          <Skeleton className="h-48 rounded-2xl" />
         </div>
         <div className="space-y-4"><Skeleton className="h-full min-h-[500px] rounded-2xl" /></div>
       </div>
@@ -126,32 +127,29 @@ const Dashboard = React.memo(function Dashboard() {
   return (
     <div className="space-y-6" data-testid="dashboard-root">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <p className="label-overline text-emerald">Overview</p>
-          <h1 className="text-2xl lg:text-3xl tracking-tight font-semibold mt-1">
-            Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}{user?.name ? `, ${user?.name?.split(" ")[0]}` : ""}.
-          </h1>
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="chip">
-              <MoreHorizontal className="h-3.5 w-3.5" /> Actions
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => loadAll(true)}>
-              <RefreshCw className="h-4 w-4 mr-2" /> Refresh
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate("/import")}>
-              <Building2 className="h-4 w-4 mr-2" /> Import
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate("/transactions")}>
-              <Plus className="h-4 w-4 mr-2" /> Add transaction
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      <PageHeader eyebrow="Dashboard" title={`Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}${user?.name ? `, ${user?.name?.split(" ")[0]}` : ""}.`}
+        description="A clean snapshot of your money, cash flow, and what needs attention next."
+        actions={
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="chip">
+                <MoreHorizontal className="h-3.5 w-3.5" /> Actions
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => loadAll(true)}>
+                <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/import")}>
+                <Building2 className="h-4 w-4 mr-2" /> Import
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/transactions")}>
+                <Plus className="h-4 w-4 mr-2" /> Add transaction
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        }
+      />
 
       {empty && (
         <EmptyState
@@ -176,19 +174,30 @@ const Dashboard = React.memo(function Dashboard() {
       )}
 
       {!empty && <>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* LEFT COLUMN — widgets */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* KPI row */}
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-            {showWidget("net_worth") && <NetWorthCard overview={overview} trendData={trendData} />}
-            {showWidget("income") && <IncomeCard overview={overview} />}
-            {showWidget("spending") && <SpendingCard overview={overview} />}
-            {showWidget("health_score") && <HealthScoreCard overview={overview} />}
-          </div>
+      {/* LIVE BALANCE HERO */}
+      {hasKpi && (
+        <LiveBalanceHero overview={overview} trendData={trendData} loading={refreshing} onRefresh={() => loadAll(true)}>
+          {showWidget("net_worth") && <NetWorthCard overview={overview} trendData={trendData} />}
+          {showWidget("income") && <IncomeCard overview={overview} />}
+          {showWidget("spending") && <SpendingCard overview={overview} />}
+          {showWidget("health_score") && <HealthScoreCard overview={overview} />}
+        </LiveBalanceHero>
+      )}
 
-          {/* Maaser Balance */}
-          {showWidget("maaser_balance") && <MaaserBalanceWidget />}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* LEFT COLUMN — Budgets, Cash Flow, Actions */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* SECTION: Budgeting & Giving */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 px-1">
+              <span className="grid h-6 w-6 place-items-center rounded-md bg-emerald/10 text-emerald">
+                <LayoutDashboard className="h-3 w-3" />
+              </span>
+              <p className="label-overline">Budgeting &amp; Giving</p>
+            </div>
+            {showWidget("budgets_overview") && <BudgetsOverview budgets={budgets} currentMonthBudget={currentMonthBudget} />}
+            {showWidget("maaser_balance") && <MaaserBalanceWidget />}
+          </div>
 
           {/* Alerts + Upcoming */}
           {(topAlerts.length > 0 || topUpcoming.length > 0) && (
@@ -226,23 +235,11 @@ const Dashboard = React.memo(function Dashboard() {
             </div>
           )}
 
-          {/* 3-column: Budgets | Cash Flow | Quick Actions */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {showWidget("budgets_overview") && <BudgetsOverview budgets={budgets} currentMonthBudget={currentMonthBudget} />}
+          {/* 2-column: Cash Flow | Quick Actions */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {showWidget("cash_flow") && <CashFlowChart overview={overview} chartStyle={chartStyle} />}
             {showWidget("quick_actions") && <QuickActionsPanel />}
           </div>
-
-          {/* AI Insights */}
-          {showWidget("ai_insights") && (
-            <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card p-5">
-              <AIInsightPanel
-                title="AI Insights"
-                subtitle="What's happening with your money"
-                endpoint="/ai/insights/dashboard"
-              />
-            </div>
-          )}
         </div>
 
         {/* RIGHT COLUMN — transactions sidebar */}
@@ -250,6 +247,11 @@ const Dashboard = React.memo(function Dashboard() {
           {showWidget("recent_transactions") && <RecentTransactions overview={overview} />}
         </div>
       </div>
+
+      {/* BOTTOM: AI Insights */}
+      {showWidget("ai_insights") && (
+        <SmartInsightsPanel />
+      )}
       </>}
     </div>
   );

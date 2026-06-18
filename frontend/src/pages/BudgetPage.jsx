@@ -623,10 +623,8 @@ export default React.memo(function BudgetPage() {
       )}
 
       {/* Dashboard overview */}
-      <div className="relative rounded-2xl border border-border bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-xl p-5 sm:p-6 shadow-card overflow-hidden">
-        {/* Glow effect */}
-        <div className="absolute -top-10 -left-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 relative">
+      <PageHeader eyebrow="Budgets" title="Budgets">
+        <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-border/70">
           {/* Large progress ring with subtle shadow */}
           <div className="relative shrink-0 drop-shadow-[0_0_8px_rgba(48,164,108,0.4)]">
             <ProgressRing pct={summary.totalPlanned ? (summary.totalSpent / summary.totalPlanned) * 100 : 0} size={80} stroke={5}
@@ -703,7 +701,7 @@ export default React.memo(function BudgetPage() {
             </DropdownMenu>
           </div>
         </div>
-      </div>
+      </PageHeader>
 
       {/* Quick stats row */}
       <div className="grid grid-cols-3 gap-3">

@@ -160,16 +160,9 @@ export default function Subscriptions() {
     <div className="space-y-6">
 
       {/* Summary header */}
-      <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card p-5 sm:p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <p className="label-overline text-emerald">Recurring</p>
-            <h1 className="text-2xl sm:text-3xl tracking-tight font-semibold mt-1">Subscriptions.</h1>
-            <p className="text-sm text-muted-foreground mt-1.5">
-              {subs.filter((s) => s.active).length} active &middot; <strong className="text-foreground">£{monthlyTotal.toFixed(2)}</strong> / month
-              &middot; <strong className="text-foreground">£{annualTotal.toLocaleString()}</strong> / year
-            </p>
-          </div>
+      <PageHeader eyebrow="Subscriptions" title="Subscriptions."
+        description={`${subs.filter((s) => s.active).length} active · £${monthlyTotal.toFixed(2)} / month · £${annualTotal.toLocaleString()} / year`}
+        actions={
           <div className="flex gap-2">
             <Button variant="outlinePill" size="pillSm" onClick={load}><RefreshCw className="h-3.5 w-3.5" /></Button>
             <DropdownMenu>
@@ -189,50 +182,50 @@ export default function Subscriptions() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        </div>
+        }
+      />
 
-        {/* Mini stat cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
-          <div className="rounded-xl border border-border bg-secondary/20 p-3 text-center">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Active</p>
-            <p className="text-lg font-semibold mt-0.5">{subs.filter((s) => s.active).length}</p>
-          </div>
-          <div className="rounded-xl border border-border bg-secondary/20 p-3 text-center">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Monthly</p>
-            <p className="text-lg font-semibold mt-0.5 tabular-nums">£{monthlyTotal.toFixed(2)}</p>
-          </div>
-          <div className="rounded-xl border border-border bg-secondary/20 p-3 text-center">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Annual</p>
-            <p className="text-lg font-semibold mt-0.5 tabular-nums">£{annualTotal.toLocaleString()}</p>
-          </div>
-          <div className="rounded-xl border border-border bg-secondary/20 p-3 text-center">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Paused</p>
-            <p className="text-lg font-semibold mt-0.5">{subs.filter((s) => !s.active).length}</p>
-          </div>
+      {/* Mini stat cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="rounded-xl border border-border bg-secondary/20 p-3 text-center">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Active</p>
+          <p className="text-lg font-semibold mt-0.5">{subs.filter((s) => s.active).length}</p>
         </div>
-
-        {/* Category breakdown */}
-        {categoryBreakdown.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-border">
-            <p className="text-xs font-medium text-muted-foreground mb-2">Spending by category (active)</p>
-            <div className="space-y-1.5">
-              {categoryBreakdown.map(([cat, amt]) => {
-                const pct = (amt / monthlyTotal) * 100;
-                return (
-                  <div key={cat} className="flex items-center gap-2 text-xs">
-                    <span className="w-24 truncate capitalize text-muted-foreground">{cat}</span>
-                    <div className="flex-1 h-1.5 rounded-full bg-muted/40 overflow-hidden">
-                      <div className="h-full rounded-full bg-gradient-to-r from-emerald to-topaz" style={{ width: `${pct}%` }} />
-                    </div>
-                    <span className="tabular-nums text-muted-foreground w-16 text-right">£{amt.toFixed(2)}</span>
-                    <span className="tabular-nums text-muted-foreground w-8 text-right">{Math.round(pct)}%</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        <div className="rounded-xl border border-border bg-secondary/20 p-3 text-center">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Monthly</p>
+          <p className="text-lg font-semibold mt-0.5 tabular-nums">£{monthlyTotal.toFixed(2)}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-secondary/20 p-3 text-center">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Annual</p>
+          <p className="text-lg font-semibold mt-0.5 tabular-nums">£{annualTotal.toLocaleString()}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-secondary/20 p-3 text-center">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Paused</p>
+          <p className="text-lg font-semibold mt-0.5">{subs.filter((s) => !s.active).length}</p>
+        </div>
       </div>
+
+      {/* Category breakdown */}
+      {categoryBreakdown.length > 0 && (
+        <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl p-5">
+          <p className="text-xs font-medium text-muted-foreground mb-2">Spending by category (active)</p>
+          <div className="space-y-1.5">
+            {categoryBreakdown.map(([cat, amt]) => {
+              const pct = (amt / monthlyTotal) * 100;
+              return (
+                <div key={cat} className="flex items-center gap-2 text-xs">
+                  <span className="w-24 truncate capitalize text-muted-foreground">{cat}</span>
+                  <div className="flex-1 h-1.5 rounded-full bg-muted/40 overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-emerald to-topaz" style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="tabular-nums text-muted-foreground w-16 text-right">£{amt.toFixed(2)}</span>
+                  <span className="tabular-nums text-muted-foreground w-8 text-right">{Math.round(pct)}%</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <SectionCard eyebrow="Managed" title={`${subs.length} subscription${subs.length !== 1 ? "s" : ""}`}>
         {detected.length > 0 && (

@@ -203,12 +203,14 @@ const Transactions = React.memo(function Transactions() {
 
   const isCurrentHebrewMonth = selectedHebrewMonth?.is_current ?? false;
 
+  const monthLabel = filters.date_from ? new Date(filters.date_from).toLocaleDateString("en-GB", { month: "long", year: "numeric" }) : "";
   const hebrewMonthLabel = selectedHebrewMonth ? (
     <span>
+      {monthLabel && <span className="text-xs font-normal text-muted-foreground mr-1">{monthLabel} ·</span>}
       <span dir="rtl" lang="he" className="inline-block">{YIDDISH[selectedHebrewMonth.month_name] || selectedHebrewMonth.month_name}</span>
       {" "}{selectedHebrewMonth.hebrew_year}
     </span>
-  ) : null;
+  ) : (monthLabel ? <span>{monthLabel}</span> : null);
 
   // Load Hebrew months and select current month (only if no date params in URL)
   useEffect(() => {
@@ -524,13 +526,11 @@ const Transactions = React.memo(function Transactions() {
     <div className="space-y-3" data-testid="transactions-root">
 
       {/* ─── Unified Header Card ─── */}
-      <div className="relative rounded-2xl border border-border bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-xl p-5 sm:p-6 shadow-card overflow-hidden">
-        {/* Glow */}
-        <div className="absolute -top-10 -left-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 relative">
+      <PageHeader eyebrow="Transactions" title="Transactions">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-border/70">
           {/* Wallet badge */}
-          <div className="relative shrink-0 h-20 w-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center drop-shadow-[0_0_8px_rgba(48,164,108,0.2)]">
-            <Wallet className="h-8 w-8 text-emerald" />
+          <div className="relative shrink-0 h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center drop-shadow-[0_0_8px_rgba(48,164,108,0.2)]">
+            <Wallet className="h-6 w-6 sm:h-8 sm:w-8 text-emerald" />
           </div>
 
           {/* Middle: Month picker + stats */}
@@ -715,6 +715,7 @@ const Transactions = React.memo(function Transactions() {
           </DropdownMenu>
         </div>
       </div>
+      </PageHeader>
 
       {/* Inline search bar */}
       {showSearch && (
@@ -726,7 +727,6 @@ const Transactions = React.memo(function Transactions() {
           {filters.search && <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="text-muted-foreground hover:text-foreground transition-colors"><X className="h-3.5 w-3.5" /></button>}
         </div>
       )}
-    </div>
 
       {/* Active filter chips (except date range, handled by month strip) */}
       {activeFilters.filter(c => c.key !== "date_from" && c.key !== "date_to").length > 0 && (

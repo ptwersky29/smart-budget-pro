@@ -118,7 +118,7 @@ export default function Integrations({ embedded }) {
     <div className="space-y-6" data-testid="integrations-root">
       {!embedded && (
         <PageHeader
-          eyebrow="System"
+          eyebrow="Settings"
           title="Connect everything in one place."
           description="Wire up TrueLayer, Twilio, and AI providers in a layout that matches the rest of FinanceAI."
         />
