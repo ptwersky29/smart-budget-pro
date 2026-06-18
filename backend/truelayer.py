@@ -301,7 +301,7 @@ async def _fetch_and_store_balances(session, conn: BankConnection):
             results = data.get("results", [])
             if results:
                 bal = results[0]
-                conn.balance = float(bal.get("balance", 0))
+                conn.balance = float(bal.get("current", bal.get("available", 0)))
                 conn.balance_currency = bal.get("currency", "GBP")
                 conn.balance_updated_at = datetime.now(timezone.utc)
                 await session.commit()
