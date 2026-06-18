@@ -285,27 +285,32 @@ async def _fetch_accounts(access_token: str, session) -> list:
         logger.warning(f"/data/v1/me fallback also failed: {e}")
     return []
 
-async def _fetch_and_store_balances(session, token: str, conn: BankConnection, cfg: dict):
-    """Fetch balance for a single account and store it."""
+async def _fetch_and_store_balances(session, conn: BankConnection):
+    """Fetch balance for a single account and store it, with card fallback."""
     account_id = conn.account_id
     if not account_id:
         return
-    try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            r = await client.get(
-                f"{cfg['api_url']}/data/v1/accounts/{account_id}/balance",
-                headers={"Authorization": f"Bearer {token}"},
-            )
-        if r.status_code == 200:
-            results = r.json().get("results", [])
+    endpoints = [
+        f"/data/v1/accounts/{account_id}/balance",
+        f"/data/v1/cards/{account_id}/balance",
+    ]
+    last_error = None
+    for path in endpoints:
+        try:
+            data = await _tl_get(session, conn, path)
+            results = data.get("results", [])
             if results:
                 bal = results[0]
                 conn.balance = float(bal.get("balance", 0))
                 conn.balance_currency = bal.get("currency", "GBP")
                 conn.balance_updated_at = datetime.now(timezone.utc)
                 await session.commit()
-    except Exception as e:
-        logger.warning(f"balance fetch failed for {account_id}: {e}")
+                return
+        except Exception as e:
+            last_error = e
+            continue
+    if last_error:
+        logger.warning(f"balance fetch failed for {account_id} (tried accounts & cards): {last_error}")
 
 
 # ── Logging ───────────────────────────────────────────────────────────────
@@ -768,9 +773,7 @@ async def _sync_connection(session, conn: BankConnection, user_id: str) -> tuple
 
         # Also fetch and store current balance
         try:
-            cfg = await _tl_config_from_db(session)
-            token = await _get_valid_token(session, conn)
-            await _fetch_and_store_balances(session, token, conn, cfg)
+            await _fetch_and_store_balances(session, conn)
         except Exception as e:
             logger.warning(f"balance sync failed for {conn.connection_id}: {e}")
 
