@@ -53,6 +53,18 @@ export const MetricCard = React.memo(function MetricCard({ label, value, icon: I
   );
 });
 
+export const SectionHeading = React.memo(function SectionHeading({ icon: Icon, label, actions, className = "" }) {
+  return (
+    <div className={`flex items-center justify-between gap-2 ${className}`}>
+      <div className="flex items-center gap-2.5">
+        {Icon && <span className="grid h-6 w-6 place-items-center rounded-md bg-emerald/10 text-emerald"><Icon className="h-3 w-3" /></span>}
+        <h3 className="label-overline text-muted-foreground m-0">{label}</h3>
+      </div>
+      {actions && <div className="flex items-center gap-2">{actions}</div>}
+    </div>
+  );
+});
+
 export const EmptyState = React.memo(function EmptyState({ icon: Icon, title, description, action, className = "", ...props }) {
   return (
     <div {...props} className={`rounded-2xl border border-dashed border-border bg-card/70 backdrop-blur-xl p-10 text-center ${className}`}>

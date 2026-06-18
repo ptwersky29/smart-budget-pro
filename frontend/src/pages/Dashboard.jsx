@@ -3,12 +3,13 @@ import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useSettings } from "../contexts/SettingsContext";
 import { toast } from "sonner";
-import { EmptyState, PageHeader } from "../components/ui/layout";
+import { EmptyState, PageHeader, SectionHeading } from "../components/ui/layout";
 import Skeleton from "../components/ui/Skeleton";
 import {
   Wallet, RefreshCw, Plus,
   AlertTriangle, CalendarDays, Building2,
   ArrowRight, MoreHorizontal, LayoutDashboard,
+  TrendingUp, Zap,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -184,66 +185,77 @@ const Dashboard = React.memo(function Dashboard() {
         </LiveBalanceHero>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* LEFT COLUMN — Budgets, Cash Flow, Actions */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* SECTION: Budgeting & Giving */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 px-1">
-              <span className="grid h-6 w-6 place-items-center rounded-md bg-emerald/10 text-emerald">
-                <LayoutDashboard className="h-3 w-3" />
-              </span>
-              <p className="label-overline">Budgeting &amp; Giving</p>
-            </div>
-            {showWidget("budgets_overview") && <BudgetsOverview budgets={budgets} currentMonthBudget={currentMonthBudget} />}
-            {showWidget("maaser_balance") && <MaaserBalanceWidget />}
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* ──── LEFT COLUMN ──── */}
+        <div className="lg:col-span-2 space-y-6">
 
-          {/* Alerts + Upcoming */}
-          {(topAlerts.length > 0 || topUpcoming.length > 0) && (
-            <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden">
-              {topAlerts.length > 0 && (
-                <div className="divide-y divide-border/60">
-                  {topAlerts.map((a, i) => (
-                    <div key={i} className="px-5 py-3 flex items-center gap-3 text-sm">
-                      <AlertTriangle className={`h-4 w-4 shrink-0 ${a.severity === "critical" || a.severity === "danger" ? "text-ruby" : a.severity === "warning" ? "text-topaz" : "text-emerald"}`} />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{a.title || a.message}</p>
-                        {a.description && <p className="text-xs text-muted-foreground truncate">{a.description}</p>}
-                      </div>
-                      {a.action_url && <Link to={a.action_url} className="text-xs text-emerald font-medium shrink-0 hover:underline">Fix</Link>}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {topUpcoming.length > 0 && (
-                <div className="border-t border-border/60 divide-y divide-border/60">
-                  {topUpcoming.map((u, i) => (
-                    <div key={i} className="px-5 py-3 flex items-center gap-3 text-sm">
-                      <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{u.description || u.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {u.date ? new Date(u.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : ""}
-                          {u.amount ? ` · £${Number(u.amount).toFixed(2)}` : ""}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+          {/* Budgeting & Giving */}
+          {(showWidget("budgets_overview") || showWidget("maaser_balance")) && (
+            <div className="space-y-4">
+              <SectionHeading icon={LayoutDashboard} label="Budgeting &amp; Giving" />
+              {showWidget("budgets_overview") && <BudgetsOverview budgets={budgets} currentMonthBudget={currentMonthBudget} />}
+              {showWidget("maaser_balance") && <MaaserBalanceWidget />}
             </div>
           )}
 
-          {/* 2-column: Cash Flow | Quick Actions */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {showWidget("cash_flow") && <CashFlowChart overview={overview} chartStyle={chartStyle} />}
-            {showWidget("quick_actions") && <QuickActionsPanel />}
-          </div>
+          {/* Alerts + Upcoming */}
+          {(topAlerts.length > 0 || topUpcoming.length > 0) && (
+            <div className="space-y-4">
+              <SectionHeading icon={AlertTriangle} label="Alerts &amp; Upcoming" />
+              <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden">
+                {topAlerts.length > 0 && (
+                  <div className="divide-y divide-border/60">
+                    {topAlerts.map((a, i) => (
+                      <div key={i} className="px-5 py-3 flex items-center gap-3 text-sm">
+                        <AlertTriangle className={`h-4 w-4 shrink-0 ${a.severity === "critical" || a.severity === "danger" ? "text-ruby" : a.severity === "warning" ? "text-topaz" : "text-emerald"}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{a.title || a.message}</p>
+                          {a.description && <p className="text-xs text-muted-foreground truncate">{a.description}</p>}
+                        </div>
+                        {a.action_url && <Link to={a.action_url} className="text-xs text-emerald font-medium shrink-0 hover:underline">Fix</Link>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {topUpcoming.length > 0 && (
+                  <div className="border-t border-border/60 divide-y divide-border/60">
+                    {topUpcoming.map((u, i) => (
+                      <div key={i} className="px-5 py-3 flex items-center gap-3 text-sm">
+                        <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{u.description || u.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {u.date ? new Date(u.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : ""}
+                            {u.amount ? ` · £${Number(u.amount).toFixed(2)}` : ""}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Cash Flow & Trends */}
+          {showWidget("cash_flow") && (
+            <div className="space-y-4">
+              <SectionHeading icon={TrendingUp} label="Cash Flow &amp; Trends" />
+              <CashFlowChart overview={overview} chartStyle={chartStyle} />
+            </div>
+          )}
+
+          {/* Quick Actions */}
+          {showWidget("quick_actions") && (
+            <div className="space-y-4">
+              <SectionHeading icon={Zap} label="Quick Actions" />
+              <QuickActionsPanel />
+            </div>
+          )}
         </div>
 
-        {/* RIGHT COLUMN — transactions sidebar */}
-        <div className="lg:col-span-1">
+        {/* ──── RIGHT COLUMN ──── */}
+        <div className="lg:col-span-1 space-y-6">
           {showWidget("recent_transactions") && <RecentTransactions overview={overview} />}
         </div>
       </div>
