@@ -23,6 +23,7 @@ export default React.memo(function MonthStrip({ selectedMonth, onMonthSelect }) 
   const [months, setMonths] = useState([]);
   const [loading, setLoading] = useState(true);
   const stripRef = useRef(null);
+  const selectedRef = useRef(null);
 
   useEffect(() => {
     let mounted = true;
@@ -33,19 +34,32 @@ export default React.memo(function MonthStrip({ selectedMonth, onMonthSelect }) 
     return () => { mounted = false; };
   }, []);
 
+  const centerSelected = useCallback(() => {
+    if (!stripRef.current || !selectedRef.current) return;
+    const container = stripRef.current;
+    const selected = selectedRef.current;
+    container.scrollLeft =
+      selected.offsetLeft - container.clientWidth / 2 + selected.offsetWidth / 2;
+  }, []);
+
+  useEffect(() => {
+    if (!loading && months.length > 0) {
+      const timer = setTimeout(centerSelected, 80);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedMonth, loading, months, centerSelected]);
+
+  useEffect(() => {
+    const onResize = () => centerSelected();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [centerSelected]);
+
   const scrollTo = useCallback((dir) => {
     if (!stripRef.current) return;
     const amount = dir === "left" ? -300 : 300;
     stripRef.current.scrollBy({ left: amount, behavior: "smooth" });
   }, []);
-
-  useEffect(() => {
-    if (!stripRef.current || !selectedMonth) return;
-    const active = stripRef.current.querySelector("[data-selected=true]");
-    if (active) {
-      active.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-    }
-  }, [selectedMonth]);
 
   if (loading) {
     return (
@@ -87,6 +101,7 @@ export default React.memo(function MonthStrip({ selectedMonth, onMonthSelect }) 
           return (
             <button
               key={`${m.hebrew_year}-${m.hebrew_month}`}
+              ref={isSelected ? selectedRef : null}
               data-selected={isSelected}
               onClick={() => onMonthSelect(m)}
               className={`relative shrink-0 px-4 py-2.5 text-xs font-medium whitespace-nowrap transition-colors

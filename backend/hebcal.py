@@ -140,11 +140,11 @@ def _get_hebrew_months() -> list[dict]:
     today_gd = pl_dates.GregorianDate.today()
     today_hd = today_gd.to_heb()
 
-    start_gd = date.today() - timedelta(days=540)
-    end_gd = date.today() + timedelta(days=180)
+    start_gd = date.today() - timedelta(days=365)
+    end_gd = date.today() + timedelta(days=1095)
 
     months: list[dict] = []
-    for hy in range(today_hd.year - 2, today_hd.year + 2):
+    for hy in range(today_hd.year - 2, today_hd.year + 5):
         y = Year(hy)
         for hm in range(1, y.monthscount() + 1):
             m = Month(hy, hm)
