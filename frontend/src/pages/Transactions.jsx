@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
 import { Plus, Trash2, Loader2, Pencil, Search, Sparkles, Filter, ChevronLeft, ChevronRight, X, BarChart3, Star, Receipt, Download, MoreHorizontal, Wallet } from "lucide-react";
 import { toast } from "sonner";
-import { EmptyState } from "../components/ui/layout";
+import { EmptyState, PageHeader } from "../components/ui/layout";
 import { SkeletonTable } from "../components/ui/Skeleton";
 import { withUndo } from "../lib/undo";
 import ConfirmModal from "../components/ui/ConfirmModal";
