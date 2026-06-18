@@ -1,11 +1,13 @@
 """Built-in Hebrew calendar — no external API calls."""
+
 import logging
-from datetime import date, datetime, timezone, timedelta
+from datetime import date, datetime, timedelta
 from typing import Optional
 from zoneinfo import ZoneInfo
 
 from astral import LocationInfo, SunDirection
-from astral.sun import sun as astral_sun, time_at_elevation
+from astral.sun import sun as astral_sun
+from astral.sun import time_at_elevation
 from fastapi import APIRouter, HTTPException, Query
 from pyluach import dates as pl_dates
 from pyluach.hebrewcal import Month, Year
@@ -37,7 +39,9 @@ ZMAN_ANGLE_KEYS = [
 
 
 def _get_zman_times(
-    observer: LocationInfo, dt: date, tz: ZoneInfo,
+    observer: LocationInfo,
+    dt: date,
+    tz: ZoneInfo,
 ) -> dict[str, str]:
     s = astral_sun(observer, dt, tzinfo=tz)
     sunrise = s["sunrise"]
@@ -102,19 +106,23 @@ def _collect_holidays(start: date, end: date) -> list[dict]:
             dedup_key = (current.isoformat(), holiday_name)
             if dedup_key not in seen:
                 seen.add(dedup_key)
-                results.append({
-                    "date": current.isoformat(),
-                    "title": holiday_name,
-                    "hebrew": f"{hd.day} {hd.month_name()} {hd.year}",
-                    "category": "holiday",
-                    "subcat": None,
-                    "is_upcoming": current >= date.today(),
-                })
+                results.append(
+                    {
+                        "date": current.isoformat(),
+                        "title": holiday_name,
+                        "hebrew": f"{hd.day} {hd.month_name()} {hd.year}",
+                        "category": "holiday",
+                        "subcat": None,
+                        "is_upcoming": current >= date.today(),
+                    }
+                )
 
         if is_rosh_chodesh and not holiday_name:
             if hd.day == 30:
                 tomorrow = current + timedelta(days=1)
-                tmr_gd = pl_dates.GregorianDate(tomorrow.year, tomorrow.month, tomorrow.day)
+                tmr_gd = pl_dates.GregorianDate(
+                    tomorrow.year, tomorrow.month, tomorrow.day
+                )
                 tmr_hd = tmr_gd.to_heb()
                 month_name = tmr_hd.month_name()
             else:
@@ -123,14 +131,16 @@ def _collect_holidays(start: date, end: date) -> list[dict]:
             dedup_key = (current.isoformat(), title)
             if dedup_key not in seen:
                 seen.add(dedup_key)
-                results.append({
-                    "date": current.isoformat(),
-                    "title": title,
-                    "hebrew": f"{hd.day} {hd.month_name()} {hd.year}",
-                    "category": "roshchodesh",
-                    "subcat": None,
-                    "is_upcoming": current >= date.today(),
-                })
+                results.append(
+                    {
+                        "date": current.isoformat(),
+                        "title": title,
+                        "hebrew": f"{hd.day} {hd.month_name()} {hd.year}",
+                        "category": "roshchodesh",
+                        "subcat": None,
+                        "is_upcoming": current >= date.today(),
+                    }
+                )
 
         current += timedelta(days=1)
     return results
@@ -153,16 +163,18 @@ def _get_hebrew_months() -> list[dict]:
             last = days[-1].to_greg().to_pydate()
             if last < start_gd or first > end_gd:
                 continue
-            months.append({
-                "hebrew_month": hm,
-                "hebrew_year": hy,
-                "month_name": m.month_name(),
-                "gregorian_start": first.isoformat(),
-                "gregorian_end": last.isoformat(),
-                "is_current": hy == today_hd.year and hm == today_hd.month,
-                "is_leap": y.leap,
-                "days": len(days),
-            })
+            months.append(
+                {
+                    "hebrew_month": hm,
+                    "hebrew_year": hy,
+                    "month_name": m.month_name(),
+                    "gregorian_start": first.isoformat(),
+                    "gregorian_end": last.isoformat(),
+                    "is_current": hy == today_hd.year and hm == today_hd.month,
+                    "is_leap": y.leap,
+                    "days": len(days),
+                }
+            )
 
     return months
 
@@ -208,7 +220,11 @@ def build_router() -> APIRouter:
 
         lat, lon, tz_name = coords
         tz = ZoneInfo(tz_name)
-        dt = date.today() if target_date is None else datetime.strptime(target_date, "%Y-%m-%d").date()
+        dt = (
+            date.today()
+            if target_date is None
+            else datetime.strptime(target_date, "%Y-%m-%d").date()
+        )
 
         loc = LocationInfo(city_key, "", tz_name, lat, lon)
 
