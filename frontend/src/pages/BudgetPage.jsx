@@ -102,7 +102,7 @@ export default React.memo(function BudgetPage() {
   const currentHebrewMonth = useMemo(() => {
     if (!hebrewMonths.length) return null;
     const start = `${month}-01`;
-    const [y, m] = parseMonth(month);
+    const { year: y, month: m } = parseMonth(month);
     const nextM = m === 12 ? 1 : m + 1;
     const nextY = m === 12 ? y + 1 : y;
     const end = fmtMonth(nextY, nextM);
