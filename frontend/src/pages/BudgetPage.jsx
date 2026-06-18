@@ -3,7 +3,7 @@ import { parseISO, isBefore } from "date-fns";
 import {
   RefreshCw, Wallet, ShoppingCart, Calendar, Plus, Pencil, Trash2,
   Check, X, Target, TrendingDown, ChevronLeft, ChevronRight,
-  Sparkles, AlertTriangle, TrendingUp, Zap, Download, Search, Copy,
+  Sparkles, AlertTriangle, TrendingUp, Zap, Download, Search, Copy, MoreHorizontal,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
@@ -13,6 +13,12 @@ import { Input } from "../components/ui/input";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import CategoryCombobox from "../components/CategoryCombobox";
 import MonthPicker, { YIDDISH } from "../components/MonthPicker";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "../components/ui/dropdown-menu";
 
 function fmtMonth(y, m) { return `${y}-${String(m).padStart(2, "0")}`; }
 
@@ -641,22 +647,31 @@ export default React.memo(function BudgetPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <div className="relative w-full sm:w-40 lg:w-48">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
               <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-8 pl-7 pr-2 rounded-lg bg-secondary/40 border border-transparent text-xs placeholder:text-muted-foreground focus:border-ring focus:outline-none" />
+                className="w-full h-8 pl-8 pr-3 rounded-full bg-secondary/40 border border-transparent text-xs placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring/30 focus:outline-none transition-all" />
             </div>
-            <Button variant="primary" size="pillSm" onClick={() => { setAddTab("budget"); setShowAdd(true); setForm((prev) => ({ ...prev, budget_type: "everyday" })); }}>
-              <Plus className="h-3.5 w-3.5 mr-1" /> Add
+            <Button variant="primary" size="sm" onClick={() => { setAddTab("budget"); setShowAdd(true); setForm((prev) => ({ ...prev, budget_type: "everyday" })); }}>
+              <Plus className="h-3.5 w-3.5" /> Add
             </Button>
-            <Button variant="outlinePill" size="pillSm" onClick={handleCopyPreviousMonth} title="Copy budgets from previous month">
-              <Copy className="h-3.5 w-3.5 mr-1" /> Copy Previous
-            </Button>
-            <Button variant="outlinePill" size="pillSm" onClick={handleSeedDefaults} disabled={seeding || loading}>
-              <Download className={`h-3.5 w-3.5 mr-1 ${seeding ? "animate-pulse" : ""}`} /> {seeding ? "..." : "Defaults"}
-            </Button>
-            <Button variant="outlinePill" size="pillSm" onClick={fetchData} disabled={loading}>
-              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="h-8 w-8 rounded-full grid place-items-center text-muted-foreground hover:bg-secondary/60 hover:text-foreground transition-all duration-200">
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={handleCopyPreviousMonth}>
+                  <Copy className="h-4 w-4 mr-2" /> Copy Previous
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSeedDefaults} disabled={seeding || loading}>
+                  <Download className={`h-4 w-4 mr-2 ${seeding ? "animate-pulse" : ""}`} /> {seeding ? "Loading..." : "Load Defaults"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={fetchData} disabled={loading}>
+                  <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Refresh
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>

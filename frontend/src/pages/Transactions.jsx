@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
-import { Plus, Trash2, Loader2, Pencil, Search, Sparkles, Filter, ChevronLeft, ChevronRight, X, BarChart3, Star, Receipt, Download, MoreHorizontal } from "lucide-react";
+import { Plus, Trash2, Loader2, Pencil, Search, Sparkles, Filter, ChevronLeft, ChevronRight, X, BarChart3, Star, Receipt, Download, MoreHorizontal, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "../components/ui/layout";
 import { SkeletonTable } from "../components/ui/Skeleton";
@@ -523,11 +523,80 @@ const Transactions = React.memo(function Transactions() {
   return (
     <div className="space-y-3" data-testid="transactions-root">
 
-      {/* ─── Header ─── */}
-      <div className="rounded-2xl border border-border bg-card/60 backdrop-blur-xl px-5 py-3 shadow-sm">
-        <div className="flex items-center justify-between">
-          <h1 className="text-lg font-semibold tracking-tight">Transactions</h1>
-          <div className="flex items-center gap-1.5">
+      {/* ─── Unified Header Card ─── */}
+      <div className="relative rounded-2xl border border-border bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-xl p-5 sm:p-6 shadow-card overflow-hidden">
+        {/* Glow */}
+        <div className="absolute -top-10 -left-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 relative">
+          {/* Wallet badge */}
+          <div className="relative shrink-0 h-20 w-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center drop-shadow-[0_0_8px_rgba(48,164,108,0.2)]">
+            <Wallet className="h-8 w-8 text-emerald" />
+          </div>
+
+          {/* Middle: Month picker + stats */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <MonthPicker
+                label={hebrewMonthLabel}
+                onPrev={() => toggleHebrewMonth("prev")}
+                onNext={() => toggleHebrewMonth("next")}
+                onToday={() => { const c = hebrewMonths.find(m => m.is_current); if (c) applyHebrewMonth(c); }}
+                isToday={isCurrentHebrewMonth}
+              />
+            </div>
+            {(!someSelected) ? (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                <span>Income <strong className="text-emerald font-medium tabular-nums">{fmt(incomeTotal)}</strong></span>
+                <span className="text-muted-foreground/30">·</span>
+                <span>Expenses <strong className="text-ruby font-medium tabular-nums">{fmt(expenseTotal)}</strong></span>
+                <span className="text-muted-foreground/30">·</span>
+                <span>Net <strong className={`font-medium tabular-nums ${netTotal >= 0 ? "text-emerald" : "text-ruby"}`}>{netTotal >= 0 ? "+" : ""}{fmt(netTotal)}</strong></span>
+                <span className="ml-auto text-xs text-muted-foreground/50">{total} transaction{total !== 1 ? "s" : ""}</span>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-muted-foreground">{selectedIds.size} selected</span>
+                  <button onClick={() => setSelectedIds(new Set())} className="text-muted-foreground hover:text-foreground">Clear</button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="text-xs px-2.5 py-1 rounded-full border border-ruby/40 text-ruby hover:bg-ruby/5 transition-colors">
+                        <Trash2 className="h-3 w-3 inline mr-1" /> Bulk ({selectedIds.size})
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>Set category</DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent>
+                          {Object.entries(groupCatsBySection(selectedCats)).map(([section, cats]) => (
+                            <React.Fragment key={section}>
+                              <DropdownMenuLabel className="text-xs text-muted-foreground font-semibold uppercase tracking-wider px-2 py-1">{section}</DropdownMenuLabel>
+                              {cats.map(c => (
+                                <DropdownMenuItem key={c.name} onClick={() => bulkCategory(c.name)}>{c.name}</DropdownMenuItem>
+                              ))}
+                            </React.Fragment>
+                          ))}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => { const c = prompt("New category name:"); if (c) bulkCategory(c.trim().toLowerCase().replace(/\s+/g, "_")); }}>
+                            ➕ Add custom category
+                          </DropdownMenuItem>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={bulkDelete} className="text-ruby">
+                        <Trash2 className="h-4 w-4 mr-2" /> Delete {selectedIds.size}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right: Action buttons */}
+          <div className="flex items-center gap-1.5 shrink-0">
             {/* Search toggle */}
             <button
               onClick={() => setShowSearch((s) => !s)}
@@ -646,11 +715,10 @@ const Transactions = React.memo(function Transactions() {
           </DropdownMenu>
         </div>
       </div>
-    </div>
 
       {/* Inline search bar */}
       {showSearch && (
-        <div className="flex items-center gap-2 rounded-full border border-border bg-card/70 backdrop-blur-xl px-4 h-9 shadow-sm transition-all duration-200">
+        <div className="mt-3 flex items-center gap-2 rounded-full border border-border bg-card/70 backdrop-blur-xl px-4 h-9 shadow-sm transition-all duration-200">
           <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           <input ref={searchRef} value={searchInput} onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
             placeholder="Search transactions... (/)"
@@ -658,66 +726,7 @@ const Transactions = React.memo(function Transactions() {
           {filters.search && <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="text-muted-foreground hover:text-foreground transition-colors"><X className="h-3.5 w-3.5" /></button>}
         </div>
       )}
-
-      {/* ─── Hebrew Month Picker ─── */}
-      <MonthPicker
-        label={hebrewMonthLabel}
-        onPrev={() => toggleHebrewMonth("prev")}
-        onNext={() => toggleHebrewMonth("next")}
-        onToday={() => { const c = hebrewMonths.find(m => m.is_current); if (c) applyHebrewMonth(c); }}
-        isToday={isCurrentHebrewMonth}
-      />
-
-      {/* Summary + Bulk actions */}
-      {(!someSelected) ? (
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <span>Income <span className="text-emerald font-medium tabular-nums">{fmt(incomeTotal)}</span></span>
-          <span className="text-muted-foreground/30">|</span>
-          <span>Expenses <span className="text-ruby font-medium tabular-nums">{fmt(expenseTotal)}</span></span>
-          <span className="text-muted-foreground/30">|</span>
-          <span>Net <span className={`font-medium tabular-nums ${netTotal >= 0 ? "text-emerald" : "text-ruby"}`}>{netTotal >= 0 ? "+" : ""}{fmt(netTotal)}</span></span>
-          <span className="ml-auto text-muted-foreground/50">{total} transaction{total !== 1 ? "s" : ""}</span>
-        </div>
-      ) : (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-muted-foreground">{selectedIds.size} selected</span>
-            <button onClick={() => setSelectedIds(new Set())} className="text-muted-foreground hover:text-foreground">Clear</button>
-          </div>
-          <div className="flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="text-xs px-2.5 py-1 rounded-full border border-ruby/40 text-ruby hover:bg-ruby/5 transition-colors">
-                  <Trash2 className="h-3 w-3 inline mr-1" /> Bulk ({selectedIds.size})
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>Set category</DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent>
-                    {Object.entries(groupCatsBySection(selectedCats)).map(([section, cats]) => (
-                      <React.Fragment key={section}>
-                        <DropdownMenuLabel className="text-xs text-muted-foreground font-semibold uppercase tracking-wider px-2 py-1">{section}</DropdownMenuLabel>
-                        {cats.map(c => (
-                          <DropdownMenuItem key={c.name} onClick={() => bulkCategory(c.name)}>{c.name}</DropdownMenuItem>
-                        ))}
-                      </React.Fragment>
-                    ))}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => { const c = prompt("New category name:"); if (c) bulkCategory(c.trim().toLowerCase().replace(/\s+/g, "_")); }}>
-                      ➕ Add custom category
-                    </DropdownMenuItem>
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={bulkDelete} className="text-ruby">
-                  <Trash2 className="h-4 w-4 mr-2" /> Delete {selectedIds.size}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-      )}
+    </div>
 
       {/* Active filter chips (except date range, handled by month strip) */}
       {activeFilters.filter(c => c.key !== "date_from" && c.key !== "date_to").length > 0 && (
