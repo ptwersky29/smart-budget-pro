@@ -129,6 +129,7 @@ export default function AccountPage() {
 
       {/* Header card with bank color accent */}
       <div className="relative overflow-hidden rounded-[1.75rem] border border-border/60 bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-xl shadow-card">
+        <div className="h-1" style={{ background: bankColor }} />
         <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full blur-3xl pointer-events-none" style={{ background: `${bankColor}15` }} />
         <div className="absolute -bottom-20 -left-20 w-48 h-48 rounded-full blur-3xl pointer-events-none" style={{ background: `${bankColor}08` }} />
         <div className="relative p-5 sm:p-6 lg:p-8">

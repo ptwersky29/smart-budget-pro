@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { RefreshCw, Wallet, ChevronUp, ChevronDown, Building2 } from "lucide-react";
-import { getBankLogoOrFallback, toAccountTypeLabel } from "../data/bankLogos";
+import { RefreshCw, Wallet, ChevronUp, ChevronDown } from "lucide-react";
+import BankAccountCard from "../components/BankAccountCard";
 
 function timeAgo(date) {
   const diff = Math.floor((Date.now() - date) / 1000);
@@ -71,32 +70,9 @@ export default React.memo(function LiveBalanceHero({ overview, truelayerBalance,
         {/* Account cards — inline row */}
         {hasAccounts && (
           <div className="mt-4 flex flex-wrap gap-2">
-            {accounts.map((acct) => {
-              const institution = acct.institution || acct.account_name;
-              const logoUrl = getBankLogoOrFallback(institution);
-              const balance = acct.balance ?? 0;
-              return (
-                <Link
-                  key={acct.connection_id}
-                  to={`/accounts/${acct.connection_id}`}
-                  className="inline-flex items-center gap-2 rounded-lg bg-card/80 border border-border/40 px-2.5 py-1.5 hover:ring-2 hover:ring-emerald/30 hover:border-emerald/40 transition-all duration-200 cursor-pointer group"
-                >
-                  <div className="relative shrink-0 h-8 w-8 rounded-lg bg-white dark:bg-secondary/40 border border-border/30 flex items-center justify-center overflow-hidden">
-                    {logoUrl ? (
-                      <img src={logoUrl} alt={institution || acct.account_name} className="h-6 w-6 object-contain group-hover:scale-110 transition-transform duration-200" loading="lazy" onError={(e) => { e.target.onerror = null; e.target.src = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#6b7280"/><text x="16" y="22" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="700" font-size="18" fill="white">${(institution || "?")[0].toUpperCase()}</text></svg>`)}`; }} />
-                    ) : (
-                      <Building2 className="h-3 w-3 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium leading-tight group-hover:text-emerald transition-colors">{institution || acct.account_name}</p>
-                    <p className="text-[10px] text-muted-foreground leading-tight">
-                      £{Number(balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                </Link>
-              );
-            })}
+            {accounts.map((acct) => (
+              <BankAccountCard key={acct.connection_id} account={acct} variant="default" />
+            ))}
           </div>
         )}
 
