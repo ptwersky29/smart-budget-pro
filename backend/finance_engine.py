@@ -2068,14 +2068,19 @@ Output ONLY valid JSON, no markdown, no explanation:
         async with sm() as session:
             result = await session.execute(
                 select(Transaction).where(Transaction.user_id == uid)
-                .order_by(Transaction.date.desc()).limit(1000)
+                .order_by(Transaction.date.desc()).limit(2000)
             )
             txs = result.scalars().all()
-            income = sum(t.amount for t in txs if t.amount > 0)
-            spend = sum(-t.amount for t in txs if t.amount < 0)
-            balance = income - spend
+            balance = sum(t.amount for t in txs)
+
+            now = datetime.now(timezone.utc)
+            month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            month_txs = [t for t in txs if t.date and t.date >= month_start]
+            income = sum(t.amount for t in month_txs if t.amount > 0)
+            spend = sum(-t.amount for t in month_txs if t.amount < 0)
+
             cats = defaultdict(float)
-            for t in txs:
+            for t in month_txs:
                 if t.amount < 0:
                     cats[t.category or "uncategorized"] += -t.amount
             monthly = defaultdict(lambda: {"income": 0, "spend": 0})
