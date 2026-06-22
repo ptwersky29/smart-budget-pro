@@ -15,6 +15,7 @@ import {
   ContextMenuSeparator,
 } from "./ui/context-menu";
 import { toast } from "sonner";
+import { getBankLogoOrFallback } from "../data/bankLogos";
 
 const TransactionRow = React.memo(({ t, isSelected, isFocused, onToggleSelect, onEdit, onDelete, onSetFocus }) => {
   const copyDescription = useCallback(() => {
@@ -55,8 +56,17 @@ const TransactionRow = React.memo(({ t, isSelected, isFocused, onToggleSelect, o
             )}
           </td>
           <td className="px-6 py-3">
-            <span className="text-xs px-2 py-1 rounded-full bg-secondary capitalize">{t.category || "uncategorized"}</span>
-            {t.source_label && <span className="text-xs text-muted-foreground ml-1.5">{t.source_label}</span>}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs px-2 py-1 rounded-full bg-secondary capitalize">{t.category || "uncategorized"}</span>
+              {t.source_label && (
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  {t.institution && (
+                    <img src={getBankLogoOrFallback(t.institution)} alt="" className="h-3.5 w-3.5 object-contain shrink-0" />
+                  )}
+                  {t.source_label}
+                </span>
+              )}
+            </div>
           </td>
           <td className={`px-6 py-3 text-right font-medium tabular-nums ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}>
             {t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}

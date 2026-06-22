@@ -370,10 +370,16 @@ SOURCE_LABELS = {
 }
 
 
-def _tx_to_dict(t: Transaction, institution_map: dict = None) -> dict:
+def _tx_to_dict(t: Transaction, institution_map: dict = None, label_map: dict = None) -> dict:
     source_label = SOURCE_LABELS.get(t.source, t.source)
-    if t.source == "truelayer" and institution_map and t.connection_id:
-        source_label = institution_map.get(t.connection_id, source_label)
+    institution = None
+    if t.source == "truelayer" and t.connection_id:
+        if label_map and t.connection_id in label_map:
+            source_label = label_map[t.connection_id]
+        elif institution_map and t.connection_id in institution_map:
+            source_label = institution_map[t.connection_id]
+        if institution_map:
+            institution = institution_map.get(t.connection_id)
     return {
         "transaction_id": t.transaction_id,
         "user_id": t.user_id,
@@ -386,6 +392,8 @@ def _tx_to_dict(t: Transaction, institution_map: dict = None) -> dict:
         "subcategory": t.subcategory,
         "date": t.date.isoformat() if t.date else None,
         "account_id": t.account_id,
+        "connection_id": t.connection_id,
+        "institution": institution,
         "is_income": t.amount > 0,
         "notes": t.notes,
         "tags": t.tags,
@@ -503,6 +511,7 @@ def build_router() -> APIRouter:
 
             conn_ids = list({t.connection_id for t in rows if t.connection_id})
             institution_map = {}
+            label_map = {}
             if conn_ids:
                 from db import BankConnection
                 bc_result = await session.execute(
@@ -511,12 +520,13 @@ def build_router() -> APIRouter:
                     )
                 )
                 for bc_row in bc_result:
-                    label = bc_row.nickname or bc_row.account_name
-                    if not label:
-                        cfg = bc_row.config or {}
-                        label = cfg.get("institution") if isinstance(cfg, dict) else None
-                    if label:
-                        institution_map[bc_row.connection_id] = label
+                    cfg = bc_row.config or {}
+                    inst = cfg.get("institution") if isinstance(cfg, dict) else None
+                    if inst:
+                        institution_map[bc_row.connection_id] = inst
+                    lbl = bc_row.nickname or bc_row.account_name or inst
+                    if lbl:
+                        label_map[bc_row.connection_id] = lbl
 
             count_stmt = select(func.count()).select_from(Transaction).where(Transaction.user_id == user["user_id"])
             if connection_id:
@@ -585,7 +595,7 @@ def build_router() -> APIRouter:
             expense_total = round(abs(float(expense_total)), 2)
 
             return {
-                "transactions": [_tx_to_dict(t, institution_map) for t in rows],
+                "transactions": [_tx_to_dict(t, institution_map, label_map) for t in rows],
                 "total": total,
                 "income_total": income_total,
                 "expense_total": expense_total,
@@ -979,6 +989,7 @@ Output ONLY valid JSON, no markdown, no explanation:
 
             conn_ids = list({t.connection_id for t in tx_rows if t.connection_id})
             institution_map = {}
+            label_map = {}
             if conn_ids:
                 from db import BankConnection
                 bc_result = await session.execute(
@@ -987,14 +998,15 @@ Output ONLY valid JSON, no markdown, no explanation:
                     )
                 )
                 for bc_row in bc_result:
-                    label = bc_row.nickname or bc_row.account_name
-                    if not label:
-                        cfg = bc_row.config or {}
-                        label = cfg.get("institution") if isinstance(cfg, dict) else None
-                    if label:
-                        institution_map[bc_row.connection_id] = label
+                    cfg = bc_row.config or {}
+                    inst = cfg.get("institution") if isinstance(cfg, dict) else None
+                    if inst:
+                        institution_map[bc_row.connection_id] = inst
+                    lbl = bc_row.nickname or bc_row.account_name or inst
+                    if lbl:
+                        label_map[bc_row.connection_id] = lbl
 
-            txs = [_tx_to_dict(t, institution_map) for t in tx_rows]
+            txs = [_tx_to_dict(t, institution_map, label_map) for t in tx_rows]
 
             # Build response
             resp = {
@@ -2093,13 +2105,15 @@ Output ONLY valid JSON, no markdown, no explanation:
             bank_connections = conn_result.scalars().all()
             truelayer_balance = sum(c.balance for c in bank_connections if c.balance is not None) or 0
             institution_map = {}
+            label_map = {}
             for c in bank_connections:
-                label = c.nickname or c.account_name
-                if not label:
-                    cfg = c.config or {}
-                    label = cfg.get("institution") if isinstance(cfg, dict) else None
-                if label:
-                    institution_map[c.connection_id] = label
+                cfg = c.config or {}
+                inst = cfg.get("institution") if isinstance(cfg, dict) else None
+                if inst:
+                    institution_map[c.connection_id] = inst
+                lbl = c.nickname or c.account_name or inst
+                if lbl:
+                    label_map[c.connection_id] = lbl
             accounts = [
                 {
                     "connection_id": c.connection_id,
@@ -2123,7 +2137,7 @@ Output ONLY valid JSON, no markdown, no explanation:
                 "health_score": score,
                 "categories": [{"name": k, "value": round(v, 2)} for k, v in sorted(cats.items(), key=lambda x: -x[1])],
                 "monthly_flow": flow,
-                "recent": [_tx_to_dict(t, institution_map) for t in txs[:8]],
+                "recent": [_tx_to_dict(t, institution_map, label_map) for t in txs[:8]],
                 "source_breakdown": [{"source": k, "count": v} for k, v in sorted(sources.items(), key=lambda x: -x[1])],
             }
             _query_cache.set(f"dash:{uid}", payload)
