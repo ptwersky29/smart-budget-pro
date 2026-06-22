@@ -370,7 +370,10 @@ SOURCE_LABELS = {
 }
 
 
-def _tx_to_dict(t: Transaction) -> dict:
+def _tx_to_dict(t: Transaction, institution_map: dict = None) -> dict:
+    source_label = SOURCE_LABELS.get(t.source, t.source)
+    if t.source == "truelayer" and institution_map and t.connection_id:
+        source_label = institution_map.get(t.connection_id, source_label)
     return {
         "transaction_id": t.transaction_id,
         "user_id": t.user_id,
@@ -389,7 +392,7 @@ def _tx_to_dict(t: Transaction) -> dict:
         "pending": t.pending,
         "tx_type": t.tx_type,
         "source": t.source,
-        "source_label": SOURCE_LABELS.get(t.source, t.source),
+        "source_label": source_label,
         "parent_id": t.parent_id,
         "recurring_id": t.recurring_id,
         "subscription_name": t.subscription_name,
@@ -498,6 +501,21 @@ def build_router() -> APIRouter:
             result = await session.execute(stmt)
             rows = result.scalars().all()
 
+            conn_ids = list({t.connection_id for t in rows if t.connection_id})
+            institution_map = {}
+            if conn_ids:
+                from db import BankConnection
+                bc_result = await session.execute(
+                    select(BankConnection.connection_id, BankConnection.config).where(
+                        BankConnection.connection_id.in_(conn_ids)
+                    )
+                )
+                for bc_row in bc_result:
+                    cfg = bc_row.config or {}
+                    inst = cfg.get("institution") if isinstance(cfg, dict) else None
+                    if inst:
+                        institution_map[bc_row.connection_id] = inst
+
             count_stmt = select(func.count()).select_from(Transaction).where(Transaction.user_id == user["user_id"])
             if connection_id:
                 count_stmt = count_stmt.where(Transaction.connection_id == connection_id)
@@ -565,7 +583,7 @@ def build_router() -> APIRouter:
             expense_total = round(abs(float(expense_total)), 2)
 
             return {
-                "transactions": [_tx_to_dict(t) for t in rows],
+                "transactions": [_tx_to_dict(t, institution_map) for t in rows],
                 "total": total,
                 "income_total": income_total,
                 "expense_total": expense_total,
@@ -955,7 +973,24 @@ Output ONLY valid JSON, no markdown, no explanation:
                 limit_n = 50
             stmt = stmt.limit(limit_n)
             result = await session.execute(stmt)
-            txs = [_tx_to_dict(t) for t in result.scalars().all()]
+            tx_rows = result.scalars().all()
+
+            conn_ids = list({t.connection_id for t in tx_rows if t.connection_id})
+            institution_map = {}
+            if conn_ids:
+                from db import BankConnection
+                bc_result = await session.execute(
+                    select(BankConnection.connection_id, BankConnection.config).where(
+                        BankConnection.connection_id.in_(conn_ids)
+                    )
+                )
+                for bc_row in bc_result:
+                    cfg = bc_row.config or {}
+                    inst = cfg.get("institution") if isinstance(cfg, dict) else None
+                    if inst:
+                        institution_map[bc_row.connection_id] = inst
+
+            txs = [_tx_to_dict(t, institution_map) for t in tx_rows]
 
             # Build response
             resp = {
@@ -2053,6 +2088,12 @@ Output ONLY valid JSON, no markdown, no explanation:
             )
             bank_connections = conn_result.scalars().all()
             truelayer_balance = sum(c.balance for c in bank_connections if c.balance is not None) or 0
+            institution_map = {}
+            for c in bank_connections:
+                cfg = c.config or {}
+                inst = cfg.get("institution") if isinstance(cfg, dict) else None
+                if inst:
+                    institution_map[c.connection_id] = inst
             accounts = [
                 {
                     "connection_id": c.connection_id,
@@ -2076,7 +2117,7 @@ Output ONLY valid JSON, no markdown, no explanation:
                 "health_score": score,
                 "categories": [{"name": k, "value": round(v, 2)} for k, v in sorted(cats.items(), key=lambda x: -x[1])],
                 "monthly_flow": flow,
-                "recent": [_tx_to_dict(t) for t in txs[:8]],
+                "recent": [_tx_to_dict(t, institution_map) for t in txs[:8]],
                 "source_breakdown": [{"source": k, "count": v} for k, v in sorted(sources.items(), key=lambda x: -x[1])],
             }
             _query_cache.set(f"dash:{uid}", payload)

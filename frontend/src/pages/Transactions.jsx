@@ -38,7 +38,7 @@ import { useKeyboardShortcut } from "../hooks/useKeyboardShortcut";
 
 import CategoryCombobox from "../components/CategoryCombobox";
 
-const SOURCE_LABELS = { manual: "Manual", truelayer: "Bank", csv: "CSV", pdf: "PDF", statement: "Statement", sms: "SMS" };
+const SOURCE_LABELS = { manual: "Manual", csv: "CSV", pdf: "PDF", statement: "Statement", sms: "SMS" };
 const emptyForm = { description: "", amount: "", category: "", is_income: false, budget_type: "", occasion: "", merchant: "" };
 
 function today() {
