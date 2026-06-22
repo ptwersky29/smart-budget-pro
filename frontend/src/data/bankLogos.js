@@ -1,33 +1,31 @@
-const CDN_BASE = "https://cdn.simpleicons.org";
 const LOCAL_BASE = "/bank-logos";
 
 export const BANK_LOGOS = {
-  "NatWest":               { slug: "natwest",               color: "#4f0599", name: "NatWest", file: "natwest.svg" },
-  "Barclays":              { slug: "barclays",              color: "#00aeef", name: "Barclays", file: "barclays.svg" },
-  "HSBC":                  { slug: "hsbc",                  color: "#db0011", name: "HSBC", file: "hsbc.svg" },
-  "Santander":             { slug: "santander",             color: "#ec0000", name: "Santander", file: "santander.svg" },
-  "Monzo":                 { slug: "monzo",                 color: "#ff3355", name: "Monzo", file: "monzo.svg" },
-  "TSB":                   { slug: "tsb",                   color: "#003a70", name: "TSB", file: "tsb.svg" },
-  "Lloyds":                { slug: "lloydsbank",            color: "#00693e", name: "Lloyds" },
-  "Starling":              { slug: "starlingbank",          color: "#6935d2", name: "Starling" },
-  "Revolut":               { slug: "revolut",               color: "#191c1f", name: "Revolut" },
-  "Nationwide":            { slug: "nationwide",            color: "#002b49", name: "Nationwide" },
-  "Halifax":               { slug: "halifax",               color: "#003a6e", name: "Halifax" },
-  "First Direct":          { slug: "firstdirect",           color: "#146eb4", name: "First Direct" },
-  "Co-operative":          { slug: "co-operative-bank",     color: "#136a8a", name: "Co-operative" },
-  "Clydesdale":            { slug: "clydesdale",            color: "#006747", name: "Clydesdale" },
-  "Yorkshire":             { slug: "yorkshire",             color: "#004b87", name: "Yorkshire" },
-  "Danske":                { slug: "danske",                color: "#003057", name: "Danske" },
-  "Ulster":                { slug: "ulsterbank",            color: "#c41e3a", name: "Ulster" },
-  "Bank of Scotland":      { slug: "bankofscotland",        color: "#005b9f", name: "Bank of Scotland" },
-  "Royal Bank of Scotland":{ slug: "royalbankofscotland",   color: "#005b9f", name: "RBS" },
-  "Metro Bank":            { slug: "metro",                 color: "#00a6d6", name: "Metro" },
-  "Tesco Bank":            { slug: "tesco",                 color: "#ee1c2e", name: "Tesco" },
-  "Virgin Money":          { slug: "virginmoney",           color: "#da0530", name: "Virgin Money" },
-  "Sainsbury":             { slug: "sainsburys",            color: "#ec7e00", name: "Sainsbury's" },
-  "Triodos":               { slug: "triodos",               color: "#005340", name: "Triodos" },
-  "Coutts":                { slug: "coutts",                color: "#003a70", name: "Coutts" },
-  "Chase":                 { slug: "chase",                 color: "#117aca", name: "Chase" },
+  "NatWest":               { color: "#4f0599", name: "NatWest",               file: "natwest.svg" },
+  "Barclays":              { color: "#00aeef", name: "Barclays",              file: "barclays.svg" },
+  "HSBC":                  { color: "#db0011", name: "HSBC",                  file: "hsbc.svg" },
+  "Santander":             { color: "#ec0000", name: "Santander",             file: "santander.svg" },
+  "Monzo":                 { color: "#ff3355", name: "Monzo",                 file: "monzo.svg" },
+  "TSB":                   { color: "#003a70", name: "TSB",                   file: "tsb.svg" },
+  "Lloyds":                { color: "#00693e", name: "Lloyds",                file: "lloyds.svg" },
+  "Halifax":               { color: "#003a6e", name: "Halifax",               file: "halifax.svg" },
+  "Nationwide":            { color: "#002b49", name: "Nationwide",            file: "nationwide.svg" },
+  "Starling":              { color: "#6935d2", name: "Starling",              file: "starlingbank.svg" },
+  "Revolut":               { color: "#191c1f", name: "Revolut",               file: "revolut.svg" },
+  "First Direct":          { color: "#146eb4", name: "First Direct",          file: "firstdirect.svg" },
+  "Co-operative":          { color: "#136a8a", name: "Co-operative",          file: "cooperative.svg" },
+  "Clydesdale":            { color: "#006747", name: "Clydesdale",            file: "clydesdale.svg" },
+  "Yorkshire":             { color: "#004b87", name: "Yorkshire",             file: "yorkshire.svg" },
+  "Danske":                { color: "#003057", name: "Danske",                file: "danske.svg" },
+  "Ulster":                { color: "#c41e3a", name: "Ulster",                file: "ulsterbank.svg" },
+  "Bank of Scotland":      { color: "#005b9f", name: "Bank of Scotland",      file: "bankofscotland.svg" },
+  "Royal Bank of Scotland":{ color: "#005b9f", name: "RBS",                   file: "royalbankofscotland.svg" },
+  "Metro Bank":            { color: "#00a6d6", name: "Metro",                 file: "metro.svg" },
+  "Tesco Bank":            { color: "#ee1c2e", name: "Tesco",                 file: "tesco.svg" },
+  "Virgin Money":          { color: "#da0530", name: "Virgin Money",          file: "virginmoney.svg" },
+  "Chase":                 { color: "#117aca", name: "Chase",                 file: "chase.svg" },
+  "Triodos":               { color: "#005340", name: "Triodos",               file: "triodos.svg" },
+  "Coutts":                { color: "#003a70", name: "Coutts",                file: "coutts.svg" },
 };
 
 const NORMALIZED = {};
@@ -35,9 +33,66 @@ Object.entries(BANK_LOGOS).forEach(([key, val]) => {
   NORMALIZED[key.toLowerCase().replace(/[^a-z0-9]/g, "")] = val;
 });
 
+const ALIASES = {
+  "lloydsbank": "lloyds",
+  "lloydsbankgb": "lloyds",
+  "lloydsbankplc": "lloyds",
+  "firstdirect": "firstdirect",
+  "firstdirectfb": "firstdirect",
+  "starlingbank": "starling",
+  "starlingbankgb": "starling",
+  "royalbankofscotland": "royalbankofscotland",
+  "rbs": "royalbankofscotland",
+  "natwestgroup": "natwest",
+  "natwestgb": "natwest",
+  "bankofscotland": "bankofscotland",
+  "bankofscotlandplc": "bankofscotland",
+  "halifaxgb": "halifax",
+  "halifaxplc": "halifax",
+  "nationwidegb": "nationwide",
+  "nationwidebuilding": "nationwide",
+  "nationwidebuildingociety": "nationwide",
+  "barclaysgb": "barclays",
+  "barclaysplc": "barclays",
+  "hsbcgb": "hsbc",
+  "hsbcplc": "hsbc",
+  "santanderuk": "santander",
+  "santanderukplc": "santander",
+  "tsbgb": "tsb",
+  "tsbplc": "tsb",
+  "monzobank": "monzo",
+  "monzobankgb": "monzo",
+  "revolutgb": "revolut",
+  "revolutltd": "revolut",
+  "chasegb": "chase",
+  "jpms": "chase",
+  "cooperativebank": "cooperative",
+  "cooperativebankgb": "cooperative",
+  "virginmoneygb": "virginmoney",
+  "virginmoneyuk": "virginmoney",
+  "tescobankgb": "tesco",
+  "tescoplc": "tesco",
+  "metrobankgb": "metro",
+  "metrobankplc": "metro",
+  "clydesdalebank": "clydesdale",
+  "clydesdalebankplc": "clydesdale",
+  "yorkshirebank": "yorkshire",
+  "yorkshirebankgb": "yorkshire",
+  "yorkshirebuilding": "yorkshire",
+  "danskebank": "danske",
+  "danskebankgb": "danske",
+  "ulsterbank": "ulster",
+  "ulsterbankgb": "ulster",
+  "ulsterbankltd": "ulster",
+  "triodosbank": "triodos",
+  "triodosgb": "triodos",
+  "couttsgb": "coutts",
+};
+
 function _resolve(institution) {
   if (!institution) return null;
-  const norm = institution.toLowerCase().replace(/[^a-z0-9]/g, "");
+  let norm = institution.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (ALIASES[norm]) norm = ALIASES[norm];
   return NORMALIZED[norm] || null;
 }
 
@@ -45,15 +100,6 @@ function _initialSvg(text, color) {
   const letter = (text || "?")[0].toUpperCase();
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="${color}"/><text x="16" y="22" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="700" font-size="18" fill="white">${letter}</text></svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
-}
-
-export function getBankLogoUrl(institution) {
-  if (!institution) return null;
-  const match = _resolve(institution);
-  if (match?.file) return `${LOCAL_BASE}/${match.file}`;
-  if (match) return `${CDN_BASE}/${match.slug}`;
-  const slug = institution.toLowerCase().replace(/[^a-z0-9]/g, "");
-  return `${CDN_BASE}/${slug}`;
 }
 
 export function getBankLogoOrFallback(institution) {
