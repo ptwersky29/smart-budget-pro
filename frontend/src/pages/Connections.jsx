@@ -265,10 +265,11 @@ export default function Connections() {
                 <Link to={`/accounts/${c.connection_id}`} className="flex items-center gap-3 min-w-0 flex-1 group">
                   <div className="w-10 h-10 rounded-xl bg-white dark:bg-secondary/40 border border-border/30 grid place-items-center shrink-0 group-hover:scale-105 transition-transform overflow-hidden">
                     {getBankLogoOrFallback(c.config?.institution || c.provider) ? (
-                      <img src={getBankLogoOrFallback(c.config?.institution || c.provider)} alt={c.config?.institution || c.provider} className="h-6 w-6 object-contain" loading="lazy" />
-                    ) : (
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                    )}
+                      <img src={getBankLogoOrFallback(c.config?.institution || c.provider)} alt={c.config?.institution || c.provider} className="h-7 w-7 object-contain" loading="lazy" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+                    ) : null}
+                    <div className={`${getBankLogoOrFallback(c.config?.institution || c.provider) ? 'hidden' : 'flex'} items-center justify-center w-7 h-7 rounded-lg bg-secondary text-muted-foreground`}>
+                      <Building2 className="h-3.5 w-3.5" />
+                    </div>
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">

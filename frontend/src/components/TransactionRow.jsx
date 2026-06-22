@@ -61,7 +61,7 @@ const TransactionRow = React.memo(({ t, isSelected, isFocused, onToggleSelect, o
               {t.source_label && (
                 <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                   {t.institution && (
-                    <img src={getBankLogoOrFallback(t.institution)} alt="" className="h-3.5 w-3.5 object-contain shrink-0" />
+                    <img src={getBankLogoOrFallback(t.institution)} alt="" className="h-5 w-5 object-contain shrink-0 rounded-sm" onError={(e) => { e.target.onerror = null; e.target.src = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#6b7280"/><text x="16" y="22" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="700" font-size="18" fill="white">${(t.institution || "?")[0].toUpperCase()}</text></svg>`)}`; }} />
                   )}
                   {t.source_label}
                 </span>

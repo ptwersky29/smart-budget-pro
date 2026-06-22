@@ -81,9 +81,9 @@ export default React.memo(function LiveBalanceHero({ overview, truelayerBalance,
                   to={`/accounts/${acct.connection_id}`}
                   className="inline-flex items-center gap-2 rounded-lg bg-card/80 border border-border/40 px-2.5 py-1.5 hover:ring-2 hover:ring-emerald/30 hover:border-emerald/40 transition-all duration-200 cursor-pointer group"
                 >
-                  <div className="relative shrink-0 h-6 w-6 rounded-full bg-white dark:bg-secondary/40 flex items-center justify-center overflow-hidden">
+                  <div className="relative shrink-0 h-8 w-8 rounded-lg bg-white dark:bg-secondary/40 border border-border/30 flex items-center justify-center overflow-hidden">
                     {logoUrl ? (
-                      <img src={logoUrl} alt={institution || acct.account_name} className="h-4 w-4 object-contain group-hover:scale-110 transition-transform duration-200" loading="lazy" onError={(e) => { e.target.onerror = null; e.target.src = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#6b7280"/><text x="16" y="22" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="700" font-size="18" fill="white">${(institution || "?")[0].toUpperCase()}</text></svg>`)}`; }} />
+                      <img src={logoUrl} alt={institution || acct.account_name} className="h-6 w-6 object-contain group-hover:scale-110 transition-transform duration-200" loading="lazy" onError={(e) => { e.target.onerror = null; e.target.src = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#6b7280"/><text x="16" y="22" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="700" font-size="18" fill="white">${(institution || "?")[0].toUpperCase()}</text></svg>`)}`; }} />
                     ) : (
                       <Building2 className="h-3 w-3 text-muted-foreground" />
                     )}
