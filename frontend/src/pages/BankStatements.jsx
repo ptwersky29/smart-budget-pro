@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import { api, formatApiError } from "../lib/api";
+import { Link } from "react-router-dom";
 import { Building2, Loader2, Upload, RefreshCcw, Trash2, CheckCircle2, XCircle, AlertCircle, ArrowRight, Clock, Wallet, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, PageHeader, SectionCard } from "../components/ui/layout";
 import Skeleton from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
+import { getBankLogoUrl } from "../data/bankLogos";
 
 export default function BankStatements() {
   useEffect(() => { document.title = "Bank & Statements | FinanceAI"; }, []);
@@ -155,24 +157,39 @@ export default function BankStatements() {
           ) : (
             <ul className="divide-y divide-border">
               {conns.map((c) => (
-                <li key={c.connection_id} className="px-6 py-4 flex items-center justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium truncate">{c.account_name}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {c.status === "active" ? <span className="text-emerald">● Active</span> : <span className="text-ruby">● {c.status}</span>}
-                      {c.balance !== null && <span className="ml-2 font-medium">£{c.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>}
-                    </p>
-                  </div>
+                <li key={c.connection_id} className="px-6 py-4 flex items-center justify-between gap-4 hover:bg-secondary/30 transition-colors">
+                  <Link to={`/accounts/${c.connection_id}`} className="flex items-center gap-3 min-w-0 flex-1 group">
+                    <div className="w-10 h-10 rounded-xl bg-white dark:bg-secondary/40 border border-border/30 grid place-items-center shrink-0 group-hover:scale-105 transition-transform overflow-hidden">
+                      {getBankLogoUrl(c.config?.institution || c.provider) ? (
+                        <img src={getBankLogoUrl(c.config?.institution || c.provider)} alt={c.config?.institution || c.provider} className="h-6 w-6 object-contain" loading="lazy" />
+                      ) : (
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate group-hover:text-emerald transition-colors">{c.account_name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {c.config?.institution && <span>{c.config.institution} · </span>}
+                        {c.status === "active" ? <span className="text-emerald">● Active</span> : <span className="text-ruby">● {c.status}</span>}
+                      </p>
+                    </div>
+                  </Link>
                   <div className="flex items-center gap-2 shrink-0">
+                    {c.balance !== null && (
+                      <span className="text-sm font-semibold text-foreground mr-2">£{c.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    )}
                     {c.status === "reconnect_required" && (
-                      <Button variant="danger" size="pillSm" onClick={async () => {
-                        try {
-                          const { data } = await api.post(`/truelayer/reconnect/${c.connection_id}`);
-                          setTimeout(() => { window.location.href = data.auth_url; }, 600);
-                        } catch { toast.error("Reconnect failed"); }
+                      <Button variant="danger" size="pillSm" onClick={(e) => {
+                        e.preventDefault(); e.stopPropagation();
+                        (async () => {
+                          try {
+                            const { data } = await api.post(`/truelayer/reconnect/${c.connection_id}`);
+                            setTimeout(() => { window.location.href = data.auth_url; }, 600);
+                          } catch { toast.error("Reconnect failed"); }
+                        })();
                       }}>Reconnect</Button>
                     )}
-                    <button onClick={() => removeConn(c.connection_id)} className="h-9 w-9 rounded-full grid place-items-center hover:bg-secondary text-ruby"><Trash2 className="h-4 w-4" /></button>
+                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeConn(c.connection_id); }} className="h-9 w-9 rounded-full grid place-items-center hover:bg-secondary text-ruby"><Trash2 className="h-4 w-4" /></button>
                   </div>
                 </li>
               ))}
