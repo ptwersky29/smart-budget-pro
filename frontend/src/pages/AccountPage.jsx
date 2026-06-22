@@ -112,7 +112,7 @@ export default function AccountPage() {
 
   if (!conn) return null;
 
-  const institution = conn.config?.institution;
+  const institution = conn.config?.institution || conn.account_name || conn.nickname;
   const logoUrl = getBankLogoOrFallback(institution);
   const bankColor = getBankColor(institution);
   const statusInfo = STATUS_STYLES[conn.status] || STATUS_STYLES.active;

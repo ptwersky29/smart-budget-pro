@@ -93,11 +93,31 @@ const ALIASES = {
   "sainsburysgb": "sainsbury",
 };
 
+const STRIP_WORDS = ["bank", "plc", "group", "uk", "ltd", "limited", "the", "of", "and"];
+function _stripSuffixes(s) {
+  return STRIP_WORDS.reduce((cur, w) => {
+    if (cur.endsWith(w)) return cur.slice(0, -w.length);
+    return cur;
+  }, s);
+}
+
 function _resolve(institution) {
   if (!institution) return null;
   let norm = institution.toLowerCase().replace(/[^a-z0-9]/g, "");
   if (ALIASES[norm]) norm = ALIASES[norm];
-  return NORMALIZED[norm] || null;
+  let hit = NORMALIZED[norm];
+  if (hit) return hit;
+  const stripped = _stripSuffixes(norm);
+  if (ALIASES[stripped]) return NORMALIZED[ALIASES[stripped]] || null;
+  hit = NORMALIZED[stripped];
+  if (hit) return hit;
+  const words = institution.toLowerCase().split(/\s+/);
+  for (const w of words) {
+    const wn = w.replace(/[^a-z0-9]/g, "");
+    if (ALIASES[wn] && NORMALIZED[ALIASES[wn]]) return NORMALIZED[ALIASES[wn]];
+    if (NORMALIZED[wn]) return NORMALIZED[wn];
+  }
+  return null;
 }
 
 function _initialSvg(text, color) {

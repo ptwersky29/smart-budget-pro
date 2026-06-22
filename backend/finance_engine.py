@@ -522,6 +522,7 @@ def build_router() -> APIRouter:
                 for bc_row in bc_result:
                     cfg = bc_row.config or {}
                     inst = cfg.get("institution") if isinstance(cfg, dict) else None
+                    inst = inst or bc_row.account_name
                     if inst:
                         institution_map[bc_row.connection_id] = inst
                     lbl = bc_row.nickname or bc_row.account_name or inst
@@ -1000,6 +1001,7 @@ Output ONLY valid JSON, no markdown, no explanation:
                 for bc_row in bc_result:
                     cfg = bc_row.config or {}
                     inst = cfg.get("institution") if isinstance(cfg, dict) else None
+                    inst = inst or bc_row.account_name
                     if inst:
                         institution_map[bc_row.connection_id] = inst
                     lbl = bc_row.nickname or bc_row.account_name or inst
@@ -2114,6 +2116,7 @@ Output ONLY valid JSON, no markdown, no explanation:
             for c in bank_connections:
                 cfg = c.config or {}
                 inst = cfg.get("institution") if isinstance(cfg, dict) else None
+                inst = inst or c.account_name
                 if inst:
                     institution_map[c.connection_id] = inst
                 lbl = c.nickname or c.account_name or inst
@@ -2126,7 +2129,7 @@ Output ONLY valid JSON, no markdown, no explanation:
                     "account_type": c.account_type or "",
                     "balance": float(c.balance) if c.balance is not None else 0,
                     "balance_currency": c.balance_currency or "GBP",
-                    "institution": (c.config or {}).get("institution"),
+                    "institution": (c.config or {}).get("institution") or c.account_name,
                     "balance_updated_at": c.balance_updated_at.isoformat() if c.balance_updated_at else None,
                 }
                 for c in bank_connections

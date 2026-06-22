@@ -72,7 +72,7 @@ export default React.memo(function LiveBalanceHero({ overview, truelayerBalance,
         {hasAccounts && (
           <div className="mt-4 flex flex-wrap gap-2">
             {accounts.map((acct) => {
-              const institution = acct.institution;
+              const institution = acct.institution || acct.account_name;
               const logoUrl = getBankLogoOrFallback(institution);
               const balance = acct.balance ?? 0;
               return (
