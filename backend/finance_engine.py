@@ -506,15 +506,17 @@ def build_router() -> APIRouter:
             if conn_ids:
                 from db import BankConnection
                 bc_result = await session.execute(
-                    select(BankConnection.connection_id, BankConnection.config).where(
+                    select(BankConnection.connection_id, BankConnection.nickname, BankConnection.account_name, BankConnection.config).where(
                         BankConnection.connection_id.in_(conn_ids)
                     )
                 )
                 for bc_row in bc_result:
-                    cfg = bc_row.config or {}
-                    inst = cfg.get("institution") if isinstance(cfg, dict) else None
-                    if inst:
-                        institution_map[bc_row.connection_id] = inst
+                    label = bc_row.nickname or bc_row.account_name
+                    if not label:
+                        cfg = bc_row.config or {}
+                        label = cfg.get("institution") if isinstance(cfg, dict) else None
+                    if label:
+                        institution_map[bc_row.connection_id] = label
 
             count_stmt = select(func.count()).select_from(Transaction).where(Transaction.user_id == user["user_id"])
             if connection_id:
@@ -980,15 +982,17 @@ Output ONLY valid JSON, no markdown, no explanation:
             if conn_ids:
                 from db import BankConnection
                 bc_result = await session.execute(
-                    select(BankConnection.connection_id, BankConnection.config).where(
+                    select(BankConnection.connection_id, BankConnection.nickname, BankConnection.account_name, BankConnection.config).where(
                         BankConnection.connection_id.in_(conn_ids)
                     )
                 )
                 for bc_row in bc_result:
-                    cfg = bc_row.config or {}
-                    inst = cfg.get("institution") if isinstance(cfg, dict) else None
-                    if inst:
-                        institution_map[bc_row.connection_id] = inst
+                    label = bc_row.nickname or bc_row.account_name
+                    if not label:
+                        cfg = bc_row.config or {}
+                        label = cfg.get("institution") if isinstance(cfg, dict) else None
+                    if label:
+                        institution_map[bc_row.connection_id] = label
 
             txs = [_tx_to_dict(t, institution_map) for t in tx_rows]
 
@@ -2090,10 +2094,12 @@ Output ONLY valid JSON, no markdown, no explanation:
             truelayer_balance = sum(c.balance for c in bank_connections if c.balance is not None) or 0
             institution_map = {}
             for c in bank_connections:
-                cfg = c.config or {}
-                inst = cfg.get("institution") if isinstance(cfg, dict) else None
-                if inst:
-                    institution_map[c.connection_id] = inst
+                label = c.nickname or c.account_name
+                if not label:
+                    cfg = c.config or {}
+                    label = cfg.get("institution") if isinstance(cfg, dict) else None
+                if label:
+                    institution_map[c.connection_id] = label
             accounts = [
                 {
                     "connection_id": c.connection_id,
