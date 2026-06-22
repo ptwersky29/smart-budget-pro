@@ -1,31 +1,33 @@
 const LOCAL_BASE = "/bank-logos";
+const TRUSTLY_BASE = "https://content.trustly.com/logos/banks/GB";
 
 export const BANK_LOGOS = {
-  "NatWest":               { color: "#4f0599", name: "NatWest",               file: "natwest.svg" },
-  "Barclays":              { color: "#00aeef", name: "Barclays",              file: "barclays.svg" },
-  "HSBC":                  { color: "#db0011", name: "HSBC",                  file: "hsbc.svg" },
-  "Santander":             { color: "#ec0000", name: "Santander",             file: "santander.svg" },
-  "Monzo":                 { color: "#ff3355", name: "Monzo",                 file: "monzo.svg" },
-  "TSB":                   { color: "#003a70", name: "TSB",                   file: "tsb.svg" },
-  "Lloyds":                { color: "#00693e", name: "Lloyds",                file: "lloyds.svg" },
-  "Halifax":               { color: "#003a6e", name: "Halifax",               file: "halifax.svg" },
-  "Nationwide":            { color: "#002b49", name: "Nationwide",            file: "nationwide.svg" },
-  "Starling":              { color: "#6935d2", name: "Starling",              file: "starlingbank.svg" },
-  "Revolut":               { color: "#191c1f", name: "Revolut",               file: "revolut.svg" },
-  "First Direct":          { color: "#146eb4", name: "First Direct",          file: "firstdirect.svg" },
-  "Co-operative":          { color: "#136a8a", name: "Co-operative",          file: "cooperative.svg" },
-  "Clydesdale":            { color: "#006747", name: "Clydesdale",            file: "clydesdale.svg" },
-  "Yorkshire":             { color: "#004b87", name: "Yorkshire",             file: "yorkshire.svg" },
-  "Danske":                { color: "#003057", name: "Danske",                file: "danske.svg" },
-  "Ulster":                { color: "#c41e3a", name: "Ulster",                file: "ulsterbank.svg" },
-  "Bank of Scotland":      { color: "#005b9f", name: "Bank of Scotland",      file: "bankofscotland.svg" },
-  "Royal Bank of Scotland":{ color: "#005b9f", name: "RBS",                   file: "royalbankofscotland.svg" },
-  "Metro Bank":            { color: "#00a6d6", name: "Metro",                 file: "metro.svg" },
-  "Tesco Bank":            { color: "#ee1c2e", name: "Tesco",                 file: "tesco.svg" },
-  "Virgin Money":          { color: "#da0530", name: "Virgin Money",          file: "virginmoney.svg" },
-  "Chase":                 { color: "#117aca", name: "Chase",                 file: "chase.svg" },
+  "NatWest":               { color: "#4f0599", name: "NatWest",               file: "natwest.svg", trustly: "nwbk" },
+  "Barclays":              { color: "#00aeef", name: "Barclays",              file: "barclays.svg", trustly: "barc" },
+  "HSBC":                  { color: "#db0011", name: "HSBC",                  file: "hsbc.svg", trustly: "midl" },
+  "Santander":             { color: "#ec0000", name: "Santander",             file: "santander.svg", trustly: "abby" },
+  "Monzo":                 { color: "#ff3355", name: "Monzo",                 file: "monzo.svg", trustly: "monz" },
+  "TSB":                   { color: "#003a70", name: "TSB",                   file: "tsb.svg", trustly: "tsbs" },
+  "Lloyds":                { color: "#00693e", name: "Lloyds",                file: "lloyds.svg", trustly: "loyd" },
+  "Halifax":               { color: "#003a6e", name: "Halifax",               file: "halifax.svg", trustly: "hlfx" },
+  "Nationwide":            { color: "#002b49", name: "Nationwide",            file: "nationwide.svg", trustly: "naia" },
+  "Starling":              { color: "#6935d2", name: "Starling",              file: "starlingbank.svg", trustly: "srlg" },
+  "Revolut":               { color: "#191c1f", name: "Revolut",               file: "revolut.svg", trustly: "revo" },
+  "First Direct":          { color: "#146eb4", name: "First Direct",          file: "firstdirect.svg", trustly: "hbuk" },
+  "Co-operative":          { color: "#136a8a", name: "Co-operative",          file: "cooperative.svg", trustly: "cpbk" },
+  "Clydesdale":            { color: "#006747", name: "Clydesdale",            file: "clydesdale.svg", trustly: "clyd" },
+  "Yorkshire":             { color: "#004b87", name: "Yorkshire",             file: "yorkshire.svg", trustly: "york" },
+  "Danske":                { color: "#003057", name: "Danske",                file: "danske.svg", trustly: "daba" },
+  "Ulster":                { color: "#c41e3a", name: "Ulster",                file: "ulsterbank.svg", trustly: "ulsb" },
+  "Bank of Scotland":      { color: "#005b9f", name: "Bank of Scotland",      file: "bankofscotland.svg", trustly: "bofs" },
+  "Royal Bank of Scotland":{ color: "#005b9f", name: "RBS",                   file: "royalbankofscotland.svg", trustly: "rbos" },
+  "Metro Bank":            { color: "#00a6d6", name: "Metro",                 file: "metro.svg", trustly: "mymb" },
+  "Tesco Bank":            { color: "#ee1c2e", name: "Tesco",                 file: "tesco.svg", trustly: "tpfg" },
+  "Virgin Money":          { color: "#da0530", name: "Virgin Money",          file: "virginmoney.svg", trustly: "nrnb" },
+  "Chase":                 { color: "#117aca", name: "Chase",                 file: "chase.svg", trustly: "chas" },
   "Triodos":               { color: "#005340", name: "Triodos",               file: "triodos.svg" },
-  "Coutts":                { color: "#003a70", name: "Coutts",                file: "coutts.svg" },
+  "Coutts":                { color: "#003a70", name: "Coutts",                file: "coutts.svg", trustly: "cout" },
+  "Sainsbury":             { color: "#ec7e00", name: "Sainsbury's",           file: "sainsburys.svg" },
 };
 
 const NORMALIZED = {};
@@ -37,8 +39,8 @@ const ALIASES = {
   "lloydsbank": "lloyds",
   "lloydsbankgb": "lloyds",
   "lloydsbankplc": "lloyds",
-  "firstdirect": "firstdirect",
   "firstdirectfb": "firstdirect",
+  "firstdirectgb": "firstdirect",
   "starlingbank": "starling",
   "starlingbankgb": "starling",
   "royalbankofscotland": "royalbankofscotland",
@@ -87,6 +89,8 @@ const ALIASES = {
   "triodosbank": "triodos",
   "triodosgb": "triodos",
   "couttsgb": "coutts",
+  "sainsburysbank": "sainsbury",
+  "sainsburysgb": "sainsbury",
 };
 
 function _resolve(institution) {
@@ -105,6 +109,7 @@ function _initialSvg(text, color) {
 export function getBankLogoOrFallback(institution) {
   if (!institution) return null;
   const match = _resolve(institution);
+  if (match?.trustly) return `${TRUSTLY_BASE}/${match.trustly}/round.svg`;
   if (match?.file) return `${LOCAL_BASE}/${match.file}`;
   const color = match?.color || "#6b7280";
   const name = match?.name || institution;
