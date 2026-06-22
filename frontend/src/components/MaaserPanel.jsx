@@ -5,8 +5,8 @@ import { toast } from "sonner";
 import { SectionCard } from "./ui/layout";
 import Skeleton from "./ui/Skeleton";
 import ConfirmModal from "./ui/ConfirmModal";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
 
 const EMPTY_SUM = {
   percent: 10, total_income: 0, obligation: 0, given_total: 0,

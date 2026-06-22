@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { X } from "lucide-react";
-import { Button } from "../components/ui/button";
+import { Button } from "./ui/button";
 
 export default function ConsentBanner() {
   const [visible, setVisible] = useState(false);

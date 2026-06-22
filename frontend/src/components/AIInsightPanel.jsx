@@ -4,7 +4,7 @@ import { Sparkles, Loader2, TrendingUp, TrendingDown, AlertCircle, Wallet, Refre
 import { toast } from "sonner";
 import { SectionCard } from "./ui/layout";
 import Skeleton from "./ui/Skeleton";
-import { Button } from "../components/ui/button";
+import { Button } from "./ui/button";
 
 const ICONS = {
   "trending-up": TrendingUp,

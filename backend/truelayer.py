@@ -3,9 +3,9 @@ import os
 import uuid
 import secrets
 import hashlib
-import hmac
 import json
 import logging
+import asyncio
 from base64 import b64encode, b64decode
 from datetime import datetime, timezone, timedelta, date
 from urllib.parse import urlencode, urlparse
@@ -212,7 +212,6 @@ async def _tl_get(session, conn: BankConnection, path: str, params: dict = None)
                 token = await _get_valid_token(session, conn)
                 continue
             if r.status_code == 429:
-                import asyncio
                 wait = 2 ** attempt
                 logger.warning(f"rate limited, retrying in {wait}s")
                 await asyncio.sleep(wait)
@@ -221,13 +220,11 @@ async def _tl_get(session, conn: BankConnection, path: str, params: dict = None)
             return r.json()
         except httpx.HTTPStatusError as e:
             if attempt < MAX_RETRIES - 1:
-                import asyncio
                 await asyncio.sleep(2 ** attempt)
                 continue
             raise RuntimeError(f"TrueLayer API error {path}: {e.response.status_code} {e.response.text[:500]}")
         except httpx.RequestError as e:
             if attempt < MAX_RETRIES - 1:
-                import asyncio
                 await asyncio.sleep(2 ** attempt)
                 continue
             raise RuntimeError(f"TrueLayer network error {path}: {e}")

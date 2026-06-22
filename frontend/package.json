@@ -65,7 +65,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "CI=false DISABLE_ESLINT_PLUGIN=true react-scripts build && exit 0",
+    "build": "CI=false DISABLE_ESLINT_PLUGIN=true react-scripts build",
     "test": "react-scripts test",
     "analyze": "CI=false GENERATE_SOURCEMAP=true react-scripts build && source-map-explorer 'build/static/js/*.js'",
     "test:ci": "react-scripts test --watchAll=false --coverage"

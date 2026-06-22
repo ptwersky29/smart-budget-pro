@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { Download, Loader2, TrendingDown, TrendingUp, CheckCircle2, AlertCircle } from "lucide-react";
-import { Button } from "../components/ui/button";
+import { Button } from "./ui/button";
 
 /**
  * Year-End Jewish Finance Report Component

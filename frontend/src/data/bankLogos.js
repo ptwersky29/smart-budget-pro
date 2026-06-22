@@ -1,13 +1,14 @@
-const LOGO_BASE = "https://cdn.simpleicons.org";
+const CDN_BASE = "https://cdn.simpleicons.org";
+const LOCAL_BASE = "/bank-logos";
 
 export const BANK_LOGOS = {
-  "NatWest":       { slug: "natwest",       color: "#4f0599", name: "NatWest" },
-  "Barclays":      { slug: "barclays",      color: "#00aeef", name: "Barclays" },
+  "NatWest":       { slug: "natwest",       color: "#4f0599", name: "NatWest",       file: "natwest.svg" },
+  "Barclays":      { slug: "barclays",      color: "#00aeef", name: "Barclays",      file: "barclays.svg" },
+  "HSBC":          { slug: "hsbc",          color: "#db0011", name: "HSBC",          file: "hsbc.svg" },
+  "Santander":     { slug: "santander",     color: "#ec0000", name: "Santander",     file: "santander.svg" },
+  "Monzo":         { slug: "monzo",         color: "#ff3355", name: "Monzo",         file: "monzo.svg" },
   "TSB":           { slug: "tsb",           color: "#003a70", name: "TSB" },
   "Lloyds":        { slug: "lloydsbank",    color: "#00693e", name: "Lloyds" },
-  "HSBC":          { slug: "hsbc",          color: "#db0011", name: "HSBC" },
-  "Santander":     { slug: "santander",     color: "#ec0000", name: "Santander" },
-  "Monzo":         { slug: "monzo",         color: "#ff3355", name: "Monzo" },
   "Starling":      { slug: "starlingbank",  color: "#6935d2", name: "Starling" },
   "Revolut":       { slug: "revolut",       color: "#191c1f", name: "Revolut" },
   "Nationwide":    { slug: "nationwide",    color: "#002b49", name: "Nationwide" },
@@ -31,9 +32,10 @@ export const BANK_LOGOS = {
 export function getBankLogoUrl(institution) {
   if (!institution) return null;
   const match = BANK_LOGOS[institution];
-  if (match) return `${LOGO_BASE}/${match.slug}`;
+  if (match?.file) return `${LOCAL_BASE}/${match.file}`;
+  if (match) return `${CDN_BASE}/${match.slug}`;
   const slug = institution.toLowerCase().replace(/[^a-z0-9]/g, "");
-  return `${LOGO_BASE}/${slug}`;
+  return `${CDN_BASE}/${slug}`;
 }
 
 export function getBankColor(institution) {

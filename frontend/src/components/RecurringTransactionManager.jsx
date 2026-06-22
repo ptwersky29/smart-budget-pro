@@ -3,8 +3,8 @@ import { api } from "../lib/api";
 import { toast } from "sonner";
 import { Plus, Edit2, Trash2, Loader2, Calendar, DollarSign, Tag, AlertCircle } from "lucide-react";
 import ConfirmModal from "./ui/ConfirmModal";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
 import CategoryCombobox from "./CategoryCombobox";
 
 /**

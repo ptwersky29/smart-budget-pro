@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Volume2, Eye, Type, X } from "lucide-react";
-import { Input } from "../components/ui/input";
+import { Input } from "./ui/input";
 
 /**
  * Accessibility Overlay Component

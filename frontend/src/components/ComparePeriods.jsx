@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import { api, formatApiError } from "../lib/api";
 import { BarChart3, Loader2, X, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
 
 const fmt = (n) => `£${Number(n || 0).toFixed(2)}`;
 
