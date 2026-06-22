@@ -7,7 +7,7 @@ import { EmptyState, MetricCard, PageHeader, SectionCard } from "../components/u
 import Skeleton from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { getBankLogoUrl } from "../data/bankLogos";
+import { getBankLogoOrFallback } from "../data/bankLogos";
 
 export default function Connections() {
   useEffect(() => { document.title = "Bank Connections | FinanceAI"; }, []);
@@ -264,8 +264,8 @@ export default function Connections() {
               <li key={c.connection_id} className="px-6 py-4 flex items-center justify-between border-b border-border/70 last:border-0 gap-4 hover:bg-secondary/30 transition-colors">
                 <Link to={`/accounts/${c.connection_id}`} className="flex items-center gap-3 min-w-0 flex-1 group">
                   <div className="w-10 h-10 rounded-xl bg-white dark:bg-secondary/40 border border-border/30 grid place-items-center shrink-0 group-hover:scale-105 transition-transform overflow-hidden">
-                    {getBankLogoUrl(c.config?.institution || c.provider) ? (
-                      <img src={getBankLogoUrl(c.config?.institution || c.provider)} alt={c.config?.institution || c.provider} className="h-6 w-6 object-contain" loading="lazy" />
+                    {getBankLogoOrFallback(c.config?.institution || c.provider) ? (
+                      <img src={getBankLogoOrFallback(c.config?.institution || c.provider)} alt={c.config?.institution || c.provider} className="h-6 w-6 object-contain" loading="lazy" />
                     ) : (
                       <Building2 className="h-4 w-4 text-muted-foreground" />
                     )}

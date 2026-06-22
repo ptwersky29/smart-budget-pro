@@ -10,7 +10,7 @@ import { PageHeader, MetricCard, SectionCard, EmptyState } from "../components/u
 import { SkeletonTable } from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
 import TransactionRow from "../components/TransactionRow";
-import { getBankLogoUrl, getBankColor, toAccountTypeLabel } from "../data/bankLogos";
+import { getBankLogoOrFallback, getBankColor, toAccountTypeLabel } from "../data/bankLogos";
 
 const STATUS_STYLES = {
   active: { icon: CheckCircle2, color: "text-emerald", bg: "bg-emerald/10", label: "Active" },
@@ -113,7 +113,7 @@ export default function AccountPage() {
   if (!conn) return null;
 
   const institution = conn.config?.institution;
-  const logoUrl = getBankLogoUrl(institution);
+  const logoUrl = getBankLogoOrFallback(institution);
   const bankColor = getBankColor(institution);
   const statusInfo = STATUS_STYLES[conn.status] || STATUS_STYLES.active;
   const StatusIcon = statusInfo.icon;

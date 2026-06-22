@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { RefreshCw, Wallet, ChevronUp, ChevronDown, Building2 } from "lucide-react";
-import { getBankLogoUrl, toAccountTypeLabel } from "../data/bankLogos";
+import { getBankLogoOrFallback, toAccountTypeLabel } from "../data/bankLogos";
 
 function timeAgo(date) {
   const diff = Math.floor((Date.now() - date) / 1000);
@@ -73,7 +73,7 @@ export default React.memo(function LiveBalanceHero({ overview, truelayerBalance,
           <div className="mt-4 flex flex-wrap gap-2">
             {accounts.map((acct) => {
               const institution = acct.institution;
-              const logoUrl = getBankLogoUrl(institution);
+              const logoUrl = getBankLogoOrFallback(institution);
               const balance = acct.balance ?? 0;
               return (
                 <Link
@@ -83,7 +83,7 @@ export default React.memo(function LiveBalanceHero({ overview, truelayerBalance,
                 >
                   <div className="relative shrink-0 h-6 w-6 rounded-full bg-white dark:bg-secondary/40 flex items-center justify-center overflow-hidden">
                     {logoUrl ? (
-                      <img src={logoUrl} alt={institution || acct.account_name} className="h-4 w-4 object-contain group-hover:scale-110 transition-transform duration-200" loading="lazy" />
+                      <img src={logoUrl} alt={institution || acct.account_name} className="h-4 w-4 object-contain group-hover:scale-110 transition-transform duration-200" loading="lazy" onError={(e) => { e.target.onerror = null; e.target.src = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#6b7280"/><text x="16" y="22" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="700" font-size="18" fill="white">${(institution || "?")[0].toUpperCase()}</text></svg>`)}`; }} />
                     ) : (
                       <Building2 className="h-3 w-3 text-muted-foreground" />
                     )}
