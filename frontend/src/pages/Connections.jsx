@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import { api, formatApiError } from "../lib/api";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { Building2, Loader2, CheckCircle2, XCircle, RefreshCcw, Trash2, ArrowRight, AlertCircle, Clock, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, MetricCard, PageHeader, SectionCard } from "../components/ui/layout";
@@ -260,9 +260,9 @@ export default function Connections() {
         ) : (
           <ul>
             {conns.map((c) => (
-              <li key={c.connection_id} className="px-6 py-4 flex items-center justify-between border-b border-border/70 last:border-0 gap-4">
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="w-10 h-10 rounded-xl bg-secondary grid place-items-center shrink-0"><Building2 className="h-4 w-4" /></div>
+              <li key={c.connection_id} className="px-6 py-4 flex items-center justify-between border-b border-border/70 last:border-0 gap-4 hover:bg-secondary/30 transition-colors">
+                <Link to={`/accounts/${c.connection_id}`} className="flex items-center gap-3 min-w-0 flex-1 group">
+                  <div className="w-10 h-10 rounded-xl bg-secondary grid place-items-center shrink-0 group-hover:scale-105 transition-transform"><Building2 className="h-4 w-4" /></div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       {editingNickname === c.connection_id ? (
@@ -280,7 +280,7 @@ export default function Connections() {
                       ) : (
                         <>
                           <p className="font-medium truncate">{c.account_name}</p>
-                          <button onClick={() => { setEditingNickname(c.connection_id); setNicknameValue(c.nickname || c.account_name); }} className="text-xs text-muted-foreground hover:text-emerald shrink-0">✎</button>
+                          <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingNickname(c.connection_id); setNicknameValue(c.nickname || c.account_name); }} className="text-xs text-muted-foreground hover:text-emerald shrink-0">✎</button>
                         </>
                       )}
                       {c.account_type && <span className="text-xs text-muted-foreground shrink-0">{c.account_type}</span>}
@@ -298,14 +298,14 @@ export default function Connections() {
                     </p>
                     {c.last_error && <p className="text-xs text-ruby mt-1 max-w-[48rem] truncate" title={c.last_error}>{c.last_error}</p>}
                   </div>
-                </div>
+                </Link>
                 <div className="flex items-center gap-2 shrink-0">
                   {c.status === "reconnect_required" && (
-                    <Button onClick={() => reconnectConn(c.connection_id)} data-testid={`reconnect-${c.connection_id}`} variant="danger" size="pill" className="text-xs whitespace-nowrap">
+                    <Button onClick={(e) => { e.preventDefault(); e.stopPropagation(); reconnectConn(c.connection_id); }} data-testid={`reconnect-${c.connection_id}`} variant="danger" size="pill" className="text-xs whitespace-nowrap">
                       Reconnect
                     </Button>
                   )}
-                  <button onClick={() => removeConn(c.connection_id)} data-testid={`remove-${c.connection_id}`} className="h-9 w-9 rounded-full grid place-items-center hover:bg-secondary text-ruby" title="Remove connection"><Trash2 className="h-4 w-4" /></button>
+                  <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeConn(c.connection_id); }} data-testid={`remove-${c.connection_id}`} className="h-9 w-9 rounded-full grid place-items-center hover:bg-secondary text-ruby" title="Remove connection"><Trash2 className="h-4 w-4" /></button>
                 </div>
               </li>
             ))}

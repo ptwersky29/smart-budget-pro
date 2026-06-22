@@ -30,6 +30,7 @@ const Connections = lazy(() => import("./pages/Connections"));
 const Integrations = lazy(() => import("./pages/Integrations"));
 const SMS = lazy(() => import("./pages/SMS"));
 const Statements = lazy(() => import("./pages/Statements"));
+const AccountPage = lazy(() => import("./pages/AccountPage"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
 const OnboardingWizard = lazy(() => import("./pages/OnboardingWizard"));
@@ -69,6 +70,7 @@ function AppRouter() {
         <Route path="/integrations" element={<Integrations />} />
         <Route path="/sms" element={<SMS />} />
         <Route path="/statements" element={<Statements />} />
+        <Route path="/accounts/:connectionId" element={<AccountPage />} />
         <Route path="/jewish" element={<Jewish />} />
         <Route path="/uk-tools" element={<UKTools />} />
         <Route path="/reports" element={<Reports />} />

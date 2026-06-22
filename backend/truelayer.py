@@ -552,6 +552,51 @@ def build_router() -> APIRouter:
                 ],
             }
 
+    @router.get("/connections/{connection_id}")
+    async def get_connection(connection_id: str, request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(BankConnection).where(
+                    BankConnection.connection_id == connection_id,
+                    BankConnection.user_id == user["user_id"],
+                )
+            )
+            conn = result.scalar_one_or_none()
+            if not conn:
+                raise HTTPException(status_code=404, detail="Connection not found")
+            tx_count_result = await session.execute(
+                select(func.count()).where(Transaction.connection_id == connection_id)
+            )
+            tx_count = tx_count_result.scalar() or 0
+            last_tx_result = await session.execute(
+                select(Transaction).where(Transaction.connection_id == connection_id)
+                .order_by(Transaction.date.desc()).limit(1)
+            )
+            last_tx = last_tx_result.scalar_one_or_none()
+            return {
+                "connection_id": conn.connection_id,
+                "account_id": conn.account_id,
+                "account_name": conn.nickname or conn.account_name,
+                "account_type": conn.account_type,
+                "provider": conn.provider,
+                "status": conn.status,
+                "created_at": conn.created_at.isoformat() if conn.created_at else None,
+                "expires_at": conn.expires_at.isoformat() if conn.expires_at else None,
+                "last_sync_at": conn.last_sync_at.isoformat() if conn.last_sync_at else None,
+                "last_sync_status": conn.last_sync_status or conn.status,
+                "last_error": conn.last_error,
+                "last_error_at": conn.last_error_at.isoformat() if conn.last_error_at else None,
+                "config": conn.config or {},
+                "import_from_date": conn.import_start_date.isoformat() if conn.import_start_date else None,
+                "nickname": conn.nickname or conn.account_name,
+                "balance": float(conn.balance) if conn.balance is not None else None,
+                "balance_currency": conn.balance_currency,
+                "balance_updated_at": conn.balance_updated_at.isoformat() if conn.balance_updated_at else None,
+                "transaction_count": tx_count,
+                "last_transaction_date": last_tx.date.isoformat() if last_tx and last_tx.date else None,
+            }
+
     @router.post("/reconnect/{connection_id}")
     async def reconnect_connection(connection_id: str, request: Request, user: dict = Depends(get_current_user)):
         sm = request.app.state.db

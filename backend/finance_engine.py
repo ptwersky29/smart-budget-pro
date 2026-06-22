@@ -447,7 +447,7 @@ def build_router() -> APIRouter:
         request: Request, user: dict = Depends(get_current_user),
         category: str = Query(None), source: str = Query(None),
         tx_type: str = Query(None), merchant: str = Query(None),
-        pending: str = Query(None),
+        pending: str = Query(None), connection_id: str = Query(None),
         date_from: str = Query(None), date_to: str = Query(None),
         amount_min: float = Query(None), amount_max: float = Query(None),
         search: str = Query(None),
@@ -457,6 +457,8 @@ def build_router() -> APIRouter:
         sm = request.app.state.db
         async with sm() as session:
             stmt = select(Transaction).where(Transaction.user_id == user["user_id"])
+            if connection_id:
+                stmt = stmt.where(Transaction.connection_id == connection_id)
             if category:
                 stmt = stmt.where(Transaction.category == category)
             if source:
@@ -497,6 +499,8 @@ def build_router() -> APIRouter:
             rows = result.scalars().all()
 
             count_stmt = select(func.count()).select_from(Transaction).where(Transaction.user_id == user["user_id"])
+            if connection_id:
+                count_stmt = count_stmt.where(Transaction.connection_id == connection_id)
             if category:
                 count_stmt = count_stmt.where(Transaction.category == category)
             if source:
@@ -524,6 +528,8 @@ def build_router() -> APIRouter:
                 func.coalesce(func.sum(Transaction.amount).filter(Transaction.amount > 0), 0),
                 func.coalesce(func.sum(Transaction.amount).filter(Transaction.amount < 0), 0),
             ).where(Transaction.user_id == user["user_id"])
+            if connection_id:
+                agg_stmt = agg_stmt.where(Transaction.connection_id == connection_id)
             if category:
                 agg_stmt = agg_stmt.where(Transaction.category == category)
             if source:

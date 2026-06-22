@@ -110,6 +110,12 @@ export const ROUTE_META = [
     secondary: { label: "Dashboard", to: "/dashboard" },
   },
   {
+    paths: ["/accounts"],
+    eyebrow: "Account",
+    title: "Account Details",
+    description: "View transactions, settings, and balance for this bank account.",
+  },
+  {
     paths: ["/settings"],
     eyebrow: "Settings",
     title: "Settings",
