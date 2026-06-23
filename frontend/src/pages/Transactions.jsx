@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
-import { Plus, Trash2, Loader2, Pencil, Search, Sparkles, Filter, ChevronLeft, ChevronRight, X, BarChart3, Star, Receipt, Download, MoreHorizontal, Wallet } from "lucide-react";
+import { Plus, Trash2, Loader2, Pencil, Search, Sparkles, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, BarChart3, Star, Receipt, Download, MoreHorizontal, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, PageHeader } from "../components/ui/layout";
 import { SkeletonTable } from "../components/ui/Skeleton";
@@ -609,6 +609,20 @@ const Transactions = React.memo(function Transactions() {
             >
               <Search className="h-3.5 w-3.5" />
             </button>
+
+            {/* Sort + order */}
+            <div className="flex items-center gap-0.5">
+              <select value={filters.sort} onChange={(e) => setFilter("sort", e.target.value)}
+                className="h-8 px-2 rounded-lg bg-secondary/50 border border-border/50 text-[11px] font-medium focus:outline-none focus:border-ring">
+                <option value="date">Date</option>
+                <option value="amount">Amount</option>
+                <option value="description">Description</option>
+              </select>
+              <button onClick={() => setFilter("order", filters.order === "desc" ? "asc" : "desc")}
+                className="h-8 w-7 grid place-items-center rounded-lg bg-secondary/50 border border-border/50 hover:bg-secondary/80 transition-colors">
+                {filters.order === "desc" ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronUp className="h-3 w-3 text-muted-foreground" />}
+              </button>
+            </div>
 
             {/* Filter */}
             <Sheet>
