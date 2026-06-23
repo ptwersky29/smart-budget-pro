@@ -119,7 +119,7 @@ export default function AccountPage() {
 
       {/* Bank card mockup header */}
       <div className={`fade-up`}>
-        <BankCardMockup connection={conn} size="lg" showStatus />
+        <BankCardMockup connection={conn} size="md" showStatus />
 
         {/* Nickname + stats row below card */}
         <div className="mt-3 flex items-center gap-3 flex-wrap">

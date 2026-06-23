@@ -19,7 +19,7 @@ const STATUS_CONFIG = {
   reconnect_required: { icon: AlertCircle, label: "Reconnect", text: "text-topaz" },
 };
 
-function BankCardMockup({ connection, size = "md", showStatus = false, actions }) {
+function BankCardMockup({ connection, size = "sm", showStatus = false, actions }) {
   const c = connection;
   const institution = c.config?.institution || c.account_name || c.nickname || c.provider;
   const logoUrl = getBankLogoOrFallback(institution);
@@ -37,10 +37,10 @@ function BankCardMockup({ connection, size = "md", showStatus = false, actions }
   const balanceFmt = Number(balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const sizeClasses = {
-    sm: { card: "aspect-[1.586/1] p-3 sm:p-4", logoBox: "h-7 w-7 sm:h-8 sm:w-8", logoImg: "h-5 w-5 sm:h-6 sm:w-6", nameSize: "text-[10px] sm:text-xs", balanceSize: "text-base sm:text-lg md:text-xl", badgeSize: "text-[9px]", ccySize: "text-[9px]" },
-    md: { card: "aspect-[1.586/1] p-4 sm:p-5", logoBox: "h-8 w-8 sm:h-10 sm:w-10", logoImg: "h-6 w-6 sm:h-7 sm:w-7", nameSize: "text-xs sm:text-sm", balanceSize: "text-lg sm:text-xl md:text-2xl", badgeSize: "text-[10px]", ccySize: "text-[10px]" },
-    lg: { card: "aspect-[1.586/1] p-5 sm:p-6 lg:p-8", logoBox: "h-10 w-10 sm:h-12 sm:w-12 lg:h-14 lg:w-14", logoImg: "h-8 w-8 sm:h-9 sm:w-9 lg:h-10 lg:w-10", nameSize: "text-sm sm:text-base lg:text-lg", balanceSize: "text-xl sm:text-2xl lg:text-3xl", badgeSize: "text-[10px] sm:text-xs", ccySize: "text-[10px] sm:text-xs" },
-  }[size] || sizeClasses.md;
+    xs: { card: "aspect-[1.586/1] p-2", logoBox: "h-6 w-6", logoImg: "h-4 w-4", nameSize: "text-[9px] leading-tight", balanceSize: "text-xs sm:text-sm", badgeSize: "text-[7px]", ccySize: "text-[8px]" },
+    sm: { card: "aspect-[1.586/1] p-2.5 sm:p-3", logoBox: "h-7 w-7 sm:h-8 sm:w-8", logoImg: "h-5 w-5 sm:h-6 sm:w-6", nameSize: "text-[10px] sm:text-xs", balanceSize: "text-sm sm:text-base", badgeSize: "text-[8px] sm:text-[9px]", ccySize: "text-[8px] sm:text-[9px]" },
+    md: { card: "aspect-[1.586/1] p-3 sm:p-4", logoBox: "h-8 w-8 sm:h-9 sm:w-9 lg:h-10 lg:w-10", logoImg: "h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8", nameSize: "text-xs sm:text-sm lg:text-base", balanceSize: "text-base sm:text-lg lg:text-xl", badgeSize: "text-[9px] sm:text-[10px]", ccySize: "text-[9px] sm:text-[10px]" },
+  }[size] || sizeClasses.sm;
 
   const content = (
     <div
@@ -62,7 +62,7 @@ function BankCardMockup({ connection, size = "md", showStatus = false, actions }
 
       {/* Status badge — top right */}
       {showStatus && (
-        <div className="absolute top-2 sm:top-3 right-2 sm:right-3 z-10">
+        <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 z-10">
           <span className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full bg-black/20 backdrop-blur-sm text-[9px] sm:text-[10px] ${statusInfo.text} font-medium`}>
             <StatusIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
             {statusInfo.label}
@@ -71,7 +71,7 @@ function BankCardMockup({ connection, size = "md", showStatus = false, actions }
       )}
 
       {/* Balance — bottom area */}
-      <div className="absolute bottom-2 sm:bottom-3 left-2 sm:left-3 right-2 sm:right-3 z-10">
+      <div className="absolute bottom-1.5 sm:bottom-2 left-1.5 sm:left-2 right-1.5 sm:right-2 z-10">
         <p className={`font-semibold tracking-tight text-white ${sizeClasses.balanceSize} leading-none drop-shadow-sm`}>
           £{balanceFmt}
         </p>

@@ -157,7 +157,7 @@ export default function BankStatements() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {conns.map((c, i) => (
                   <div key={c.connection_id} className={`fade-up delay-${Math.min(i, 5)}`}>
-                    <BankCardMockup connection={c} size="sm" showStatus />
+                    <BankCardMockup connection={c} size="xs" showStatus />
                     <div className="mt-2 flex items-center gap-2 justify-between">
                       <p className="text-[10px] text-muted-foreground">
                         {c.config?.institution && <span>{c.config.institution}</span>}

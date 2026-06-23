@@ -93,7 +93,7 @@ export default React.memo(function LiveBalanceHero({ overview, truelayerBalance,
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {group.accounts.map((acct, ai) => (
                     <div key={acct.connection_id} className={`fade-up delay-${Math.min(gi * 2 + ai, 5)}`}>
-                      <BankCardMockup size="sm" connection={acct} />
+                      <BankCardMockup size="xs" connection={acct} />
                     </div>
                   ))}
                 </div>

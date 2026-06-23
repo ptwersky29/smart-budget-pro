@@ -7,7 +7,6 @@ import { EmptyState, MetricCard, PageHeader, SectionCard } from "../components/u
 import Skeleton from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { getBankColor } from "../data/bankLogos";
 import BankCardMockup from "../components/BankCardMockup";
 
 export default function Connections() {
@@ -264,10 +263,9 @@ export default function Connections() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
               {conns.map((c, i) => {
                 const bcInst = c.config?.institution || c.account_name || c.nickname || c.provider;
-                const bcColor = getBankColor(bcInst);
                 return (
                   <div key={c.connection_id} className={`fade-up delay-${Math.min(i, 5)}`}>
-                    <BankCardMockup connection={c} size="md" showStatus />
+                    <BankCardMockup connection={c} size="sm" showStatus />
                     {/* Actions row below card */}
                     <div className="mt-2.5 flex items-center gap-2 flex-wrap">
                       {editingNickname === c.connection_id ? (
