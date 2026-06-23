@@ -446,24 +446,24 @@ export default React.memo(function BudgetPage() {
     const isSelected = bulkSelected.has(b.budget_id);
     const statusLabel = over ? "Over" : (b.progress_pct || 0) >= 80 ? "Nearing" : "On track";
     return (
-      <div key={b.budget_id} className={`rounded-lg border ${isSelected ? "border-emerald bg-emerald/5" : "border-border bg-card/80"} p-3 hover:border-muted-foreground/20 hover:shadow-sm transition-all group relative`}>
+      <div key={b.budget_id} className={`rounded-lg border ${isSelected ? "border-emerald bg-emerald/5" : "border-border bg-card/80"} p-4 hover:border-muted-foreground/20 hover:shadow-md transition-all group relative`}>
         {isSelected && <div className="absolute inset-0 rounded-lg border-2 border-emerald/40 pointer-events-none" />}
-        <div className="flex items-start gap-3">
-          <div className="relative shrink-0 mt-0.5">
+        <div className="flex items-start gap-4">
+          <div className="relative shrink-0 mt-1">
             <input type="checkbox" checked={isSelected} onChange={() => {
               const next = new Set(bulkSelected);
               if (isSelected) next.delete(b.budget_id); else next.add(b.budget_id);
               setBulkSelected(next);
             }} className="absolute -left-1 -top-1 z-10 w-3.5 h-3.5 rounded border-border text-emerald focus:ring-emerald/30" />
-            <ProgressRing pct={b.progress_pct || 0} size={36} stroke={3} color={progressColor} />
+            <ProgressRing pct={b.progress_pct || 0} size={44} stroke={3.5} color={progressColor} />
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <span className="text-[9px] font-bold tabular-nums">{Math.round(b.progress_pct || 0)}%</span>
+              <span className="text-[10px] font-bold tabular-nums">{Math.round(b.progress_pct || 0)}%</span>
             </div>
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <h3 className="text-[13px] font-medium capitalize truncate leading-tight">{b.category}</h3>
-              <span className={`shrink-0 text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
+            <div className="flex items-center gap-1.5 mb-1">
+              <h3 className="text-sm font-medium capitalize truncate leading-tight">{b.category}</h3>
+              <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium ${
                 over ? "bg-ruby/10 text-ruby" :
                 (b.progress_pct || 0) >= 80 ? "bg-topaz/10 text-topaz" :
                 "bg-emerald/10 text-emerald"
@@ -471,22 +471,22 @@ export default React.memo(function BudgetPage() {
                 {statusLabel}
               </span>
             </div>
-            <div className="flex items-baseline gap-1">
-              <span className={`text-xs font-semibold tabular-nums ${over ? "text-ruby" : "text-foreground"}`}>
+            <div className="flex items-baseline gap-1.5 mb-1.5">
+              <span className={`text-sm font-semibold tabular-nums ${over ? "text-ruby" : "text-foreground"}`}>
                 £{b.spent}
               </span>
-              <span className="text-[10px] text-muted-foreground">/ £{b.limit}</span>
-              <span className="ml-auto text-[10px] tabular-nums text-muted-foreground">
+              <span className="text-[11px] text-muted-foreground">/ £{b.limit}</span>
+              <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">
                 £{b.remaining >= 0 ? `${b.remaining} left` : `${Math.abs(b.remaining)} over`}
               </span>
             </div>
-            <div className="h-1.5 rounded-full bg-muted/30 overflow-hidden mt-1.5">
+            <div className="h-2 rounded-full bg-muted/30 overflow-hidden">
               <div className={`h-full rounded-full ${over ? "bg-ruby" : "bg-gradient-to-r from-emerald via-topaz to-ruby"}`} style={{ width: `${Math.min(100, b.progress_pct || 0)}%` }} />
             </div>
           </div>
-          <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
-            <button onClick={() => startEdit(b)} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground" aria-label={`Edit ${b.category} budget`}><Pencil className="h-3 w-3" /></button>
-            <button onClick={() => setConfirmDelete(b.budget_id)} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-ruby" aria-label={`Delete ${b.category} budget`}><Trash2 className="h-3 w-3" /></button>
+          <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-1">
+            <button onClick={() => startEdit(b)} className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground" aria-label={`Edit ${b.category} budget`}><Pencil className="h-3.5 w-3.5" /></button>
+            <button onClick={() => setConfirmDelete(b.budget_id)} className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-ruby" aria-label={`Delete ${b.category} budget`}><Trash2 className="h-3.5 w-3.5" /></button>
           </div>
         </div>
       </div>
@@ -760,8 +760,8 @@ export default React.memo(function BudgetPage() {
 
       {/* Loading */}
       {loading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {[...Array(9)].map((_, i) => <div key={i} className="h-28 rounded-xl bg-muted/40 animate-pulse" />)}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {[...Array(6)].map((_, i) => <div key={i} className="h-32 rounded-xl bg-muted/40 animate-pulse" />)}
         </div>
       )}
 
@@ -830,12 +830,12 @@ export default React.memo(function BudgetPage() {
                     </span>
                   </h3>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {items.map((b) => renderBudgetCard(b))}
                   <button onClick={() => { setAddTab("budget"); setShowAdd(true); setForm((prev) => ({ ...prev, category: "", limit: "", budget_type: "everyday" })); }}
-                    className="rounded-lg border-2 border-dashed border-border/50 hover:border-emerald/40 hover:bg-emerald/5 hover:text-emerald text-muted-foreground/60 transition-all flex flex-col items-center justify-center p-3 min-h-[92px] w-full">
-                    <Plus className="h-4 w-4 mb-1" />
-                    <span className="text-[10px] font-medium">Add {section}</span>
+                    className="rounded-lg border-2 border-dashed border-border/50 hover:border-emerald/40 hover:bg-emerald/5 hover:text-emerald text-muted-foreground/60 transition-all flex flex-col items-center justify-center p-4 min-h-[110px] w-full">
+                    <Plus className="h-5 w-5 mb-1.5" />
+                    <span className="text-xs font-medium">Add {section}</span>
                   </button>
                 </div>
               </div>
@@ -858,7 +858,7 @@ export default React.memo(function BudgetPage() {
                   <span className="text-xs text-muted-foreground">{upcomingEventGroups.length} events</span>
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {upcomingEventGroups.map((g) => renderEventGroup(g))}
               </div>
             </section>
@@ -873,7 +873,7 @@ export default React.memo(function BudgetPage() {
                   Past Events
                 </h2>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {pastEventGroups.map((g) => renderEventGroup(g))}
               </div>
             </section>
@@ -887,7 +887,7 @@ export default React.memo(function BudgetPage() {
                   Planned Events
                 </h2>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {Object.values(eventGroups).filter((g) => !g.event_date).map((g) => renderEventGroup(g))}
               </div>
             </section>
