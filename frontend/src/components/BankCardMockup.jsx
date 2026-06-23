@@ -1,11 +1,20 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Building2, Wallet, CheckCircle2, AlertCircle } from "lucide-react";
-import { getBankLogoOrFallback, getBankColor, toAccountTypeLabel } from "../data/bankLogos";
+import {
+  getBankLogoOrFallback,
+  getBankColor,
+  pickBankInstitution,
+  toAccountTypeLabel,
+} from "../data/bankLogos";
 
 const STATUS_CONFIG = {
   active: { icon: CheckCircle2, label: "Active", text: "text-emerald" },
-  reconnect_required: { icon: AlertCircle, label: "Reconnect", text: "text-ruby" },
+  reconnect_required: {
+    icon: AlertCircle,
+    label: "Reconnect",
+    text: "text-ruby",
+  },
 };
 
 function BankCardMockup({ connection, size = "sm", showStatus = false }) {
@@ -13,9 +22,16 @@ function BankCardMockup({ connection, size = "sm", showStatus = false }) {
   const isManual = c.provider === "manual";
   const customImage = c.config?.image;
   const customColor = c.config?.color;
-  const institution = c.config?.institution || c.account_name || c.nickname || c.provider;
-  const logoUrl = customImage || getBankLogoOrFallback(institution);
-  const bankColor = customColor || getBankColor(institution);
+  const institution =
+    c.config?.institution || c.account_name || c.nickname || c.provider;
+  const brandInstitution = pickBankInstitution(
+    c.config?.institution,
+    c.nickname,
+    c.account_name,
+    c.provider,
+  );
+  const logoUrl = customImage || getBankLogoOrFallback(brandInstitution);
+  const bankColor = customColor || getBankColor(brandInstitution);
   const name = c.nickname || c.account_name || "Bank Account";
   const balance = c.balance ?? 0;
   const ccy = c.balance_currency || "GBP";
@@ -24,13 +40,47 @@ function BankCardMockup({ connection, size = "sm", showStatus = false }) {
 
   const statusInfo = STATUS_CONFIG[c.status] || STATUS_CONFIG.active;
   const StatusIcon = statusInfo.icon;
-  const balanceFmt = Number(balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const balanceFmt = Number(balance).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
-  const sizes = {
-    xs: { h: "h-14", logoBox: "h-7 w-7", logoImg: "h-4 w-4", nameSize: "text-xs", metaSize: "text-[10px]", balanceSize: "text-sm", iconSize: "h-2.5 w-2.5", gap: "gap-2.5", badgeSize: "text-[9px]" },
-    sm: { h: "h-16", logoBox: "h-8 w-8", logoImg: "h-5 w-5", nameSize: "text-sm", metaSize: "text-[11px]", balanceSize: "text-base", iconSize: "h-3 w-3", gap: "gap-3", badgeSize: "text-[10px]" },
-    md: { h: "h-20", logoBox: "h-10 w-10", logoImg: "h-7 w-7", nameSize: "text-sm sm:text-base", metaSize: "text-xs", balanceSize: "text-lg sm:text-xl", iconSize: "h-3 w-3", gap: "gap-3 sm:gap-4", badgeSize: "text-[10px]" },
-  }[size] || sizes.sm;
+  const sizes =
+    {
+      xs: {
+        h: "h-14",
+        logoBox: "h-7 w-7",
+        logoImg: "h-4 w-4",
+        nameSize: "text-xs",
+        metaSize: "text-[10px]",
+        balanceSize: "text-sm",
+        iconSize: "h-2.5 w-2.5",
+        gap: "gap-2.5",
+        badgeSize: "text-[9px]",
+      },
+      sm: {
+        h: "h-16",
+        logoBox: "h-8 w-8",
+        logoImg: "h-5 w-5",
+        nameSize: "text-sm",
+        metaSize: "text-[11px]",
+        balanceSize: "text-base",
+        iconSize: "h-3 w-3",
+        gap: "gap-3",
+        badgeSize: "text-[10px]",
+      },
+      md: {
+        h: "h-20",
+        logoBox: "h-10 w-10",
+        logoImg: "h-7 w-7",
+        nameSize: "text-sm sm:text-base",
+        metaSize: "text-xs",
+        balanceSize: "text-lg sm:text-xl",
+        iconSize: "h-3 w-3",
+        gap: "gap-3 sm:gap-4",
+        badgeSize: "text-[10px]",
+      },
+    }[size] || sizes.sm;
 
   return (
     <Link
@@ -39,31 +89,64 @@ function BankCardMockup({ connection, size = "sm", showStatus = false }) {
       style={{ borderLeft: `3px solid ${bankColor}` }}
     >
       {/* Logo */}
-      <div className={`shrink-0 rounded-lg bg-white dark:bg-secondary/40 border border-border/30 flex items-center justify-center overflow-hidden ${sizes.logoBox}`}>
+      <div
+        className={`shrink-0 rounded-lg bg-white dark:bg-secondary/40 border border-border/30 flex items-center justify-center overflow-hidden ${sizes.logoBox}`}
+      >
         {logoUrl ? (
-          <img src={logoUrl} alt={institution} className={`object-contain ${sizes.logoImg} group-hover:scale-110 transition-transform duration-200`} loading="lazy" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+          <img
+            src={logoUrl}
+            alt={brandInstitution || institution}
+            className={`object-contain ${sizes.logoImg} group-hover:scale-110 transition-transform duration-200`}
+            loading="lazy"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.style.display = "none";
+              e.target.nextSibling.style.display = "flex";
+            }}
+          />
         ) : null}
-        {!logoUrl && (isManual ? <Wallet className="h-3.5 w-3.5 text-muted-foreground" /> : <Building2 className="h-3.5 w-3.5 text-muted-foreground" />)}
+        {!logoUrl &&
+          (isManual ? (
+            <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
+          ) : (
+            <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+          ))}
       </div>
 
       {/* Name + type */}
       <div className="flex-1 min-w-0">
-        <p className={`font-medium truncate group-hover:text-emerald transition-colors ${sizes.nameSize}`}>{name}</p>
-        <p className={`text-muted-foreground truncate flex items-center gap-1.5 ${sizes.metaSize}`}>
-          {type && <span className="px-1.5 py-0.5 rounded-md bg-secondary/70 font-medium">{toAccountTypeLabel(type)}</span>}
-          {institution && institution !== name && <span className="truncate">{institution}</span>}
+        <p
+          className={`font-medium truncate group-hover:text-emerald transition-colors ${sizes.nameSize}`}
+        >
+          {name}
+        </p>
+        <p
+          className={`text-muted-foreground truncate flex items-center gap-1.5 ${sizes.metaSize}`}
+        >
+          {type && (
+            <span className="px-1.5 py-0.5 rounded-md bg-secondary/70 font-medium">
+              {toAccountTypeLabel(type)}
+            </span>
+          )}
+          {institution && institution !== name && (
+            <span className="truncate">{institution}</span>
+          )}
         </p>
       </div>
 
       {/* Balance + status */}
       <div className="text-right shrink-0 flex flex-col items-end gap-0.5">
         {showStatus && (
-          <span className={`inline-flex items-center gap-0.5 ${sizes.badgeSize} ${statusInfo.text} font-medium`}>
+          <span
+            className={`inline-flex items-center gap-0.5 ${sizes.badgeSize} ${statusInfo.text} font-medium`}
+          >
             <StatusIcon className={sizes.iconSize} />
             {statusInfo.label}
           </span>
         )}
-        <p className={`font-semibold tracking-tight ${sizes.balanceSize}`}>£{balanceFmt}</p>
+        <p className={`font-semibold tracking-tight ${sizes.balanceSize}`}>
+          £{balanceFmt}
+        </p>
         <p className={`text-muted-foreground ${sizes.metaSize}`}>{ccy}</p>
       </div>
     </Link>
