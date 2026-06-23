@@ -1,12 +1,10 @@
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import { api, formatApiError } from "../lib/api";
-import { Link } from "react-router-dom";
 import { Building2, Loader2, Upload, RefreshCcw, Trash2, AlertCircle, ArrowRight, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, PageHeader, SectionCard } from "../components/ui/layout";
-import Skeleton from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
-import { getBankLogoOrFallback, getBankColor } from "../data/bankLogos";
+import BankCardMockup from "../components/BankCardMockup";
 
 export default function BankStatements() {
   useEffect(() => { document.title = "Bank & Statements | FinanceAI"; }, []);
@@ -155,57 +153,32 @@ export default function BankStatements() {
               <EmptyState icon={Building2} title="No banks connected" description="Connect a bank to automatically import transactions." />
             </div>
           ) : (
-            <ul className="divide-y divide-border">
-              {conns.map((c) => {
-                const bcInst = c.config?.institution || c.account_name || c.nickname || c.provider;
-                const bcColor = getBankColor(bcInst);
-                const bcLogo = getBankLogoOrFallback(bcInst);
-                return (
-                <li key={c.connection_id} className="overflow-hidden border-b border-border/70 last:border-0 hover:bg-secondary/30 transition-colors">
-                  <div className="h-0.5" style={{ background: bcColor }} />
-                  <div className="px-6 py-4 flex items-center justify-between gap-4">
-                    <Link to={`/accounts/${c.connection_id}`} className="flex items-center gap-3 min-w-0 flex-1 group">
-                      <div className="w-10 h-10 rounded-xl bg-white dark:bg-secondary/40 border border-border/30 grid place-items-center shrink-0 group-hover:scale-105 transition-transform overflow-hidden">
-                        {bcLogo ? (
-                          <img src={bcLogo} alt={bcInst} className="h-7 w-7 object-contain" loading="lazy" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
-                        ) : null}
-                        <div className={`${bcLogo ? 'hidden' : 'flex'} items-center justify-center w-7 h-7 rounded-lg bg-secondary text-muted-foreground`}>
-                          <Building2 className="h-3.5 w-3.5" />
-                        </div>
+            <div className="p-4 sm:p-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                {conns.map((c, i) => (
+                  <div key={c.connection_id} className={`fade-up delay-${Math.min(i, 5)}`}>
+                    <BankCardMockup connection={c} size="sm" showStatus />
+                    <div className="mt-2 flex items-center gap-2 justify-between">
+                      <p className="text-[10px] text-muted-foreground">
+                        {c.config?.institution && <span>{c.config.institution}</span>}
+                        {c.last_sync_at && <span>{c.config?.institution ? " · " : ""}synced {new Date(c.last_sync_at).toLocaleDateString()}</span>}
+                      </p>
+                      <div className="flex items-center gap-1.5">
+                        {c.status === "reconnect_required" && (
+                          <button onClick={(e) => { e.preventDefault(); e.stopPropagation();
+                            (async () => { try { const { data } = await api.post(`/truelayer/reconnect/${c.connection_id}`); setTimeout(() => { window.location.href = data.auth_url; }, 600); } catch { toast.error("Reconnect failed"); } })();
+                          }} className="text-xs px-2 py-1 rounded-lg border border-ruby/30 text-ruby hover:bg-ruby/5 transition-colors">Reconnect</button>
+                        )}
+                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeConn(c.connection_id); }}
+                          className="text-xs px-2 py-1 rounded-lg border border-border/50 text-muted-foreground hover:text-ruby hover:border-ruby/30 transition-colors">
+                          <Trash2 className="h-3 w-3 inline mr-1" />Remove
+                        </button>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium truncate group-hover:text-emerald transition-colors">{c.account_name}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {c.config?.institution && <span>{c.config.institution} · </span>}
-                          {c.status === "active" ? <span className="text-emerald">● Active</span> : <span className="text-ruby">● {c.status}</span>}
-                        </p>
-                      </div>
-                    </Link>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {c.balance !== null && (
-                        <div className="text-right mr-2">
-                          <p className="text-base font-semibold tracking-tight">£{c.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                          <p className="text-[10px] text-muted-foreground">{c.balance_currency}</p>
-                        </div>
-                      )}
-                      {c.status === "reconnect_required" && (
-                        <Button variant="danger" size="pillSm" onClick={(e) => {
-                          e.preventDefault(); e.stopPropagation();
-                          (async () => {
-                            try {
-                              const { data } = await api.post(`/truelayer/reconnect/${c.connection_id}`);
-                              setTimeout(() => { window.location.href = data.auth_url; }, 600);
-                            } catch { toast.error("Reconnect failed"); }
-                          })();
-                        }}>Reconnect</Button>
-                      )}
-                      <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeConn(c.connection_id); }} className="h-9 w-9 rounded-full grid place-items-center hover:bg-secondary text-ruby"><Trash2 className="h-4 w-4" /></button>
                     </div>
                   </div>
-                </li>
-                );
-              })}
-            </ul>
+                ))}
+              </div>
+            </div>
           )}
         </SectionCard>
 

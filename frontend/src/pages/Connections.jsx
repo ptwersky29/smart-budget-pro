@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import { api, formatApiError } from "../lib/api";
 import { useSearchParams, Link } from "react-router-dom";
-import { Building2, Loader2, CheckCircle2, XCircle, RefreshCcw, Trash2, ArrowRight, AlertCircle, Clock, Wallet } from "lucide-react";
+import { Building2, Loader2, CheckCircle2, XCircle, RefreshCcw, Trash2, ArrowRight, AlertCircle, Clock, Wallet, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, MetricCard, PageHeader, SectionCard } from "../components/ui/layout";
 import Skeleton from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { getBankLogoOrFallback, getBankColor } from "../data/bankLogos";
+import { getBankColor } from "../data/bankLogos";
+import BankCardMockup from "../components/BankCardMockup";
 
 export default function Connections() {
   useEffect(() => { document.title = "Bank Connections | FinanceAI"; }, []);
@@ -259,76 +260,59 @@ export default function Connections() {
             />
           </div>
         ) : (
-          <ul>
-            {conns.map((c) => {
-              const bcInst = c.config?.institution || c.account_name || c.nickname || c.provider;
-              const bcColor = getBankColor(bcInst);
-              const bcLogo = getBankLogoOrFallback(bcInst);
-              return (
-              <li key={c.connection_id} className="overflow-hidden border-b border-border/70 last:border-0 hover:bg-secondary/30 transition-colors">
-                <div className="h-0.5" style={{ background: bcColor }} />
-                <div className="px-6 py-4 flex items-center justify-between gap-4">
-                  <Link to={`/accounts/${c.connection_id}`} className="flex items-center gap-3 min-w-0 flex-1 group">
-                    <div className="w-10 h-10 rounded-xl bg-white dark:bg-secondary/40 border border-border/30 grid place-items-center shrink-0 group-hover:scale-105 transition-transform overflow-hidden">
-                      {bcLogo ? (
-                        <img src={bcLogo} alt={bcInst} className="h-7 w-7 object-contain" loading="lazy" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
-                      ) : null}
-                      <div className={`${bcLogo ? 'hidden' : 'flex'} items-center justify-center w-7 h-7 rounded-lg bg-secondary text-muted-foreground`}>
-                        <Building2 className="h-3.5 w-3.5" />
-                      </div>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {editingNickname === c.connection_id ? (
-                          <form onSubmit={(e) => { e.preventDefault(); saveNickname(c.connection_id); }} className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              value={nicknameValue}
-                              onChange={(e) => setNicknameValue(e.target.value)}
-                              className="h-8 px-3 rounded-xl bg-secondary/50 border border-border focus:border-ring focus:outline-none text-sm font-medium w-48"
-                              autoFocus
-                            />
-                            <button type="submit" className="text-xs text-emerald font-medium">Save</button>
-                            <button type="button" onClick={() => setEditingNickname(null)} className="text-xs text-muted-foreground">Cancel</button>
-                          </form>
-                        ) : (
-                          <>
-                            <p className="font-medium truncate">{c.account_name}</p>
-                            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingNickname(c.connection_id); setNicknameValue(c.nickname || c.account_name); }} className="text-xs text-muted-foreground hover:text-emerald shrink-0">✎</button>
-                          </>
-                        )}
-                        {c.account_type && <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-secondary/80 text-muted-foreground font-medium">{c.account_type}</span>}
-                        {c.config?.institution && <span className="text-xs text-muted-foreground shrink-0">{c.config.institution}</span>}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
-                        {c.status === "active" ? <span className="text-emerald">● Active</span> : c.status === "reconnect_required" ? <span className="text-ruby">● Reconnect required</span> : <span className="text-topaz">● {c.status}</span>}
-                        {c.import_from_date && <span>from {new Date(c.import_from_date).toLocaleDateString()}</span>}
-                        {c.last_sync_at && <span>synced {new Date(c.last_sync_at).toLocaleString()}</span>}
-                      </p>
-                      {c.last_error && <p className="text-xs text-ruby mt-1 max-w-[48rem] truncate" title={c.last_error}>{c.last_error}</p>}
-                    </div>
-                  </Link>
-                  <div className="flex items-center gap-3 shrink-0">
-                    {c.balance !== null && c.balance !== undefined && (
-                      <div className="text-right">
-                        <p className="text-base font-semibold tracking-tight">£{c.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                        <p className="text-[10px] text-muted-foreground">{c.balance_currency}</p>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2">
-                      {c.status === "reconnect_required" && (
-                        <Button onClick={(e) => { e.preventDefault(); e.stopPropagation(); reconnectConn(c.connection_id); }} data-testid={`reconnect-${c.connection_id}`} variant="danger" size="pill" className="text-xs whitespace-nowrap">
-                          Reconnect
-                        </Button>
+          <div className="p-5 sm:p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+              {conns.map((c, i) => {
+                const bcInst = c.config?.institution || c.account_name || c.nickname || c.provider;
+                const bcColor = getBankColor(bcInst);
+                return (
+                  <div key={c.connection_id} className={`fade-up delay-${Math.min(i, 5)}`}>
+                    <BankCardMockup connection={c} size="md" showStatus />
+                    {/* Actions row below card */}
+                    <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+                      {editingNickname === c.connection_id ? (
+                        <form onSubmit={(e) => { e.preventDefault(); saveNickname(c.connection_id); }} className="flex items-center gap-1.5 w-full">
+                          <input type="text" value={nicknameValue} onChange={(e) => setNicknameValue(e.target.value)}
+                            className="flex-1 h-8 px-2.5 rounded-lg bg-secondary/50 border border-border focus:border-ring focus:outline-none text-xs font-medium" autoFocus />
+                          <button type="submit" className="text-xs text-emerald font-medium shrink-0">Save</button>
+                          <button type="button" onClick={() => setEditingNickname(null)} className="text-xs text-muted-foreground shrink-0">Cancel</button>
+                        </form>
+                      ) : (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <button onClick={(e) => { e.preventDefault(); setEditingNickname(c.connection_id); setNicknameValue(c.nickname || c.account_name); }}
+                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-emerald transition-colors">
+                            <Pencil className="h-3 w-3" /> {c.nickname ? "Edit" : "Rename"}
+                          </button>
+                          <span className="text-xs text-muted-foreground/40">·</span>
+                          {c.status === "active" ? <span className="text-[11px] text-emerald font-medium">● Active</span> : c.status === "reconnect_required" ? <span className="text-[11px] text-ruby font-medium">● Reconnect</span> : <span className="text-[11px] text-topaz">● {c.status}</span>}
+                          {c.import_from_date && <><span className="text-xs text-muted-foreground/40">·</span><span className="text-[11px] text-muted-foreground">from {new Date(c.import_from_date).toLocaleDateString()}</span></>}
+                        </div>
                       )}
-                      <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeConn(c.connection_id); }} data-testid={`remove-${c.connection_id}`} className="h-9 w-9 rounded-full grid place-items-center hover:bg-secondary text-ruby" title="Remove connection"><Trash2 className="h-4 w-4" /></button>
+                    </div>
+                    {c.last_sync_at && !editingNickname && (
+                      <p className="text-[10px] text-muted-foreground mt-1">synced {new Date(c.last_sync_at).toLocaleString()}</p>
+                    )}
+                    {c.last_error && !editingNickname && (
+                      <p className="text-[10px] text-ruby mt-1 truncate" title={c.last_error}>{c.last_error}</p>
+                    )}
+                    {/* Action buttons */}
+                    <div className="mt-2 flex items-center gap-2">
+                      {c.status === "reconnect_required" && (
+                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); reconnectConn(c.connection_id); }}
+                          className="text-xs px-3 py-1.5 rounded-lg border border-ruby/30 text-ruby hover:bg-ruby/5 transition-colors">
+                          Reconnect
+                        </button>
+                      )}
+                      <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeConn(c.connection_id); }}
+                        className="text-xs px-3 py-1.5 rounded-lg border border-border/50 text-muted-foreground hover:text-ruby hover:border-ruby/30 transition-colors">
+                        <Trash2 className="h-3 w-3 inline mr-1" />Remove
+                      </button>
                     </div>
                   </div>
-                </div>
-              </li>
-              );
-            })}
-          </ul>
+                );
+              })}
+            </div>
+          </div>
         )}
       </SectionCard>
 

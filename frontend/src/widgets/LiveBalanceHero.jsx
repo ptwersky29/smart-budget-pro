@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { RefreshCw, Wallet, ChevronUp, ChevronDown } from "lucide-react";
-import BankAccountCard from "../components/BankAccountCard";
+import BankCardMockup from "../components/BankCardMockup";
+import { toAccountTypeLabel } from "../data/bankLogos";
 
 function timeAgo(date) {
   const diff = Math.floor((Date.now() - date) / 1000);
@@ -8,6 +9,21 @@ function timeAgo(date) {
   if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
+}
+
+function groupAccounts(accounts) {
+  const groups = {};
+  const order = [];
+  for (const acct of accounts) {
+    const key = acct.account_type || "other";
+    const label = toAccountTypeLabel(key);
+    if (!groups[key]) {
+      groups[key] = { label, key, accounts: [] };
+      order.push(key);
+    }
+    groups[key].accounts.push(acct);
+  }
+  return order.map((k) => groups[k]);
 }
 
 export default React.memo(function LiveBalanceHero({ overview, truelayerBalance, accounts, trendData, loading, onRefresh, children }) {
@@ -21,6 +37,7 @@ export default React.memo(function LiveBalanceHero({ overview, truelayerBalance,
   const hasAccounts = Array.isArray(accounts) && accounts.length > 0;
   const displayBalance = hasAccounts ? (truelayerBalance ?? overview?.balance ?? 0) : (overview?.balance ?? 0);
   const trend = trendData?.direction === "up";
+  const accountGroups = useMemo(() => hasAccounts ? groupAccounts(accounts) : [], [accounts]);
 
   return (
     <div className="relative overflow-hidden rounded-[1.75rem] border border-border/60 bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-xl shadow-card">
@@ -67,11 +84,20 @@ export default React.memo(function LiveBalanceHero({ overview, truelayerBalance,
           </div>
         </div>
 
-        {/* Account cards — inline row */}
+        {/* Account card groups */}
         {hasAccounts && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {accounts.map((acct) => (
-              <BankAccountCard key={acct.connection_id} account={acct} variant="default" />
+          <div className="mt-6 space-y-5">
+            {accountGroups.map((group, gi) => (
+              <div key={group.key}>
+                <p className="label-overline text-muted-foreground mb-3">{group.label}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                  {group.accounts.map((acct, ai) => (
+                    <div key={acct.connection_id} className={`fade-up delay-${Math.min(gi * 2 + ai, 5)}`}>
+                      <BankCardMockup size="sm" connection={acct} />
+                    </div>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}

@@ -2,21 +2,16 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
 import {
-  ArrowLeft, Building2, Wallet, RefreshCcw, Trash2, Loader2,
-  Clock, Receipt, CreditCard, AlertCircle, CheckCircle2, XCircle, Settings,
+  ArrowLeft, Wallet, RefreshCcw, Trash2, Loader2,
+  Clock, Receipt, CreditCard, Settings,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, MetricCard, SectionCard, EmptyState } from "../components/ui/layout";
 import { SkeletonTable } from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
 import TransactionRow from "../components/TransactionRow";
-import { getBankLogoOrFallback, getBankColor, toAccountTypeLabel } from "../data/bankLogos";
-
-const STATUS_STYLES = {
-  active: { icon: CheckCircle2, color: "text-emerald", bg: "bg-emerald/10", label: "Active" },
-  reconnect_required: { icon: AlertCircle, color: "text-ruby", bg: "bg-ruby/10", label: "Reconnect required" },
-  error: { icon: XCircle, color: "text-ruby", bg: "bg-ruby/10", label: "Error" },
-};
+import { toAccountTypeLabel } from "../data/bankLogos";
+import BankCardMockup from "../components/BankCardMockup";
 
 export default function AccountPage() {
   const { connectionId } = useParams();
@@ -112,11 +107,6 @@ export default function AccountPage() {
 
   if (!conn) return null;
 
-  const institution = conn.config?.institution || conn.account_name || conn.nickname;
-  const logoUrl = getBankLogoOrFallback(institution);
-  const bankColor = getBankColor(institution);
-  const statusInfo = STATUS_STYLES[conn.status] || STATUS_STYLES.active;
-  const StatusIcon = statusInfo.icon;
   const income = txs.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
   const expenses = txs.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
 
@@ -127,65 +117,41 @@ export default function AccountPage() {
         <ArrowLeft className="h-3.5 w-3.5" /> Back
       </button>
 
-      {/* Header card with bank color accent */}
-      <div className="relative overflow-hidden rounded-[1.75rem] border border-border/60 bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-xl shadow-card">
-        <div className="h-1" style={{ background: bankColor }} />
-        <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full blur-3xl pointer-events-none" style={{ background: `${bankColor}15` }} />
-        <div className="absolute -bottom-20 -left-20 w-48 h-48 rounded-full blur-3xl pointer-events-none" style={{ background: `${bankColor}08` }} />
-        <div className="relative p-5 sm:p-6 lg:p-8">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-            {/* Bank logo */}
-            <div className="h-14 w-14 rounded-2xl bg-white dark:bg-secondary/40 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
-              {logoUrl ? (
-                <img src={logoUrl} alt={institution || conn.account_name} className="h-10 w-10 object-contain" />
-              ) : (
-                <Building2 className="h-6 w-6 text-muted-foreground" />
-              )}
+      {/* Bank card mockup header */}
+      <div className={`fade-up`}>
+        <BankCardMockup connection={conn} size="lg" showStatus />
+
+        {/* Nickname + stats row below card */}
+        <div className="mt-3 flex items-center gap-3 flex-wrap">
+          {editingNickname ? (
+            <form onSubmit={(e) => { e.preventDefault(); saveNickname(); }} className="flex items-center gap-1.5">
+              <input type="text" value={nicknameValue} onChange={(e) => setNicknameValue(e.target.value)}
+                className="h-8 px-2.5 rounded-lg bg-secondary/50 border border-border focus:border-ring focus:outline-none text-sm font-medium w-48" autoFocus />
+              <button type="submit" className="text-xs text-emerald font-medium">Save</button>
+              <button type="button" onClick={() => setEditingNickname(false)} className="text-xs text-muted-foreground">Cancel</button>
+            </form>
+          ) : (
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg sm:text-xl font-semibold tracking-tight">{conn.account_name}</h1>
+              <button onClick={() => { setEditingNickname(true); setNicknameValue(conn.nickname || conn.account_name || ""); }}
+                className="text-xs text-muted-foreground hover:text-emerald transition-colors" title="Edit nickname">
+                <Settings className="h-3.5 w-3.5" />
+              </button>
             </div>
-            {/* Info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                {editingNickname ? (
-                  <form onSubmit={(e) => { e.preventDefault(); saveNickname(); }} className="flex items-center gap-2">
-                    <input
-                      type="text" value={nicknameValue}
-                      onChange={(e) => setNicknameValue(e.target.value)}
-                      className="h-9 px-3 rounded-xl bg-secondary/50 border border-border focus:border-ring focus:outline-none text-lg font-semibold w-64"
-                      autoFocus
-                    />
-                    <button type="submit" className="text-xs text-emerald font-medium">Save</button>
-                    <button type="button" onClick={() => setEditingNickname(false)} className="text-xs text-muted-foreground">Cancel</button>
-                  </form>
-                ) : (
-                  <h1 className="text-xl sm:text-2xl font-semibold tracking-tight truncate">
-                    {conn.account_name}
-                  </h1>
-                )}
-                <button onClick={() => { setEditingNickname(true); setNicknameValue(conn.nickname || conn.account_name || ""); }}
-                  className="text-xs text-muted-foreground hover:text-emerald shrink-0" title="Edit nickname">
-                  <Settings className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              <div className="flex items-center gap-2 mt-1 flex-wrap">
-                {institution && <span className="text-sm text-muted-foreground">{institution}</span>}
-                {conn.account_type && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-secondary/80 text-muted-foreground">{toAccountTypeLabel(conn.account_type)}</span>
-                )}
-                <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${statusInfo.bg} ${statusInfo.color}`}>
-                  <StatusIcon className="h-3 w-3" /> {statusInfo.label}
-                </span>
-              </div>
-            </div>
-            {/* Balance */}
-            {conn.balance !== null && conn.balance !== undefined && (
-              <div className="text-right shrink-0">
-                <p className="text-2xl sm:text-3xl font-semibold tracking-tight">
-                  £{conn.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">{conn.balance_currency || "GBP"}</p>
-              </div>
-            )}
-          </div>
+          )}
+        </div>
+
+        {/* Income / Expenses chips */}
+        <div className="mt-3 flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-emerald/10 text-emerald font-medium">
+            +£{income.toLocaleString(undefined, { minimumFractionDigits: 2 })} income
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-ruby/10 text-ruby font-medium">
+            -£{expenses.toLocaleString(undefined, { minimumFractionDigits: 2 })} spending
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-secondary/80 text-muted-foreground">
+            {totalTx} transaction{totalTx !== 1 ? "s" : ""}
+          </span>
         </div>
       </div>
 
