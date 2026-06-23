@@ -40,22 +40,29 @@ export default function Connections() {
     if (pollAbortRef.current) pollAbortRef.current.abort();
     const controller = new AbortController();
     pollAbortRef.current = controller;
+    // Load each endpoint independently so one failure doesn't block the other
     try {
-      const [connRes, manualRes] = await Promise.all([
-        api.get("/truelayer/connections", { signal: controller.signal }),
-        api.get("/accounts/manual", { signal: controller.signal }),
-      ]);
-      if (controller.signal.aborted) return;
-      setConns(connRes.data.connections);
-      setManualAccounts(manualRes.data.accounts);
-      setSyncLogs(connRes.data.recent_syncs);
-      setTotalTx(connRes.data.total_transactions);
+      const connRes = await api.get("/truelayer/connections", { signal: controller.signal });
+      if (!controller.signal.aborted) {
+        setConns(connRes.data.connections || []);
+        setSyncLogs(connRes.data.recent_syncs || []);
+        setTotalTx(connRes.data.total_transactions || 0);
+      }
     } catch (err) {
       if (err?.name === "CanceledError" || err?.code === "ERR_CANCELED") return;
       if (err.response?.status === 500 && err.response?.data?.detail?.includes("configured")) {
         setNeedsSetup(true);
       }
-      console.error("connections load failed", err);
+      console.error("truelayer connections load failed", err);
+    }
+    try {
+      const manualRes = await api.get("/accounts/manual", { signal: controller.signal });
+      if (!controller.signal.aborted) {
+        setManualAccounts(manualRes.data.accounts || []);
+      }
+    } catch (err) {
+      if (err?.name === "CanceledError" || err?.code === "ERR_CANCELED") return;
+      console.error("manual accounts load failed", err);
     }
   }, []);
 
