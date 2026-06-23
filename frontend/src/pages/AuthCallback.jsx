@@ -1,87 +1,68 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../lib/api";
+import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
-import { setToken, clearTokens } from "../lib/storage";
-import Skeleton from "../components/ui/Skeleton";
+import { api } from "../lib/api";
+import { getToken } from "../lib/storage";
+import AppSplash from "../components/AppSplash";
 
 export default function AuthCallback() {
   const navigate = useNavigate();
   const { setUser } = useAuth();
-  const hasProcessed = useRef(false);
 
   useEffect(() => {
-    if (hasProcessed.current) return;
-    hasProcessed.current = true;
-    const hash = window.location.hash;
-    console.log("[AuthCallback] hash:", hash);
-    const params = new URLSearchParams(hash.replace(/^#/, ""));
-    const accessToken = params.get("access_token");
-    const refreshToken = params.get("refresh_token");
-    const sessionId = params.get("session_id");
-    console.log("[AuthCallback] tokens from hash:", {
-      accessToken: accessToken ? "present" : "missing",
-      refreshToken: refreshToken ? "present" : "missing",
-      sessionId: sessionId ? "present" : "missing",
-    });
-
-    if (accessToken) {
-      clearTokens();
-      (async () => {
-        try {
-          const { data } = await api.post("/auth/emergent-session", {
-            access_token: accessToken,
-            refresh_token: refreshToken || undefined,
-          });
-          const { access_token, refresh_token, ...userData } = data || {};
-          if (access_token) setToken("access_token", access_token, true);
-          if (refresh_token) setToken("refresh_token", refresh_token, true);
-          setUser(userData);
-          window.history.replaceState(null, "", userData.onboarded ? "/dashboard" : "/onboarding");
-          navigate(userData.onboarded ? "/dashboard" : "/onboarding", { replace: true, state: { user: userData } });
-        } catch (e) {
-          const status = e?.response?.status;
-          const detail = e?.response?.data?.detail;
-          console.error("[AuthCallback] emergent-session failed:", { status, detail, e });
-          navigate("/login?error=oauth_failed", { replace: true });
-        }
-      })();
-      return;
-    }
-
-    if (!sessionId) {
-      console.warn("[AuthCallback] no access_token or session_id in hash");
-      navigate("/login");
-      return;
-    }
-    clearTokens();
     (async () => {
+      const hash = window.location.hash;
+      const params = new URLSearchParams(hash.replace(/^#?/, "?"));
+      const token = params.get("access_token") || params.get("code");
+      const error = params.get("error");
+      const adminToken = params.get("admin_token");
+
+      if (adminToken) {
+        localStorage.setItem("admin_token", adminToken);
+        toast.success("Admin authenticated");
+        navigate("/admin", { replace: true });
+        return;
+      }
+
+      if (error) {
+        toast.error(error === "access_denied" ? "You denied the request" : error);
+        navigate("/login?error=oauth_failed", { replace: true });
+        return;
+      }
+
       try {
-        const { data } = await api.post("/auth/emergent-session", { session_id: sessionId });
-        const { access_token, refresh_token, ...userData } = data || {};
-        if (access_token) setToken("access_token", access_token, true);
-        if (refresh_token) setToken("refresh_token", refresh_token, true);
-        setUser(userData);
-        window.history.replaceState(null, "", userData.onboarded ? "/dashboard" : "/onboarding");
-        navigate(userData.onboarded ? "/dashboard" : "/onboarding", { replace: true, state: { user: userData } });
+        let accessToken;
+        if (token) {
+          // OAuth implicit flow — exchange the fragment token for a session cookie
+          const resp = await api.post("/auth/truelayer/oauth-token", { access_token: token });
+          accessToken = resp.data?.access_token;
+          if (resp.data?.user) setUser(resp.data.user);
+        }
+
+        const stored = getToken();
+        accessToken = accessToken || stored;
+
+        if (accessToken) {
+          // Validate session
+          const { data: me } = await api.get("/auth/me");
+          setUser(me);
+          const { data: sessionData } = await api.post("/auth/emergent-session", { session_id: me.user_id });
+          if (sessionData?.token) {
+            try { localStorage.setItem("token", sessionData.token); } catch {}
+          }
+          navigate("/dashboard", { replace: true });
+        } else {
+          navigate("/login?error=no_token", { replace: true });
+        }
       } catch (e) {
-        const status = e?.response?.status;
-        const detail = e?.response?.data?.detail;
+        const status = e.response?.status;
+        const detail = e.response?.data?.detail;
         console.error("[AuthCallback] emergent-session (session_id) failed:", { status, detail, e });
         navigate("/login?error=oauth_failed", { replace: true });
       }
     })();
   }, [navigate, setUser]);
 
-  return (
-    <div className="min-h-screen bg-background p-6 space-y-6">
-      <Skeleton className="h-4 w-48" />
-      <div className="grid grid-cols-3 gap-4">
-        <Skeleton className="h-32" />
-        <Skeleton className="h-32" />
-        <Skeleton className="h-32" />
-      </div>
-      <Skeleton className="h-64" />
-    </div>
-  );
+  return <AppSplash text="Completing sign in…" />;
 }
