@@ -154,5 +154,7 @@ export function toAccountTypeLabel(type) {
   if (type.includes("credit")) return "Credit Card";
   if (type.includes("savings")) return "Savings";
   if (type.includes("current") || type.includes("retail")) return "Current Account";
+  if (type === "cash") return "Cash";
+  if (type === "investment") return "Investment";
   return type.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 }

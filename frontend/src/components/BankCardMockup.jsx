@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Building2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Building2, Wallet, CheckCircle2, AlertCircle } from "lucide-react";
 import { getBankLogoOrFallback, getBankColor, toAccountTypeLabel } from "../data/bankLogos";
 
 const STATUS_CONFIG = {
@@ -10,9 +10,12 @@ const STATUS_CONFIG = {
 
 function BankCardMockup({ connection, size = "sm", showStatus = false }) {
   const c = connection;
+  const isManual = c.provider === "manual";
+  const customImage = c.config?.image;
+  const customColor = c.config?.color;
   const institution = c.config?.institution || c.account_name || c.nickname || c.provider;
-  const logoUrl = getBankLogoOrFallback(institution);
-  const bankColor = getBankColor(institution);
+  const logoUrl = customImage || getBankLogoOrFallback(institution);
+  const bankColor = customColor || getBankColor(institution);
   const name = c.nickname || c.account_name || "Bank Account";
   const balance = c.balance ?? 0;
   const ccy = c.balance_currency || "GBP";
@@ -40,7 +43,7 @@ function BankCardMockup({ connection, size = "sm", showStatus = false }) {
         {logoUrl ? (
           <img src={logoUrl} alt={institution} className={`object-contain ${sizes.logoImg} group-hover:scale-110 transition-transform duration-200`} loading="lazy" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
         ) : null}
-        {!logoUrl && <Building2 className="h-3.5 w-3.5 text-muted-foreground" />}
+        {!logoUrl && (isManual ? <Wallet className="h-3.5 w-3.5 text-muted-foreground" /> : <Building2 className="h-3.5 w-3.5 text-muted-foreground" />)}
       </div>
 
       {/* Name + type */}

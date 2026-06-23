@@ -49,6 +49,7 @@ import analytics
 import empty_states
 import budget_system
 import notifications
+import manual_accounts
 from exceptions import FinanceAIError
 from rate_limit import RateLimiter, RateLimitMiddleware, CsrfProtectionMiddleware
 from middleware import ErrorMonitorMiddleware, RequestTimerMiddleware, RequestIdMiddleware, SecurityHeadersMiddleware
@@ -190,6 +191,7 @@ api.include_router(analytics.build_router())
 api.include_router(empty_states.build_router())
 api.include_router(budget_system.build_router())
 api.include_router(notifications.router)
+api.include_router(manual_accounts.build_router())
 
 app.include_router(api)
 

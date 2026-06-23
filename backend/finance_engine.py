@@ -373,7 +373,7 @@ SOURCE_LABELS = {
 def _tx_to_dict(t: Transaction, institution_map: dict = None, label_map: dict = None) -> dict:
     source_label = SOURCE_LABELS.get(t.source, t.source)
     institution = None
-    if t.source == "truelayer" and t.connection_id:
+    if t.connection_id:
         if label_map and t.connection_id in label_map:
             source_label = label_map[t.connection_id]
         elif institution_map and t.connection_id in institution_map:

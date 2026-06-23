@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import { api, formatApiError } from "../lib/api";
 import { useSearchParams, Link } from "react-router-dom";
-import { Building2, Loader2, CheckCircle2, XCircle, RefreshCcw, Trash2, ArrowRight, AlertCircle, Clock, Wallet, Pencil } from "lucide-react";
+import { Building2, Loader2, CheckCircle2, XCircle, RefreshCcw, Trash2, ArrowRight, AlertCircle, Clock, Wallet, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, MetricCard, PageHeader, SectionCard } from "../components/ui/layout";
 import Skeleton from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import BankCardMockup from "../components/BankCardMockup";
+import AddManualAccountModal from "../components/AddManualAccountModal";
 
 export default function Connections() {
   useEffect(() => { document.title = "Bank Connections | FinanceAI"; }, []);
@@ -15,6 +16,7 @@ export default function Connections() {
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState(null);
   const [conns, setConns] = useState([]);
+  const [manualAccounts, setManualAccounts] = useState([]);
   const [syncLogs, setSyncLogs] = useState([]);
   const [totalTx, setTotalTx] = useState(0);
   const [syncing, setSyncing] = useState(false);
@@ -28,6 +30,9 @@ export default function Connections() {
   });
   const [editingNickname, setEditingNickname] = useState(null);
   const [nicknameValue, setNicknameValue] = useState("");
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [editingBalance, setEditingBalance] = useState(null);
+  const [balanceValue, setBalanceValue] = useState("");
   const pollingRef = useRef(null);
   const pollAbortRef = useRef(null);
 
@@ -36,11 +41,15 @@ export default function Connections() {
     const controller = new AbortController();
     pollAbortRef.current = controller;
     try {
-      const { data } = await api.get("/truelayer/connections", { signal: controller.signal });
+      const [connRes, manualRes] = await Promise.all([
+        api.get("/truelayer/connections", { signal: controller.signal }),
+        api.get("/accounts/manual", { signal: controller.signal }),
+      ]);
       if (controller.signal.aborted) return;
-      setConns(data.connections);
-      setSyncLogs(data.recent_syncs);
-      setTotalTx(data.total_transactions);
+      setConns(connRes.data.connections);
+      setManualAccounts(manualRes.data.accounts);
+      setSyncLogs(connRes.data.recent_syncs);
+      setTotalTx(connRes.data.total_transactions);
     } catch (err) {
       if (err?.name === "CanceledError" || err?.code === "ERR_CANCELED") return;
       if (err.response?.status === 500 && err.response?.data?.detail?.includes("configured")) {
@@ -62,8 +71,9 @@ export default function Connections() {
     } finally { setSyncing(false); }
   }, [load]);
 
+  const allAccounts = [...conns, ...manualAccounts];
   const reconnectCount = conns.filter((c) => c.status === "reconnect_required").length;
-  const totalBalance = conns.reduce((sum, c) => sum + (c.balance || 0), 0);
+  const totalBalance = allAccounts.reduce((sum, c) => sum + (c.balance || 0), 0);
 
   useEffect(() => {
     const s = params.get("status");
@@ -176,6 +186,22 @@ export default function Connections() {
   const removeConn = async (id) => {
     try { await api.delete(`/truelayer/connections/${id}`); toast.success("Connection removed"); await load(); }
     catch (err) { console.error(err); toast.error("Could not remove"); }
+  };
+
+  const removeManual = async (id) => {
+    try { await api.delete(`/accounts/manual/${id}`); toast.success("Manual account removed"); await load(); }
+    catch (err) { console.error(err); toast.error("Could not remove"); }
+  };
+
+  const saveManualBalance = async (id) => {
+    try {
+      await api.put(`/accounts/manual/${id}`, { balance: parseFloat(balanceValue) || 0 });
+      toast.success("Balance updated");
+      setEditingBalance(null);
+      await load();
+    } catch (e) {
+      toast.error("Failed to update balance");
+    }
   };
 
   return (
@@ -313,6 +339,68 @@ export default function Connections() {
           </div>
         )}
       </SectionCard>
+
+      {/* Manual Accounts Section */}
+      <SectionCard eyebrow="Manual accounts" title={`${manualAccounts.length} manual account${manualAccounts.length !== 1 ? "s" : ""}`}
+        description="Track cash, wallets, or bank balances without Open Banking."
+        actions={
+          <Button onClick={() => setShowManualModal(true)} variant="outlinePill" size="pill">
+            <Plus className="h-4 w-4 mr-1.5" /> Add Account
+          </Button>
+        }
+        contentClassName="p-0"
+      >
+        {manualAccounts.length === 0 ? (
+          <div className="p-6">
+            <EmptyState icon={Wallet}
+              title="No manual accounts yet"
+              description="Add cash, savings, or any account you want to track manually."
+            />
+          </div>
+        ) : (
+          <div className="p-5 sm:p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+              {manualAccounts.map((c, i) => (
+                <div key={c.connection_id} className={`fade-up delay-${Math.min(i, 5)}`}>
+                  <BankCardMockup connection={c} size="sm" />
+                  {/* Inline balance editing */}
+                  <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+                    {editingBalance === c.connection_id ? (
+                      <form onSubmit={(e) => { e.preventDefault(); saveManualBalance(c.connection_id); }} className="flex items-center gap-1.5 w-full">
+                        <span className="text-xs text-muted-foreground">£</span>
+                        <input type="number" value={balanceValue} onChange={(e) => setBalanceValue(e.target.value)}
+                          step="0.01" className="flex-1 h-8 px-2.5 rounded-lg bg-secondary/50 border border-border focus:border-ring focus:outline-none text-xs font-medium" autoFocus />
+                        <button type="submit" className="text-xs text-emerald font-medium shrink-0">Save</button>
+                        <button type="button" onClick={() => setEditingBalance(null)} className="text-xs text-muted-foreground shrink-0">Cancel</button>
+                      </form>
+                    ) : (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button onClick={() => { setEditingBalance(c.connection_id); setBalanceValue(c.balance ?? ""); }}
+                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-emerald transition-colors">
+                          <Pencil className="h-3 w-3" /> Update Balance
+                        </button>
+                        <span className="text-xs text-muted-foreground/40">·</span>
+                        <span className="text-[11px] text-emerald font-medium">● Active</span>
+                      </div>
+                    )}
+                  </div>
+                  {c.balance_updated_at && (
+                    <p className="text-[10px] text-muted-foreground mt-1">updated {new Date(c.balance_updated_at).toLocaleString()}</p>
+                  )}
+                  <div className="mt-2 flex items-center gap-2">
+                    <button onClick={() => removeManual(c.connection_id)}
+                      className="text-xs px-3 py-1.5 rounded-lg border border-border/50 text-muted-foreground hover:text-ruby hover:border-ruby/30 transition-colors">
+                      <Trash2 className="h-3 w-3 inline mr-1" />Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </SectionCard>
+
+      <AddManualAccountModal open={showManualModal} onClose={() => setShowManualModal(false)} onCreated={() => load()} />
 
       {syncLogs.length > 0 && (
         <SectionCard eyebrow="Sync history" title="Recent transaction sync activity" contentClassName="p-0">
