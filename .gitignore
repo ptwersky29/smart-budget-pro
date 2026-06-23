@@ -29,6 +29,7 @@ out/
 *.tar.gz
 *.tar
 *.tgz
+*.db
 .cache/
 .vercel
 memory/test_credentials.md
