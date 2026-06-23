@@ -2,7 +2,7 @@ const LOCAL_BASE = "/bank-logos";
 const TRUSTLY_BASE = "https://content.trustly.com/logos/banks/GB";
 
 export const BANK_LOGOS = {
-  "NatWest":               { color: "#4f0599", name: "NatWest",               file: "natwest.svg", trustly: "nwbk" },
+  "NatWest":               { color: "#4f0599", name: "NatWest",               file: "natwest.svg" },
   "Barclays":              { color: "#00aeef", name: "Barclays",              file: "barclays.svg", trustly: "barc" },
   "HSBC":                  { color: "#db0011", name: "HSBC",                  file: "hsbc.svg", trustly: "midl" },
   "Santander":             { color: "#ec0000", name: "Santander",             file: "santander.svg", trustly: "abby" },
@@ -47,6 +47,7 @@ const ALIASES = {
   "rbs": "royalbankofscotland",
   "natwestgroup": "natwest",
   "natwestgb": "natwest",
+  "mynatwest": "natwest",
   "bankofscotland": "bankofscotland",
   "bankofscotlandplc": "bankofscotland",
   "halifaxgb": "halifax",
