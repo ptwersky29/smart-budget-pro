@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { BACKEND_URL, formatApiError } from "../lib/api";
+import { api, BACKEND_URL, formatApiError } from "../lib/api";
 import { toast } from "sonner";
 import { Loader2, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { Button } from "../components/ui/button";

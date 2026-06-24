@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
 import { api } from "../lib/api";
-import { getToken } from "../lib/storage";
+import { setToken, getToken } from "../lib/storage";
 import AppSplash from "../components/AppSplash";
 
 export default function AuthCallback() {
@@ -14,12 +14,13 @@ export default function AuthCallback() {
     (async () => {
       const hash = window.location.hash;
       const params = new URLSearchParams(hash.replace(/^#?/, "?"));
-      const token = params.get("access_token") || params.get("code");
+      const accessToken = params.get("access_token");
+      const refreshToken = params.get("refresh_token");
       const error = params.get("error");
       const adminToken = params.get("admin_token");
 
       if (adminToken) {
-        localStorage.setItem("admin_token", adminToken);
+        setToken("admin_token", adminToken, true);
         toast.success("Admin authenticated");
         navigate("/admin", { replace: true });
         return;
@@ -31,35 +32,25 @@ export default function AuthCallback() {
         return;
       }
 
+      // Save tokens from hash fragment immediately (Google OAuth or direct login)
+      if (accessToken) {
+        setToken("access_token", accessToken, true);
+        if (refreshToken) setToken("refresh_token", refreshToken, true);
+        window.location.hash = "";
+      }
+
       try {
-        let accessToken;
-        if (token) {
-          // OAuth implicit flow — exchange the fragment token for a session cookie
-          const resp = await api.post("/auth/truelayer/oauth-token", { access_token: token });
-          accessToken = resp.data?.access_token;
-          if (resp.data?.user) setUser(resp.data.user);
-        }
-
-        const stored = getToken();
-        accessToken = accessToken || stored;
-
-        if (accessToken) {
-          // Validate session
+        const stored = getToken("access_token");
+        if (stored) {
           const { data: me } = await api.get("/auth/me");
           setUser(me);
-          const { data: sessionData } = await api.post("/auth/emergent-session", { session_id: me.user_id });
-          if (sessionData?.token) {
-            try { localStorage.setItem("token", sessionData.token); } catch {}
-          }
           navigate("/dashboard", { replace: true });
         } else {
           navigate("/login?error=no_token", { replace: true });
         }
       } catch (e) {
-        const status = e.response?.status;
-        const detail = e.response?.data?.detail;
-        console.error("[AuthCallback] emergent-session (session_id) failed:", { status, detail, e });
-        navigate("/login?error=oauth_failed", { replace: true });
+        console.error("[AuthCallback] session validation failed:", e?.response?.status, e?.response?.data?.detail);
+        navigate("/login?error=auth_failed", { replace: true });
       }
     })();
   }, [navigate, setUser]);

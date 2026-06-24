@@ -202,9 +202,9 @@ def _user_to_dict(u: User) -> dict:
         "subscription_status": u.subscription_status,
         "free_trial_end": free_trial_end,
         "created_at": u.created_at.isoformat() if u.created_at else None,
-        "onboarded": u.onboarded,
+        "onboarded": u.onboarded or False,
         "preferences": u.preferences or {},
-        "disabled": u.disabled,
+        "disabled": u.disabled or False,
         "email_verified": u.email_verified or False,
     }
 
@@ -748,7 +748,7 @@ def build_router() -> APIRouter:
             frontend_url = os.environ.get("FRONTEND_URL", "").rstrip("/")
             if not frontend_url:
                 raise HTTPException(500, "FRONTEND_URL not configured")
-            redirect_url = f"{frontend_url}/dashboard?access_token={urllib.parse.quote(access, safe='')}&refresh_token={urllib.parse.quote(refresh, safe='')}"
+            redirect_url = f"{frontend_url}/callback#access_token={urllib.parse.quote(access, safe='')}&refresh_token={urllib.parse.quote(refresh, safe='')}"
             resp = RedirectResponse(url=redirect_url)
             set_auth_cookies(resp, access, refresh)
             return resp

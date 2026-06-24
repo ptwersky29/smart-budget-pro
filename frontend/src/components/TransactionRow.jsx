@@ -27,6 +27,7 @@ import {
   getBankColor,
   pickBankInstitution,
 } from "../data/bankLogos";
+import CategoryBadge from "./CategoryBadge";
 
 const TransactionRow = React.memo(
   ({
@@ -87,10 +88,12 @@ const TransactionRow = React.memo(
                 )}
             </td>
             <td className="px-6 py-3">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs px-2 py-1 rounded-full bg-secondary capitalize">
-                  {t.category || "uncategorized"}
-                </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <CategoryBadge
+                  category={t.category || "uncategorized"}
+                  size="sm"
+                  truncate
+                />
                 {t.source_label && (
                   <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                     {brandInstitution && (

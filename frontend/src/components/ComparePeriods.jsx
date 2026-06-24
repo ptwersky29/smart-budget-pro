@@ -1,9 +1,17 @@
 import React, { useState } from "react";
 import { api, formatApiError } from "../lib/api";
-import { BarChart3, Loader2, X, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import {
+  BarChart3,
+  Loader2,
+  X,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import CategoryBadge from "./CategoryBadge";
 
 const fmt = (n) => `£${Number(n || 0).toFixed(2)}`;
 
@@ -43,24 +51,39 @@ export default function ComparePeriods({ open, onClose }) {
     try {
       const { data } = await api.get("/analytics/compare-periods", {
         params: {
-          period_a_from: aFrom, period_a_to: aTo,
-          period_b_from: bFrom, period_b_to: bTo,
+          period_a_from: aFrom,
+          period_a_to: aTo,
+          period_b_from: bFrom,
+          period_b_to: bTo,
         },
       });
       setResult(data);
     } catch (e) {
-      toast.error(formatApiError(e?.response?.data?.detail) || "Comparison failed");
+      toast.error(
+        formatApiError(e?.response?.data?.detail) || "Comparison failed",
+      );
+    } finally {
+      setLoading(false);
     }
-    finally { setLoading(false); }
   };
 
   const ChangeBadge = ({ pct }) => {
-    if (pct == null || isNaN(pct)) return <Minus className="h-4 w-4 text-muted-foreground" />;
+    if (pct == null || isNaN(pct))
+      return <Minus className="h-4 w-4 text-muted-foreground" />;
     const isGood = pct < 0;
     return (
-      <span className={`inline-flex items-center gap-1 text-xs font-medium ${isGood ? "text-emerald" : pct > 0 ? "text-ruby" : "text-muted-foreground"}`}>
-        {pct > 0 ? <TrendingUp className="h-3 w-3" /> : pct < 0 ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
-        {isGood ? "" : "+"}{pct.toFixed(1)}%
+      <span
+        className={`inline-flex items-center gap-1 text-xs font-medium ${isGood ? "text-emerald" : pct > 0 ? "text-ruby" : "text-muted-foreground"}`}
+      >
+        {pct > 0 ? (
+          <TrendingUp className="h-3 w-3" />
+        ) : pct < 0 ? (
+          <TrendingDown className="h-3 w-3" />
+        ) : (
+          <Minus className="h-3 w-3" />
+        )}
+        {isGood ? "" : "+"}
+        {pct.toFixed(1)}%
       </span>
     );
   };
@@ -68,14 +91,30 @@ export default function ComparePeriods({ open, onClose }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={onClose} role="dialog" aria-modal="true" aria-label="Compare periods">
-      <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Compare periods"
+    >
+      <div
+        className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <BarChart3 className="h-5 w-5 text-topaz" />
-            <h3 className="text-xl tracking-tight font-medium">Compare Periods</h3>
+            <h3 className="text-xl tracking-tight font-medium">
+              Compare Periods
+            </h3>
           </div>
-          <button onClick={onClose} className="p-3 rounded-lg hover:bg-secondary text-muted-foreground"><X className="h-4 w-4" /></button>
+          <button
+            onClick={onClose}
+            className="p-3 rounded-lg hover:bg-secondary text-muted-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Date range inputs */}
@@ -85,13 +124,21 @@ export default function ComparePeriods({ open, onClose }) {
             <div className="space-y-2">
               <div>
                 <label className="text-xs text-muted-foreground">From</label>
-                <Input type="date" value={aFrom} onChange={(e) => setAFrom(e.target.value)}
-                  className="w-full" />
+                <Input
+                  type="date"
+                  value={aFrom}
+                  onChange={(e) => setAFrom(e.target.value)}
+                  className="w-full"
+                />
               </div>
               <div>
                 <label className="text-xs text-muted-foreground">To</label>
-                <Input type="date" value={aTo} onChange={(e) => setATo(e.target.value)}
-                  className="w-full" />
+                <Input
+                  type="date"
+                  value={aTo}
+                  onChange={(e) => setATo(e.target.value)}
+                  className="w-full"
+                />
               </div>
             </div>
           </div>
@@ -100,20 +147,37 @@ export default function ComparePeriods({ open, onClose }) {
             <div className="space-y-2">
               <div>
                 <label className="text-xs text-muted-foreground">From</label>
-                <Input type="date" value={bFrom} onChange={(e) => setBFrom(e.target.value)}
-                  className="w-full" />
+                <Input
+                  type="date"
+                  value={bFrom}
+                  onChange={(e) => setBFrom(e.target.value)}
+                  className="w-full"
+                />
               </div>
               <div>
                 <label className="text-xs text-muted-foreground">To</label>
-                <Input type="date" value={bTo} onChange={(e) => setBTo(e.target.value)}
-                  className="w-full" />
+                <Input
+                  type="date"
+                  value={bTo}
+                  onChange={(e) => setBTo(e.target.value)}
+                  className="w-full"
+                />
               </div>
             </div>
           </div>
         </div>
 
-        <Button variant="warning" size="pill" onClick={compare} disabled={loading}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <BarChart3 className="h-4 w-4 mr-2" />}
+        <Button
+          variant="warning"
+          size="pill"
+          onClick={compare}
+          disabled={loading}
+        >
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          ) : (
+            <BarChart3 className="h-4 w-4 mr-2" />
+          )}
           {loading ? "Comparing…" : "Compare"}
         </Button>
 
@@ -123,31 +187,65 @@ export default function ComparePeriods({ open, onClose }) {
             {/* Side-by-side stats */}
             <div className="grid md:grid-cols-2 gap-4">
               <div className="rounded-2xl border border-border bg-card/80 p-4">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">{result.period_a.label}</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">
+                  {result.period_a.label}
+                </p>
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Income</span><span className="font-medium text-emerald">{fmt(result.period_a.income)}</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Spend</span><span className="font-medium text-ruby">{fmt(result.period_a.spend)}</span></div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Income</span>
+                    <span className="font-medium text-emerald">
+                      {fmt(result.period_a.income)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Spend</span>
+                    <span className="font-medium text-ruby">
+                      {fmt(result.period_a.spend)}
+                    </span>
+                  </div>
                   <div className="flex justify-between text-sm border-t border-border pt-2">
                     <span className="text-muted-foreground">Net</span>
-                    <span className={`font-medium ${result.period_a.income - result.period_a.spend >= 0 ? "text-emerald" : "text-ruby"}`}>
+                    <span
+                      className={`font-medium ${result.period_a.income - result.period_a.spend >= 0 ? "text-emerald" : "text-ruby"}`}
+                    >
                       {fmt(result.period_a.income - result.period_a.spend)}
                     </span>
                   </div>
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Transactions</span><span className="font-medium">{result.period_a.count}</span></div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Transactions</span>
+                    <span className="font-medium">{result.period_a.count}</span>
+                  </div>
                 </div>
               </div>
               <div className="rounded-2xl border border-border bg-card/80 p-4">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">{result.period_b.label}</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">
+                  {result.period_b.label}
+                </p>
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Income</span><span className="font-medium text-emerald">{fmt(result.period_b.income)}</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Spend</span><span className="font-medium text-ruby">{fmt(result.period_b.spend)}</span></div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Income</span>
+                    <span className="font-medium text-emerald">
+                      {fmt(result.period_b.income)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Spend</span>
+                    <span className="font-medium text-ruby">
+                      {fmt(result.period_b.spend)}
+                    </span>
+                  </div>
                   <div className="flex justify-between text-sm border-t border-border pt-2">
                     <span className="text-muted-foreground">Net</span>
-                    <span className={`font-medium ${result.period_b.income - result.period_b.spend >= 0 ? "text-emerald" : "text-ruby"}`}>
+                    <span
+                      className={`font-medium ${result.period_b.income - result.period_b.spend >= 0 ? "text-emerald" : "text-ruby"}`}
+                    >
                       {fmt(result.period_b.income - result.period_b.spend)}
                     </span>
                   </div>
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Transactions</span><span className="font-medium">{result.period_b.count}</span></div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Transactions</span>
+                    <span className="font-medium">{result.period_b.count}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -155,11 +253,15 @@ export default function ComparePeriods({ open, onClose }) {
             {/* Change summary */}
             <div className="grid grid-cols-2 gap-4">
               <div className="rounded-xl bg-secondary/30 p-4 flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Spend change</span>
+                <span className="text-sm text-muted-foreground">
+                  Spend change
+                </span>
                 <ChangeBadge pct={result.spend_change_pct} />
               </div>
               <div className="rounded-xl bg-secondary/30 p-4 flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Income change</span>
+                <span className="text-sm text-muted-foreground">
+                  Income change
+                </span>
                 <ChangeBadge pct={result.income_change_pct} />
               </div>
             </div>
@@ -173,18 +275,33 @@ export default function ComparePeriods({ open, onClose }) {
                     <thead>
                       <tr className="text-left text-xs text-muted-foreground border-b border-border">
                         <th className="pb-2 font-medium">Category</th>
-                        <th className="pb-2 text-right font-medium">Period A</th>
-                        <th className="pb-2 text-right font-medium">Period B</th>
+                        <th className="pb-2 text-right font-medium">
+                          Period A
+                        </th>
+                        <th className="pb-2 text-right font-medium">
+                          Period B
+                        </th>
                         <th className="pb-2 text-right font-medium">Change</th>
                       </tr>
                     </thead>
                     <tbody>
                       {result.category_breakdown.map((cat) => (
-                        <tr key={cat.category} className="border-b border-border/50 last:border-0">
-                          <td className="py-2 capitalize">{cat.category}</td>
-                          <td className="py-2 text-right font-medium tabular-nums">{fmt(cat.a_spend)}</td>
-                          <td className="py-2 text-right font-medium tabular-nums">{fmt(cat.b_spend)}</td>
-                          <td className="py-2 text-right"><ChangeBadge pct={cat.change_pct} /></td>
+                        <tr
+                          key={cat.category}
+                          className="border-b border-border/50 last:border-0"
+                        >
+                          <td className="py-2">
+                            <CategoryBadge category={cat.category} size="sm" />
+                          </td>
+                          <td className="py-2 text-right font-medium tabular-nums">
+                            {fmt(cat.a_spend)}
+                          </td>
+                          <td className="py-2 text-right font-medium tabular-nums">
+                            {fmt(cat.b_spend)}
+                          </td>
+                          <td className="py-2 text-right">
+                            <ChangeBadge pct={cat.change_pct} />
+                          </td>
                         </tr>
                       ))}
                     </tbody>

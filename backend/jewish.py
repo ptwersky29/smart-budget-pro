@@ -513,6 +513,11 @@ def build_router() -> APIRouter:
                 by_holiday[key]["total_actual"] += r.actual_amount
             return {"budgets": list(by_holiday.values()), "raw": [_hb_to_dict(r) for r in rows]}
 
+    @router.get("/holiday-budget")
+    async def list_holiday_budget_singular(request: Request, user: dict = Depends(get_current_user),
+                                           holiday: str = Query(None), year: str = Query(None)):
+        return await list_holiday_budgets(request, user, holiday, year)
+
     @router.post("/holiday-budgets")
     async def add_holiday_budget(payload: HolidayBudgetIn, request: Request, user: dict = Depends(get_current_user)):
         sm = request.app.state.db

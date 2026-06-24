@@ -19,6 +19,6 @@ test("SkeletonChart renders with rounded-2xl", () => {
 
 test("SkeletonTable renders 5 rows by default", () => {
   const { container } = render(<SkeletonTable />);
-  const rows = container.querySelectorAll(".flex.gap-4");
-  expect(rows.length).toBe(6);
+  const rows = container.querySelectorAll(".flex.items-center.space-x-4");
+  expect(rows.length).toBe(5);
 });

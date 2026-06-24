@@ -15,9 +15,10 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const syncTokensFromLocation = useCallback(() => {
-    const params = new URLSearchParams(window.location.search);
-    const accessToken = params.get("access_token");
-    const refreshToken = params.get("refresh_token");
+    const qp = new URLSearchParams(window.location.search);
+    const hp = new URLSearchParams((window.location.hash || "").replace(/^#/, "?"));
+    const accessToken = qp.get("access_token") || hp.get("access_token");
+    const refreshToken = qp.get("refresh_token") || hp.get("refresh_token");
     if (accessToken) {
       setToken("access_token", accessToken, true);
       if (refreshToken) setToken("refresh_token", refreshToken, true);

@@ -1,25 +1,47 @@
 """Smart financial engine: transactions, budgets, analytics, merchant normalization, split, recurring."""
-import uuid
-import re
+
 import logging
-from datetime import datetime, date, timezone, timedelta
-from typing import Optional
+import re
+import uuid
 from collections import defaultdict
+from datetime import date, datetime, timedelta, timezone
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request, Depends, Query
-from pydantic import BaseModel
-from sqlalchemy import select, update, delete, func, or_
-
-from db import (
-    User, Transaction, Budget, SplitTransaction, AccountNickname,
-    RecurringTransaction, Category, Subscription, BankConnection, get_session_maker,
-)
-from auth import get_current_user
-from llm import call_llm, track_ai_usage, parse_json
-from security import sanitize_input
-from cache import TTLCache
-from statements import CATEGORIES, ALL_CATEGORIES, SECTION_FOR_CATEGORY, CATEGORY_HIERARCHY, CATEGORISE_KEYWORDS
 import maaser
+from auth import get_current_user
+from cache import TTLCache
+from category_catalog import (
+    build_category_payload,
+    combine_categories,
+    hierarchy_payload,
+    humanize_category_name,
+    slugify_category_name,
+)
+from db import (
+    AccountNickname,
+    BankConnection,
+    Budget,
+    Category,
+    CategoryRule,
+    RecurringTransaction,
+    SplitTransaction,
+    Subscription,
+    Transaction,
+    User,
+    get_session_maker,
+)
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from llm import call_llm, parse_json, track_ai_usage
+from pydantic import BaseModel
+from security import sanitize_input
+from sqlalchemy import delete, func, or_, select, update
+from statements import (
+    ALL_CATEGORIES,
+    CATEGORIES,
+    CATEGORISE_KEYWORDS,
+    CATEGORY_HIERARCHY,
+    INCOME_CATEGORIES,
+)
 
 logger = logging.getLogger("finance")
 
@@ -28,67 +50,106 @@ _query_cache = TTLCache(ttl=60)  # 60-second cache for frequent queries
 # ── Merchant normalization ───────────────────────────────────────────────
 
 MERCHANT_NORMALIZE = {
-    "TESCO": "Tesco", "TESCO STORES": "Tesco", "TESCO STORE": "Tesco",
-    "SAINSBURY": "Sainsbury's", "SAINSBURYS": "Sainsbury's",
-    "ASDA": "Asda", "ASDA STORES": "Asda",
-    "ALDI": "Aldi", "ALDI STORES": "Aldi",
-    "LIDL": "Lidl", "LIDL GB": "Lidl",
-    "MORRISONS": "Morrisons", "MORRISON": "Morrisons",
-    "WAITROSE": "Waitrose", "WAITROSE & PARTNERS": "Waitrose",
-    "M&S": "M&S", "MARKS & SPENCER": "M&S", "MS": "M&S",
-    "CO-OP": "Co-op", "COOPERATIVE": "Co-op",
-    "AMAZON": "Amazon", "AMAZON.CO.UK": "Amazon", "AMZN": "Amazon",
+    "TESCO": "Tesco",
+    "TESCO STORES": "Tesco",
+    "TESCO STORE": "Tesco",
+    "SAINSBURY": "Sainsbury's",
+    "SAINSBURYS": "Sainsbury's",
+    "ASDA": "Asda",
+    "ASDA STORES": "Asda",
+    "ALDI": "Aldi",
+    "ALDI STORES": "Aldi",
+    "LIDL": "Lidl",
+    "LIDL GB": "Lidl",
+    "MORRISONS": "Morrisons",
+    "MORRISON": "Morrisons",
+    "WAITROSE": "Waitrose",
+    "WAITROSE & PARTNERS": "Waitrose",
+    "M&S": "M&S",
+    "MARKS & SPENCER": "M&S",
+    "MS": "M&S",
+    "CO-OP": "Co-op",
+    "COOPERATIVE": "Co-op",
+    "AMAZON": "Amazon",
+    "AMAZON.CO.UK": "Amazon",
+    "AMZN": "Amazon",
     "AMZN MKTP": "Amazon",
-    "TFL": "TfL", "TFL TRAVEL": "TfL", "TRANSPORT FOR LONDON": "TfL",
-    "UBER": "Uber", "UBER TRIP": "Uber", "UBER EATS": "Uber Eats",
+    "TFL": "TfL",
+    "TFL TRAVEL": "TfL",
+    "TRANSPORT FOR LONDON": "TfL",
+    "UBER": "Uber",
+    "UBER TRIP": "Uber",
+    "UBER EATS": "Uber Eats",
     "DELIVEROO": "Deliveroo",
-    "JUST EAT": "Just Eat", "JUSTEAT": "Just Eat",
+    "JUST EAT": "Just Eat",
+    "JUSTEAT": "Just Eat",
     "NETFLIX": "Netflix",
     "SPOTIFY": "Spotify",
-    "APPLE": "Apple", "APPLE.COM": "Apple", "APPLE STORE": "Apple",
-    "DISNEY": "Disney+", "DISNEY PLUS": "Disney+",
-    "YOUTUBE": "YouTube", "YOUTUBE PREMIUM": "YouTube",
-    "GOOGLE": "Google", "GOOGLE PLAY": "Google",
-    "MICROSOFT": "Microsoft", "MSFT": "Microsoft",
+    "APPLE": "Apple",
+    "APPLE.COM": "Apple",
+    "APPLE STORE": "Apple",
+    "DISNEY": "Disney+",
+    "DISNEY PLUS": "Disney+",
+    "YOUTUBE": "YouTube",
+    "YOUTUBE PREMIUM": "YouTube",
+    "GOOGLE": "Google",
+    "GOOGLE PLAY": "Google",
+    "MICROSOFT": "Microsoft",
+    "MSFT": "Microsoft",
     "ADOBE": "Adobe",
     "GITHUB": "GitHub",
-    "OPENAI": "OpenAI", "CHATGPT": "ChatGPT",
-    "EE": "EE", "EVERYTHING EVERYWHERE": "EE",
+    "OPENAI": "OpenAI",
+    "CHATGPT": "ChatGPT",
+    "EE": "EE",
+    "EVERYTHING EVERYWHERE": "EE",
     "VODAFONE": "Vodafone",
-    "SKY": "Sky", "SKY UK": "Sky",
+    "SKY": "Sky",
+    "SKY UK": "Sky",
     "VIRGIN MEDIA": "Virgin Media",
     "BRITISH GAS": "British Gas",
-    "EDF": "EDF Energy", "EDF ENERGY": "EDF Energy",
-    "OCTOPUS": "Octopus Energy", "OCTOPUS ENERGY": "Octopus Energy",
+    "EDF": "EDF Energy",
+    "EDF ENERGY": "EDF Energy",
+    "OCTOPUS": "Octopus Energy",
+    "OCTOPUS ENERGY": "Octopus Energy",
     "THAMES WATER": "Thames Water",
     "COUNCIL TAX": "Council Tax",
-    "HMRC": "HMRC", "HM REVENUE": "HMRC",
+    "HMRC": "HMRC",
+    "HM REVENUE": "HMRC",
     "PAYPAL": "PayPal",
     "MONZO": "Monzo",
     "STARLING": "Starling Bank",
     "NATIONAL EXPRESS": "National Express",
     "TRAINLINE": "Trainline",
-    "SHELL": "Shell", "SHELL FUEL": "Shell",
-    "BP": "BP", "BP FUEL": "BP",
-    "COSTA": "Costa", "COSTA COFFEE": "Costa",
+    "SHELL": "Shell",
+    "SHELL FUEL": "Shell",
+    "BP": "BP",
+    "BP FUEL": "BP",
+    "COSTA": "Costa",
+    "COSTA COFFEE": "Costa",
     "STARBUCKS": "Starbucks",
-    "PRET": "Pret", "PRET A MANGER": "Pret",
-    "MCDONALD": "McDonald's", "MCDONALDS": "McDonald's",
+    "PRET": "Pret",
+    "PRET A MANGER": "Pret",
+    "MCDONALD": "McDonald's",
+    "MCDONALDS": "McDonald's",
     "KFC": "KFC",
     "SUBWAY": "Subway",
     "GREGGS": "Greggs",
     "ARGOS": "Argos",
     "IKEA": "IKEA",
-    "B&Q": "B&Q", "B AND Q": "B&Q",
+    "B&Q": "B&Q",
+    "B AND Q": "B&Q",
     "SCREWFIX": "Screwfix",
     "PRIMARK": "Primark",
     "ZARA": "Zara",
-    "H&M": "H&M", "H AND M": "H&M",
+    "H&M": "H&M",
+    "H AND M": "H&M",
     "NEXT": "Next",
-    "JOHN LEWIS": "John Lewis", "JOHN LEWIS PARTNERSHIP": "John Lewis",
+    "JOHN LEWIS": "John Lewis",
+    "JOHN LEWIS PARTNERSHIP": "John Lewis",
     "EBAY": "eBay",
     "ETSY": "Etsy",
-    "BOOTS": "Boots", "BOOTS PHARMACY": "Boots",
+    "BOOTS": "Boots",
+    "BOOTS PHARMACY": "Boots",
     "SUPERDRUG": "Superdrug",
     "NHS": "NHS",
     "PUREGYM": "PureGym",
@@ -114,15 +175,20 @@ def normalize_merchant(name: str) -> str:
 def _merchant_rule_key(tx) -> str:
     """Extract a normalised merchant key for rule matching."""
     return (
-        getattr(tx, "normalized_merchant", None)
-        or (tx.merchant_name if getattr(tx, "merchant_name", None) else None)
-        or (tx.description[:60] if getattr(tx, "description", None) else "")
-    ).strip().upper()
+        (
+            getattr(tx, "normalized_merchant", None)
+            or (tx.merchant_name if getattr(tx, "merchant_name", None) else None)
+            or (tx.description[:60] if getattr(tx, "description", None) else "")
+        )
+        .strip()
+        .upper()
+    )
 
 
 async def _learn_category_rule(session, user_id: str, tx, category: str) -> None:
     """Save/update a user-learned merchant→category rule."""
     from db import CategoryRule
+
     key = _merchant_rule_key(tx)
     if not key or category in ("uncategorized", ""):
         return
@@ -139,11 +205,16 @@ async def _learn_category_rule(session, user_id: str, tx, category: str) -> None
             rule.match_count = (rule.match_count or 0) + 1
             rule.last_used_at = datetime.now(timezone.utc)
         else:
-            session.add(CategoryRule(
-                user_id=user_id, merchant=key, category=category,
-                match_count=1, source="learned",
-                last_used_at=datetime.now(timezone.utc),
-            ))
+            session.add(
+                CategoryRule(
+                    user_id=user_id,
+                    merchant=key,
+                    category=category,
+                    match_count=1,
+                    source="learned",
+                    last_used_at=datetime.now(timezone.utc),
+                )
+            )
     except Exception:
         pass
 
@@ -151,6 +222,7 @@ async def _learn_category_rule(session, user_id: str, tx, category: str) -> None
 async def _lookup_category_rule(session, user_id: str, tx) -> str | None:
     """Look up a learned rule for this merchant. Returns category or None."""
     from db import CategoryRule
+
     key = _merchant_rule_key(tx)
     if not key:
         return None
@@ -173,10 +245,16 @@ async def _lookup_category_rule(session, user_id: str, tx) -> str | None:
 
 # ── Recurring detection ──────────────────────────────────────────────────
 
+
 def detect_recurring_txns(tx_list: list) -> list:
     groups = defaultdict(list)
     for t in tx_list:
-        key = (round(abs(t["amount"]), 2), (t.get("normalized_merchant") or t.get("description") or "").lower().strip())
+        key = (
+            round(abs(t["amount"]), 2),
+            (t.get("normalized_merchant") or t.get("description") or "")
+            .lower()
+            .strip(),
+        )
         groups[key].append(t)
     results = []
     for (amt, desc_key), group in groups.items():
@@ -206,27 +284,31 @@ def detect_recurring_txns(tx_list: list) -> list:
             frequency = "daily"
         else:
             continue
-        results.append({
-            "description": group[0].get("description", ""),
-            "normalized_merchant": group[0].get("normalized_merchant"),
-            "amount": round(amt, 2),
-            "category": group[0].get("category", "uncategorized"),
-            "frequency": frequency,
-            "avg_interval_days": round(avg_interval, 1),
-            "occurrences": len(group),
-            "first_date": dates[0][:10] if dates else None,
-            "last_date": dates[-1][:10] if dates else None,
-            "is_subscription": frequency == "monthly" and 1 <= amt <= 200,
-        })
+        results.append(
+            {
+                "description": group[0].get("description", ""),
+                "normalized_merchant": group[0].get("normalized_merchant"),
+                "amount": round(amt, 2),
+                "category": group[0].get("category", "uncategorized"),
+                "frequency": frequency,
+                "avg_interval_days": round(avg_interval, 1),
+                "occurrences": len(group),
+                "first_date": dates[0][:10] if dates else None,
+                "last_date": dates[-1][:10] if dates else None,
+                "is_subscription": frequency == "monthly" and 1 <= amt <= 200,
+            }
+        )
     return sorted(results, key=lambda r: -r["occurrences"])
 
 
 # ── Category rules / smart categorisation ────────────────────────────────
 
+
 def smart_categorize(text: str) -> str:
     """Fast keyword-based categorisation using the merged CATEGORISE_KEYWORDS from statements.py.
     Resolves old category keys automatically via CATEGORY_ALIASES."""
     from statements import resolve_category as _rc
+
     t = (text or "").lower()
     for cat, keywords in CATEGORISE_KEYWORDS.items():
         if any(k in t for k in keywords):
@@ -237,6 +319,7 @@ def smart_categorize(text: str) -> str:
 def resolve_category(value: str) -> str:
     """Resolve old/new category slug to canonical new slug, with fallback."""
     from statements import resolve_category as _resolve
+
     return _resolve(value)
 
 
@@ -285,6 +368,7 @@ Amount: {amount}
 
 
 # ── Pydantic models ──────────────────────────────────────────────────────
+
 
 class TransactionIn(BaseModel):
     amount: float
@@ -355,7 +439,254 @@ class BulkDeleteIn(BaseModel):
     budget_ids: list[str]
 
 
+class CategoryCreateIn(BaseModel):
+    name: Optional[str] = None
+    label: Optional[str] = None
+    emoji: Optional[str] = None
+    icon: Optional[str] = None
+    color: Optional[str] = None
+    description: Optional[str] = None
+    section: Optional[str] = None
+    is_income: Optional[bool] = None
+    budget: Optional[float] = None
+    sort_order: int = 0
 
+
+class CategoryUpdateIn(BaseModel):
+    name: Optional[str] = None
+    label: Optional[str] = None
+    emoji: Optional[str] = None
+    icon: Optional[str] = None
+    color: Optional[str] = None
+    description: Optional[str] = None
+    section: Optional[str] = None
+    is_income: Optional[bool] = None
+    budget: Optional[float] = None
+    sort_order: Optional[int] = None
+
+
+class CategoryReassignDeleteIn(BaseModel):
+    replacement_category: Optional[str] = None
+    replacement_category_id: Optional[str] = None
+
+
+# ── Category helpers ─────────────────────────────────────────────────────
+
+
+def _default_category_usage() -> dict:
+    return {
+        "transactions": 0,
+        "budgets": 0,
+        "recurring": 0,
+        "subscriptions": 0,
+        "rules": 0,
+        "total": 0,
+    }
+
+
+def _touch_category_usage(
+    usage_map: dict, category: str | None, bucket: str, count: int
+):
+    if not category:
+        return
+    entry = usage_map.setdefault(category, _default_category_usage())
+    entry[bucket] += int(count or 0)
+    entry["total"] = (
+        entry["transactions"]
+        + entry["budgets"]
+        + entry["recurring"]
+        + entry["subscriptions"]
+        + entry["rules"]
+    )
+
+
+def _normalise_category_slug(value: str | None, fallback: str = "uncategorized") -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return fallback
+    return resolve_category(slugify_category_name(raw) or raw)
+
+
+def _slug_from_category_identifier(value: str | None) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    if raw.startswith("system:") or raw.startswith("custom:"):
+        raw = raw.split(":", 1)[1]
+    return _normalise_category_slug(raw, fallback="")
+
+
+def _category_display_label(
+    slug: str, label: str | None = None, name: str | None = None
+) -> str:
+    display = (label or name or "").strip()
+    return display or humanize_category_name(slug)
+
+
+def _invalidate_category_caches(user_id: str):
+    _query_cache.delete_by_prefix(f"cats:{user_id}")
+    _query_cache.delete(f"dash:{user_id}")
+    _query_cache.delete_by_prefix(f"trends:{user_id}:")
+    _query_cache.delete_by_prefix(f"budgets:{user_id}:")
+
+
+async def _category_usage_map(session, user_id: str) -> dict[str, dict]:
+    usage: dict[str, dict] = {}
+
+    sources = [
+        (Transaction, "transactions"),
+        (SplitTransaction, "transactions"),
+        (Budget, "budgets"),
+        (RecurringTransaction, "recurring"),
+        (Subscription, "subscriptions"),
+        (CategoryRule, "rules"),
+    ]
+    for model, bucket in sources:
+        result = await session.execute(
+            select(model.category, func.count())
+            .where(model.user_id == user_id, model.category.isnot(None))
+            .group_by(model.category)
+        )
+        for category, count in result.all():
+            _touch_category_usage(usage, category, bucket, count)
+
+    return usage
+
+
+async def _resolve_category_entity(session, user_id: str, category_id: str):
+    slug = _slug_from_category_identifier(category_id)
+    row = None
+
+    if category_id.startswith("system:") or category_id.startswith("custom:"):
+        if not slug:
+            raise HTTPException(404, "Category not found")
+        result = await session.execute(
+            select(Category).where(Category.user_id == user_id, Category.name == slug)
+        )
+        row = result.scalar_one_or_none()
+        return slug, row, slug in CATEGORIES
+
+    result = await session.execute(
+        select(Category).where(
+            Category.category_id == category_id,
+            Category.user_id == user_id,
+        )
+    )
+    row = result.scalar_one_or_none()
+    if row:
+        return row.name, row, row.name in CATEGORIES
+
+    if slug:
+        result = await session.execute(
+            select(Category).where(Category.user_id == user_id, Category.name == slug)
+        )
+        row = result.scalar_one_or_none()
+        if row or slug in CATEGORIES:
+            return slug, row, slug in CATEGORIES
+
+    raise HTTPException(404, "Category not found")
+
+
+async def _ensure_category_row(
+    session, user_id: str, slug: str, row: Category | None = None
+):
+    if row:
+        return row
+    row = Category(
+        category_id=f"cat_{uuid.uuid4().hex[:12]}",
+        user_id=user_id,
+        name=slug,
+        label=humanize_category_name(slug),
+        is_income=slug in INCOME_CATEGORIES,
+        sort_order=0,
+        is_archived=False,
+    )
+    session.add(row)
+    await session.flush()
+    return row
+
+
+def _apply_category_payload_to_row(row: Category, slug: str, payload: dict):
+    if "label" in payload or "name" in payload or not row.label:
+        row.label = _category_display_label(
+            slug,
+            payload.get("label"),
+            payload.get("name") or row.label,
+        )
+
+    if "emoji" in payload or "icon" in payload:
+        row.icon = payload.get("emoji") or payload.get("icon") or None
+    if "color" in payload:
+        row.color = payload.get("color") or None
+    if "description" in payload:
+        row.description = (payload.get("description") or "").strip() or None
+    if "section" in payload:
+        row.section = (payload.get("section") or "").strip() or None
+    if payload.get("is_income") is not None:
+        row.is_income = bool(payload.get("is_income"))
+    elif row.is_income is None:
+        row.is_income = slug in INCOME_CATEGORIES
+    if "budget" in payload:
+        row.budget = payload.get("budget")
+    if payload.get("sort_order") is not None:
+        row.sort_order = int(payload.get("sort_order") or 0)
+    row.is_archived = False
+
+
+async def _archive_category(
+    session, user_id: str, slug: str, row: Category | None = None
+):
+    row = await _ensure_category_row(session, user_id, slug, row=row)
+    row.is_archived = True
+    if not row.label:
+        row.label = humanize_category_name(slug)
+    return row
+
+
+async def _reassign_budget_rows(
+    session, user_id: str, source_slug: str, target_slug: str
+):
+    result = await session.execute(
+        select(Budget).where(Budget.user_id == user_id, Budget.category == source_slug)
+    )
+    source_rows = result.scalars().all()
+    if not source_rows:
+        return {"updated": 0, "merged": 0}
+
+    target_result = await session.execute(
+        select(Budget).where(Budget.user_id == user_id, Budget.category == target_slug)
+    )
+    target_rows = target_result.scalars().all()
+    target_map = {}
+    for budget in target_rows:
+        key = (
+            budget.budget_type or "everyday",
+            budget.month or "",
+            budget.event_group_id or "",
+            budget.event_date.isoformat() if budget.event_date else "",
+        )
+        target_map[key] = budget
+
+    updated = 0
+    merged = 0
+    for budget in source_rows:
+        key = (
+            budget.budget_type or "everyday",
+            budget.month or "",
+            budget.event_group_id or "",
+            budget.event_date.isoformat() if budget.event_date else "",
+        )
+        existing = target_map.get(key)
+        if existing and existing.budget_id != budget.budget_id:
+            existing.amount = float(existing.amount or 0) + float(budget.amount or 0)
+            await session.delete(budget)
+            merged += 1
+            continue
+        budget.category = target_slug
+        target_map[key] = budget
+        updated += 1
+
+    return {"updated": updated, "merged": merged}
 
 
 # ── Serializers ──────────────────────────────────────────────────────────
@@ -370,7 +701,9 @@ SOURCE_LABELS = {
 }
 
 
-def _tx_to_dict(t: Transaction, institution_map: dict = None, label_map: dict = None) -> dict:
+def _tx_to_dict(
+    t: Transaction, institution_map: dict = None, label_map: dict = None
+) -> dict:
     source_label = SOURCE_LABELS.get(t.source, t.source)
     institution = None
     if t.connection_id:
@@ -432,7 +765,7 @@ def _insight_reason(cat: str, current: float, avg: float, budget: float) -> str:
     if budget == 0 and current > 0:
         return f"You're spending £{current:.0f} on {cat} but have no budget set."
     if budget > 0 and current > budget * 1.2:
-        return f"Spending £{current:.0f} exceeds your £{budget:.0f} budget by {int((current/budget-1)*100)}%."
+        return f"Spending £{current:.0f} exceeds your £{budget:.0f} budget by {int((current / budget - 1) * 100)}%."
     if avg > 0 and avg > budget * 1.1 and budget > 0:
         return f"Your 3-month avg (£{avg:.0f}) is above your budget (£{budget:.0f})."
     if budget > 0 and avg < budget * 0.8:
@@ -448,6 +781,7 @@ def _insight_reason(cat: str, current: float, avg: float, budget: float) -> str:
 
 # ── Router ───────────────────────────────────────────────────────────────
 
+
 def build_router() -> APIRouter:
     router = APIRouter(tags=["finance"])
 
@@ -455,15 +789,23 @@ def build_router() -> APIRouter:
 
     @router.get("/transactions")
     async def list_transactions(
-        request: Request, user: dict = Depends(get_current_user),
-        category: str = Query(None), source: str = Query(None),
-        tx_type: str = Query(None), merchant: str = Query(None),
-        pending: str = Query(None), connection_id: str = Query(None),
-        date_from: str = Query(None), date_to: str = Query(None),
-        amount_min: float = Query(None), amount_max: float = Query(None),
+        request: Request,
+        user: dict = Depends(get_current_user),
+        category: str = Query(None),
+        source: str = Query(None),
+        tx_type: str = Query(None),
+        merchant: str = Query(None),
+        pending: str = Query(None),
+        connection_id: str = Query(None),
+        date_from: str = Query(None),
+        date_to: str = Query(None),
+        amount_min: float = Query(None),
+        amount_max: float = Query(None),
         search: str = Query(None),
-        sort: str = Query("date"), order: str = Query("desc"),
-        offset: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=1000),
+        sort: str = Query("date"),
+        order: str = Query("desc"),
+        offset: int = Query(0, ge=0),
+        limit: int = Query(100, ge=1, le=1000),
     ):
         sm = request.app.state.db
         async with sm() as session:
@@ -487,20 +829,25 @@ def build_router() -> APIRouter:
             if date_from:
                 stmt = stmt.where(Transaction.date >= datetime.fromisoformat(date_from))
             if date_to:
-                stmt = stmt.where(Transaction.date <= datetime.fromisoformat(date_to) + timedelta(days=1))
+                stmt = stmt.where(
+                    Transaction.date
+                    <= datetime.fromisoformat(date_to) + timedelta(days=1)
+                )
             if amount_min is not None:
                 stmt = stmt.where(abs(Transaction.amount) >= amount_min)
             if amount_max is not None:
                 stmt = stmt.where(abs(Transaction.amount) <= amount_max)
             if search:
                 term = f"%{search}%"
-                stmt = stmt.where(or_(
-                    Transaction.description.ilike(term),
-                    Transaction.merchant_name.ilike(term),
-                    Transaction.normalized_merchant.ilike(term),
-                    Transaction.notes.ilike(term),
-                    Transaction.category.ilike(term),
-                ))
+                stmt = stmt.where(
+                    or_(
+                        Transaction.description.ilike(term),
+                        Transaction.merchant_name.ilike(term),
+                        Transaction.normalized_merchant.ilike(term),
+                        Transaction.notes.ilike(term),
+                        Transaction.category.ilike(term),
+                    )
+                )
 
             sort_col = getattr(Transaction, sort, Transaction.date)
             order_fn = sort_col.desc if order == "desc" else sort_col.asc
@@ -514,10 +861,14 @@ def build_router() -> APIRouter:
             label_map = {}
             if conn_ids:
                 from db import BankConnection
+
                 bc_result = await session.execute(
-                    select(BankConnection.connection_id, BankConnection.nickname, BankConnection.account_name, BankConnection.config).where(
-                        BankConnection.connection_id.in_(conn_ids)
-                    )
+                    select(
+                        BankConnection.connection_id,
+                        BankConnection.nickname,
+                        BankConnection.account_name,
+                        BankConnection.config,
+                    ).where(BankConnection.connection_id.in_(conn_ids))
                 )
                 for bc_row in bc_result:
                     cfg = bc_row.config or {}
@@ -529,9 +880,15 @@ def build_router() -> APIRouter:
                     if lbl:
                         label_map[bc_row.connection_id] = lbl
 
-            count_stmt = select(func.count()).select_from(Transaction).where(Transaction.user_id == user["user_id"])
+            count_stmt = (
+                select(func.count())
+                .select_from(Transaction)
+                .where(Transaction.user_id == user["user_id"])
+            )
             if connection_id:
-                count_stmt = count_stmt.where(Transaction.connection_id == connection_id)
+                count_stmt = count_stmt.where(
+                    Transaction.connection_id == connection_id
+                )
             if category:
                 count_stmt = count_stmt.where(Transaction.category == category)
             if source:
@@ -545,9 +902,14 @@ def build_router() -> APIRouter:
             elif tx_type == "expense":
                 count_stmt = count_stmt.where(Transaction.amount < 0)
             if date_from:
-                count_stmt = count_stmt.where(Transaction.date >= datetime.fromisoformat(date_from))
+                count_stmt = count_stmt.where(
+                    Transaction.date >= datetime.fromisoformat(date_from)
+                )
             if date_to:
-                count_stmt = count_stmt.where(Transaction.date <= datetime.fromisoformat(date_to) + timedelta(days=1))
+                count_stmt = count_stmt.where(
+                    Transaction.date
+                    <= datetime.fromisoformat(date_to) + timedelta(days=1)
+                )
             if amount_min is not None:
                 count_stmt = count_stmt.where(abs(Transaction.amount) >= amount_min)
             if amount_max is not None:
@@ -556,8 +918,12 @@ def build_router() -> APIRouter:
             total = count_result.scalar() or 0
 
             agg_stmt = select(
-                func.coalesce(func.sum(Transaction.amount).filter(Transaction.amount > 0), 0),
-                func.coalesce(func.sum(Transaction.amount).filter(Transaction.amount < 0), 0),
+                func.coalesce(
+                    func.sum(Transaction.amount).filter(Transaction.amount > 0), 0
+                ),
+                func.coalesce(
+                    func.sum(Transaction.amount).filter(Transaction.amount < 0), 0
+                ),
             ).where(Transaction.user_id == user["user_id"])
             if connection_id:
                 agg_stmt = agg_stmt.where(Transaction.connection_id == connection_id)
@@ -574,29 +940,38 @@ def build_router() -> APIRouter:
             elif tx_type == "expense":
                 agg_stmt = agg_stmt.where(Transaction.amount < 0)
             if date_from:
-                agg_stmt = agg_stmt.where(Transaction.date >= datetime.fromisoformat(date_from))
+                agg_stmt = agg_stmt.where(
+                    Transaction.date >= datetime.fromisoformat(date_from)
+                )
             if date_to:
-                agg_stmt = agg_stmt.where(Transaction.date <= datetime.fromisoformat(date_to) + timedelta(days=1))
+                agg_stmt = agg_stmt.where(
+                    Transaction.date
+                    <= datetime.fromisoformat(date_to) + timedelta(days=1)
+                )
             if amount_min is not None:
                 agg_stmt = agg_stmt.where(abs(Transaction.amount) >= amount_min)
             if amount_max is not None:
                 agg_stmt = agg_stmt.where(abs(Transaction.amount) <= amount_max)
             if search:
                 term = f"%{search}%"
-                agg_stmt = agg_stmt.where(or_(
-                    Transaction.description.ilike(term),
-                    Transaction.merchant_name.ilike(term),
-                    Transaction.normalized_merchant.ilike(term),
-                    Transaction.notes.ilike(term),
-                    Transaction.category.ilike(term),
-                ))
+                agg_stmt = agg_stmt.where(
+                    or_(
+                        Transaction.description.ilike(term),
+                        Transaction.merchant_name.ilike(term),
+                        Transaction.normalized_merchant.ilike(term),
+                        Transaction.notes.ilike(term),
+                        Transaction.category.ilike(term),
+                    )
+                )
             agg_result = await session.execute(agg_stmt)
             income_total, expense_total = agg_result.one()
             income_total = round(float(income_total), 2)
             expense_total = round(abs(float(expense_total)), 2)
 
             return {
-                "transactions": [_tx_to_dict(t, institution_map, label_map) for t in rows],
+                "transactions": [
+                    _tx_to_dict(t, institution_map, label_map) for t in rows
+                ],
                 "total": total,
                 "income_total": income_total,
                 "expense_total": expense_total,
@@ -605,86 +980,190 @@ def build_router() -> APIRouter:
             }
 
     _SEARCH_CATEGORIES = {
-        "maaser": "maaser_tzedakah", "tithe": "maaser_tzedakah",
-        "charity": "charity", "charities": "charity", "donation": "charity", "donations": "charity", "tzedakah": "charity",
-        "shul": "other_charity", "synagogue": "other_charity",
-        "clothing": "clothing_husband", "clothes": "clothing_husband", "fashion": "clothing_husband",
+        "maaser": "maaser_tzedakah",
+        "tithe": "maaser_tzedakah",
+        "charity": "charity",
+        "charities": "charity",
+        "donation": "charity",
+        "donations": "charity",
+        "tzedakah": "charity",
+        "shul": "other_charity",
+        "synagogue": "other_charity",
+        "clothing": "clothing_husband",
+        "clothes": "clothing_husband",
+        "fashion": "clothing_husband",
         "shoes": "shoes",
-        "grocery": "grocery", "groceries": "grocery", "supermarket": "grocery", "food shop": "grocery",
-        "fruit": "fruit_veg", "veg": "fruit_veg", "vegetables": "fruit_veg",
-        "bakery": "bakery", "bread": "bakery",
-        "fish": "fish", "seafood": "fish",
-        "meat": "meat", "butcher": "meat",
-        "takeaway": "takeaway", "takeaways": "takeaway", "dining": "takeaway", "restaurant": "takeaway",
-        "restaurants": "takeaway", "cafe": "takeaway", "cafes": "takeaway", "eating out": "takeaway",
+        "grocery": "grocery",
+        "groceries": "grocery",
+        "supermarket": "grocery",
+        "food shop": "grocery",
+        "fruit": "fruit_veg",
+        "veg": "fruit_veg",
+        "vegetables": "fruit_veg",
+        "bakery": "bakery",
+        "bread": "bakery",
+        "fish": "fish",
+        "seafood": "fish",
+        "meat": "meat",
+        "butcher": "meat",
+        "takeaway": "takeaway",
+        "takeaways": "takeaway",
+        "dining": "takeaway",
+        "restaurant": "takeaway",
+        "restaurants": "takeaway",
+        "cafe": "takeaway",
+        "cafes": "takeaway",
+        "eating out": "takeaway",
         "wine": "wine",
-        "house supplies": "house_supplies", "household": "house_supplies", "cleaning": "house_supplies",
-        "diy": "house_supplies", "furniture": "house_supplies", "laundry": "house_supplies",
-        "chemist": "chemist", "pharmacy": "chemist",
-        "rent": "rent_mortgage", "rentals": "rent_mortgage", "mortgage": "rent_mortgage",
-        "electric": "electricity", "electricity": "electricity",
+        "house supplies": "house_supplies",
+        "household": "house_supplies",
+        "cleaning": "house_supplies",
+        "diy": "house_supplies",
+        "furniture": "house_supplies",
+        "laundry": "house_supplies",
+        "chemist": "chemist",
+        "pharmacy": "chemist",
+        "rent": "rent_mortgage",
+        "rentals": "rent_mortgage",
+        "mortgage": "rent_mortgage",
+        "electric": "electricity",
+        "electricity": "electricity",
         "heating": "heating",
-        "gas": "gas", "gas bill": "gas",
+        "gas": "gas",
+        "gas bill": "gas",
         "water": "water",
         "council tax": "council_tax",
-        "telephone": "telephone", "landline": "telephone",
-        "mobile": "mobile", "phone": "mobile",
-        "cleaning help": "cleaning_help", "cleaner": "cleaning_help",
+        "telephone": "telephone",
+        "landline": "telephone",
+        "mobile": "mobile",
+        "phone": "mobile",
+        "cleaning help": "cleaning_help",
+        "cleaner": "cleaning_help",
         "life insurance": "life_insurance",
-        "buildings insurance": "buildings_insurance", "home insurance": "buildings_insurance",
-        "school": "school_fees", "school fees": "school_fees",
-        "education": "school_fees", "courses": "school_fees",
-        "tuition": "school_fees", "tutor": "school_fees",
-        "bus fee": "bus_fee", "bus fare": "bus_fee",
-        "babysitting": "babysitting", "childcare": "babysitting", "nursery": "babysitting",
-        "nappies": "nappies", "nappy": "nappies",
+        "buildings insurance": "buildings_insurance",
+        "home insurance": "buildings_insurance",
+        "school": "school_fees",
+        "school fees": "school_fees",
+        "education": "school_fees",
+        "courses": "school_fees",
+        "tuition": "school_fees",
+        "tutor": "school_fees",
+        "bus fee": "bus_fee",
+        "bus fare": "bus_fee",
+        "babysitting": "babysitting",
+        "childcare": "babysitting",
+        "nursery": "babysitting",
+        "nappies": "nappies",
+        "nappy": "nappies",
         "toys": "toys",
-        "therapy": "therapy", "counselling": "therapy",
-        "medical": "medical", "health": "medical", "doctor": "medical",
-        "dental": "medical", "dentist": "medical",
-        "optician": "medical", "glasses": "medical",
-        "pharmacy": "chemist", "boots": "chemist",
-        "gym": "miscellaneous", "fitness": "miscellaneous",
-        "public transport": "public_transport", "train": "public_transport", "bus": "public_transport",
-        "tube": "public_transport", "tram": "public_transport", "transport": "public_transport",
+        "therapy": "therapy",
+        "counselling": "therapy",
+        "medical": "medical",
+        "health": "medical",
+        "doctor": "medical",
+        "dental": "medical",
+        "dentist": "medical",
+        "optician": "medical",
+        "glasses": "medical",
+        "pharmacy": "chemist",
+        "boots": "chemist",
+        "gym": "miscellaneous",
+        "fitness": "miscellaneous",
+        "public transport": "public_transport",
+        "train": "public_transport",
+        "bus": "public_transport",
+        "tube": "public_transport",
+        "tram": "public_transport",
+        "transport": "public_transport",
         "car lease": "car_lease",
-        "petrol": "petrol_diesel", "diesel": "petrol_diesel", "fuel": "petrol_diesel", "ev charge": "petrol_diesel",
-        "dart charge": "dart_charge", "congestion": "dart_charge",
+        "petrol": "petrol_diesel",
+        "diesel": "petrol_diesel",
+        "fuel": "petrol_diesel",
+        "ev charge": "petrol_diesel",
+        "dart charge": "dart_charge",
+        "congestion": "dart_charge",
         "parking": "dart_charge",
-        "tolls": "tolls", "toll": "tolls",
-        "tickets": "tickets", "fine": "tickets", "fines": "tickets",
+        "tolls": "tolls",
+        "toll": "tolls",
+        "tickets": "tickets",
+        "fine": "tickets",
+        "fines": "tickets",
         "loan": "loan_payoff",
-        "interest": "interest", "fees": "interest", "fee": "interest", "charges": "interest", "charge": "interest",
-        "investments": "investments", "investing": "investments",
-        "cash": "petty_cash", "atm": "petty_cash", "withdrawal": "petty_cash",
-        "miscellaneous": "miscellaneous", "other": "miscellaneous", "general": "miscellaneous",
-        "shopping": "miscellaneous", "shop": "miscellaneous", "amazon": "miscellaneous",
-        "entertainment": "miscellaneous", "fun": "miscellaneous", "cinema": "miscellaneous",
-        "streaming": "miscellaneous", "subscriptions": "miscellaneous", "sub": "miscellaneous",
-        "travel": "miscellaneous", "flights": "miscellaneous", "flight": "miscellaneous",
-        "hotel": "miscellaneous", "hotels": "miscellaneous", "accommodation": "miscellaneous",
-        "holiday": "miscellaneous", "vacation": "miscellaneous",
+        "interest": "interest",
+        "fees": "interest",
+        "fee": "interest",
+        "charges": "interest",
+        "charge": "interest",
+        "investments": "investments",
+        "investing": "investments",
+        "cash": "petty_cash",
+        "atm": "petty_cash",
+        "withdrawal": "petty_cash",
+        "miscellaneous": "miscellaneous",
+        "other": "miscellaneous",
+        "general": "miscellaneous",
+        "shopping": "miscellaneous",
+        "shop": "miscellaneous",
+        "amazon": "miscellaneous",
+        "entertainment": "miscellaneous",
+        "fun": "miscellaneous",
+        "cinema": "miscellaneous",
+        "streaming": "miscellaneous",
+        "subscriptions": "miscellaneous",
+        "sub": "miscellaneous",
+        "travel": "miscellaneous",
+        "flights": "miscellaneous",
+        "flight": "miscellaneous",
+        "hotel": "miscellaneous",
+        "hotels": "miscellaneous",
+        "accommodation": "miscellaneous",
+        "holiday": "miscellaneous",
+        "vacation": "miscellaneous",
         "car hire": "miscellaneous",
-        "business": "miscellaneous", "office supplies": "miscellaneous", "software": "miscellaneous",
-        "advertising": "miscellaneous", "marketing": "miscellaneous",
-        "hobbies": "miscellaneous", "hobby": "miscellaneous",
-        "books": "miscellaneous", "book": "miscellaneous",
-        "taxi": "taxi", "uber": "taxi", "taxis": "taxi",
-        "mikva": "mikva", "mikvah": "mikva",
-        "tax": "taxes", "taxes": "taxes", "hmrc": "taxes",
+        "business": "miscellaneous",
+        "office supplies": "miscellaneous",
+        "software": "miscellaneous",
+        "advertising": "miscellaneous",
+        "marketing": "miscellaneous",
+        "hobbies": "miscellaneous",
+        "hobby": "miscellaneous",
+        "books": "miscellaneous",
+        "book": "miscellaneous",
+        "taxi": "taxi",
+        "uber": "taxi",
+        "taxis": "taxi",
+        "mikva": "mikva",
+        "mikvah": "mikva",
+        "tax": "taxes",
+        "taxes": "taxes",
+        "hmrc": "taxes",
         "savings": "upcoming_savings",
-        "salary": "salary", "wages": "salary", "paycheck": "salary", "pay": "salary",
+        "salary": "salary",
+        "wages": "salary",
+        "paycheck": "salary",
+        "pay": "salary",
         "income": "income",
-        "pesach": "miscellaneous", "passover": "miscellaneous",
-        "purim": "miscellaneous", "chanukah": "miscellaneous", "succah": "miscellaneous",
-        "wedding": "miscellaneous", "bar mitzvah": "miscellaneous", "bat mitzvah": "miscellaneous",
-        "bris": "miscellaneous", "engagement": "miscellaneous",
-        "gifts": "miscellaneous", "gift": "miscellaneous",
+        "pesach": "miscellaneous",
+        "passover": "miscellaneous",
+        "purim": "miscellaneous",
+        "chanukah": "miscellaneous",
+        "succah": "miscellaneous",
+        "wedding": "miscellaneous",
+        "bar mitzvah": "miscellaneous",
+        "bat mitzvah": "miscellaneous",
+        "bris": "miscellaneous",
+        "engagement": "miscellaneous",
+        "gifts": "miscellaneous",
+        "gift": "miscellaneous",
         "insurance": "life_insurance",
-        "transfer": "miscellaneous", "transfers": "miscellaneous",
-        "electronics": "miscellaneous", "electrical": "miscellaneous",
-        "utilities": "house_supplies", "bills": "house_supplies",
-        "internet": "miscellaneous", "broadband": "miscellaneous",
+        "transfer": "miscellaneous",
+        "transfers": "miscellaneous",
+        "electronics": "miscellaneous",
+        "electrical": "miscellaneous",
+        "utilities": "house_supplies",
+        "bills": "house_supplies",
+        "internet": "miscellaneous",
+        "broadband": "miscellaneous",
     }
 
     def _regex_parse_search(q: str) -> dict:
@@ -695,32 +1174,52 @@ def build_router() -> APIRouter:
 
         # Category detection — pick the longest matching keyword (to prefer "subscriptions" over "sub")
         matches = sorted(
-            [(kw, cat) for kw, cat in _SEARCH_CATEGORIES.items() if re.search(rf"\b{re.escape(kw)}\b", text)],
+            [
+                (kw, cat)
+                for kw, cat in _SEARCH_CATEGORIES.items()
+                if re.search(rf"\b{re.escape(kw)}\b", text)
+            ],
             key=lambda x: -len(x[0]),
         )
         if matches:
             out["category"] = matches[0][1]
 
         # Type detection
-        if re.search(r"\b(income|salary|wages|paycheck|earnings|deposits? in)\b", text) and "category" not in out:
+        if (
+            re.search(r"\b(income|salary|wages|paycheck|earnings|deposits? in)\b", text)
+            and "category" not in out
+        ):
             out["type"] = "income"
-        elif re.search(r"\b(expense|expenses|spending|spent|purchases?|paid out)\b", text):
+        elif re.search(
+            r"\b(expense|expenses|spending|spent|purchases?|paid out)\b", text
+        ):
             out["type"] = "expense"
 
         # Amount bounds: "over £100", "under £50", "more than £20", "less than £10", "above £X", "below £X"
-        m = re.search(r"\b(over|above|more than|greater than|>=?)\s*[£$]?\s*(\d+(?:\.\d+)?)\b", text)
+        m = re.search(
+            r"\b(over|above|more than|greater than|>=?)\s*[£$]?\s*(\d+(?:\.\d+)?)\b",
+            text,
+        )
         if m:
             out["amount_min"] = float(m.group(2))
             out["amount_comparator"] = "over"
-        m = re.search(r"\b(under|below|less than|<=?)\s*[£$]?\s*(\d+(?:\.\d+)?)\b", text)
+        m = re.search(
+            r"\b(under|below|less than|<=?)\s*[£$]?\s*(\d+(?:\.\d+)?)\b", text
+        )
         if m:
             out["amount_max"] = float(m.group(2))
             out["amount_comparator"] = "under"
         # Price adjectives
-        if re.search(r"\b(expensive|large|big|high value)\b", text) and "amount_min" not in out:
+        if (
+            re.search(r"\b(expensive|large|big|high value)\b", text)
+            and "amount_min" not in out
+        ):
             out["amount_min"] = 50
             out["amount_comparator"] = "over"
-        if re.search(r"\b(cheap|small|low value|minor)\b", text) and "amount_max" not in out:
+        if (
+            re.search(r"\b(cheap|small|low value|minor)\b", text)
+            and "amount_max" not in out
+        ):
             out["amount_max"] = 20
             out["amount_comparator"] = "under"
         # Bare amount filter: "£100", "100 pounds"
@@ -757,18 +1256,47 @@ def build_router() -> APIRouter:
             last = now.year - 1
             out["date_from"] = f"{last}-01-01"
             out["date_to"] = f"{last}-12-31"
-        elif m := re.search(r"\blast\s+(\d+)\s+(day|days|week|weeks|month|months|year|years)\b", text):
+        elif m := re.search(
+            r"\blast\s+(\d+)\s+(day|days|week|weeks|month|months|year|years)\b", text
+        ):
             n, unit = int(m.group(1)), m.group(2)
-            days = n * {"day": 1, "days": 1, "week": 7, "weeks": 7,
-                        "month": 30, "months": 30, "year": 365, "years": 365}[unit]
+            days = (
+                n
+                * {
+                    "day": 1,
+                    "days": 1,
+                    "week": 7,
+                    "weeks": 7,
+                    "month": 30,
+                    "months": 30,
+                    "year": 365,
+                    "years": 365,
+                }[unit]
+            )
             d = now - timedelta(days=days)
             out["date_from"] = d.strftime("%Y-%m-%d")
             out["date_to"] = now.strftime("%Y-%m-%d")
         else:
             # Month name detection (e.g. "in March", "March 2024", "from January")
-            months = {m_: i+1 for i, m_ in enumerate(
-                ["january", "february", "march", "april", "may", "june",
-                 "july", "august", "september", "october", "november", "december"])}
+            months = {
+                m_: i + 1
+                for i, m_ in enumerate(
+                    [
+                        "january",
+                        "february",
+                        "march",
+                        "april",
+                        "may",
+                        "june",
+                        "july",
+                        "august",
+                        "september",
+                        "october",
+                        "november",
+                        "december",
+                    ]
+                )
+            }
             for name, num in months.items():
                 if re.search(rf"\b{name}\b", text):
                     yr_match = re.search(r"\b(20\d{2})\b", text)
@@ -799,7 +1327,14 @@ def build_router() -> APIRouter:
             "waitrose": ["waitrose", "waitrose & partners", "waitrose and partners"],
             "lidl": ["lidl"],
             "aldi": ["aldi"],
-            "mcdonald": ["mcdonald", "mcdonalds", "mcd", "mc donald", "mc donalds", "maccies"],
+            "mcdonald": [
+                "mcdonald",
+                "mcdonalds",
+                "mcd",
+                "mc donald",
+                "mc donalds",
+                "maccies",
+            ],
             "amazon": ["amazon", "amzn"],
             "uber": ["uber", "uber eats", "uber trip"],
             "netflix": ["netflix", "netflix.com"],
@@ -816,25 +1351,37 @@ def build_router() -> APIRouter:
             "ikea": ["ikea"],
             "currys": ["currys", "currys pc world"],
         }
-        merchant_matches = [name for name, aliases in _MERCHANT_ALIASES.items()
-                           if any(a in text for a in aliases)]
+        merchant_matches = [
+            name
+            for name, aliases in _MERCHANT_ALIASES.items()
+            if any(a in text for a in aliases)
+        ]
         if merchant_matches:
             out["merchant_keywords"] = merchant_matches[:5]
 
         # Aggregate detection: "how much did I spend", "total", "sum"
-        if re.search(r"\b(how much|total spent|total spend|sum of|what did i spend|spending on)\b", text):
+        if re.search(
+            r"\b(how much|total spent|total spend|sum of|what did i spend|spending on)\b",
+            text,
+        ):
             out["aggregate"] = "how_much"
         elif re.search(r"\b(how many|count of|number of)\b", text):
             out["aggregate"] = "count"
 
         # Comparative detection: "compare", "vs", "versus", "difference between"
-        if re.search(r"\b(compare|comparison|vs\.?|versus|difference between)\b", text) and out.get("date_from") and out.get("date_to"):
+        if (
+            re.search(r"\b(compare|comparison|vs\.?|versus|difference between)\b", text)
+            and out.get("date_from")
+            and out.get("date_to")
+        ):
             out["comparative"] = True
 
         return out
 
     @router.post("/transactions/ai-search")
-    async def ai_search(request: Request, user: dict = Depends(get_current_user), q: str = Query("")):
+    async def ai_search(
+        request: Request, user: dict = Depends(get_current_user), q: str = Query("")
+    ):
         """Two-pass natural language transaction search.
         1. LLM extracts structured filters (date range, category, amount, type, merchant keywords) from the query.
         2. Server applies filters to the DB and returns matches, optionally re-ranked by LLM.
@@ -847,7 +1394,7 @@ def build_router() -> APIRouter:
             filters: dict = {}
             llm_used = False
             try:
-                today_str = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+                today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
                 filter_resp, provider, model, pt, ct, cost = await call_llm(
                     "You are a UK personal finance search assistant. Understand what the user wants, think step by step, "
                     "then output structured JSON filters. Today is " + today_str + ".",
@@ -890,14 +1437,29 @@ Output ONLY valid JSON, no markdown, no explanation:
   "comparative": "true|false — true if comparing two periods",
   "limit": 50
 }}""",
-                    temperature=0.1, max_tokens=600, json_mode=False,
+                    temperature=0.1,
+                    max_tokens=600,
+                    json_mode=False,
                 )
                 try:
-                    await track_ai_usage(session, user["user_id"], provider, model, pt, ct, cost, endpoint="ai_search")
+                    await track_ai_usage(
+                        session,
+                        user["user_id"],
+                        provider,
+                        model,
+                        pt,
+                        ct,
+                        cost,
+                        endpoint="ai_search",
+                    )
                 except Exception:
                     pass
                 try:
-                    parsed = parse_json(filter_resp) if isinstance(filter_resp, str) else filter_resp
+                    parsed = (
+                        parse_json(filter_resp)
+                        if isinstance(filter_resp, str)
+                        else filter_resp
+                    )
                     if isinstance(parsed, dict):
                         filters = parsed
                         llm_used = True
@@ -925,12 +1487,19 @@ Output ONLY valid JSON, no markdown, no explanation:
                 stmt = stmt.where(Transaction.amount > 0)
             df = filters.get("date_from")
             if df and df != "null":
-                try: stmt = stmt.where(Transaction.date >= datetime.fromisoformat(df))
-                except Exception: pass
+                try:
+                    stmt = stmt.where(Transaction.date >= datetime.fromisoformat(df))
+                except Exception:
+                    pass
             dto = filters.get("date_to")
             if dto and dto != "null":
-                try: stmt = stmt.where(Transaction.date <= datetime.fromisoformat(dto) + timedelta(days=1))
-                except Exception: pass
+                try:
+                    stmt = stmt.where(
+                        Transaction.date
+                        <= datetime.fromisoformat(dto) + timedelta(days=1)
+                    )
+                except Exception:
+                    pass
             amin = filters.get("amount_min")
             if amin is not None and amin != "null":
                 try:
@@ -940,37 +1509,53 @@ Output ONLY valid JSON, no markdown, no explanation:
                         stmt = stmt.where(func.abs(Transaction.amount) <= v)
                     else:
                         stmt = stmt.where(func.abs(Transaction.amount) >= v)
-                except Exception: pass
+                except Exception:
+                    pass
             amax = filters.get("amount_max")
             if amax is not None and amax != "null":
                 try:
                     stmt = stmt.where(func.abs(Transaction.amount) <= abs(float(amax)))
-                except Exception: pass
+                except Exception:
+                    pass
             keywords = filters.get("merchant_keywords") or []
             if isinstance(keywords, list) and keywords:
                 from sqlalchemy import or_ as _or
+
                 kw_filters = []
                 for kw in keywords[:5]:
                     if isinstance(kw, str) and kw.strip():
                         pattern = f"%{kw.strip().lower()}%"
-                        kw_filters.append(func.lower(Transaction.description).like(pattern))
-                        kw_filters.append(func.lower(Transaction.merchant_name).like(pattern))
-                        kw_filters.append(func.lower(Transaction.normalized_merchant).like(pattern))
+                        kw_filters.append(
+                            func.lower(Transaction.description).like(pattern)
+                        )
+                        kw_filters.append(
+                            func.lower(Transaction.merchant_name).like(pattern)
+                        )
+                        kw_filters.append(
+                            func.lower(Transaction.normalized_merchant).like(pattern)
+                        )
                 if kw_filters:
                     stmt = stmt.where(_or(*kw_filters))
             search_text = filters.get("search_text")
-            if not search_text and not keywords and not filters.get("category") and not filters.get("type"):
+            if (
+                not search_text
+                and not keywords
+                and not filters.get("category")
+                and not filters.get("type")
+            ):
                 # Nothing structured matched — fall back to free-text search over the original query
                 search_text = clean_q
             if search_text and search_text != "null":
                 pattern = f"%{str(search_text).lower()}%"
-                stmt = stmt.where(_or(
-                    func.lower(Transaction.description).like(pattern),
-                    func.lower(Transaction.merchant_name).like(pattern),
-                    func.lower(Transaction.normalized_merchant).like(pattern),
-                    func.lower(Transaction.category).like(pattern),
-                    func.lower(Transaction.notes).like(pattern),
-                ))
+                stmt = stmt.where(
+                    _or(
+                        func.lower(Transaction.description).like(pattern),
+                        func.lower(Transaction.merchant_name).like(pattern),
+                        func.lower(Transaction.normalized_merchant).like(pattern),
+                        func.lower(Transaction.category).like(pattern),
+                        func.lower(Transaction.notes).like(pattern),
+                    )
+                )
             sort = filters.get("sort")
             if sort == "amount_desc":
                 stmt = stmt.order_by(Transaction.amount.desc())
@@ -993,10 +1578,14 @@ Output ONLY valid JSON, no markdown, no explanation:
             label_map = {}
             if conn_ids:
                 from db import BankConnection
+
                 bc_result = await session.execute(
-                    select(BankConnection.connection_id, BankConnection.nickname, BankConnection.account_name, BankConnection.config).where(
-                        BankConnection.connection_id.in_(conn_ids)
-                    )
+                    select(
+                        BankConnection.connection_id,
+                        BankConnection.nickname,
+                        BankConnection.account_name,
+                        BankConnection.config,
+                    ).where(BankConnection.connection_id.in_(conn_ids))
                 )
                 for bc_row in bc_result:
                     cfg = bc_row.config or {}
@@ -1041,7 +1630,9 @@ Output ONLY valid JSON, no markdown, no explanation:
                 period_days = (dto_dt - df_dt).days
                 prev_to = df_dt - timedelta(days=1)
                 prev_from = prev_to - timedelta(days=period_days)
-                prev_stmt = select(Transaction).where(Transaction.user_id == user["user_id"])
+                prev_stmt = select(Transaction).where(
+                    Transaction.user_id == user["user_id"]
+                )
                 if cat and cat != "null":
                     prev_stmt = prev_stmt.where(Transaction.category == cat)
                 if t == "expense":
@@ -1053,7 +1644,8 @@ Output ONLY valid JSON, no markdown, no explanation:
                         Transaction.date >= prev_from,
                         Transaction.date <= prev_to + timedelta(days=1),
                     )
-                except Exception: pass
+                except Exception:
+                    pass
                 prev_result = await session.execute(prev_stmt)
                 prev_txs = [_tx_to_dict(t) for t in prev_result.scalars().all()]
                 prev_income = sum(t["amount"] for t in prev_txs if t["amount"] > 0)
@@ -1070,7 +1662,9 @@ Output ONLY valid JSON, no markdown, no explanation:
             return resp
 
     @router.post("/transactions")
-    async def create_transaction(payload: TransactionIn, request: Request, user: dict = Depends(get_current_user)):
+    async def create_transaction(
+        payload: TransactionIn, request: Request, user: dict = Depends(get_current_user)
+    ):
         sm = request.app.state.db
         async with sm() as session:
             tx_id = f"tx_{uuid.uuid4().hex[:12]}"
@@ -1078,29 +1672,53 @@ Output ONLY valid JSON, no markdown, no explanation:
             merch = payload.merchant or ""
             category = payload.category or smart_categorize(f"{desc} {merch}")
             from statements import resolve_category as _rc
+
             category = _rc(category)
             if category == "uncategorized":
                 # Fast path: keyword match
                 from statements import _keyword_categorise as kw_cat
+
                 fast = kw_cat(desc, merch, payload.amount)
                 if fast:
                     category = fast
                 else:
-                    from llm import call_llm, parse_json as llm_parse, track_ai_usage as track_usage
+                    from llm import call_llm
+                    from llm import parse_json as llm_parse
+                    from llm import track_ai_usage as track_usage
+
                     try:
                         raw, provider, model, pt, ct, cost = await call_llm(
                             "You categorise UK transactions. Output valid JSON only.",
-                            CATEGORISE_PROMPT_FE.format(description=desc[:100], merchant=merch or "unknown", amount=payload.amount),
+                            CATEGORISE_PROMPT_FE.format(
+                                description=desc[:100],
+                                merchant=merch or "unknown",
+                                amount=payload.amount,
+                            ),
                             json_mode=False,
                         )
-                        await track_usage(session, user["user_id"], provider, model, pt, ct, cost, endpoint="manual_categorize")
-                        ai_cat = str(llm_parse(raw).get("category", "uncategorized")).lower().strip()
+                        await track_usage(
+                            session,
+                            user["user_id"],
+                            provider,
+                            model,
+                            pt,
+                            ct,
+                            cost,
+                            endpoint="manual_categorize",
+                        )
+                        ai_cat = (
+                            str(llm_parse(raw).get("category", "uncategorized"))
+                            .lower()
+                            .strip()
+                        )
                         if ai_cat in ALL_CATEGORIES and ai_cat != "uncategorized":
                             category = ai_cat
                     except Exception:
                         pass
             normalized = normalize_merchant(merch or desc)
-            signed_amount = abs(payload.amount) if payload.is_income else -abs(payload.amount)
+            signed_amount = (
+                abs(payload.amount) if payload.is_income else -abs(payload.amount)
+            )
             tx = Transaction(
                 transaction_id=tx_id,
                 user_id=user["user_id"],
@@ -1110,7 +1728,9 @@ Output ONLY valid JSON, no markdown, no explanation:
                 merchant_name=merch or None,
                 normalized_merchant=normalized,
                 category=category,
-                date=datetime.fromisoformat(payload.date) if payload.date else datetime.now(timezone.utc),
+                date=datetime.fromisoformat(payload.date)
+                if payload.date
+                else datetime.now(timezone.utc),
                 account_id=payload.account_id,
                 notes=payload.notes,
                 tags=payload.tags,
@@ -1129,7 +1749,12 @@ Output ONLY valid JSON, no markdown, no explanation:
             return doc
 
     @router.patch("/transactions/{tx_id}")
-    async def update_transaction(tx_id: str, payload: TransactionUpdate, request: Request, user: dict = Depends(get_current_user)):
+    async def update_transaction(
+        tx_id: str,
+        payload: TransactionUpdate,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
@@ -1152,6 +1777,7 @@ Output ONLY valid JSON, no markdown, no explanation:
             old_category = tx.category
             if payload.category is not None and payload.category != tx.category:
                 from statements import resolve_category as _rc
+
                 tx.category = _rc(payload.category)
                 category_changed = True
             if payload.date is not None:
@@ -1176,7 +1802,9 @@ Output ONLY valid JSON, no markdown, no explanation:
             return doc
 
     @router.delete("/transactions/{tx_id}")
-    async def delete_transaction(tx_id: str, request: Request, user: dict = Depends(get_current_user)):
+    async def delete_transaction(
+        tx_id: str, request: Request, user: dict = Depends(get_current_user)
+    ):
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
@@ -1189,9 +1817,12 @@ Output ONLY valid JSON, no markdown, no explanation:
             if not tx:
                 raise HTTPException(404, "Not found")
             await session.execute(
-                delete(SplitTransaction).where(SplitTransaction.parent_transaction_id == tx_id)
+                delete(SplitTransaction).where(
+                    SplitTransaction.parent_transaction_id == tx_id
+                )
             )
             from db import MaaserLedger
+
             await session.execute(
                 delete(MaaserLedger).where(
                     MaaserLedger.transaction_id == tx_id,
@@ -1214,9 +1845,34 @@ Output ONLY valid JSON, no markdown, no explanation:
         date_to: Optional[str] = None
 
     @router.post("/transactions/bulk-delete")
-    async def bulk_delete(payload: BulkUpdateIn, request: Request, user: dict = Depends(get_current_user)):
+    async def bulk_delete(
+        payload: BulkUpdateIn, request: Request, user: dict = Depends(get_current_user)
+    ):
         sm = request.app.state.db
         async with sm() as session:
+            result = await session.execute(
+                select(Transaction).where(
+                    Transaction.transaction_id.in_(payload.transaction_ids),
+                    Transaction.user_id == user["user_id"],
+                )
+            )
+            records = result.scalars().all()
+            backup = [
+                {
+                    "transaction_id": r.transaction_id,
+                    "user_id": r.user_id,
+                    "amount": r.amount,
+                    "description": r.description,
+                    "category": r.category,
+                    "date": r.date.isoformat() if r.date else None,
+                    "tx_type": r.tx_type,
+                    "source": r.source,
+                    "pending": r.pending,
+                    "notes": r.notes,
+                    "merchant_name": r.merchant_name,
+                }
+                for r in records
+            ]
             await session.execute(
                 delete(SplitTransaction).where(
                     SplitTransaction.parent_transaction_id.in_(payload.transaction_ids),
@@ -1224,6 +1880,7 @@ Output ONLY valid JSON, no markdown, no explanation:
                 )
             )
             from db import MaaserLedger
+
             await session.execute(
                 delete(MaaserLedger).where(
                     MaaserLedger.transaction_id.in_(payload.transaction_ids),
@@ -1231,20 +1888,63 @@ Output ONLY valid JSON, no markdown, no explanation:
                 )
             )
             result = await session.execute(
-                delete(Transaction).where(
+                delete(Transaction)
+                .where(
                     Transaction.transaction_id.in_(payload.transaction_ids),
                     Transaction.user_id == user["user_id"],
-                ).returning(Transaction.transaction_id)
+                )
+                .returning(Transaction.transaction_id)
             )
             deleted = len(result.fetchall())
             await session.commit()
             _query_cache.delete(f"dash:{user['user_id']}")
             _query_cache.delete_by_prefix(f"trends:{user['user_id']}:")
             _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
-            return {"ok": True, "deleted": deleted}
+            return {"ok": True, "deleted": deleted, "backup": backup}
+
+    @router.post("/transactions/undo-bulk-delete")
+    async def undo_bulk_delete(
+        payload: BulkUpdateIn, request: Request, user: dict = Depends(get_current_user)
+    ):
+        return {
+            "ok": True,
+            "restored": 0,
+            "info": "Full undo requires soft-delete migration",
+        }
+
+    @router.post("/transactions/bulk-category")
+    async def bulk_category(
+        payload: BulkUpdateIn, request: Request, user: dict = Depends(get_current_user)
+    ):
+        sm = request.app.state.db
+        async with sm() as session:
+            values = {}
+            if payload.category is not None:
+                values["category"] = payload.category
+            if values:
+                await session.execute(
+                    update(Transaction)
+                    .where(
+                        Transaction.transaction_id.in_(payload.transaction_ids),
+                        Transaction.user_id == user["user_id"],
+                    )
+                    .values(**values)
+                )
+                await session.commit()
+            _query_cache.delete(f"dash:{user['user_id']}")
+            _query_cache.delete_by_prefix(f"trends:{user['user_id']}:")
+            _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
+            return {
+                "ok": True,
+                "updated": len(payload.transaction_ids) if values else 0,
+            }
 
     @router.post("/transactions/clear")
-    async def clear_transactions(payload: BulkDeleteByQueryIn, request: Request, user: dict = Depends(get_current_user)):
+    async def clear_transactions(
+        payload: BulkDeleteByQueryIn,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
         sm = request.app.state.db
         async with sm() as session:
             base = select(Transaction).where(Transaction.user_id == user["user_id"])
@@ -1259,11 +1959,18 @@ Output ONLY valid JSON, no markdown, no explanation:
             if payload.search:
                 base = base.where(Transaction.description.ilike(f"%{payload.search}%"))
             if payload.date_from:
-                base = base.where(Transaction.date >= datetime.fromisoformat(payload.date_from))
+                base = base.where(
+                    Transaction.date >= datetime.fromisoformat(payload.date_from)
+                )
             if payload.date_to:
-                base = base.where(Transaction.date <= datetime.fromisoformat(payload.date_to) + timedelta(days=1))
+                base = base.where(
+                    Transaction.date
+                    <= datetime.fromisoformat(payload.date_to) + timedelta(days=1)
+                )
             # Fetch matching IDs, delete splits first, then transactions
-            ids_result = await session.execute(base.with_only_columns(Transaction.transaction_id))
+            ids_result = await session.execute(
+                base.with_only_columns(Transaction.transaction_id)
+            )
             ids = [row[0] for row in ids_result.fetchall()]
             if ids:
                 await session.execute(
@@ -1273,6 +1980,7 @@ Output ONLY valid JSON, no markdown, no explanation:
                     )
                 )
                 from db import MaaserLedger
+
                 await session.execute(
                     delete(MaaserLedger).where(
                         MaaserLedger.transaction_id.in_(ids),
@@ -1292,7 +2000,9 @@ Output ONLY valid JSON, no markdown, no explanation:
             return {"ok": True, "deleted": deleted}
 
     @router.post("/transactions/bulk-update")
-    async def bulk_update(payload: BulkUpdateIn, request: Request, user: dict = Depends(get_current_user)):
+    async def bulk_update(
+        payload: BulkUpdateIn, request: Request, user: dict = Depends(get_current_user)
+    ):
         sm = request.app.state.db
         async with sm() as session:
             values = {}
@@ -1304,10 +2014,12 @@ Output ONLY valid JSON, no markdown, no explanation:
                 values["pending"] = payload.pending
             if values:
                 await session.execute(
-                    update(Transaction).where(
+                    update(Transaction)
+                    .where(
                         Transaction.transaction_id.in_(payload.transaction_ids),
                         Transaction.user_id == user["user_id"],
-                    ).values(**values)
+                    )
+                    .values(**values)
                 )
                 await session.commit()
             _query_cache.delete(f"dash:{user['user_id']}")
@@ -1320,12 +2032,15 @@ Output ONLY valid JSON, no markdown, no explanation:
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
-                select(func.count()).select_from(Transaction).where(Transaction.user_id == user["user_id"])
+                select(func.count())
+                .select_from(Transaction)
+                .where(Transaction.user_id == user["user_id"])
             )
             existing = result.scalar() or 0
             if existing > 0:
                 return {"ok": True, "skipped": True}
             from statements import resolve_category as _rc
+
             sample = [
                 ("Tesco Express", -42.50, "grocery"),
                 ("Salary - Acme Ltd", 3200.00, "salary"),
@@ -1368,7 +2083,12 @@ Output ONLY valid JSON, no markdown, no explanation:
     # ── Split transactions ───────────────────────────────────────────
 
     @router.post("/transactions/{tx_id}/split")
-    async def split_transaction(tx_id: str, payload: SplitIn, request: Request, user: dict = Depends(get_current_user)):
+    async def split_transaction(
+        tx_id: str,
+        payload: SplitIn,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
@@ -1382,9 +2102,14 @@ Output ONLY valid JSON, no markdown, no explanation:
                 raise HTTPException(404, "Not found")
             total_split = sum(s["amount"] for s in payload.splits)
             if abs(total_split - abs(tx.amount)) > 0.01:
-                raise HTTPException(400, f"Split amounts (${total_split:.2f}) must equal original amount (${abs(tx.amount):.2f})")
+                raise HTTPException(
+                    400,
+                    f"Split amounts (${total_split:.2f}) must equal original amount (${abs(tx.amount):.2f})",
+                )
             await session.execute(
-                delete(SplitTransaction).where(SplitTransaction.parent_transaction_id == tx_id)
+                delete(SplitTransaction).where(
+                    SplitTransaction.parent_transaction_id == tx_id
+                )
             )
             for s in payload.splits:
                 st = SplitTransaction(
@@ -1400,7 +2125,9 @@ Output ONLY valid JSON, no markdown, no explanation:
             return {"ok": True, "splits": payload.splits}
 
     @router.get("/transactions/{tx_id}/splits")
-    async def get_splits(tx_id: str, request: Request, user: dict = Depends(get_current_user)):
+    async def get_splits(
+        tx_id: str, request: Request, user: dict = Depends(get_current_user)
+    ):
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
@@ -1410,27 +2137,35 @@ Output ONLY valid JSON, no markdown, no explanation:
                 )
             )
             splits = result.scalars().all()
-            return {"splits": [
-                {
-                    "split_id": s.split_id,
-                    "amount": s.amount,
-                    "category": s.category,
-                    "description": s.description,
-                    "notes": s.notes,
-                } for s in splits
-            ]}
+            return {
+                "splits": [
+                    {
+                        "split_id": s.split_id,
+                        "amount": s.amount,
+                        "category": s.category,
+                        "description": s.description,
+                        "notes": s.notes,
+                    }
+                    for s in splits
+                ]
+            }
 
     # ── Recurring detection ──────────────────────────────────────────
 
     @router.post("/transactions/detect-recurring")
-    async def detect_recurring(request: Request, user: dict = Depends(get_current_user)):
+    async def detect_recurring(
+        request: Request, user: dict = Depends(get_current_user)
+    ):
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
-                select(Transaction).where(
+                select(Transaction)
+                .where(
                     Transaction.user_id == user["user_id"],
                     Transaction.amount < 0,
-                ).order_by(Transaction.date.desc()).limit(500)
+                )
+                .order_by(Transaction.date.desc())
+                .limit(500)
             )
             txs = [_tx_to_dict(t) for t in result.scalars().all()]
             patterns = detect_recurring_txns(txs)
@@ -1447,22 +2182,27 @@ Output ONLY valid JSON, no markdown, no explanation:
                 )
             )
             items = result.scalars().all()
-            return {"recurring": [
-                {
-                    "id": r.id,
-                    "description": r.description,
-                    "amount": r.amount,
-                    "category": r.category,
-                    "frequency": r.frequency,
-                    "next_date": r.next_date.isoformat() if r.next_date else None,
-                    "active": r.active,
-                } for r in items
-            ]}
+            return {
+                "recurring": [
+                    {
+                        "id": r.id,
+                        "description": r.description,
+                        "amount": r.amount,
+                        "category": r.category,
+                        "frequency": r.frequency,
+                        "next_date": r.next_date.isoformat() if r.next_date else None,
+                        "active": r.active,
+                    }
+                    for r in items
+                ]
+            }
 
     # ── Merchant normalization ───────────────────────────────────────
 
     @router.post("/transactions/normalize-merchants")
-    async def normalize_merchants(request: Request, user: dict = Depends(get_current_user)):
+    async def normalize_merchants(
+        request: Request, user: dict = Depends(get_current_user)
+    ):
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
@@ -1486,25 +2226,41 @@ Output ONLY valid JSON, no markdown, no explanation:
     # ── Subscriptions ───────────────────────────────────────────────
 
     @router.get("/subscriptions")
-    async def list_subscriptions(request: Request, user: dict = Depends(get_current_user)):
+    async def list_subscriptions(
+        request: Request, user: dict = Depends(get_current_user)
+    ):
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
-                select(Subscription).where(Subscription.user_id == user["user_id"]).order_by(Subscription.active.desc(), Subscription.name)
+                select(Subscription)
+                .where(Subscription.user_id == user["user_id"])
+                .order_by(Subscription.active.desc(), Subscription.name)
             )
             subs = result.scalars().all()
-            return {"subscriptions": [
-                {"subscription_id": s.subscription_id, "name": s.name,
-                 "amount": float(s.amount), "currency": s.currency,
-                 "category": s.category, "merchant": s.merchant,
-                 "frequency": s.frequency,
-                 "next_billing": s.next_billing.isoformat() if s.next_billing else None,
-                 "active": s.active, "notes": s.notes}
-                for s in subs
-            ]}
+            return {
+                "subscriptions": [
+                    {
+                        "subscription_id": s.subscription_id,
+                        "name": s.name,
+                        "amount": float(s.amount),
+                        "currency": s.currency,
+                        "category": s.category,
+                        "merchant": s.merchant,
+                        "frequency": s.frequency,
+                        "next_billing": s.next_billing.isoformat()
+                        if s.next_billing
+                        else None,
+                        "active": s.active,
+                        "notes": s.notes,
+                    }
+                    for s in subs
+                ]
+            }
 
     @router.post("/subscriptions")
-    async def create_subscription(payload: dict, request: Request, user: dict = Depends(get_current_user)):
+    async def create_subscription(
+        payload: dict, request: Request, user: dict = Depends(get_current_user)
+    ):
         sm = request.app.state.db
         async with sm() as session:
             sub = Subscription(
@@ -1525,16 +2281,32 @@ Output ONLY valid JSON, no markdown, no explanation:
             return {"subscription_id": sub.subscription_id, "name": sub.name}
 
     @router.patch("/subscriptions/{subscription_id}")
-    async def update_subscription(subscription_id: str, payload: dict, request: Request, user: dict = Depends(get_current_user)):
+    async def update_subscription(
+        subscription_id: str,
+        payload: dict,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
-                select(Subscription).where(Subscription.subscription_id == subscription_id, Subscription.user_id == user["user_id"])
+                select(Subscription).where(
+                    Subscription.subscription_id == subscription_id,
+                    Subscription.user_id == user["user_id"],
+                )
             )
             sub = result.scalar_one_or_none()
             if not sub:
                 raise HTTPException(404, "Subscription not found")
-            for field in ("name", "amount", "currency", "category", "merchant", "frequency", "notes"):
+            for field in (
+                "name",
+                "amount",
+                "currency",
+                "category",
+                "merchant",
+                "frequency",
+                "notes",
+            ):
                 if field in payload:
                     setattr(sub, field, payload[field])
             if "next_billing" in payload:
@@ -1545,11 +2317,16 @@ Output ONLY valid JSON, no markdown, no explanation:
             return {"ok": True}
 
     @router.delete("/subscriptions/{subscription_id}")
-    async def delete_subscription(subscription_id: str, request: Request, user: dict = Depends(get_current_user)):
+    async def delete_subscription(
+        subscription_id: str, request: Request, user: dict = Depends(get_current_user)
+    ):
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
-                select(Subscription).where(Subscription.subscription_id == subscription_id, Subscription.user_id == user["user_id"])
+                select(Subscription).where(
+                    Subscription.subscription_id == subscription_id,
+                    Subscription.user_id == user["user_id"],
+                )
             )
             sub = result.scalar_one_or_none()
             if not sub:
@@ -1566,27 +2343,39 @@ Output ONLY valid JSON, no markdown, no explanation:
         async with sm() as session:
             result = await session.execute(
                 select(Transaction.account_id, func.count().label("tx_count"))
-                .where(Transaction.user_id == user["user_id"], Transaction.account_id.isnot(None))
+                .where(
+                    Transaction.user_id == user["user_id"],
+                    Transaction.account_id.isnot(None),
+                )
                 .group_by(Transaction.account_id)
                 .order_by(func.count().desc())
             )
             account_rows = result.all()
             nick_result = await session.execute(
-                select(AccountNickname).where(AccountNickname.user_id == user["user_id"])
+                select(AccountNickname).where(
+                    AccountNickname.user_id == user["user_id"]
+                )
             )
             nicknames = {n.account_id: n.nickname for n in nick_result.scalars().all()}
             accounts = []
             for row in account_rows:
                 aid = row.account_id
-                accounts.append({
-                    "account_id": aid,
-                    "nickname": nicknames.get(aid),
-                    "transaction_count": row.tx_count,
-                })
+                accounts.append(
+                    {
+                        "account_id": aid,
+                        "nickname": nicknames.get(aid),
+                        "transaction_count": row.tx_count,
+                    }
+                )
             return {"accounts": accounts}
 
     @router.put("/accounts/{account_id}/nickname")
-    async def set_nickname(account_id: str, payload: NicknameIn, request: Request, user: dict = Depends(get_current_user)):
+    async def set_nickname(
+        account_id: str,
+        payload: NicknameIn,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
@@ -1619,123 +2408,263 @@ Output ONLY valid JSON, no markdown, no explanation:
         cached = _query_cache.get(cache_key)
         if cached:
             return cached
+
         sm = request.app.state.db
         async with sm() as session:
-            result = await session.execute(
-                select(Category).where(Category.user_id == user["user_id"]).order_by(Category.sort_order, Category.name)
+            rows = (
+                (
+                    await session.execute(
+                        select(Category)
+                        .where(Category.user_id == user["user_id"])
+                        .order_by(Category.sort_order, Category.name)
+                    )
+                )
+                .scalars()
+                .all()
             )
-            cats = result.scalars().all()
-            user_names = {c.name for c in cats}
-            # Build section hierarchy for system categories
-            defaults = []
-            for i, n in enumerate(CATEGORIES):
-                if n == "uncategorized" or n in user_names:
-                    continue
-                section = SECTION_FOR_CATEGORY.get(n, "Other")
-                defaults.append({
-                    "category_id": None, "name": n, "icon": None, "color": None,
-                    "is_income": n in {"salary", "income"}, "budget": None,
-                    "sort_order": i, "is_default": True, "source": "System",
-                    "section": section,
-                })
-            user_cats = [
-                {"category_id": c.category_id, "name": c.name, "icon": c.icon,
-                 "color": c.color, "is_income": c.is_income,
-                 "budget": float(c.budget) if c.budget else None,
-                 "sort_order": c.sort_order, "is_default": False, "source": "Custom",
-                 "section": SECTION_FOR_CATEGORY.get(c.name, "Other")}
-                for c in cats
-            ]
-            payload = {"categories": defaults + user_cats, "hierarchy": {
-                section: [name for name, _ in items]
-                for section, items in CATEGORY_HIERARCHY.items()
-            }}
+            usage_map = await _category_usage_map(session, user["user_id"])
+            categories = combine_categories(rows, usage_map)
+            payload = {
+                "categories": categories,
+                "hierarchy": hierarchy_payload(categories),
+            }
             _query_cache.set(cache_key, payload, ttl=120)
             return payload
 
     @router.post("/categories")
-    async def create_category(payload: dict, request: Request, user: dict = Depends(get_current_user)):
+    async def create_category(
+        payload: CategoryCreateIn,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
+        data = payload.model_dump(exclude_unset=True)
+        slug = _normalise_category_slug(
+            data.get("name") or data.get("label"), fallback=""
+        )
+        if not slug:
+            raise HTTPException(400, "Category name is required")
+        if slug == "uncategorized":
+            raise HTTPException(400, "Cannot create a duplicate Uncategorized category")
+
         sm = request.app.state.db
         async with sm() as session:
-            existing = await session.execute(
-                select(Category).where(Category.user_id == user["user_id"], Category.name == payload["name"])
-            )
-            if existing.scalar_one_or_none():
+            existing = (
+                await session.execute(
+                    select(Category).where(
+                        Category.user_id == user["user_id"],
+                        Category.name == slug,
+                    )
+                )
+            ).scalar_one_or_none()
+            if existing and not existing.is_archived:
                 raise HTTPException(409, "Category already exists")
-            cat = Category(
-                category_id=f"cat_{uuid.uuid4().hex[:12]}",
-                user_id=user["user_id"],
-                name=payload["name"],
-                icon=payload.get("icon"),
-                color=payload.get("color"),
-                is_income=payload.get("is_income", False),
-                budget=payload.get("budget"),
-                sort_order=payload.get("sort_order", 0),
+
+            cat = await _ensure_category_row(
+                session, user["user_id"], slug, row=existing
             )
-            session.add(cat)
+            _apply_category_payload_to_row(cat, slug, data)
+            if data.get("is_income") is None and slug in INCOME_CATEGORIES:
+                cat.is_income = True
+
             await session.commit()
             await session.refresh(cat)
-            _query_cache.delete_by_prefix(f"cats:{user['user_id']}")
-            return {"category_id": cat.category_id, "name": cat.name}
+            usage_map = await _category_usage_map(session, user["user_id"])
+            _invalidate_category_caches(user["user_id"])
+            return {"category": build_category_payload(slug, cat, usage_map.get(slug))}
 
     @router.patch("/categories/{category_id}")
-    async def update_category(category_id: str, payload: dict, request: Request, user: dict = Depends(get_current_user)):
+    async def update_category(
+        category_id: str,
+        payload: CategoryUpdateIn,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
+        data = payload.model_dump(exclude_unset=True)
         sm = request.app.state.db
         async with sm() as session:
-            result = await session.execute(
-                select(Category).where(Category.category_id == category_id, Category.user_id == user["user_id"])
+            slug, cat, _ = await _resolve_category_entity(
+                session, user["user_id"], category_id
             )
-            cat = result.scalar_one_or_none()
-            if not cat:
-                raise HTTPException(404, "Category not found")
-            for field in ("name", "icon", "color", "is_income", "sort_order"):
-                if field in payload:
-                    setattr(cat, field, payload[field])
-            if "budget" in payload:
-                cat.budget = payload["budget"]
+            cat = await _ensure_category_row(session, user["user_id"], slug, row=cat)
+            _apply_category_payload_to_row(cat, slug, data)
             await session.commit()
-            _query_cache.delete_by_prefix(f"cats:{user['user_id']}")
-            return {"ok": True}
+            await session.refresh(cat)
+            usage_map = await _category_usage_map(session, user["user_id"])
+            _invalidate_category_caches(user["user_id"])
+            return {"category": build_category_payload(slug, cat, usage_map.get(slug))}
+
+    @router.post("/categories/{category_id}/reassign-delete")
+    async def reassign_delete_category(
+        category_id: str,
+        payload: CategoryReassignDeleteIn,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
+        sm = request.app.state.db
+        async with sm() as session:
+            slug, cat, _ = await _resolve_category_entity(
+                session, user["user_id"], category_id
+            )
+            if slug == "uncategorized":
+                raise HTTPException(400, "Uncategorized cannot be deleted")
+
+            replacement_ref = (
+                payload.replacement_category_id or payload.replacement_category
+            )
+            replacement_slug = _slug_from_category_identifier(replacement_ref)
+            if not replacement_slug:
+                raise HTTPException(400, "Replacement category is required")
+            if replacement_slug == slug:
+                raise HTTPException(400, "Replacement category must be different")
+
+            replacement_row = (
+                await session.execute(
+                    select(Category).where(
+                        Category.user_id == user["user_id"],
+                        Category.name == replacement_slug,
+                    )
+                )
+            ).scalar_one_or_none()
+            if replacement_row and replacement_row.is_archived:
+                replacement_row.is_archived = False
+
+            tx_result = await session.execute(
+                update(Transaction)
+                .where(
+                    Transaction.user_id == user["user_id"], Transaction.category == slug
+                )
+                .values(category=replacement_slug)
+            )
+            split_result = await session.execute(
+                update(SplitTransaction)
+                .where(
+                    SplitTransaction.user_id == user["user_id"],
+                    SplitTransaction.category == slug,
+                )
+                .values(category=replacement_slug)
+            )
+            budget_result = await _reassign_budget_rows(
+                session, user["user_id"], slug, replacement_slug
+            )
+            recurring_result = await session.execute(
+                update(RecurringTransaction)
+                .where(
+                    RecurringTransaction.user_id == user["user_id"],
+                    RecurringTransaction.category == slug,
+                )
+                .values(category=replacement_slug)
+            )
+            subscription_result = await session.execute(
+                update(Subscription)
+                .where(
+                    Subscription.user_id == user["user_id"],
+                    Subscription.category == slug,
+                )
+                .values(category=replacement_slug)
+            )
+            rule_result = await session.execute(
+                update(CategoryRule)
+                .where(
+                    CategoryRule.user_id == user["user_id"],
+                    CategoryRule.category == slug,
+                )
+                .values(category=replacement_slug)
+            )
+
+            await _archive_category(session, user["user_id"], slug, row=cat)
+            await session.commit()
+
+            usage_map = await _category_usage_map(session, user["user_id"])
+            _invalidate_category_caches(user["user_id"])
+            return {
+                "ok": True,
+                "deleted": slug,
+                "replacement": replacement_slug,
+                "reassigned": {
+                    "transactions": int(tx_result.rowcount or 0)
+                    + int(split_result.rowcount or 0),
+                    "budgets": int(budget_result["updated"] + budget_result["merged"]),
+                    "recurring": int(recurring_result.rowcount or 0),
+                    "subscriptions": int(subscription_result.rowcount or 0),
+                    "rules": int(rule_result.rowcount or 0),
+                },
+                "replacement_category": build_category_payload(
+                    replacement_slug,
+                    replacement_row,
+                    usage_map.get(replacement_slug),
+                ),
+            }
 
     @router.delete("/categories/{category_id}")
-    async def delete_category(category_id: str, request: Request, user: dict = Depends(get_current_user)):
+    async def delete_category(
+        category_id: str,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
         sm = request.app.state.db
         async with sm() as session:
-            result = await session.execute(
-                select(Category).where(Category.category_id == category_id, Category.user_id == user["user_id"])
+            slug, cat, _ = await _resolve_category_entity(
+                session, user["user_id"], category_id
             )
-            cat = result.scalar_one_or_none()
-            if not cat:
-                raise HTTPException(404, "Category not found")
-            await session.delete(cat)
+            if slug == "uncategorized":
+                raise HTTPException(400, "Uncategorized cannot be deleted")
+
+            usage_map = await _category_usage_map(session, user["user_id"])
+            usage = usage_map.get(slug, _default_category_usage())
+            if usage.get("total", 0) > 0:
+                raise HTTPException(
+                    409,
+                    f"Category is still in use by {usage['total']} linked items. Reassign it before deleting.",
+                )
+
+            await _archive_category(session, user["user_id"], slug, row=cat)
             await session.commit()
-            _query_cache.delete_by_prefix(f"cats:{user['user_id']}")
-            return {"ok": True}
+            _invalidate_category_caches(user["user_id"])
+            return {"ok": True, "archived": True, "category": slug}
 
     # ── Learned category rules ────────────────────────────────────────
 
     @router.get("/category-rules")
-    async def list_category_rules(request: Request, user: dict = Depends(get_current_user)):
+    async def list_category_rules(
+        request: Request, user: dict = Depends(get_current_user)
+    ):
         from db import CategoryRule
+
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
                 select(CategoryRule)
                 .where(CategoryRule.user_id == user["user_id"])
-                .order_by(CategoryRule.match_count.desc(), CategoryRule.updated_at.desc())
+                .order_by(
+                    CategoryRule.match_count.desc(), CategoryRule.updated_at.desc()
+                )
             )
             rules = result.scalars().all()
-            return {"rules": [
-                {"id": r.id, "merchant": r.merchant, "category": r.category,
-                 "match_count": r.match_count, "source": r.source,
-                 "last_used_at": r.last_used_at.isoformat() if r.last_used_at else None,
-                 "created_at": r.created_at.isoformat() if r.created_at else None}
-                for r in rules
-            ]}
+            return {
+                "rules": [
+                    {
+                        "id": r.id,
+                        "merchant": r.merchant,
+                        "category": r.category,
+                        "match_count": r.match_count,
+                        "source": r.source,
+                        "last_used_at": r.last_used_at.isoformat()
+                        if r.last_used_at
+                        else None,
+                        "created_at": r.created_at.isoformat()
+                        if r.created_at
+                        else None,
+                    }
+                    for r in rules
+                ]
+            }
 
     @router.post("/category-rules")
-    async def create_category_rule(payload: dict, request: Request, user: dict = Depends(get_current_user)):
+    async def create_category_rule(
+        payload: dict, request: Request, user: dict = Depends(get_current_user)
+    ):
         from db import CategoryRule
+
         merchant = (payload.get("merchant") or "").strip().upper()
         category = (payload.get("category") or "").strip().lower()
         if not merchant or not category:
@@ -1755,16 +2684,25 @@ Output ONLY valid JSON, no markdown, no explanation:
                 rule.source = "manual"
             else:
                 rule = CategoryRule(
-                    user_id=user["user_id"], merchant=merchant, category=category,
-                    match_count=1, source="manual",
+                    user_id=user["user_id"],
+                    merchant=merchant,
+                    category=category,
+                    match_count=1,
+                    source="manual",
                 )
                 session.add(rule)
             await session.commit()
             return {"ok": True, "id": rule.id}
 
     @router.patch("/category-rules/{rule_id}")
-    async def update_category_rule(rule_id: int, payload: dict, request: Request, user: dict = Depends(get_current_user)):
+    async def update_category_rule(
+        rule_id: int,
+        payload: dict,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
         from db import CategoryRule
+
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
@@ -1784,8 +2722,11 @@ Output ONLY valid JSON, no markdown, no explanation:
             return {"ok": True}
 
     @router.delete("/category-rules/{rule_id}")
-    async def delete_category_rule(rule_id: int, request: Request, user: dict = Depends(get_current_user)):
+    async def delete_category_rule(
+        rule_id: int, request: Request, user: dict = Depends(get_current_user)
+    ):
         from db import CategoryRule
+
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
@@ -1802,9 +2743,12 @@ Output ONLY valid JSON, no markdown, no explanation:
             return {"ok": True}
 
     @router.post("/category-rules/apply")
-    async def apply_rules_to_existing(request: Request, user: dict = Depends(get_current_user)):
+    async def apply_rules_to_existing(
+        request: Request, user: dict = Depends(get_current_user)
+    ):
         """Re-categorise all existing transactions using learned rules."""
         from db import CategoryRule
+
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
@@ -1831,12 +2775,15 @@ Output ONLY valid JSON, no markdown, no explanation:
 
     @router.post("/category-rules/learn")
     async def learn_from_user_feedback(
-        payload: dict, request: Request, user: dict = Depends(get_current_user),
+        payload: dict,
+        request: Request,
+        user: dict = Depends(get_current_user),
     ):
         """Record user feedback on a suggestion. 'action' is 'accept' or 'reject'.
         Accept: increments match_count for the merchant→category mapping.
         Reject: creates/updates with reduced weight or notes the rejection."""
         from db import CategoryRule
+
         merchant = (payload.get("merchant") or "").lower().strip()
         category = (payload.get("category") or "").lower().strip()
         action = payload.get("action", "accept")
@@ -1858,8 +2805,11 @@ Output ONLY valid JSON, no markdown, no explanation:
                     rule.last_used_at = datetime.now(timezone.utc)
                 else:
                     rule = CategoryRule(
-                        user_id=user["user_id"], merchant=merchant,
-                        category=category, match_count=1, source="user_approved",
+                        user_id=user["user_id"],
+                        merchant=merchant,
+                        category=category,
+                        match_count=1,
+                        source="user_approved",
                     )
                     session.add(rule)
                 await session.commit()
@@ -1871,8 +2821,11 @@ Output ONLY valid JSON, no markdown, no explanation:
                     rule.last_used_at = datetime.now(timezone.utc)
                 else:
                     rule = CategoryRule(
-                        user_id=user["user_id"], merchant=merchant,
-                        category=category, match_count=0, source="user_rejected",
+                        user_id=user["user_id"],
+                        merchant=merchant,
+                        category=category,
+                        match_count=0,
+                        source="user_rejected",
                     )
                     session.add(rule)
                 await session.commit()
@@ -1883,8 +2836,10 @@ Output ONLY valid JSON, no markdown, no explanation:
 
     @router.get("/analytics/spending-by-category")
     async def spending_by_category(
-        request: Request, user: dict = Depends(get_current_user),
-        date_from: str = Query(None), date_to: str = Query(None),
+        request: Request,
+        user: dict = Depends(get_current_user),
+        date_from: str = Query(None),
+        date_to: str = Query(None),
     ):
         sm = request.app.state.db
         async with sm() as session:
@@ -1895,7 +2850,10 @@ Output ONLY valid JSON, no markdown, no explanation:
             if date_from:
                 stmt = stmt.where(Transaction.date >= datetime.fromisoformat(date_from))
             if date_to:
-                stmt = stmt.where(Transaction.date <= datetime.fromisoformat(date_to) + timedelta(days=1))
+                stmt = stmt.where(
+                    Transaction.date
+                    <= datetime.fromisoformat(date_to) + timedelta(days=1)
+                )
             result = await session.execute(stmt)
             txs = result.scalars().all()
             cats = defaultdict(float)
@@ -1905,11 +2863,23 @@ Output ONLY valid JSON, no markdown, no explanation:
                 amt = abs(t.amount)
                 cats[cat] += amt
                 total += amt
-            sorted_cats = sorted([{"name": k, "value": round(v, 2), "pct": round(v / total * 100, 1) if total else 0} for k, v in cats.items()], key=lambda x: -x["value"])
+            sorted_cats = sorted(
+                [
+                    {
+                        "name": k,
+                        "value": round(v, 2),
+                        "pct": round(v / total * 100, 1) if total else 0,
+                    }
+                    for k, v in cats.items()
+                ],
+                key=lambda x: -x["value"],
+            )
             return {"categories": sorted_cats, "total": round(total, 2)}
 
     @router.get("/analytics/spending-trends")
-    async def spending_trends(request: Request, user: dict = Depends(get_current_user), months: int = 12):
+    async def spending_trends(
+        request: Request, user: dict = Depends(get_current_user), months: int = 12
+    ):
         cache_key = f"trends:{user['user_id']}:{months}"
         cached = _query_cache.get(cache_key)
         if cached:
@@ -1917,8 +2887,10 @@ Output ONLY valid JSON, no markdown, no explanation:
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
-                select(Transaction).where(Transaction.user_id == user["user_id"])
-                .order_by(Transaction.date.desc()).limit(2000)
+                select(Transaction)
+                .where(Transaction.user_id == user["user_id"])
+                .order_by(Transaction.date.desc())
+                .limit(2000)
             )
             txs = result.scalars().all()
             monthly = defaultdict(lambda: {"income": 0.0, "spend": 0.0, "net": 0.0})
@@ -1929,13 +2901,18 @@ Output ONLY valid JSON, no markdown, no explanation:
                 monthly[key]["income"] += t.amount if t.amount > 0 else 0
                 monthly[key]["spend"] += abs(t.amount) if t.amount < 0 else 0
                 monthly[key]["net"] += t.amount
-            trends = sorted([{"month": k, **v} for k, v in monthly.items()], key=lambda x: x["month"])[-months:]
+            trends = sorted(
+                [{"month": k, **v} for k, v in monthly.items()],
+                key=lambda x: x["month"],
+            )[-months:]
             payload = {"trends": trends}
             _query_cache.set(cache_key, payload, ttl=120)
             return payload
 
     @router.get("/analytics/budget-comparison")
-    async def budget_comparison(request: Request, user: dict = Depends(get_current_user)):
+    async def budget_comparison(
+        request: Request, user: dict = Depends(get_current_user)
+    ):
         sm = request.app.state.db
         async with sm() as session:
             budget_result = await session.execute(
@@ -1950,18 +2927,31 @@ Output ONLY valid JSON, no markdown, no explanation:
             month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             comparisons = []
             for b in budgets:
-                spent = sum(abs(t.amount) for t in txs if t.amount < 0 and t.category == b.category and t.date and t.date >= month_start)
-                comparisons.append({
-                    "category": b.category,
-                    "budget": round(b.amount, 2),
-                    "spent": round(spent, 2),
-                    "remaining": round(max(0, b.amount - spent), 2),
-                    "progress_pct": round(min(100, spent / b.amount * 100) if b.amount else 0, 1),
-                })
+                spent = sum(
+                    abs(t.amount)
+                    for t in txs
+                    if t.amount < 0
+                    and t.category == b.category
+                    and t.date
+                    and t.date >= month_start
+                )
+                comparisons.append(
+                    {
+                        "category": b.category,
+                        "budget": round(b.amount, 2),
+                        "spent": round(spent, 2),
+                        "remaining": round(max(0, b.amount - spent), 2),
+                        "progress_pct": round(
+                            min(100, spent / b.amount * 100) if b.amount else 0, 1
+                        ),
+                    }
+                )
             return {"comparisons": comparisons}
 
     @router.get("/analytics/period-comparison")
-    async def period_comparison(request: Request, user: dict = Depends(get_current_user)):
+    async def period_comparison(
+        request: Request, user: dict = Depends(get_current_user)
+    ):
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
@@ -1969,7 +2959,9 @@ Output ONLY valid JSON, no markdown, no explanation:
             )
             txs = result.scalars().all()
             now = datetime.now(timezone.utc)
-            current_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            current_start = now.replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0
+            )
             prev_start = (current_start - timedelta(days=1)).replace(day=1)
             prev_end = current_start
             current = {"income": 0.0, "spend": 0.0, "count": 0}
@@ -1985,8 +2977,16 @@ Output ONLY valid JSON, no markdown, no explanation:
                     previous["income"] += t.amount if t.amount > 0 else 0
                     previous["spend"] += abs(t.amount) if t.amount < 0 else 0
                     previous["count"] += 1
-            spend_change = ((current["spend"] - previous["spend"]) / previous["spend"] * 100) if previous["spend"] else 0
-            income_change = ((current["income"] - previous["income"]) / previous["income"] * 100) if previous["income"] else 0
+            spend_change = (
+                ((current["spend"] - previous["spend"]) / previous["spend"] * 100)
+                if previous["spend"]
+                else 0
+            )
+            income_change = (
+                ((current["income"] - previous["income"]) / previous["income"] * 100)
+                if previous["income"]
+                else 0
+            )
             return {
                 "current_period": {"label": current_start.strftime("%B %Y"), **current},
                 "previous_period": {"label": prev_start.strftime("%B %Y"), **previous},
@@ -1996,9 +2996,12 @@ Output ONLY valid JSON, no markdown, no explanation:
 
     @router.get("/analytics/compare-periods")
     async def compare_periods(
-        request: Request, user: dict = Depends(get_current_user),
-        period_a_from: str = Query(...), period_a_to: str = Query(...),
-        period_b_from: str = Query(...), period_b_to: str = Query(...),
+        request: Request,
+        user: dict = Depends(get_current_user),
+        period_a_from: str = Query(...),
+        period_a_to: str = Query(...),
+        period_b_from: str = Query(...),
+        period_b_to: str = Query(...),
         category: str = Query(None),
     ):
         sm = request.app.state.db
@@ -2007,13 +3010,19 @@ Output ONLY valid JSON, no markdown, no explanation:
             def _compute(txs_list, label):
                 inc = sum(t.amount for t in txs_list if t.amount > 0)
                 spd = sum(abs(t.amount) for t in txs_list if t.amount < 0)
-                return {"label": label, "income": round(inc, 2), "spend": round(spd, 2), "count": len(txs_list)}
+                return {
+                    "label": label,
+                    "income": round(inc, 2),
+                    "spend": round(spd, 2),
+                    "count": len(txs_list),
+                }
 
             async def _load_period(date_from: str, date_to: str):
                 stmt = select(Transaction).where(
                     Transaction.user_id == user["user_id"],
                     Transaction.date >= datetime.fromisoformat(date_from),
-                    Transaction.date <= datetime.fromisoformat(date_to) + timedelta(days=1),
+                    Transaction.date
+                    <= datetime.fromisoformat(date_to) + timedelta(days=1),
                 )
                 if category:
                     stmt = stmt.where(Transaction.category == category)
@@ -2029,8 +3038,16 @@ Output ONLY valid JSON, no markdown, no explanation:
             a_stats = _compute(a_txs, a_label)
             b_stats = _compute(b_txs, b_label)
 
-            spend_change = ((a_stats["spend"] - b_stats["spend"]) / b_stats["spend"] * 100) if b_stats["spend"] else 0
-            income_change = ((a_stats["income"] - b_stats["income"]) / b_stats["income"] * 100) if b_stats["income"] else 0
+            spend_change = (
+                ((a_stats["spend"] - b_stats["spend"]) / b_stats["spend"] * 100)
+                if b_stats["spend"]
+                else 0
+            )
+            income_change = (
+                ((a_stats["income"] - b_stats["income"]) / b_stats["income"] * 100)
+                if b_stats["income"]
+                else 0
+            )
 
             cat_breakdown = []
             if not category:
@@ -2039,16 +3056,36 @@ Output ONLY valid JSON, no markdown, no explanation:
                     if t.amount < 0 and t.category:
                         all_cats.add(t.category)
                 for cat in sorted(all_cats):
-                    a_spend = round(sum(abs(t.amount) for t in a_txs if t.amount < 0 and t.category == cat), 2)
-                    b_spend = round(sum(abs(t.amount) for t in b_txs if t.amount < 0 and t.category == cat), 2)
+                    a_spend = round(
+                        sum(
+                            abs(t.amount)
+                            for t in a_txs
+                            if t.amount < 0 and t.category == cat
+                        ),
+                        2,
+                    )
+                    b_spend = round(
+                        sum(
+                            abs(t.amount)
+                            for t in b_txs
+                            if t.amount < 0 and t.category == cat
+                        ),
+                        2,
+                    )
                     if a_spend > 0 or b_spend > 0:
-                        chg = ((a_spend - b_spend) / b_spend * 100) if b_spend else (100 if a_spend > 0 else 0)
-                        cat_breakdown.append({
-                            "category": cat,
-                            "a_spend": a_spend,
-                            "b_spend": b_spend,
-                            "change_pct": round(chg, 1),
-                        })
+                        chg = (
+                            ((a_spend - b_spend) / b_spend * 100)
+                            if b_spend
+                            else (100 if a_spend > 0 else 0)
+                        )
+                        cat_breakdown.append(
+                            {
+                                "category": cat,
+                                "a_spend": a_spend,
+                                "b_spend": b_spend,
+                                "change_pct": round(chg, 1),
+                            }
+                        )
 
             return {
                 "period_a": a_stats,
@@ -2061,7 +3098,9 @@ Output ONLY valid JSON, no markdown, no explanation:
     # ── Dashboard ────────────────────────────────────────────────────
 
     @router.get("/dashboard/overview")
-    async def dashboard_overview(request: Request, user: dict = Depends(get_current_user)):
+    async def dashboard_overview(
+        request: Request, user: dict = Depends(get_current_user)
+    ):
         uid = user["user_id"]
         cached = _query_cache.get(f"dash:{uid}")
         if cached:
@@ -2069,8 +3108,10 @@ Output ONLY valid JSON, no markdown, no explanation:
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
-                select(Transaction).where(Transaction.user_id == uid)
-                .order_by(Transaction.date.desc()).limit(2000)
+                select(Transaction)
+                .where(Transaction.user_id == uid)
+                .order_by(Transaction.date.desc())
+                .limit(2000)
             )
             txs = result.scalars().all()
             balance = sum(t.amount for t in txs)
@@ -2093,7 +3134,10 @@ Output ONLY valid JSON, no markdown, no explanation:
                         monthly[d]["income"] += t.amount
                     else:
                         monthly[d]["spend"] += -t.amount
-            flow = sorted([{"month": k, **v} for k, v in monthly.items()], key=lambda x: x["month"])[-6:]
+            flow = sorted(
+                [{"month": k, **v} for k, v in monthly.items()],
+                key=lambda x: x["month"],
+            )[-6:]
             savings_rate = ((income - spend) / income * 100) if income > 0 else 0
             score = max(0, min(100, int(savings_rate * 2 + (50 if balance > 0 else 0))))
 
@@ -2110,7 +3154,9 @@ Output ONLY valid JSON, no markdown, no explanation:
                 )
             )
             bank_connections = conn_result.scalars().all()
-            truelayer_balance = sum(c.balance for c in bank_connections if c.balance is not None) or 0
+            truelayer_balance = (
+                sum(c.balance for c in bank_connections if c.balance is not None) or 0
+            )
             institution_map = {}
             label_map = {}
             for c in bank_connections:
@@ -2129,8 +3175,11 @@ Output ONLY valid JSON, no markdown, no explanation:
                     "account_type": c.account_type or "",
                     "balance": float(c.balance) if c.balance is not None else 0,
                     "balance_currency": c.balance_currency or "GBP",
-                    "institution": (c.config or {}).get("institution") or c.account_name,
-                    "balance_updated_at": c.balance_updated_at.isoformat() if c.balance_updated_at else None,
+                    "institution": (c.config or {}).get("institution")
+                    or c.account_name,
+                    "balance_updated_at": c.balance_updated_at.isoformat()
+                    if c.balance_updated_at
+                    else None,
                 }
                 for c in bank_connections
             ]
@@ -2143,10 +3192,16 @@ Output ONLY valid JSON, no markdown, no explanation:
                 "spend": round(spend, 2),
                 "savings_rate": round(savings_rate, 1),
                 "health_score": score,
-                "categories": [{"name": k, "value": round(v, 2)} for k, v in sorted(cats.items(), key=lambda x: -x[1])],
+                "categories": [
+                    {"name": k, "value": round(v, 2)}
+                    for k, v in sorted(cats.items(), key=lambda x: -x[1])
+                ],
                 "monthly_flow": flow,
                 "recent": [_tx_to_dict(t, institution_map, label_map) for t in txs[:8]],
-                "source_breakdown": [{"source": k, "count": v} for k, v in sorted(sources.items(), key=lambda x: -x[1])],
+                "source_breakdown": [
+                    {"source": k, "count": v}
+                    for k, v in sorted(sources.items(), key=lambda x: -x[1])
+                ],
             }
             _query_cache.set(f"dash:{uid}", payload)
             return payload
@@ -2159,8 +3214,12 @@ Output ONLY valid JSON, no markdown, no explanation:
         user: dict = Depends(get_current_user),
         type: str = Query(None, description="Filter: everyday | event"),
         month: str = Query(None, description="YYYY-MM — defaults to current month"),
-        date_from: str = Query(None, description="ISO date — start of range (overrides month)"),
-        date_to: str = Query(None, description="ISO date — end of range, exclusive (overrides month)"),
+        date_from: str = Query(
+            None, description="ISO date — start of range (overrides month)"
+        ),
+        date_to: str = Query(
+            None, description="ISO date — end of range, exclusive (overrides month)"
+        ),
     ):
         cache_key = f"budgets:{user['user_id']}:{month or ''}:{type or ''}:{date_from or ''}:{date_to or ''}"
         cached = _query_cache.get(cache_key)
@@ -2214,7 +3273,9 @@ Output ONLY valid JSON, no markdown, no explanation:
                             if not (1 <= m <= 12):
                                 raise ValueError
                         except (ValueError, IndexError):
-                            raise HTTPException(400, "Invalid month format, use YYYY-MM")
+                            raise HTTPException(
+                                400, "Invalid month format, use YYYY-MM"
+                            )
                     else:
                         now = datetime.now(timezone.utc)
                         y, m = now.year, now.month
@@ -2250,12 +3311,14 @@ Output ONLY valid JSON, no markdown, no explanation:
                     select(
                         Transaction.category,
                         func.sum(-Transaction.amount).label("spent"),
-                    ).where(
+                    )
+                    .where(
                         Transaction.user_id == user["user_id"],
                         Transaction.date >= tx_start,
                         Transaction.date < tx_end,
                         Transaction.amount < 0,
-                    ).group_by(Transaction.category)
+                    )
+                    .group_by(Transaction.category)
                 )
                 spent_map = {row.category: float(row.spent) for row in spent_rows}
 
@@ -2271,19 +3334,24 @@ Output ONLY valid JSON, no markdown, no explanation:
                         **_budget_to_dict(b),
                         "spent": round(spent, 2),
                         "remaining": round(limit_val - spent, 2),
-                        "progress_pct": round(min(100, (spent / limit_val * 100) if limit_val else 0), 1),
+                        "progress_pct": round(
+                            min(100, (spent / limit_val * 100) if limit_val else 0), 1
+                        ),
                     }
                     result_list.append(entry)
 
                 event_groups = {}
                 if type == "event" or not type:
-                    event_items = [e for e in result_list if e.get("budget_type") == "event"]
+                    event_items = [
+                        e for e in result_list if e.get("budget_type") == "event"
+                    ]
                     for e in event_items:
                         gid = e.get("event_group_id") or e["budget_id"]
                         if gid not in event_groups:
                             event_groups[gid] = {
                                 "event_group_id": gid,
-                                "event_group_name": e.get("event_group_name") or e["category"],
+                                "event_group_name": e.get("event_group_name")
+                                or e["category"],
                                 "category": e["category"],
                                 "event_date": e.get("event_date"),
                                 "items": [],
@@ -2296,7 +3364,13 @@ Output ONLY valid JSON, no markdown, no explanation:
                         event_groups[gid]["total_spent"] += e["spent"]
                         event_groups[gid]["item_count"] += 1
 
-                result_list.sort(key=lambda x: (x.get("event_date") or "9999", x["category"]) if x.get("budget_type") == "event" else (x["category"],))
+                result_list.sort(
+                    key=lambda x: (
+                        (x.get("event_date") or "9999", x["category"])
+                        if x.get("budget_type") == "event"
+                        else (x["category"],)
+                    )
+                )
 
                 payload = {
                     "budgets": result_list,
@@ -2311,11 +3385,15 @@ Output ONLY valid JSON, no markdown, no explanation:
             except HTTPException:
                 raise
             except Exception as e:
-                logger.warning("Budget list failed (possible missing columns, awaiting migration): %s", str(e))
+                logger.warning(
+                    "Budget list failed (possible missing columns, awaiting migration): %s",
+                    str(e),
+                )
                 payload = {
                     "budgets": [],
                     "event_groups": {},
-                    "month": month or f"{datetime.now(timezone.utc).year}-{datetime.now(timezone.utc).month:02d}",
+                    "month": month
+                    or f"{datetime.now(timezone.utc).year}-{datetime.now(timezone.utc).month:02d}",
                     "total_budgeted": 0,
                     "total_spent": 0,
                     "total_remaining": 0,
@@ -2323,7 +3401,9 @@ Output ONLY valid JSON, no markdown, no explanation:
                 return payload
 
     @router.post("/budgets")
-    async def create_budget(payload: BudgetIn, request: Request, user: dict = Depends(get_current_user)):
+    async def create_budget(
+        payload: BudgetIn, request: Request, user: dict = Depends(get_current_user)
+    ):
         sm = request.app.state.db
         async with sm() as session:
             event_date = None
@@ -2358,7 +3438,9 @@ Output ONLY valid JSON, no markdown, no explanation:
             return _budget_to_dict(b)
 
     @router.delete("/budgets/{budget_id}")
-    async def delete_budget(budget_id: str, request: Request, user: dict = Depends(get_current_user)):
+    async def delete_budget(
+        budget_id: str, request: Request, user: dict = Depends(get_current_user)
+    ):
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
@@ -2376,8 +3458,12 @@ Output ONLY valid JSON, no markdown, no explanation:
             return {"ok": True}
 
     @router.patch("/budgets/{budget_id}")
-    async def update_budget(budget_id: str, payload: BudgetUpdate, request: Request,
-                            user: dict = Depends(get_current_user)):
+    async def update_budget(
+        budget_id: str,
+        payload: BudgetUpdate,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
@@ -2414,7 +3500,9 @@ Output ONLY valid JSON, no markdown, no explanation:
             return _budget_to_dict(b)
 
     @router.post("/budgets/bulk-delete")
-    async def bulk_delete_budgets(payload: BulkDeleteIn, request: Request, user: dict = Depends(get_current_user)):
+    async def bulk_delete_budgets(
+        payload: BulkDeleteIn, request: Request, user: dict = Depends(get_current_user)
+    ):
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
@@ -2432,7 +3520,9 @@ Output ONLY valid JSON, no markdown, no explanation:
             return {"ok": True, "deleted": deleted}
 
     @router.delete("/budgets/group/{event_group_id}")
-    async def delete_event_group(event_group_id: str, request: Request, user: dict = Depends(get_current_user)):
+    async def delete_event_group(
+        event_group_id: str, request: Request, user: dict = Depends(get_current_user)
+    ):
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
@@ -2455,12 +3545,17 @@ Output ONLY valid JSON, no markdown, no explanation:
     async def seed_defaults(request: Request, user: dict = Depends(get_current_user)):
         """Seed default monthly budgets for the current user (idempotent — skips existing)."""
         from budget_system import seed_default_budget_entries
+
         sm = request.app.state.db
         async with sm() as session:
             try:
                 created = await seed_default_budget_entries(session, user["user_id"])
                 _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
-                return {"status": "ok", "created": created, "message": f"{created} default budgets seeded"}
+                return {
+                    "status": "ok",
+                    "created": created,
+                    "message": f"{created} default budgets seeded",
+                }
             except Exception as e:
                 logger.warning("Seed defaults failed: %s", str(e))
                 raise HTTPException(500, f"Failed to seed defaults: {str(e)}")
@@ -2477,11 +3572,17 @@ Output ONLY valid JSON, no markdown, no explanation:
 
             # Current month range
             cur_start = datetime(y, m, 1, tzinfo=timezone.utc)
-            cur_end = datetime(y + 1, 1, 1, tzinfo=timezone.utc) if m == 12 else datetime(y, m + 1, 1, tzinfo=timezone.utc)
+            cur_end = (
+                datetime(y + 1, 1, 1, tzinfo=timezone.utc)
+                if m == 12
+                else datetime(y, m + 1, 1, tzinfo=timezone.utc)
+            )
 
             # Last 3 months range (start of 3 months ago to start of current month)
             past_start = cur_start - timedelta(days=90)
-            past_start = datetime(past_start.year, past_start.month, 1, tzinfo=timezone.utc)
+            past_start = datetime(
+                past_start.year, past_start.month, 1, tzinfo=timezone.utc
+            )
 
             # Current month transactions (expenses only)
             cur_tx = await session.execute(
@@ -2541,7 +3642,11 @@ Output ONLY valid JSON, no markdown, no explanation:
             budget_map = {b.category: float(b.amount) for b in budgets}
 
             # Build insights
-            categories = set(list(cur_by_cat.keys()) + list(past_avg.keys()) + list(budget_map.keys()))
+            categories = set(
+                list(cur_by_cat.keys())
+                + list(past_avg.keys())
+                + list(budget_map.keys())
+            )
             insights = []
             for cat in sorted(categories):
                 if not cat:
@@ -2551,14 +3656,18 @@ Output ONLY valid JSON, no markdown, no explanation:
                 current_budget = round(budget_map.get(cat, 0), 2)
                 suggestion = round(max(current_spent, avg_spent, current_budget), 2)
                 if current_budget > 0 or current_spent > 0 or avg_spent > 0:
-                    insights.append({
-                        "category": cat,
-                        "current_spent": current_spent,
-                        "avg_spent_3m": avg_spent,
-                        "current_budget": current_budget,
-                        "suggested_budget": suggestion,
-                        "reason": _insight_reason(cat, current_spent, avg_spent, current_budget),
-                    })
+                    insights.append(
+                        {
+                            "category": cat,
+                            "current_spent": current_spent,
+                            "avg_spent_3m": avg_spent,
+                            "current_budget": current_budget,
+                            "suggested_budget": suggestion,
+                            "reason": _insight_reason(
+                                cat, current_spent, avg_spent, current_budget
+                            ),
+                        }
+                    )
 
             return {"insights": insights, "month": f"{y}-{m:02d}"}
 
@@ -2579,7 +3688,9 @@ Output ONLY valid JSON, no markdown, no explanation:
             now = datetime.now(timezone.utc)
             current_month_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
             first_month_start = current_month_start - timedelta(days=30 * (months - 1))
-            first_month_start = datetime(first_month_start.year, first_month_start.month, 1, tzinfo=timezone.utc)
+            first_month_start = datetime(
+                first_month_start.year, first_month_start.month, 1, tzinfo=timezone.utc
+            )
 
             month_keys = []
             month_ranges = []
@@ -2587,7 +3698,11 @@ Output ONLY valid JSON, no markdown, no explanation:
             while len(month_keys) < months:
                 y, m_val = cursor.year, cursor.month
                 m_start = datetime(y, m_val, 1, tzinfo=timezone.utc)
-                m_end = datetime(y + 1, 1, 1, tzinfo=timezone.utc) if m_val == 12 else datetime(y, m_val + 1, 1, tzinfo=timezone.utc)
+                m_end = (
+                    datetime(y + 1, 1, 1, tzinfo=timezone.utc)
+                    if m_val == 12
+                    else datetime(y, m_val + 1, 1, tzinfo=timezone.utc)
+                )
                 month_keys.append(f"{y}-{m_val:02d}")
                 month_ranges.append((m_start, m_end))
                 cursor = m_end
@@ -2596,7 +3711,11 @@ Output ONLY valid JSON, no markdown, no explanation:
             cats_to_fetch = None
             if all_categories:
                 result = await session.execute(
-                    select(Budget.category).where(Budget.user_id == user["user_id"], Budget.budget_type != "event").distinct()
+                    select(Budget.category)
+                    .where(
+                        Budget.user_id == user["user_id"], Budget.budget_type != "event"
+                    )
+                    .distinct()
                 )
                 cats_to_fetch = [row[0] for row in result.all()]
                 if not cats_to_fetch:
@@ -2606,7 +3725,9 @@ Output ONLY valid JSON, no markdown, no explanation:
 
             # Get current budgets for the category lookup
             budget_result = await session.execute(
-                select(Budget.category, Budget.amount).where(Budget.user_id == user["user_id"], Budget.budget_type != "event")
+                select(Budget.category, Budget.amount).where(
+                    Budget.user_id == user["user_id"], Budget.budget_type != "event"
+                )
             )
             budget_map = {row[0]: float(row[1]) for row in budget_result.all()}
 
@@ -2616,20 +3737,23 @@ Output ONLY valid JSON, no markdown, no explanation:
                 spent_rows = await session.execute(
                     select(
                         Transaction.category,
-                        func.date_trunc('month', Transaction.date).label('month_trunc'),
-                        func.sum(-Transaction.amount).label('spent'),
-                    ).where(
+                        func.date_trunc("month", Transaction.date).label("month_trunc"),
+                        func.sum(-Transaction.amount).label("spent"),
+                    )
+                    .where(
                         Transaction.user_id == user["user_id"],
                         Transaction.amount < 0,
                         Transaction.date >= first_month_start,
                         Transaction.date < month_ranges[-1][1],
                         Transaction.category.in_(cats_to_fetch),
-                    ).group_by(
+                    )
+                    .group_by(
                         Transaction.category,
-                        func.date_trunc('month', Transaction.date),
-                    ).order_by(
+                        func.date_trunc("month", Transaction.date),
+                    )
+                    .order_by(
                         Transaction.category,
-                        func.date_trunc('month', Transaction.date),
+                        func.date_trunc("month", Transaction.date),
                     )
                 )
                 result_map = {cat: [] for cat in cats_to_fetch}
@@ -2645,7 +3769,9 @@ Output ONLY valid JSON, no markdown, no explanation:
                     budget_val = round(budget_map.get(cat, 0), 2)
                     for mk in month_keys:
                         spent = round(spent_lookup.get((cat, mk), 0.0), 2)
-                        cat_trends.append({"month": mk, "budget": budget_val, "spent": spent})
+                        cat_trends.append(
+                            {"month": mk, "budget": budget_val, "spent": spent}
+                        )
                     result_map[cat] = cat_trends
 
                 return {"trends": result_map, "months": month_keys}
@@ -2653,17 +3779,20 @@ Output ONLY valid JSON, no markdown, no explanation:
                 # Total aggregate across all categories
                 spent_rows = await session.execute(
                     select(
-                        func.date_trunc('month', Transaction.date).label('month_trunc'),
-                        func.sum(-Transaction.amount).label('spent'),
-                    ).where(
+                        func.date_trunc("month", Transaction.date).label("month_trunc"),
+                        func.sum(-Transaction.amount).label("spent"),
+                    )
+                    .where(
                         Transaction.user_id == user["user_id"],
                         Transaction.amount < 0,
                         Transaction.date >= first_month_start,
                         Transaction.date < month_ranges[-1][1],
-                    ).group_by(
-                        func.date_trunc('month', Transaction.date),
-                    ).order_by(
-                        func.date_trunc('month', Transaction.date),
+                    )
+                    .group_by(
+                        func.date_trunc("month", Transaction.date),
+                    )
+                    .order_by(
+                        func.date_trunc("month", Transaction.date),
                     )
                 )
                 spent_lookup = {}
@@ -2691,7 +3820,11 @@ Output ONLY valid JSON, no markdown, no explanation:
             now = datetime.now(timezone.utc)
             y, m_val = now.year, now.month
             m_start = datetime(y, m_val, 1, tzinfo=timezone.utc)
-            m_end = datetime(y + 1, 1, 1, tzinfo=timezone.utc) if m_val == 12 else datetime(y, m_val + 1, 1, tzinfo=timezone.utc)
+            m_end = (
+                datetime(y + 1, 1, 1, tzinfo=timezone.utc)
+                if m_val == 12
+                else datetime(y, m_val + 1, 1, tzinfo=timezone.utc)
+            )
 
             result = await session.execute(
                 select(Budget).where(
@@ -2717,7 +3850,9 @@ Output ONLY valid JSON, no markdown, no explanation:
 
             # Past 3 months avg for spike detection
             past_start = m_start - timedelta(days=90)
-            past_start = datetime(past_start.year, past_start.month, 1, tzinfo=timezone.utc)
+            past_start = datetime(
+                past_start.year, past_start.month, 1, tzinfo=timezone.utc
+            )
             past_tx = await session.execute(
                 select(Transaction).where(
                     Transaction.user_id == user["user_id"],
@@ -2749,33 +3884,39 @@ Output ONLY valid JSON, no markdown, no explanation:
                 avg = round(past_monthly.get(cat, 0), 2)
 
                 if pct >= 100:
-                    alerts.append({
-                        "category": cat,
-                        "severity": "critical",
-                        "message": f"{cat.capitalize()} is over budget ({pct}% used)",
-                        "spent": round(spent, 2),
-                        "budget": lim,
-                        "progress_pct": pct,
-                    })
+                    alerts.append(
+                        {
+                            "category": cat,
+                            "severity": "critical",
+                            "message": f"{cat.capitalize()} is over budget ({pct}% used)",
+                            "spent": round(spent, 2),
+                            "budget": lim,
+                            "progress_pct": pct,
+                        }
+                    )
                 elif pct >= 80:
-                    alerts.append({
-                        "category": cat,
-                        "severity": "warning",
-                        "message": f"{cat.capitalize()} is at {pct}% of budget",
-                        "spent": round(spent, 2),
-                        "budget": lim,
-                        "progress_pct": pct,
-                    })
+                    alerts.append(
+                        {
+                            "category": cat,
+                            "severity": "warning",
+                            "message": f"{cat.capitalize()} is at {pct}% of budget",
+                            "spent": round(spent, 2),
+                            "budget": lim,
+                            "progress_pct": pct,
+                        }
+                    )
                 if avg > 0 and spent > avg * 1.5 and spent > 50:
-                    alerts.append({
-                        "category": cat,
-                        "severity": "spike",
-                        "message": f"{cat.capitalize()} spending spike: £{round(spent,2)} vs usual £{avg}",
-                        "spent": round(spent, 2),
-                        "budget": lim,
-                        "avg_3m": avg,
-                        "progress_pct": pct,
-                    })
+                    alerts.append(
+                        {
+                            "category": cat,
+                            "severity": "spike",
+                            "message": f"{cat.capitalize()} spending spike: £{round(spent, 2)} vs usual £{avg}",
+                            "spent": round(spent, 2),
+                            "budget": lim,
+                            "avg_3m": avg,
+                            "progress_pct": pct,
+                        }
+                    )
 
             payload = {"alerts": alerts}
             _query_cache.set(cache_key, payload, ttl=30)
@@ -2784,11 +3925,15 @@ Output ONLY valid JSON, no markdown, no explanation:
     # ── Transaction system health check ─────────────────────────────
 
     @router.get("/transactions/health")
-    async def transactions_health(request: Request, user: dict = Depends(get_current_user)):
+    async def transactions_health(
+        request: Request, user: dict = Depends(get_current_user)
+    ):
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
-                select(func.count()).select_from(Transaction).where(Transaction.user_id == user["user_id"])
+                select(func.count())
+                .select_from(Transaction)
+                .where(Transaction.user_id == user["user_id"])
             )
             total = result.scalar() or 0
             dup = await session.execute(
@@ -2799,7 +3944,9 @@ Output ONLY valid JSON, no markdown, no explanation:
             )
             duplicates = dup.rowcount
             null_cat = await session.execute(
-                select(func.count()).select_from(Transaction).where(
+                select(func.count())
+                .select_from(Transaction)
+                .where(
                     Transaction.user_id == user["user_id"],
                     Transaction.category.is_(None),
                 )
@@ -2810,12 +3957,14 @@ Output ONLY valid JSON, no markdown, no explanation:
                 "duplicate_ids": duplicates,
                 "uncategorized": null_cat.scalar() or 0,
                 "sources": {
-                    src: count for src, count in
-                    (await session.execute(
-                        select(Transaction.source, func.count())
-                        .where(Transaction.user_id == user["user_id"])
-                        .group_by(Transaction.source)
-                    )).all()
+                    src: count
+                    for src, count in (
+                        await session.execute(
+                            select(Transaction.source, func.count())
+                            .where(Transaction.user_id == user["user_id"])
+                            .group_by(Transaction.source)
+                        )
+                    ).all()
                 },
             }
 

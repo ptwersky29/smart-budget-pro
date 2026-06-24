@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import "./App.css";
 import { AuthProvider } from "./contexts/AuthContext";
 import { SettingsProvider } from "./contexts/SettingsContext";
+import { CategoriesProvider } from "./contexts/CategoriesContext";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "next-themes";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -43,7 +44,11 @@ function AppRouter() {
   const location = useLocation();
   const authHash = location.hash || "";
 
-  if (authHash.includes("access_token=") || authHash.includes("refresh_token=") || authHash.includes("session_id=")) {
+  if (
+    authHash.includes("access_token=") ||
+    authHash.includes("refresh_token=") ||
+    authHash.includes("session_id=")
+  ) {
     console.log("[AppRouter] hash detected, rendering AuthCallback");
     return <AuthCallback />;
   }
@@ -57,9 +62,22 @@ function AppRouter() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/privacy" element={<Privacy />} />
-      <Route path="/onboarding" element={<ProtectedRoute><OnboardingWizard /></ProtectedRoute>} />
+      <Route
+        path="/onboarding"
+        element={
+          <ProtectedRoute>
+            <OnboardingWizard />
+          </ProtectedRoute>
+        }
+      />
       <Route path="/billing/success" element={<PaymentSuccess />} />
-      <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+      <Route
+        element={
+          <ProtectedRoute>
+            <AppLayout />
+          </ProtectedRoute>
+        }
+      >
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/transactions" element={<Transactions />} />
         <Route path="/budgets" element={<BudgetPage />} />
@@ -88,12 +106,14 @@ export default function App() {
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <AuthProvider>
           <SettingsProvider>
-          <ErrorBoundary>
-            <Suspense fallback={<PageLoader />}>
-              <AppRouter />
-            </Suspense>
-            <ConsentBanner />
-          </ErrorBoundary>
+            <CategoriesProvider>
+              <ErrorBoundary>
+                <Suspense fallback={<PageLoader />}>
+                  <AppRouter />
+                </Suspense>
+                <ConsentBanner />
+              </ErrorBoundary>
+            </CategoriesProvider>
           </SettingsProvider>
           <Toaster richColors position="top-right" />
         </AuthProvider>

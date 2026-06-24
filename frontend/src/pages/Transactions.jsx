@@ -173,7 +173,7 @@ const Transactions = React.memo(function Transactions() {
       const cats = data.categories || [];
       cats.hierarchy = data.hierarchy || {};
       setSelectedCats(cats);
-    } catch {}
+    } catch { console.warn("[transactions] failed to load categories"); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -230,7 +230,7 @@ const Transactions = React.memo(function Transactions() {
           if (firstOfMonth) setSelectedHebrewMonth(firstOfMonth);
         }
       })
-      .catch(() => {});
+      .catch(() => { console.warn("[transactions] failed to load Hebrew months"); });
   }, []);
 
   const activeFilters = useMemo(() => {

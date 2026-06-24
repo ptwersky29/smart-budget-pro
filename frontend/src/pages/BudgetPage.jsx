@@ -110,7 +110,7 @@ export default React.memo(function BudgetPage() {
   useEffect(() => {
     api.get("/jewish/hebcal/months")
       .then(({ data }) => setHebrewMonths(data.months || []))
-      .catch(() => {});
+      .catch(() => { console.warn("[budgets] failed to load Hebrew months"); });
   }, []);
 
   const { year, month: mNum } = parseMonth(month);
@@ -238,14 +238,14 @@ export default React.memo(function BudgetPage() {
       const { data } = await api.get("/categories");
       setAllCats(data.categories || []);
       setCategoryHierarchy(data.hierarchy || {});
-    } catch {}
+    } catch { console.warn("[budgets] failed to load categories"); }
   }, []);
 
   const fetchAlerts = useCallback(async () => {
     try {
       const { data } = await api.get("/budgets/alerts");
       setAlerts(data.alerts || []);
-    } catch {}
+    } catch { console.warn("[budgets] failed to load alerts"); }
   }, []);
 
   const fetchInsights = useCallback(async () => {
@@ -253,7 +253,7 @@ export default React.memo(function BudgetPage() {
     try {
       const { data } = await api.get("/budgets/insights");
       setInsights(data.insights || []);
-    } catch {} finally {
+    } catch { console.warn("[budgets] failed to load insights"); } finally {
       setInsightsLoading(false);
     }
   }, []);

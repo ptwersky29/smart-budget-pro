@@ -1,102 +1,113 @@
-import React, { useState, useCallback, useRef, useEffect } from "react";
-import { Check, ChevronDown, Plus, Loader2, Search } from "lucide-react";
-import { api } from "../lib/api";
+import React, { useCallback, useMemo, useState } from "react";
+import { Check, ChevronDown, Plus, Search } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "../lib/utils";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "./ui/popover";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "./ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import {
   Command,
-  CommandList,
   CommandEmpty,
   CommandGroup,
   CommandItem,
+  CommandList,
   CommandSeparator,
 } from "./ui/command";
+import CategoryBadge from "./CategoryBadge";
+import CategoryEditorDialog from "./CategoryEditorDialog";
+import { useCategories } from "../contexts/CategoriesContext";
+import { formatApiError } from "../lib/api";
 
-function groupBySection(cats) {
+function groupBySection(categories) {
   const groups = {};
-  for (const c of cats) {
-    const section = c.section || "Other";
+  categories.forEach((category) => {
+    const section = category.section || "🧩 Ungrouped";
     if (!groups[section]) groups[section] = [];
-    groups[section].push(c);
-  }
+    groups[section].push(category);
+  });
   return groups;
 }
 
 export default function CategoryCombobox({
   value,
   onChange,
-  categories = [],
+  categories: categoriesProp,
   placeholder = "Select category…",
   className,
-  allowClear,
+  allowClear = false,
   onCategoryCreated,
 }) {
+  const {
+    categories: sharedCategories,
+    createCategory,
+    resolveCategory,
+  } = useCategories();
   const [open, setOpen] = useState(false);
-  const [addOpen, setAddOpen] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [adding, setAdding] = useState(false);
   const [search, setSearch] = useState("");
-  const inputRef = useRef(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
 
-  const grouped = groupBySection(categories);
+  const categories = categoriesProp?.length ? categoriesProp : sharedCategories;
+  const selected = value ? resolveCategory(value) : null;
 
-  const selected = categories.find((c) => c.name === value);
+  const filteredGroups = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const filtered = !query
+      ? categories
+      : categories.filter((category) => {
+          const haystack = [
+            category.name,
+            category.label,
+            category.display_name,
+            category.section,
+            category.description,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+          return haystack.includes(query);
+        });
+
+    const groups = groupBySection(filtered);
+    return Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [categories, search]);
 
   const handleSelect = useCallback(
-    (val) => {
-      if (val === "__add__") {
+    (nextValue) => {
+      if (nextValue === "__add__") {
         setOpen(false);
         setAddOpen(true);
         return;
       }
-      if (val === "__clear__") {
-        onChange("");
+      if (nextValue === "__clear__") {
+        onChange?.("");
         setOpen(false);
         return;
       }
-      onChange(val);
+      onChange?.(nextValue);
       setOpen(false);
     },
-    [onChange]
+    [onChange],
   );
 
-  const handleAddCategory = useCallback(async () => {
-    const name = newName.trim().toLowerCase().replace(/\s+/g, "_");
-    if (!name) return;
-    setAdding(true);
-    try {
-      await api.post("/categories", { name });
-      onChange(name);
-      setAddOpen(false);
-      setNewName("");
-      if (onCategoryCreated) onCategoryCreated();
-    } catch (err) {
-      // toast handled by caller or left silent
-    } finally {
-      setAdding(false);
-    }
-  }, [newName, onChange]);
-
-  useEffect(() => {
-    if (addOpen && inputRef.current) {
-      setTimeout(() => inputRef.current?.focus(), 100);
-    }
-  }, [addOpen]);
-
-  const hasValue = Boolean(value);
+  const handleCreate = useCallback(
+    async (payload) => {
+      setAdding(true);
+      try {
+        const created = await createCategory(payload);
+        onChange?.(created.name);
+        onCategoryCreated?.(created);
+        setAddOpen(false);
+        toast.success(`Category “${created.label || created.name}” created`);
+      } catch (error) {
+        toast.error(
+          formatApiError(error?.response?.data?.detail) ||
+            "Could not create category",
+        );
+      } finally {
+        setAdding(false);
+      }
+    },
+    [createCategory, onCategoryCreated, onChange],
+  );
 
   return (
     <>
@@ -107,78 +118,78 @@ export default function CategoryCombobox({
             role="combobox"
             aria-expanded={open}
             className={cn(
-              "flex h-12 w-full items-center justify-between rounded-xl bg-secondary/50 border border-transparent px-4 text-[15px] transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50",
-              !value && "text-muted-foreground",
-              className
+              "flex h-12 w-full items-center justify-between gap-3 rounded-2xl border border-transparent bg-secondary/50 px-4 text-left text-[15px] transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50",
+              !selected && "text-muted-foreground",
+              className,
             )}
           >
-            <span className="break-all line-clamp-2">
-              {value
-                ? selected
-                  ? selected.name
-                  : value
-                : placeholder}
-            </span>
-            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <div className="min-w-0 flex-1">
+              {selected ? (
+                <CategoryBadge
+                  category={selected}
+                  size="md"
+                  className="max-w-full"
+                  truncate
+                />
+              ) : (
+                <span>{placeholder}</span>
+              )}
+            </div>
+            <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
           </button>
         </PopoverTrigger>
-        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <PopoverContent
+          className="w-[--radix-popover-trigger-width] p-0"
+          align="start"
+        >
           <Command shouldFilter={false}>
             <div className="flex items-center border-b px-3">
               <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
               <input
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search categories…"
                 className="flex h-11 w-full rounded-md bg-transparent py-3 text-[15px] outline-none placeholder:text-muted-foreground"
               />
             </div>
             <CommandList>
               <CommandEmpty>
-                {search ? "No categories found" : "No categories"}
+                {search ? "No categories found" : "No categories yet"}
               </CommandEmpty>
-              {Object.entries(grouped).map(([section, cats]) => {
-                const filtered = cats.filter((c) =>
-                  !search || c.name.toLowerCase().includes(search.toLowerCase())
-                );
-                if (filtered.length === 0) return null;
-                return (
-                  <CommandGroup key={section} heading={section}>
-                    {filtered.map((c) => (
-                      <CommandItem
-                        key={c.category_id ?? c.name}
-                        value={c.name}
-                        onSelect={handleSelect}
-                      >
-                        <div
-                          className={cn(
-                            "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border",
-                            value === c.name
-                              ? "border-emerald bg-emerald text-white"
-                              : "border-border"
-                          )}
-                        >
-                          {value === c.name && (
-                            <Check className="h-3 w-3" />
-                          )}
-                        </div>
-                        <span className="break-all">{c.name}</span>
-                        {c.source === "Custom" && (
-                          <span className="ml-auto text-[10px] px-1 py-0.5 rounded-full bg-topaz/10 text-topaz shrink-0">
-                            Custom
-                          </span>
-                        )}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                );
-              })}
+              {filteredGroups.map(([section, items]) => (
+                <CommandGroup key={section} heading={section}>
+                  {items.map((category) => (
+                    <CommandItem
+                      key={category.category_id || category.name}
+                      value={category.name}
+                      onSelect={handleSelect}
+                      className="gap-2 py-2.5"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <CategoryBadge
+                          category={category}
+                          size="md"
+                          className="max-w-full"
+                          truncate
+                        />
+                      </div>
+                      {value === category.name && (
+                        <Check className="h-4 w-4 shrink-0 text-emerald" />
+                      )}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              ))}
               <CommandSeparator />
-              <CommandItem value="__add__" onSelect={handleSelect}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add custom category
+              <CommandItem
+                value="__add__"
+                onSelect={handleSelect}
+                className="gap-2 py-2.5"
+              >
+                <Plus className="h-4 w-4" />
+                Create category
               </CommandItem>
-              {allowClear && hasValue && (
+              {allowClear && value && (
                 <CommandItem value="__clear__" onSelect={handleSelect}>
                   Clear selection
                 </CommandItem>
@@ -188,34 +199,15 @@ export default function CategoryCombobox({
         </PopoverContent>
       </Popover>
 
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Add custom category</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <Input
-              ref={inputRef}
-              placeholder="Category name (e.g. pet_care)"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleAddCategory();
-                if (e.key === "Escape") { setAddOpen(false); setNewName(""); }
-              }}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outlinePill" size="pillSm" onClick={() => { setAddOpen(false); setNewName(""); }}>
-              Cancel
-            </Button>
-            <Button variant="primary" size="pillSm" onClick={handleAddCategory} disabled={!newName.trim() || adding}>
-              {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Add category
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CategoryEditorDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        onSave={handleCreate}
+        saving={adding}
+        title="Create category"
+        submitLabel={adding ? "Creating…" : "Create category"}
+        initialCategory={search ? { label: search } : null}
+      />
     </>
   );
 }

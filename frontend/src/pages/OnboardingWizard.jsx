@@ -283,7 +283,7 @@ export default function OnboardingWizard() {
         const idx = STEPS.findIndex((s) => s.id === data.step);
         setStep(idx >= 0 ? idx : 0);
       })
-      .catch(() => {})
+      .catch(() => { console.warn("[onboarding] failed to load progress"); })
       .finally(() => setLoading(false));
   }, [navigate]);
 

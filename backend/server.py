@@ -12,9 +12,9 @@ import json
 import logging
 import logging.config
 from datetime import datetime, timezone
-from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 from starlette.requests import Request as StarletteRequest
 from sqlalchemy import text
 
@@ -99,6 +99,8 @@ logger.info("JWT_SECRET validated")
 
 init_engine(database_url, echo=False)
 
+from auth import get_current_user
+
 app = FastAPI(title="FinanceAI API", version="1.1.1")
 
 GIT_COMMIT = "17a2c91"
@@ -128,9 +130,19 @@ async def health():
     try:
         sm = get_session_maker()
         async with sm() as session:
-            await session.execute(text("SELECT 1"))
-            db_ok = True
-            checks["database"] = "connected"
+            for attempt in range(2):
+                try:
+                    await session.execute(text("SELECT 1"))
+                    db_ok = True
+                    break
+                except Exception:
+                    if attempt == 0:
+                        await asyncio.sleep(1.5)
+                        session.close()
+                        continue
+                    raise
+            if db_ok:
+                checks["database"] = "connected"
     except Exception as e:
         checks["database"] = f"error: {str(e)[:60]}"
 
@@ -157,8 +169,9 @@ async def health():
 
 
 @api.get("/csrf-token")
-async def csrf_token():
+async def csrf_token(response: Response):
     token = generate_csrf_token()
+    response.set_cookie("csrf_token", token, httponly=True, samesite="lax", path="/")
     return {"csrf_token": token}
 
 
@@ -192,6 +205,77 @@ api.include_router(empty_states.build_router())
 api.include_router(budget_system.build_router())
 api.include_router(notifications.router)
 api.include_router(manual_accounts.build_router())
+
+# ── Frontend‑compatibility aliases ───────────────────────────────────────────
+
+@api.post("/uk/hmrc-estimate")
+async def hmrc_estimate(request: Request, user: dict = Depends(get_current_user)):
+    body = await request.json()
+    income = body.get("annual_income", 0)
+    from uk_tools import _calc_income_tax, PERSONAL_ALLOWANCE, PA_TAPER_THRESHOLD
+    pa = PERSONAL_ALLOWANCE
+    if income > PA_TAPER_THRESHOLD:
+        pa = max(0, pa - (income - PA_TAPER_THRESHOLD) / 2)
+    from uk_tools import (NI_THRESHOLD_PRIMARY, NI_UPPER_LIMIT,
+                          NI_BASIC_RATE, NI_HIGHER_RATE)
+    income_tax, _ = _calc_income_tax(income, pa)
+    ni = 0
+    if income > NI_THRESHOLD_PRIMARY:
+        ni_basic = max(0, min(income, NI_UPPER_LIMIT) - NI_THRESHOLD_PRIMARY) * NI_BASIC_RATE
+        ni_higher = max(0, income - NI_UPPER_LIMIT) * NI_HIGHER_RATE
+        ni = ni_basic + ni_higher
+    total = income_tax + ni
+    take_home = income - total
+    return {
+        "take_home": round(take_home, 2),
+        "monthly_take_home": round(take_home / 12, 2),
+        "effective_rate_pct": round((total / income * 100), 1) if income else 0,
+        "income_tax": round(income_tax, 2),
+        "national_insurance": round(ni, 2),
+        "personal_allowance": round(pa, 2),
+    }
+
+@api.get("/jewish/reports/download/year-end-{year}.pdf")
+async def download_jewish_report(year: int, request: Request, user: dict = Depends(get_current_user)):
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas
+    import io
+    from jewish_reports import jewish_finance_year_end_report
+    from sqlalchemy import select
+    import os
+
+    sm = request.app.state.db
+    async with sm() as session:
+        result = await session.execute(select(text("1")))
+        result.fetchone()
+
+    report = await jewish_finance_year_end_report(request, user, year)
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    c.setFont("Helvetica", 16)
+    c.drawString(50, 800, f"Jewish Finance Year-End Report {year}")
+    c.setFont("Helvetica", 10)
+    y = 770
+    c.drawString(50, y, f"Generated: {report['generated_at']}")
+    y -= 20
+    c.drawString(50, y, f"Total income: {report['sections']['maaser']['total_income']}")
+    y -= 15
+    c.drawString(50, y, f"Obligation ({report['sections']['maaser']['percent']}%): {report['sections']['maaser']['obligation']}")
+    y -= 15
+    c.drawString(50, y, f"Total given: {report['sections']['maaser']['total_given']}")
+    y -= 15
+    c.drawString(50, y, f"Balance: {report['sections']['maaser']['balance_owed']}")
+    y -= 30
+    c.drawString(50, y, "Holiday Budgets:")
+    for h in report['sections']['holidays']['holidays']:
+        y -= 15
+        c.drawString(70, y, f"{h['name']}: budgeted {h['budgeted']}, spent {h['spent']}, balance {h['balance']}")
+    c.showPage()
+    c.save()
+    buf.seek(0)
+    from starlette.responses import Response as StarResponse
+    return StarResponse(content=buf.getvalue(), media_type="application/pdf",
+                        headers={"Content-Disposition": f"attachment; filename=jewish-finance-{year}.pdf"})
 
 app.include_router(api)
 
@@ -262,6 +346,12 @@ async def startup():
         await auth.seed_admin(session)
     if not os.environ.get("FRONTEND_URL"):
         logger.warning("FRONTEND_URL not set — Google OAuth redirects will fail")
+    if not os.environ.get("OPENROUTER_API_KEY"):
+        logger.warning("OPENROUTER_API_KEY not set — AI chat, insights, and auto-categorization disabled")
+    if not os.environ.get("GOOGLE_CLIENT_ID") or not os.environ.get("GOOGLE_CLIENT_SECRET"):
+        logger.warning("GOOGLE_CLIENT_ID/SECRET not set — Google OAuth login disabled")
+    if not os.environ.get("TRUELAYER_CLIENT_ID") or not os.environ.get("TRUELAYER_CLIENT_SECRET"):
+        logger.warning("TRUELAYER_CLIENT_ID/SECRET not set — Open Banking sync disabled")
 
     # Start background sync loop for TrueLayer
     try:

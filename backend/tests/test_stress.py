@@ -17,6 +17,17 @@ import httpx
 pytestmark = pytest.mark.stress
 
 API = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8000") + "/api"
+
+
+@pytest.fixture(scope="session")
+def server_available():
+    """Skip all stress tests if the server is not running."""
+    import httpx
+    try:
+        r = httpx.get(f"{API}/health", timeout=10)
+        assert r.status_code == 200
+    except (httpx.ConnectError, httpx.TimeoutException):
+        pytest.skip(f"Server at {API} is not available")
 STRESS_ITERATIONS = int(os.environ.get("STRESS_ITERATIONS", "100"))  # 100 by default, set to 100000 for full
 CONCURRENT_WORKERS = int(os.environ.get("STRESS_WORKERS", "10"))
 

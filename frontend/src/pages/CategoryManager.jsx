@@ -1,88 +1,169 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { api } from "../lib/api";
+import React, { useMemo, useState } from "react";
+import { Loader2, Pencil, Plus, Shuffle, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
-import { Plus, Pencil, Trash2, X, Check, Sparkles, Loader2 } from "lucide-react";
+import { PageHeader } from "../components/ui/layout";
+import CategoryBadge from "../components/CategoryBadge";
+import CategoryEditorDialog from "../components/CategoryEditorDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
+import { useCategories } from "../contexts/CategoriesContext";
+import { formatApiError } from "../lib/api";
 
-function groupBySection(cats, hierarchy) {
-  const grouped = {};
-  const used = new Set();
-  if (hierarchy && Object.keys(hierarchy).length > 0) {
-    for (const [section, names] of Object.entries(hierarchy)) {
-      const sectionCats = names.map(n => cats.find(c => c.name === n)).filter(Boolean);
-      if (sectionCats.length > 0) {
-        grouped[section] = sectionCats;
-        sectionCats.forEach(c => used.add(c.name));
-      }
-    }
+function groupCategories(categories) {
+  const groups = {};
+  categories.forEach((category) => {
+    const section = category.section || "🧩 Ungrouped";
+    if (!groups[section]) groups[section] = [];
+    groups[section].push(category);
+  });
+  return Object.entries(groups)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([section, items]) => [
+      section,
+      [...items].sort((a, b) =>
+        (a.label || a.name).localeCompare(b.label || b.name),
+      ),
+    ]);
+}
+
+function UsageChips({ usage }) {
+  const items = [
+    ["transactions", usage?.transactions || 0],
+    ["budgets", usage?.budgets || 0],
+    ["recurring", usage?.recurring || 0],
+    ["subscriptions", usage?.subscriptions || 0],
+    ["rules", usage?.rules || 0],
+  ].filter(([, count]) => count > 0);
+
+  if (!items.length) {
+    return <span className="text-xs text-muted-foreground">Unused</span>;
   }
-  const remaining = cats.filter(c => !used.has(c.name));
-  for (const c of remaining) {
-    const section = c.section || "Other";
-    if (!grouped[section]) grouped[section] = [];
-    grouped[section].push(c);
-  }
-  return grouped;
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {items.map(([label, count]) => (
+        <span
+          key={label}
+          className="rounded-full bg-secondary/70 px-2 py-1 text-[11px] text-muted-foreground"
+        >
+          {count} {label}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 export default function CategoryManager() {
-  const [cats, setCats] = useState([]);
-  const [hierarchy, setHierarchy] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [newName, setNewName] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [editName, setEditName] = useState("");
+  const {
+    categories,
+    loading,
+    createCategory,
+    updateCategory,
+    deleteCategory,
+    reassignDeleteCategory,
+    getReplacementOptions,
+  } = useCategories();
 
-  const load = useCallback(async () => {
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [replacementCategory, setReplacementCategory] = useState("");
+
+  const grouped = useMemo(
+    () =>
+      groupCategories(categories.filter((category) => !category.is_archived)),
+    [categories],
+  );
+  const stats = useMemo(
+    () => ({
+      total: categories.length,
+      system: categories.filter((category) => category.source === "System")
+        .length,
+      custom: categories.filter((category) => category.source === "Custom")
+        .length,
+      linked: categories.filter((category) => (category.usage?.total || 0) > 0)
+        .length,
+    }),
+    [categories],
+  );
+
+  const replacementOptions = useMemo(() => {
+    if (!deleteTarget) return [];
+    return getReplacementOptions(deleteTarget.name);
+  }, [deleteTarget, getReplacementOptions]);
+
+  const openCreate = () => {
+    setEditingCategory(null);
+    setEditorOpen(true);
+  };
+
+  const openEdit = (category) => {
+    setEditingCategory(category);
+    setEditorOpen(true);
+  };
+
+  const handleSave = async (payload) => {
+    setSaving(true);
     try {
-      const { data } = await api.get("/categories");
-      setCats(data.categories || []);
-      setHierarchy(data.hierarchy || {});
-    } catch { toast.error("Failed to load categories"); }
-    finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const handleAdd = async () => {
-    const name = newName.trim().toLowerCase().replace(/\s+/g, "_");
-    if (!name) return;
-    try {
-      await api.post("/categories", { name, is_income: false });
-      toast.success(`Category "${name}" created`);
-      setNewName("");
-      setAdding(false);
-      await load();
-    } catch (e) {
-      toast.error(e.response?.data?.detail || "Could not create category");
+      if (editingCategory) {
+        await updateCategory(editingCategory.category_id, payload);
+        toast.success(`Updated ${payload.label}`);
+      } else {
+        await createCategory(payload);
+        toast.success(`Created ${payload.label}`);
+      }
+      setEditorOpen(false);
+      setEditingCategory(null);
+    } catch (error) {
+      toast.error(
+        formatApiError(error?.response?.data?.detail) ||
+          "Could not save category",
+      );
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleEdit = async (cat) => {
-    const name = editName.trim().toLowerCase().replace(/\s+/g, "_");
-    if (!name || name === cat.name) { setEditingId(null); return; }
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
     try {
-      await api.patch(`/categories/${cat.category_id}`, { name });
-      toast.success("Category renamed");
-      setEditingId(null);
-      await load();
-    } catch { toast.error("Could not update category"); }
+      if ((deleteTarget.usage?.total || 0) > 0) {
+        if (!replacementCategory) {
+          toast.error("Choose a replacement category first");
+          return;
+        }
+        await reassignDeleteCategory(deleteTarget.category_id, {
+          replacement_category_id: replacementCategory,
+        });
+        toast.success(
+          `Deleted ${deleteTarget.label} and reassigned linked items`,
+        );
+      } else {
+        await deleteCategory(deleteTarget.category_id);
+        toast.success(`Deleted ${deleteTarget.label}`);
+      }
+      setDeleteTarget(null);
+      setReplacementCategory("");
+    } catch (error) {
+      toast.error(
+        formatApiError(error?.response?.data?.detail) ||
+          "Could not delete category",
+      );
+    } finally {
+      setDeleteBusy(false);
+    }
   };
 
-  const handleDelete = async (cat) => {
-    if (!window.confirm(`Delete custom category "${cat.name}"?`)) return;
-    try {
-      await api.delete(`/categories/${cat.category_id}`);
-      toast.success(`"${cat.name}" deleted`);
-      await load();
-    } catch { toast.error("Could not delete category"); }
-  };
-
-  const grouped = groupBySection(cats, hierarchy);
-
-  if (loading) {
+  if (loading && categories.length === 0) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -92,89 +173,214 @@ export default function CategoryManager() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Categories" title="Category Manager"
-        description={`${cats.filter(c => c.source === "System").length} system categories · ${cats.filter(c => c.source === "Custom").length} custom`}
+      <PageHeader
+        eyebrow="Settings"
+        title="Categories"
+        description="Manage the emoji, colour, label, and lifecycle of every category in one place. Changes update transactions, budgets, and summaries across the app."
         actions={
-          <Button variant="primary" size="pill" onClick={() => setAdding(true)} disabled={adding}>
-            <Plus className="h-4 w-4 mr-1" /> Add category
+          <Button variant="primary" size="pill" onClick={openCreate}>
+            <Plus className="h-4 w-4" />
+            Add category
           </Button>
         }
       />
 
-      {/* Add new custom category */}
-      {adding && (
-        <div className="flex items-center gap-2 p-3 rounded-xl border border-border bg-secondary/20 animate-[fadeUp_0.15s_ease-out]">
-          <Input
-            placeholder="Category name (e.g. pet_care)"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); if (e.key === "Escape") { setAdding(false); setNewName(""); } }}
-            className="flex-1"
-            autoFocus
-          />
-          <Button variant="primary" size="pillSm" onClick={handleAdd} disabled={!newName.trim()}>
-            <Check className="h-4 w-4" />
-          </Button>
-          <Button variant="outlinePill" size="pillSm" onClick={() => { setAdding(false); setNewName(""); }}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
-
-      {/* Categories grouped by section */}
-      <div className="space-y-6">
-        {Object.entries(grouped).map(([section, sectionCats]) => (
-          <div key={section}>
-            <h3 className="text-sm font-medium text-muted-foreground mb-2 uppercase tracking-wider">{section}</h3>
-            <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
-              {sectionCats.map((cat) => (
-                <div key={cat.category_id ?? `default-${cat.name}`} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-secondary/30 transition-colors">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-sm font-medium truncate">{cat.name.replace(/_/g, " ")}</span>
-                    {cat.source === "System" ? (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary/60 text-muted-foreground shrink-0">System</span>
-                    ) : (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-topaz/10 text-topaz shrink-0">Custom</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    {cat.source === "Custom" && (
-                      <>
-                        {editingId === cat.category_id ? (
-                          <div className="flex items-center gap-1">
-                            <Input
-                              value={editName}
-                              onChange={(e) => setEditName(e.target.value)}
-                              onKeyDown={(e) => { if (e.key === "Enter") handleEdit(cat); if (e.key === "Escape") setEditingId(null); }}
-                              className="h-8 w-36 text-xs"
-                              autoFocus
-                            />
-                            <button onClick={() => handleEdit(cat)} className="p-1.5 rounded-lg hover:bg-emerald/10 text-emerald" aria-label="Save">
-                              <Check className="h-3.5 w-3.5" />
-                            </button>
-                            <button onClick={() => setEditingId(null)} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground" aria-label="Cancel">
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <>
-                            <button onClick={() => { setEditingId(cat.category_id); setEditName(cat.name); }} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground" aria-label="Edit category">
-                              <Pencil className="h-3.5 w-3.5" />
-                            </button>
-                            <button onClick={() => handleDelete(cat)} className="p-1.5 rounded-lg hover:bg-ruby/10 text-ruby" aria-label="Delete category">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          ["Total categories", stats.total],
+          ["System", stats.system],
+          ["Custom", stats.custom],
+          ["Linked in app", stats.linked],
+        ].map(([label, value]) => (
+          <div
+            key={label}
+            className="rounded-2xl border border-border bg-card/90 p-4"
+          >
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">
+              {label}
+            </p>
+            <p className="mt-2 text-3xl font-semibold tracking-tight">
+              {value}
+            </p>
           </div>
         ))}
       </div>
+
+      <div className="space-y-5">
+        {grouped.map(([section, items]) => (
+          <section key={section} className="space-y-3">
+            <div className="flex items-center justify-between rounded-2xl border border-border/70 bg-secondary/15 px-4 py-3">
+              <div>
+                <h2 className="text-sm font-semibold">{section}</h2>
+                <p className="text-xs text-muted-foreground">
+                  {items.length} categories
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-2">
+              {items.map((category) => (
+                <article
+                  key={category.category_id || category.name}
+                  className="rounded-2xl border border-border bg-card/90 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1 space-y-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <CategoryBadge category={category} size="lg" />
+                        <span
+                          className={`rounded-full px-2 py-1 text-[11px] font-semibold ${category.source === "System" ? "bg-secondary/70 text-muted-foreground" : "bg-emerald/10 text-emerald"}`}
+                        >
+                          {category.source}
+                        </span>
+                      </div>
+
+                      <div className="space-y-1 text-sm text-muted-foreground">
+                        <div className="font-mono text-xs text-muted-foreground/80">
+                          {category.name}
+                        </div>
+                        {category.description ? (
+                          <p>{category.description}</p>
+                        ) : null}
+                      </div>
+
+                      <UsageChips usage={category.usage} />
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => openEdit(category)}
+                        className="rounded-xl p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                        aria-label={`Edit ${category.label}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      {category.can_delete && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeleteTarget(category);
+                            setReplacementCategory("");
+                          }}
+                          className="rounded-xl p-2 text-muted-foreground transition-colors hover:bg-ruby/10 hover:text-ruby"
+                          aria-label={`Delete ${category.label}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+
+      <CategoryEditorDialog
+        open={editorOpen}
+        onOpenChange={(open) => {
+          setEditorOpen(open);
+          if (!open) setEditingCategory(null);
+        }}
+        initialCategory={editingCategory}
+        onSave={handleSave}
+        saving={saving}
+        title={
+          editingCategory ? `Edit ${editingCategory.label}` : "Create category"
+        }
+        submitLabel={
+          saving
+            ? "Saving…"
+            : editingCategory
+              ? "Save category"
+              : "Create category"
+        }
+      />
+
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+            setReplacementCategory("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Delete category</DialogTitle>
+          </DialogHeader>
+
+          {deleteTarget && (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-border bg-secondary/20 p-4">
+                <CategoryBadge category={deleteTarget} size="lg" />
+                <p className="mt-3 text-sm text-muted-foreground">
+                  {(deleteTarget.usage?.total || 0) > 0
+                    ? "This category is linked to existing data. Choose where those linked items should move before deleting it."
+                    : "This category is not linked anywhere, so it can be safely removed."}
+                </p>
+              </div>
+
+              {(deleteTarget.usage?.total || 0) > 0 && (
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <Shuffle className="h-4 w-4 text-emerald" />
+                    Reassign linked items to
+                  </label>
+                  <select
+                    value={replacementCategory}
+                    onChange={(event) =>
+                      setReplacementCategory(event.target.value)
+                    }
+                    className="flex h-11 w-full rounded-2xl border border-border bg-secondary/40 px-4 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/20"
+                  >
+                    <option value="">Choose a replacement category</option>
+                    {replacementOptions.map((category) => (
+                      <option
+                        key={category.category_id}
+                        value={category.category_id}
+                      >
+                        {category.emoji || "🏷️"} {category.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outlinePill"
+              size="pill"
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleteBusy}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="pill"
+              className="bg-ruby hover:bg-ruby/90"
+              onClick={handleDelete}
+              disabled={
+                deleteBusy ||
+                ((deleteTarget?.usage?.total || 0) > 0 && !replacementCategory)
+              }
+            >
+              {deleteBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {(deleteTarget?.usage?.total || 0) > 0
+                ? "Reassign and delete"
+                : "Delete category"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

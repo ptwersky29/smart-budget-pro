@@ -1,11 +1,13 @@
 import axios from "axios";
 import { cacheGet, cacheSet, cacheInvalidate, dedupe } from "./cache";
-import { getToken } from "./storage";
+import { getToken, setToken } from "./storage";
 
-const fallbackBackend =
-  typeof window !== "undefined" && window.location.hostname.endsWith(".vercel.app")
-    ? (process.env.REACT_APP_BACKEND_URL || "https://budget-pro-4jlg.onrender.com")
-    : "http://localhost:8000";
+const fallbackBackend = typeof window !== "undefined" && (
+  window.location.hostname !== "localhost" &&
+  window.location.hostname !== "127.0.0.1"
+)
+  ? (process.env.REACT_APP_BACKEND_URL || "https://budget-pro-4jlg.onrender.com")
+  : "http://localhost:8000";
 
 export const BACKEND_URL = (process.env.REACT_APP_BACKEND_URL || fallbackBackend).replace(/\/+$/, "");
 export const API = `${BACKEND_URL}/api`;
@@ -23,7 +25,7 @@ async function _ensureCsrf() {
   try {
     const { data } = await axios.get(`${API}/csrf-token`, { withCredentials: true });
     _csrfToken = data.csrf_token;
-  } catch { /* CSRF best-effort */ }
+  } catch { console.warn("[csrf] failed to fetch token — unsafe requests may fail"); }
   return _csrfToken;
 }
 
@@ -69,18 +71,17 @@ api.interceptors.response.use(
     ) {
       originalRequest._retry = true;
       try {
-        // Send refresh token from either cookie (browser) or localStorage (cross-site fallback)
-        const storedRt = localStorage.getItem("refresh_token");
+        const storedRt = getToken("refresh_token");
         const refreshHeaders = storedRt ? { Authorization: `Bearer ${storedRt}` } : {};
         const refreshResponse = await axios.post(`${API}/auth/refresh`, {}, {
           withCredentials: true,
           headers: refreshHeaders,
         });
         if (refreshResponse?.data?.access_token) {
-          localStorage.setItem("access_token", refreshResponse.data.access_token);
+          setToken("access_token", refreshResponse.data.access_token, true);
         }
         if (refreshResponse?.data?.refresh_token) {
-          localStorage.setItem("refresh_token", refreshResponse.data.refresh_token);
+          setToken("refresh_token", refreshResponse.data.refresh_token, true);
         }
         return api(originalRequest);
       } catch (refreshError) {
