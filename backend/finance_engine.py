@@ -3238,6 +3238,30 @@ Output ONLY valid JSON, no markdown, no explanation:
                 for a in bank_accounts
             ]
 
+            # Build institution and label maps for _tx_to_dict
+            conn_ids = list({t.connection_id for t in txs[:8] if t.connection_id})
+            institution_map = {}
+            label_map = {}
+            if conn_ids:
+                from db import BankConnection
+                bc_result = await session.execute(
+                    select(
+                        BankConnection.connection_id,
+                        BankConnection.nickname,
+                        BankConnection.account_name,
+                        BankConnection.config,
+                    ).where(BankConnection.connection_id.in_(conn_ids))
+                )
+                for bc_row in bc_result:
+                    cfg = bc_row.config or {}
+                    inst = cfg.get("institution") if isinstance(cfg, dict) else None
+                    inst = inst or bc_row.account_name
+                    if inst:
+                        institution_map[bc_row.connection_id] = inst
+                    lbl = bc_row.nickname or bc_row.account_name or inst
+                    if lbl:
+                        label_map[bc_row.connection_id] = lbl
+
             payload = {
                 "balance": round(balance, 2),
                 "truelayer_balance": round(truelayer_balance, 2),
