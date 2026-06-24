@@ -6,6 +6,12 @@ import { toast } from "sonner";
 import { EmptyState, PageHeader, SectionCard } from "../components/ui/layout";
 import Skeleton from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
 import AccountFormModal from "../components/AccountFormModal";
 import BankCardMockup from "../components/BankCardMockup";
 
@@ -314,19 +320,21 @@ export default function AccountsPage() {
               {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
               Sync now
             </Button>
-            <div className="relative group">
-              <Button variant="primary" size="pill">
-                <Plus className="h-4 w-4 mr-1.5" /> New Account
-              </Button>
-              <div className="absolute right-0 mt-2 w-48 rounded-xl border border-border bg-card shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 overflow-hidden">
-                <button onClick={connect} disabled={status === "connecting" || status === "redirecting"} className="w-full text-left px-4 py-3 text-sm hover:bg-secondary flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-emerald" /> Connect Bank
-                </button>
-                <button onClick={() => setShowCreateModal(true)} className="w-full text-left px-4 py-3 text-sm hover:bg-secondary flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="primary" size="pill">
+                  <Plus className="h-4 w-4 mr-1.5" /> New Account
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 rounded-xl p-2">
+                <DropdownMenuItem onClick={connect} disabled={status === "connecting" || status === "redirecting"} className="cursor-pointer gap-2 py-3">
+                  <Building2 className="h-4 w-4 text-emerald-500" /> Connect Bank
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowCreateModal(true)} className="cursor-pointer gap-2 py-3">
                   <Wallet className="h-4 w-4 text-muted-foreground" /> Offline Account
-                </button>
-              </div>
-            </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         }
       />
