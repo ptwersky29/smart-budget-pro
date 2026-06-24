@@ -5,9 +5,11 @@ import { Button } from "./button";
 
 export const PageHeader = React.memo(function PageHeader({ eyebrow, title, description, actions, meta, children, className = "", ...props }) {
   return (
-    <div {...props} className={`relative rounded-2xl border border-border bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-xl p-5 sm:p-6 lg:p-8 shadow-card overflow-hidden ${className}`}>
-      <div className="absolute -top-10 -left-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="relative flex flex-col gap-4 lg:gap-6 lg:flex-row lg:items-end lg:justify-between">
+    <div {...props} className={`relative rounded-2xl border border-border bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-xl p-5 sm:p-6 lg:p-8 shadow-card ${className}`}>
+      <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
+        <div className="absolute -top-10 -left-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl" />
+      </div>
+      <div className="relative flex flex-col gap-4 lg:gap-6 lg:flex-row lg:items-end lg:justify-between z-10">
         <div className="max-w-3xl space-y-2 lg:space-y-3">
           {eyebrow && <p className="label-overline text-emerald">{eyebrow}</p>}
           <h1 className="text-2xl sm:text-3xl lg:text-5xl tracking-tight font-semibold leading-[1.05]">{title}</h1>
