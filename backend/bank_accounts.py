@@ -53,7 +53,7 @@ def build_router() -> APIRouter:
             rows = result.scalars().all()
             return {"accounts": [_acct_to_dict(a) for a in rows]}
 
-    @router.get("/{account_id}")
+    @router.get("/{account_id:path}")
     async def get_account(
         account_id: str,
         request: Request,
@@ -115,7 +115,7 @@ def build_router() -> APIRouter:
             await session.refresh(ba)
             return _acct_to_dict(ba)
 
-    @router.put("/{account_id}")
+    @router.put("/{account_id:path}")
     async def update_account(
         account_id: str,
         body: dict,
@@ -168,7 +168,7 @@ def build_router() -> APIRouter:
             await session.refresh(ba)
             return _acct_to_dict(ba)
 
-    @router.delete("/{account_id}")
+    @router.delete("/{account_id:path}")
     async def delete_account(
         account_id: str,
         request: Request,
@@ -203,7 +203,7 @@ def build_router() -> APIRouter:
 
     # ── Balance types / savings separation ──
 
-    @router.post("/{account_id}/balance-type")
+    @router.post("/{account_id:path}/balance-type")
     async def set_balance_type(
         account_id: str,
         body: dict,
@@ -233,7 +233,7 @@ def build_router() -> APIRouter:
 
     # ── Recalculate balance from transactions ──
 
-    @router.post("/{account_id}/recalculate")
+    @router.post("/{account_id:path}/recalculate")
     async def recalculate_balance(
         account_id: str,
         request: Request,

@@ -21,7 +21,14 @@ function AccountLogo({ account, size = "md" }) {
   const imgSizes = { sm: "h-6 w-6", md: "h-8 w-8", lg: "h-10 w-10" };
   const sizeClass = sizes[size] || sizes.md;
   const imgSize = imgSizes[size] || imgSizes.md;
-  const displayName = account.name || (account.provider ? `${account.provider} Account` : "Unknown Account");
+  let name = account.name || "";
+  if (account.provider && account.provider !== "manual") {
+    const isGeneric = !name || name.toLowerCase() === "current account" || name.toLowerCase() === "savings account" || name.toLowerCase() === "statement account" || name.toLowerCase() === "credit card";
+    if (isGeneric) {
+      name = `${account.provider.charAt(0).toUpperCase() + account.provider.slice(1)} ${name || "Account"}`;
+    }
+  }
+  const displayName = name || (account.provider ? `${account.provider} Account` : "Unknown Account");
   const initials = displayName
     .split(" ")
     .map((w) => w[0])
@@ -52,7 +59,14 @@ function AccountCard({ account }) {
   const balanceFmt = Number(account.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const isSavings = account.type === "savings";
 
-  const displayName = account.name || (account.provider ? `${account.provider} Account` : "Unknown Account");
+  let name = account.name || "";
+  if (account.provider && account.provider !== "manual") {
+    const isGeneric = !name || name.toLowerCase() === "current account" || name.toLowerCase() === "savings account" || name.toLowerCase() === "statement account" || name.toLowerCase() === "credit card";
+    if (isGeneric) {
+      name = `${account.provider.charAt(0).toUpperCase() + account.provider.slice(1)} ${name || "Account"}`;
+    }
+  }
+  const displayName = name || (account.provider ? `${account.provider} Account` : "Unknown Account");
 
   return (
     <Link to={`/accounts/${account.account_id}`}

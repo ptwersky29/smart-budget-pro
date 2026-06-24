@@ -75,8 +75,10 @@ class CsrfProtectionMiddleware(BaseHTTPMiddleware):
         csrf_header = request.headers.get("X-CSRF-Token", "")
         csrf_cookie = request.cookies.get("csrf_token", "")
         if not csrf_header or not csrf_cookie:
-            raise HTTPException(403, "CSRF token missing")
+            from fastapi.responses import JSONResponse
+            return JSONResponse(status_code=403, content={"detail": "CSRF token missing"})
         from security import verify_csrf_token as _verify
         if not _verify(csrf_header, csrf_cookie):
-            raise HTTPException(403, "CSRF token mismatch")
+            from fastapi.responses import JSONResponse
+            return JSONResponse(status_code=403, content={"detail": "CSRF token mismatch"})
         return await call_next(request)

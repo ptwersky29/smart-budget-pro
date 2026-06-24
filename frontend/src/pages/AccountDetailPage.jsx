@@ -72,7 +72,14 @@ export default function AccountDetailPage() {
     try {
       const { data } = await api.get(`/accounts/${accountId}`);
       setAccount(data);
-      const dispName = data.name || (data.provider ? `${data.provider} Account` : "Unknown Account");
+      let name = data.name || "";
+      if (data.provider && data.provider !== "manual") {
+        const isGeneric = !name || name.toLowerCase() === "current account" || name.toLowerCase() === "savings account" || name.toLowerCase() === "statement account" || name.toLowerCase() === "credit card";
+        if (isGeneric) {
+          name = `${data.provider.charAt(0).toUpperCase() + data.provider.slice(1)} ${name || "Account"}`;
+        }
+      }
+      const dispName = name || (data.provider ? `${data.provider} Account` : "Unknown Account");
       document.title = `${dispName} | FinanceAI`;
     } catch (err) {
       setError(formatApiError(err.response?.data?.detail) || "Could not load account");
@@ -140,7 +147,14 @@ export default function AccountDetailPage() {
   const currentPage = Math.floor(offset / limit) + 1;
   const meta = ACCOUNT_TYPE_META[account?.type] || ACCOUNT_TYPE_META.current;
   const Icon = meta.icon;
-  const dispName = account?.name || (account?.provider ? `${account.provider} Account` : "Unknown Account");
+  let name = account?.name || "";
+  if (account?.provider && account.provider !== "manual") {
+    const isGeneric = !name || name.toLowerCase() === "current account" || name.toLowerCase() === "savings account" || name.toLowerCase() === "statement account" || name.toLowerCase() === "credit card";
+    if (isGeneric) {
+      name = `${account.provider.charAt(0).toUpperCase() + account.provider.slice(1)} ${name || "Account"}`;
+    }
+  }
+  const dispName = name || (account?.provider ? `${account.provider} Account` : "Unknown Account");
   const initials = dispName
     .split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
   const isSavings = account?.type === "savings";
