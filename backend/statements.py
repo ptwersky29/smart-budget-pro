@@ -464,6 +464,7 @@ def build_router() -> APIRouter:
 
     @router.post("/upload")
     async def upload(request: Request, file: UploadFile = File(...),
+                     account_id: str = Form(None),
                      user: dict = Depends(get_current_user)):
         sm = request.app.state.db
         async with sm() as session:
@@ -537,6 +538,7 @@ def build_router() -> APIRouter:
 
             stmt = Statement(
                 user_id=user["user_id"],
+                account_id=account_id,
                 period_start=None,
                 period_end=None,
                 total_income=sum(t["amount"] for t in clean if t["amount"] > 0),
@@ -559,13 +561,14 @@ def build_router() -> APIRouter:
             }
 
     @router.get("")
-    async def list_statements(request: Request, user: dict = Depends(get_current_user)):
+    async def list_statements(request: Request, account_id: Optional[str] = None, user: dict = Depends(get_current_user)):
         sm = request.app.state.db
         async with sm() as session:
-            result = await session.execute(
-                select(Statement).where(Statement.user_id == user["user_id"])
-                .order_by(Statement.created_at.desc()).limit(50)
-            )
+            q = select(Statement).where(Statement.user_id == user["user_id"])
+            if account_id:
+                q = q.where(Statement.account_id == account_id)
+            
+            result = await session.execute(q.order_by(Statement.created_at.desc()).limit(50))
             rows = result.scalars().all()
             return {"statements": [
                 {
@@ -635,7 +638,7 @@ def build_router() -> APIRouter:
                     description=t["description"],
                     merchant_name=t.get("merchant"),
                     category=t.get("category", "uncategorized"),
-                    account_id=t.get("account_id", ""),
+                    account_id=t.get("account_id") or rec.account_id or "",
                     date=datetime.fromisoformat(t["date"]) if t.get("date") else now,
                     source="statement",
                 )

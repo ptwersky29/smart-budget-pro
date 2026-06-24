@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
-import { ArrowLeft, Wallet, PiggyBank, Lock, Pencil, Trash2, Loader2, Receipt, CreditCard, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Search, X, Filter, Plus } from "lucide-react";
+import { ArrowLeft, Wallet, PiggyBank, Lock, Pencil, Trash2, Loader2, Receipt, CreditCard, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Search, X, Filter, Plus, Upload, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, MetricCard, SectionCard, EmptyState } from "../components/ui/layout";
 import { SkeletonTable } from "../components/ui/Skeleton";
@@ -34,6 +34,11 @@ export default function AccountDetailPage() {
   const [error, setError] = useState(null);
   const [showEdit, setShowEdit] = useState(false);
   const { categories: selectedCats, version: categoriesVersion } = useCategories();
+
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [uploadHistory, setUploadHistory] = useState([]);
+  const [dragOver, setDragOver] = useState(false);
+  const fileRef = React.useRef(null);
 
   const [showSearch, setShowSearch] = useState(false);
   const [searchInput, setSearchInput] = useState("");
@@ -73,6 +78,13 @@ export default function AccountDetailPage() {
     } finally { setLoading(false); }
   }, [accountId]);
 
+  const loadHistory = useCallback(async () => {
+    try {
+      const { data } = await api.get(`/statements?account_id=${accountId}`);
+      setUploadHistory(data.statements || data || []);
+    } catch {}
+  }, [accountId]);
+
   const loadTransactions = useCallback(async () => {
     setTxLoading(true);
     try {
@@ -93,8 +105,24 @@ export default function AccountDetailPage() {
     finally { setTxLoading(false); }
   }, [accountId, filters, offset]);
 
-  useEffect(() => { loadAccount(); }, [loadAccount]);
+  useEffect(() => { loadAccount(); loadHistory(); }, [loadAccount, loadHistory]);
   useEffect(() => { loadTransactions(); }, [loadTransactions, categoriesVersion]);
+
+  const handleUpload = async (file) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { toast.error("File too large — max 5 MB"); return; }
+    setUploadBusy(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("account_id", accountId);
+    try {
+      const { data } = await api.post("/statements/upload", fd);
+      toast.success(`Statement processed: ${data.transaction_count || 0} transactions found`);
+      await loadHistory();
+      await loadTransactions();
+    } catch (e) { toast.error(formatApiError(e) || "Upload failed"); }
+    finally { setUploadBusy(false); }
+  };
 
   const deleteAccount = async () => {
     if (!window.confirm(`Delete "${account.name}"? Transactions must be reassigned first.`)) return;
@@ -214,8 +242,10 @@ export default function AccountDetailPage() {
         <MetricCard label="Currency" value={account.currency} icon={CreditCard} />
       </div>
 
-      {/* Transactions */}
-      <SectionCard eyebrow="Transactions" title={`${totalTx} transaction${totalTx !== 1 ? "s" : ""}`}>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          {/* Transactions */}
+          <SectionCard eyebrow="Transactions" title={`${totalTx} transaction${totalTx !== 1 ? "s" : ""}`}>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 pb-4">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
             <span>Income <strong className="text-emerald font-medium tabular-nums">£{incomeTotal.toFixed(2)}</strong></span>
@@ -352,6 +382,51 @@ export default function AccountDetailPage() {
           )}
         </div>
       </SectionCard>
+        </div>
+        <div className="flex flex-col gap-6">
+          {/* Statement Upload */}
+          <SectionCard eyebrow="Manual import" title="Upload a statement" contentClassName="p-0">
+            <div
+              className={`p-6 text-center border-b border-border/70 transition-all duration-300 ${dragOver ? "bg-emerald/5 border-emerald/30 border-dashed" : "bg-secondary/20"}`}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => { e.preventDefault(); setDragOver(false); handleUpload(e.dataTransfer.files[0]); }}
+            >
+              <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-card border border-border/50 shadow-sm text-emerald">
+                <Upload className="h-5 w-5" />
+              </div>
+              <p className="text-sm font-medium">Drop a CSV or PDF here</p>
+              <p className="text-xs text-muted-foreground mt-1">or click to browse — max 5 MB</p>
+              <input ref={fileRef} type="file" accept=".csv,.pdf" onChange={(e) => { handleUpload(e.target.files[0]); e.target.value = ""; }}
+                className="hidden" />
+              <Button variant="outlinePill" size="pill" onClick={() => fileRef.current?.click()} disabled={uploadBusy} className="mt-5 w-full">
+                {uploadBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Upload className="h-4 w-4 mr-1.5" />}
+                {uploadBusy ? "Processing…" : "Choose file"}
+              </Button>
+            </div>
+            {uploadHistory.length > 0 ? (
+              <div className="divide-y divide-border text-sm max-h-48 overflow-auto">
+                {uploadHistory.map((s, i) => (
+                  <div key={i} className="px-5 py-3.5 flex items-center gap-3 hover:bg-secondary/30 transition-colors">
+                    <div className="h-8 w-8 rounded-full bg-secondary/80 flex items-center justify-center shrink-0">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="truncate text-xs font-medium">{s.filename || `Statement ${i + 1}`}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{s.created_at ? new Date(s.created_at).toLocaleDateString() : ""}</p>
+                    </div>
+                    {s.transaction_count && <span className="text-xs font-medium px-2 py-1 rounded-full bg-secondary text-muted-foreground shrink-0">{s.transaction_count} txns</span>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-6 text-center text-sm text-muted-foreground">
+                No statements uploaded yet
+              </div>
+            )}
+          </SectionCard>
+        </div>
+      </div>
 
       <AccountFormModal open={showEdit} onClose={() => setShowEdit(false)} onCreated={() => { loadAccount(); setShowEdit(false); }} editAccount={account} />
     </div>

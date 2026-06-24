@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { parseISO, isBefore } from "date-fns";
+import { parseISO, isBefore, getDaysInMonth, getDate } from "date-fns";
 import {
   RefreshCw, Wallet, ShoppingCart, Calendar, Plus, Pencil, Trash2,
   Check, X, Target, TrendingDown, ChevronDown, ChevronUp,
@@ -138,6 +138,10 @@ export default React.memo(function BudgetPage() {
   const monthLabelWithHebrew = (
     <span>{monthLabel}{hebrewSuffix}</span>
   );
+
+  const daysInMonth = useMemo(() => getDaysInMonth(new Date(year, mNum - 1)), [year, mNum]);
+  const currentDay = isCurrentMonth ? getDate(now) : daysInMonth;
+  const monthElapsedPct = daysInMonth ? currentDay / daysInMonth : 1;
 
   const everyday = useMemo(() => budgets.filter((b) => (b.budget_type || "everyday") !== "event"), [budgets]);
   const events = useMemo(() => budgets.filter((b) => b.budget_type === "event"), [budgets]);
@@ -436,67 +440,89 @@ export default React.memo(function BudgetPage() {
   const spikeAlerts = useMemo(() => alerts.filter((a) => a.severity === "spike"), [alerts]);
 
   const renderBudgetCard = (b, showDate = false) => {
-    const over = (b.progress_pct || 0) >= 100;
+    const pct = b.progress_pct || 0;
+    const over = pct >= 100;
     const isEditing = editingId === b.budget_id;
-    const progressColor = over ? "#e5484d" : (b.progress_pct || 0) >= 80 ? "#e8a838" : "#30a46c";
+    const progressColor = over ? "#e5484d" : pct >= 80 ? "#e8a838" : "#30a46c";
+    
+    // Forecasting
+    let paceMessage = null;
+    let paceClass = "";
+    if (isCurrentMonth && monthElapsedPct > 0 && b.limit > 0) {
+      const projectedSpend = b.spent / monthElapsedPct;
+      const projectedDeficit = projectedSpend - b.limit;
+      if (projectedDeficit > 5 && !over) {
+        paceMessage = `Pacing £${Math.round(projectedDeficit)} over`;
+        paceClass = "text-ruby bg-ruby/10";
+      } else if (projectedDeficit < -5 && pct < 100) {
+        paceMessage = `Pacing £${Math.abs(Math.round(projectedDeficit))} under`;
+        paceClass = "text-emerald bg-emerald/10";
+      }
+    }
 
     if (isEditing) {
       return (
-        <div key={b.budget_id} className="rounded-lg border border-border bg-card/50 p-2 space-y-1.5">
-          <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full text-xs rounded border border-border bg-transparent px-1.5 py-1" />
-          <input type="number" step="0.01" value={form.limit} onChange={(e) => setForm({ ...form, limit: e.target.value })} className="w-full text-xs rounded border border-border bg-transparent px-1.5 py-1" />
-          <div className="flex gap-1">
-            <button onClick={() => handleUpdate(b.budget_id)} className="text-[10px] px-2 py-1 rounded bg-emerald text-white" aria-label="Save changes"><Check className="h-3 w-3" /></button>
-            <button onClick={cancelEdit} className="text-[10px] px-2 py-1 rounded bg-muted text-muted-foreground" aria-label="Cancel edit"><X className="h-3 w-3" /></button>
+        <div key={b.budget_id} className="rounded-xl border border-border bg-card/50 backdrop-blur-md p-3 space-y-2">
+          <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full text-xs rounded border border-border bg-transparent px-2 py-1.5 focus:outline-none focus:border-ring" />
+          <input type="number" step="0.01" value={form.limit} onChange={(e) => setForm({ ...form, limit: e.target.value })} className="w-full text-xs rounded border border-border bg-transparent px-2 py-1.5 focus:outline-none focus:border-ring" />
+          <div className="flex gap-2 justify-end">
+            <button onClick={cancelEdit} className="text-xs px-3 py-1.5 rounded-lg bg-secondary text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
+            <button onClick={() => handleUpdate(b.budget_id)} className="text-xs px-3 py-1.5 rounded-lg bg-emerald text-white hover:bg-emerald/90 transition-colors">Save</button>
           </div>
         </div>
       );
     }
 
     const isSelected = bulkSelected.has(b.budget_id);
-    const statusLabel = over ? "Over" : (b.progress_pct || 0) >= 80 ? "Nearing" : "On track";
+    const statusLabel = over ? "Over" : pct >= 80 ? "Nearing" : "On track";
+    
+    const bgGlow = over ? "hover:shadow-[0_0_15px_rgba(229,72,77,0.1)]" : pct >= 80 ? "hover:shadow-[0_0_15px_rgba(232,168,56,0.1)]" : "hover:shadow-[0_0_15px_rgba(48,164,108,0.1)]";
+
     return (
-      <div key={b.budget_id} className={`rounded-xl border ${isSelected ? "border-emerald bg-emerald/5" : "border-border bg-card/90"} p-3 hover:border-muted-foreground/20 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group relative`}>
+      <div key={b.budget_id} className={`rounded-xl border ${isSelected ? "border-emerald bg-emerald/5" : "border-border/50 bg-background/40"} backdrop-blur-xl p-4 hover:border-border ${bgGlow} hover:-translate-y-0.5 transition-all duration-300 group relative overflow-hidden`}>
         {isSelected && <div className="absolute inset-0 rounded-xl border-2 border-emerald/40 pointer-events-none" />}
-        <div className="flex items-start gap-3">
-          <div className="relative shrink-0 mt-0.5">
+        <div className="flex items-start gap-4">
+          <div className="relative shrink-0">
             <input type="checkbox" checked={isSelected} onChange={() => {
               const next = new Set(bulkSelected);
               if (isSelected) next.delete(b.budget_id); else next.add(b.budget_id);
               setBulkSelected(next);
-            }} className="absolute -left-1 -top-1 z-10 w-3.5 h-3.5 rounded border-border text-emerald focus:ring-emerald/30" />
-            <ProgressRing pct={b.progress_pct || 0} size={36} stroke={3} color={progressColor} />
+            }} className="absolute -left-1 -top-1 z-10 w-4 h-4 rounded border-border text-emerald focus:ring-emerald/30 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <ProgressRing pct={pct} size={44} stroke={4} color={progressColor} />
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <span className="text-[9px] font-bold tabular-nums">{Math.round(b.progress_pct || 0)}%</span>
+              <span className="text-[10px] font-bold tabular-nums">{Math.round(pct)}%</span>
             </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <h3 className="text-[13px] font-semibold capitalize truncate leading-tight">{b.category}</h3>
-              <span className={`shrink-0 text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
-                over ? "bg-ruby/10 text-ruby" :
-                (b.progress_pct || 0) >= 80 ? "bg-topaz/10 text-topaz" :
-                "bg-emerald/10 text-emerald"
-              }`}>
-                {statusLabel}
-              </span>
+          <div className="flex-1 min-w-0 flex flex-col justify-center pt-0.5">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-sm font-semibold capitalize truncate leading-tight tracking-tight">{b.category}</h3>
+              <div className="flex gap-1.5 items-center">
+                {paceMessage && <span className={`shrink-0 text-[9px] px-1.5 py-0.5 rounded font-medium ${paceClass}`}>{paceMessage}</span>}
+                <span className={`shrink-0 text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
+                  over ? "bg-ruby text-white" :
+                  pct >= 80 ? "bg-topaz text-white" :
+                  "bg-emerald/10 text-emerald"
+                }`}>
+                  {statusLabel}
+                </span>
+              </div>
             </div>
-            <div className="flex items-baseline gap-1 mb-1">
-              <span className={`text-xs font-semibold tabular-nums ${over ? "text-ruby" : "text-foreground"}`}>
+            <div className="flex items-baseline gap-1 mb-2">
+              <span className={`text-sm font-bold tabular-nums tracking-tight ${over ? "text-ruby" : "text-foreground"}`}>
                 £{b.spent}
               </span>
-              <span className="text-[10px] text-muted-foreground">/ £{b.limit}</span>
-              <span className="ml-auto text-[10px] tabular-nums text-muted-foreground">
+              <span className="text-xs text-muted-foreground font-medium">/ £{b.limit}</span>
+              <span className="ml-auto text-[11px] font-medium tabular-nums text-muted-foreground">
                 £{b.remaining >= 0 ? `${b.remaining} left` : `${Math.abs(b.remaining)} over`}
               </span>
             </div>
-            <div className="h-1.5 rounded-full bg-muted/30 overflow-hidden">
-              <div className={`h-full rounded-full ${over ? "bg-ruby" : "bg-gradient-to-r from-emerald via-topaz to-ruby"}`} style={{ width: `${Math.min(100, b.progress_pct || 0)}%`, transition: "width 0.4s ease" }} />
+            <div className="h-1.5 rounded-full bg-secondary/50 overflow-hidden shadow-inner">
+              <div className={`h-full rounded-full ${over ? "bg-ruby" : "bg-gradient-to-r from-emerald to-topaz"}`} style={{ width: `${Math.min(100, pct)}%`, transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)" }} />
             </div>
           </div>
-          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onClick={() => startEdit(b)} className="p-1 rounded-lg bg-background/80 backdrop-blur-sm border border-border/50 hover:bg-secondary text-muted-foreground hover:text-foreground shadow-xs" aria-label={`Edit ${b.category} budget`}><Pencil className="h-3 w-3" /></button>
-            <button onClick={() => setConfirmDelete(b.budget_id)} className="p-1 rounded-lg bg-background/80 backdrop-blur-sm border border-border/50 hover:bg-secondary text-muted-foreground hover:text-ruby shadow-xs" aria-label={`Delete ${b.category} budget`}><Trash2 className="h-3 w-3" /></button>
+          <div className="absolute inset-x-0 bottom-0 top-0 bg-gradient-to-l from-background via-background/90 to-transparent flex justify-end items-center pr-4 gap-2 opacity-0 group-hover:opacity-100 transition-opacity translate-x-4 group-hover:translate-x-0 duration-200 pointer-events-none">
+            <button onClick={(e) => { e.preventDefault(); startEdit(b); }} className="p-2 rounded-full bg-secondary hover:bg-muted text-foreground shadow-sm pointer-events-auto" aria-label={`Edit ${b.category}`}><Pencil className="h-4 w-4" /></button>
+            <button onClick={(e) => { e.preventDefault(); setConfirmDelete(b.budget_id); }} className="p-2 rounded-full bg-ruby/10 hover:bg-ruby/20 text-ruby shadow-sm pointer-events-auto" aria-label={`Delete ${b.category}`}><Trash2 className="h-4 w-4" /></button>
           </div>
         </div>
       </div>
@@ -658,8 +684,9 @@ export default React.memo(function BudgetPage() {
       )}
 
       {/* Dashboard overview */}
-      <PageHeader eyebrow="Budgets" title="Budgets">
-        <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-border/70">
+      <div className="sticky top-0 z-20 -mx-4 px-4 sm:-mx-8 sm:px-8 bg-background/70 backdrop-blur-xl border-b border-border/40 pb-4 pt-2 shadow-sm transition-all duration-300">
+        <PageHeader eyebrow="Budgets" title="Budgets" titleClassName="text-2xl" hideDivider>
+          <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 mt-2 pt-2">
           {/* Large progress ring with subtle shadow */}
           <div className="relative shrink-0 drop-shadow-[0_0_8px_rgba(48,164,108,0.4)]">
             <ProgressRing pct={summary.totalPlanned ? (summary.totalSpent / summary.totalPlanned) * 100 : 0} size={80} stroke={5}
@@ -750,25 +777,26 @@ export default React.memo(function BudgetPage() {
             </DropdownMenu>
           </div>
         </div>
-      </PageHeader>
+        </PageHeader>
+      </div>
 
       {/* Quick stats row */}
-      <div className="grid grid-cols-4 gap-3">
-        <div className="rounded-xl border border-border bg-card/80 p-3 sm:p-4 text-center">
-          <p className="text-xs text-muted-foreground mb-0.5">Budgets</p>
-          <p className="text-xl sm:text-2xl font-semibold">{summary.count}</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 relative z-10">
+        <div className="rounded-2xl border border-border/50 bg-background/50 backdrop-blur-sm p-4 text-center hover:bg-secondary/20 transition-colors">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Budgets</p>
+          <p className="text-2xl sm:text-3xl font-bold tracking-tight">{summary.count}</p>
         </div>
-        <div className="rounded-xl border border-border bg-card/80 p-3 sm:p-4 text-center">
-          <p className="text-xs text-muted-foreground mb-0.5">Budgeted</p>
-          <p className="text-xl sm:text-2xl font-semibold tabular-nums">£{summary.totalPlanned.toLocaleString()}</p>
+        <div className="rounded-2xl border border-border/50 bg-background/50 backdrop-blur-sm p-4 text-center hover:bg-secondary/20 transition-colors">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Budgeted</p>
+          <p className="text-2xl sm:text-3xl font-bold tracking-tight tabular-nums">£{summary.totalPlanned.toLocaleString()}</p>
         </div>
-        <div className="rounded-xl border border-border bg-card/80 p-3 sm:p-4 text-center">
-          <p className="text-xs text-muted-foreground mb-0.5">Spent</p>
-          <p className={`text-xl sm:text-2xl font-semibold tabular-nums ${summary.overCount > 0 ? "text-ruby" : "text-emerald"}`}>£{summary.totalSpent.toLocaleString()}</p>
+        <div className="rounded-2xl border border-border/50 bg-background/50 backdrop-blur-sm p-4 text-center hover:bg-secondary/20 transition-colors">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Spent</p>
+          <p className={`text-2xl sm:text-3xl font-bold tracking-tight tabular-nums ${summary.overCount > 0 ? "text-ruby" : "text-emerald"}`}>£{summary.totalSpent.toLocaleString()}</p>
         </div>
-        <div className="rounded-xl border border-border bg-card/80 p-3 sm:p-4 text-center">
-          <p className="text-xs text-muted-foreground mb-0.5">Remaining</p>
-          <p className={`text-xl sm:text-2xl font-semibold tabular-nums ${summary.totalRemaining < 0 ? "text-ruby" : "text-emerald"}`}>£{Math.abs(summary.totalRemaining).toLocaleString()}</p>
+        <div className="rounded-2xl border border-border/50 bg-background/50 backdrop-blur-sm p-4 text-center hover:bg-secondary/20 transition-colors">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Remaining</p>
+          <p className={`text-2xl sm:text-3xl font-bold tracking-tight tabular-nums ${summary.totalRemaining < 0 ? "text-ruby" : "text-emerald"}`}>£{Math.abs(summary.totalRemaining).toLocaleString()}</p>
         </div>
       </div>
 
@@ -919,51 +947,74 @@ export default React.memo(function BudgetPage() {
 
       {/* AI Budget Insights */}
       {!loading && (insights.length > 0) && (
-        <section>
-          <button
-            onClick={() => setShowInsights(!showInsights)}
-            className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3 hover:opacity-80"
-          >
-            <Sparkles className={`h-4 w-4 text-topaz ${insightsLoading ? "animate-pulse" : ""}`} />
-            AI Budget Insights
-            <span className="text-xs text-muted-foreground font-normal">({insights.length} suggestions)</span>
-          </button>
-          {showInsights && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {insights.map((ins) => {
-                const hasBudget = ins.current_budget > 0;
-                const needsChange = ins.suggested_budget !== ins.current_budget;
-                return (
-                  <div key={ins.category} className="rounded-xl border border-border bg-card/50 p-4">
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <h4 className="text-sm font-medium capitalize">{ins.category}</h4>
-                      {!hasBudget && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-topaz/10 text-topaz font-medium">No budget</span>}
-                    </div>
-                    <div className="text-xs text-muted-foreground space-y-1 mb-3">
-                      <p>Current: <strong className="text-foreground">£{ins.current_spent}</strong> this month</p>
-                      <p>3-month avg: <strong className="text-foreground">£{ins.avg_spent_3m}</strong></p>
-                      {hasBudget && <p>Budget: <strong className="text-foreground">£{ins.current_budget}</strong></p>}
-                      <p className="text-topaz font-medium mt-1">{ins.reason}</p>
-                    </div>
-                    {needsChange && (
-                      <Button
-                        variant="primary"
-                        size="pill"
-                        className="w-full"
-                        onClick={() => handleApplyInsight(ins)}
-                        disabled={applyingInsight === ins.category}
-                      >
-                        {applyingInsight === ins.category ? "Applying..." : `Set to £${ins.suggested_budget}`}
-                      </Button>
-                    )}
-                    {!needsChange && hasBudget && (
-                      <p className="text-xs text-emerald text-center">Budget is on track ✓</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+        <section className="mt-8 mb-6">
+          <div className="rounded-2xl border border-topaz/20 bg-gradient-to-br from-topaz/5 via-background to-background p-1 shadow-sm relative overflow-hidden">
+            {/* Ambient glow */}
+            <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 bg-topaz/10 rounded-full blur-3xl pointer-events-none" />
+            
+            <button
+              onClick={() => setShowInsights(!showInsights)}
+              className="w-full flex items-center justify-between p-4 rounded-xl hover:bg-secondary/30 transition-colors text-left relative z-10"
+            >
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-topaz/20 flex items-center justify-center shrink-0 border border-topaz/30 shadow-inner">
+                  <Sparkles className={`h-5 w-5 text-topaz ${insightsLoading ? "animate-pulse" : ""}`} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">
+                    FinanceAI Coach
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">I have {insights.length} personalized suggestions to improve your cash flow.</p>
+                </div>
+              </div>
+              <div className="shrink-0 text-muted-foreground">
+                {showInsights ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+              </div>
+            </button>
+            
+            {showInsights && (
+              <div className="p-4 pt-2 relative z-10 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
+                  {insights.map((ins) => {
+                    const hasBudget = ins.current_budget > 0;
+                    const needsChange = ins.suggested_budget !== ins.current_budget;
+                    return (
+                      <div key={ins.category} className="rounded-xl border border-topaz/20 bg-card/60 backdrop-blur-md p-4 shadow-sm hover:border-topaz/40 transition-colors group">
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <h4 className="text-sm font-semibold capitalize text-foreground">{ins.category}</h4>
+                          {!hasBudget && <span className="text-[10px] px-2 py-0.5 rounded-full bg-topaz/10 border border-topaz/20 text-topaz font-medium shrink-0">No budget</span>}
+                        </div>
+                        <div className="text-xs text-muted-foreground space-y-1.5 mb-4">
+                          <p className="flex justify-between"><span>Current spend:</span> <strong className="text-foreground">£{ins.current_spent}</strong></p>
+                          <p className="flex justify-between"><span>3-month avg:</span> <strong className="text-foreground">£{ins.avg_spent_3m}</strong></p>
+                          {hasBudget && <p className="flex justify-between"><span>Current limit:</span> <strong className="text-foreground">£{ins.current_budget}</strong></p>}
+                          
+                          <div className="mt-3 p-2.5 rounded-lg bg-topaz/10 text-topaz-dark dark:text-topaz border border-topaz/10 leading-relaxed font-medium">
+                            "{ins.reason}"
+                          </div>
+                        </div>
+                        {needsChange ? (
+                          <Button
+                            variant="primary"
+                            size="pill"
+                            className="w-full bg-topaz text-topaz-foreground hover:bg-topaz/90 shadow-sm"
+                            onClick={() => handleApplyInsight(ins)}
+                            disabled={applyingInsight === ins.category}
+                          >
+                            {applyingInsight === ins.category ? "Applying..." : `Update to £${ins.suggested_budget}`}
+                          </Button>
+                        ) : hasBudget ? (
+                          <div className="py-2 text-center rounded-lg bg-emerald/10 border border-emerald/20 text-emerald text-xs font-medium">
+                            Looks perfectly calibrated ✓
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         </section>
       )}
 

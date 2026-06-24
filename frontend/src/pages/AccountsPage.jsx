@@ -90,9 +90,13 @@ function AccountCard({ account }) {
               £{balanceFmt}
             </p>
           </div>
-          {account.is_offline && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-secondary/60 text-muted-foreground border border-border/40">
-              Manual
+          {account.is_offline ? (
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-secondary/60 text-muted-foreground border border-border/40 inline-flex items-center gap-1">
+              Offline
+            </span>
+          ) : (
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald/10 text-emerald border border-emerald/20 inline-flex items-center gap-1">
+              <RefreshCcw className="h-2.5 w-2.5" /> Connected
             </span>
           )}
         </div>
@@ -293,9 +297,19 @@ export default function AccountsPage() {
               {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
               Sync now
             </Button>
-            <Button onClick={() => setShowCreateModal(true)} variant="primary" size="pill">
-              <Plus className="h-4 w-4 mr-1.5" /> New Account
-            </Button>
+            <div className="relative group">
+              <Button variant="primary" size="pill">
+                <Plus className="h-4 w-4 mr-1.5" /> New Account
+              </Button>
+              <div className="absolute right-0 mt-2 w-48 rounded-xl border border-border bg-card shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 overflow-hidden">
+                <button onClick={connect} disabled={status === "connecting" || status === "redirecting"} className="w-full text-left px-4 py-3 text-sm hover:bg-secondary flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-emerald" /> Connect Bank
+                </button>
+                <button onClick={() => setShowCreateModal(true)} className="w-full text-left px-4 py-3 text-sm hover:bg-secondary flex items-center gap-2">
+                  <Wallet className="h-4 w-4 text-muted-foreground" /> Offline Account
+                </button>
+              </div>
+            </div>
           </div>
         }
       />
@@ -344,10 +358,10 @@ export default function AccountsPage() {
           description="Create your first account or connect a bank to start tracking your money."
           action={
             <div className="flex items-center gap-3">
-              <Button onClick={() => setShowCreateModal(true)} variant="primary" size="pill">
-                <Plus className="h-4 w-4 mr-1.5" /> Create Account
+              <Button onClick={() => setShowCreateModal(true)} variant="outlinePill" size="pill">
+                <Plus className="h-4 w-4 mr-1.5" /> Offline Account
               </Button>
-              <Button variant="outlinePill" size="pill" onClick={connect} disabled={status === "connecting" || status === "redirecting"}>
+              <Button variant="primary" size="pill" onClick={connect} disabled={status === "connecting" || status === "redirecting"}>
                 {status === "connecting" || status === "redirecting" ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Connecting…</> : <><Building2 className="h-4 w-4 mr-1.5" /> Connect Bank</>}
               </Button>
             </div>
@@ -394,95 +408,7 @@ export default function AccountsPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mt-8">
-        {/* Bank Connections */}
-        <SectionCard eyebrow="Connections" title="Bank connections" contentClassName="p-0">
-          <div className="p-5 border-b border-border/70 flex items-center justify-between gap-3 flex-wrap bg-secondary/20">
-            <Button variant="primary" size="pill" onClick={connect} disabled={status === "connecting" || status === "redirecting"}>
-              {status === "connecting" || status === "redirecting" ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Working…</> : <><Plus className="h-4 w-4 mr-1" /> Connect Bank</>}
-            </Button>
-            <label className="flex items-center gap-2 text-xs text-muted-foreground">
-              From
-              <input type="date" value={importFromDate} onChange={(e) => setImportFromDate(e.target.value)}
-                className="h-8 px-2 rounded-lg bg-card border border-border/50 text-xs focus:border-ring focus:outline-none transition-colors" />
-            </label>
-          </div>
-          {conns.length === 0 ? (
-            <div className="p-6">
-              <EmptyState icon={Building2} title="No banks connected" description="Connect a bank to automatically import transactions." />
-            </div>
-          ) : (
-            <div className="p-4 sm:p-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                {conns.map((c, i) => (
-                  <div key={c.connection_id} className={`fade-up delay-${Math.min(i, 5)}`}>
-                    <BankCardMockup connection={c} size="xs" showStatus />
-                    <div className="mt-2 flex items-center gap-2 justify-between">
-                      <p className="text-[10px] text-muted-foreground">
-                        {c.config?.institution && <span>{c.config.institution}</span>}
-                        {c.last_sync_at && <span>{c.config?.institution ? " · " : ""}synced {new Date(c.last_sync_at).toLocaleDateString()}</span>}
-                      </p>
-                      <div className="flex items-center gap-1.5">
-                        {c.status === "reconnect_required" && (
-                          <button onClick={(e) => { e.preventDefault(); e.stopPropagation();
-                            (async () => { try { const { data } = await api.post(`/truelayer/reconnect/${c.connection_id}`); setTimeout(() => { window.location.href = data.auth_url; }, 600); } catch { toast.error("Reconnect failed"); } })();
-                          }} className="text-xs px-2 py-1 rounded-lg border border-ruby/30 text-ruby hover:bg-ruby/5 transition-colors">Reconnect</button>
-                        )}
-                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeConn(c.connection_id); }}
-                          className="text-xs px-2 py-1 rounded-lg border border-border/50 text-muted-foreground hover:text-ruby hover:border-ruby/30 transition-colors">
-                          <Trash2 className="h-3 w-3 inline mr-1" />Remove
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </SectionCard>
-
-        {/* Statement Upload */}
-        <SectionCard eyebrow="Manual import" title="Upload a statement" contentClassName="p-0">
-          <div
-            className={`p-8 sm:p-10 text-center border-b border-border/70 transition-all duration-300 ${dragOver ? "bg-emerald/5 border-emerald/30 border-dashed" : "bg-secondary/20"}`}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => { e.preventDefault(); setDragOver(false); handleUpload(e.dataTransfer.files[0]); }}
-          >
-            <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-card border border-border/50 shadow-sm text-emerald">
-              <Upload className="h-6 w-6" />
-            </div>
-            <p className="text-sm font-medium">Drop a CSV or PDF here</p>
-            <p className="text-xs text-muted-foreground mt-1">or click to browse — max 5 MB</p>
-            <input ref={fileRef} type="file" accept=".csv,.pdf" onChange={(e) => { handleUpload(e.target.files[0]); e.target.value = ""; }}
-              className="hidden" />
-            <Button variant="outlinePill" size="pill" onClick={() => fileRef.current?.click()} disabled={uploadBusy} className="mt-5">
-              {uploadBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Upload className="h-4 w-4 mr-1.5" />}
-              {uploadBusy ? "Processing…" : "Choose file"}
-            </Button>
-          </div>
-          {uploadHistory.length > 0 ? (
-            <div className="divide-y divide-border text-sm max-h-48 overflow-auto">
-              {uploadHistory.map((s, i) => (
-                <div key={i} className="px-5 py-3.5 flex items-center gap-3 hover:bg-secondary/30 transition-colors">
-                  <div className="h-8 w-8 rounded-full bg-secondary/80 flex items-center justify-center shrink-0">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="truncate text-xs font-medium">{s.filename || `Statement ${i + 1}`}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{s.created_at ? new Date(s.created_at).toLocaleDateString() : ""}</p>
-                  </div>
-                  {s.transaction_count && <span className="text-xs font-medium px-2 py-1 rounded-full bg-secondary text-muted-foreground shrink-0">{s.transaction_count} txns</span>}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="p-6 text-center text-sm text-muted-foreground">
-              No statements uploaded yet
-            </div>
-          )}
-        </SectionCard>
-      </div>
+      {/* Removed Bank Connections and Statement Upload sections from here */}
 
       <AccountFormModal open={showCreateModal} onClose={() => setShowCreateModal(false)} onCreated={() => { loadAccounts(); setShowCreateModal(false); }} />
     </div>
