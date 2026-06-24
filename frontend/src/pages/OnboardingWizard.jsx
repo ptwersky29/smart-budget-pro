@@ -40,7 +40,7 @@ function StepImport({ onDone }) {
   return (
     <div className="space-y-3 mt-6">
       <a
-        href="/import"
+        href="/accounts"
         className="flex items-center gap-4 p-4 rounded-2xl border border-border bg-card hover:border-emerald transition-colors group"
       >
         <span className="w-11 h-11 rounded-xl bg-emerald/10 text-emerald grid place-items-center shrink-0">
@@ -53,7 +53,7 @@ function StepImport({ onDone }) {
         <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-emerald transition-colors shrink-0" />
       </a>
       <a
-        href="/import"
+        href="/accounts"
         className="flex items-center gap-4 p-4 rounded-2xl border border-border bg-card hover:border-emerald transition-colors group"
       >
         <span className="w-11 h-11 rounded-xl bg-topaz/10 text-topaz grid place-items-center shrink-0">

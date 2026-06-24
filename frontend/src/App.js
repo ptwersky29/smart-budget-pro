@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import "./App.css";
 import { AuthProvider } from "./contexts/AuthContext";
 import { SettingsProvider } from "./contexts/SettingsContext";
@@ -19,7 +19,7 @@ const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Transactions = lazy(() => import("./pages/Transactions"));
 const BudgetPage = lazy(() => import("./pages/BudgetPage"));
-const BankStatements = lazy(() => import("./pages/BankStatements"));
+
 const Investments = lazy(() => import("./pages/Investments"));
 const Jewish = lazy(() => import("./pages/Jewish"));
 const UKTools = lazy(() => import("./pages/UKTools"));
@@ -84,7 +84,7 @@ function AppRouter() {
         <Route path="/transactions" element={<Transactions />} />
         <Route path="/budgets" element={<BudgetPage />} />
         <Route path="/subscriptions" element={<Subscriptions />} />
-        <Route path="/import" element={<BankStatements />} />
+        <Route path="/import" element={<Navigate to="/accounts" replace />} />
         <Route path="/investments" element={<Investments />} />
         <Route path="/connections" element={<Connections />} />
         <Route path="/integrations" element={<Integrations />} />

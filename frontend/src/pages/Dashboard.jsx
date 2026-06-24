@@ -203,7 +203,7 @@ const Dashboard = React.memo(function Dashboard() {
               <DropdownMenuItem onClick={() => loadAll(true)}>
                 <RefreshCw className="h-4 w-4 mr-2" /> Refresh
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate("/import")}>
+              <DropdownMenuItem onClick={() => navigate("/accounts")}>
                 <Building2 className="h-4 w-4 mr-2" /> Import
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigate("/transactions")}>
@@ -222,12 +222,12 @@ const Dashboard = React.memo(function Dashboard() {
           action={
             <div className="flex flex-wrap gap-3 justify-center">
               <Button variant="primary" size="pill" asChild>
-                <Link to="/import">
+                <Link to="/accounts">
                   Connect bank <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
               <Button variant="outlinePill" size="pill" asChild>
-                <Link to="/import">Upload statement</Link>
+                <Link to="/accounts">Upload statement</Link>
               </Button>
               <Button variant="outlinePill" size="pill" asChild>
                 <Link to="/transactions">Add manually</Link>

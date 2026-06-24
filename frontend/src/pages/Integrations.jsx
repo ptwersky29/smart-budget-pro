@@ -188,7 +188,7 @@ export default function Integrations({ embedded }) {
                 subtitle="Connect your bank to auto-sync transactions"
                 status={navigate ? "configured" : "info"}
                 statusLabel="Open"
-                href="/import"
+                href="/accounts"
                 navigate={navigate}>
         <p className="text-sm text-muted-foreground">One-click bank connection. No client IDs or secrets needed — just authenticate with your bank. Transactions sync automatically.</p>
       </LinkCard>

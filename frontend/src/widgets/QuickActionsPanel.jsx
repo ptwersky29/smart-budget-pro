@@ -11,7 +11,7 @@ export default React.memo(function QuickActionsPanel() {
           <span className="grid h-9 w-9 place-items-center rounded-lg bg-emerald/10 text-emerald"><Plus className="h-4 w-4" /></span>
           <span className="text-xs font-medium leading-tight">Add transaction</span>
         </Link>
-        <Link to="/import" className="flex flex-col items-center gap-1.5 p-4 rounded-xl border border-border hover:border-emerald/30 bg-secondary/20 hover:bg-emerald/5 transition-colors text-center">
+        <Link to="/accounts" className="flex flex-col items-center gap-1.5 p-4 rounded-xl border border-border hover:border-emerald/30 bg-secondary/20 hover:bg-emerald/5 transition-colors text-center">
           <span className="grid h-9 w-9 place-items-center rounded-lg bg-emerald/10 text-emerald"><Building2 className="h-4 w-4" /></span>
           <span className="text-xs font-medium leading-tight">Connect bank</span>
         </Link>

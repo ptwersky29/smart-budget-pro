@@ -16,7 +16,7 @@ const COMMAND_GROUPS = [
       { key: "nav-budgets", label: "Budgets", icon: PiggyBank, to: "/budgets" },
       { key: "nav-reports", label: "Reports", icon: FileText, to: "/reports" },
       { key: "nav-subscriptions", label: "Subscriptions", icon: RefreshCcw, to: "/subscriptions" },
-      { key: "nav-import", label: "Bank & Statements", icon: Building2, to: "/import" },
+      { key: "nav-import", label: "Accounts & Import", icon: Building2, to: "/accounts" },
       { key: "nav-investments", label: "Investments", icon: TrendingUp, to: "/investments" },
       { key: "nav-jewish", label: "Jewish Tools", icon: Star, to: "/jewish" },
       { key: "nav-uk", label: "UK Benefits", icon: Landmark, to: "/uk-tools" },

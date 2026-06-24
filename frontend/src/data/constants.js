@@ -11,7 +11,7 @@ export const PAGES = {
   REPORTS: "/reports",
   SETTINGS: "/settings",
   CATEGORIES: "/settings/categories",
-  IMPORT: "/import",
+  ACCOUNTS: "/accounts",
   INVESTMENTS: "/investments",
   JEWISH: "/jewish",
   UK_TOOLS: "/uk-tools",

@@ -16,7 +16,7 @@ export const NAV_SECTIONS = [
     label: "Overview",
     items: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { to: "/accounts", label: "Accounts", icon: Wallet },
+      { to: "/accounts", label: "Accounts & Import", icon: Wallet },
       { to: "/reports", label: "Reports", icon: FileText },
     ],
   },
@@ -31,7 +31,6 @@ export const NAV_SECTIONS = [
   {
     label: "Connect",
     items: [
-      { to: "/import", label: "Bank & Statements", icon: Building2 },
       { to: "/investments", label: "Investments", icon: TrendingUp },
     ],
   },
@@ -52,7 +51,7 @@ export const ROUTE_META = [
     title: "Dashboard",
     description: "A clean snapshot of your money, cash flow, and what needs attention next.",
     primary: { label: "Add transaction", to: "/transactions" },
-    secondary: { label: "Import data", to: "/import" },
+    secondary: { label: "Accounts & Import", to: "/accounts" },
   },
   {
     paths: ["/transactions"],
@@ -77,11 +76,11 @@ export const ROUTE_META = [
     primary: { label: "Add subscription", to: "/subscriptions" },
   },
   {
-    paths: ["/import"],
-    eyebrow: "Import",
-    title: "Bank & Statements",
-    description: "Connect your bank via TrueLayer, upload CSV/PDF statements, or manage existing connections.",
-    primary: { label: "Connect bank", to: "/import" },
+    paths: ["/accounts"],
+    eyebrow: "Accounts & Import",
+    title: "Your accounts.",
+    description: "All your bank accounts, wallets, savings, and statement imports in one place.",
+    primary: { label: "Connect bank", to: "/accounts" },
     secondary: { label: "Settings", to: "/settings" },
   },
   {
@@ -112,7 +111,7 @@ export const ROUTE_META = [
     secondary: { label: "Dashboard", to: "/dashboard" },
   },
   {
-    paths: ["/accounts"],
+    paths: ["/accounts/legacy", "/accounts/"],
     eyebrow: "Account",
     title: "Account Details",
     description: "View transactions, settings, and balance for this bank account.",
@@ -123,7 +122,7 @@ export const ROUTE_META = [
     title: "Settings",
     description: "Manage your account, subscription, AI providers, integrations, and SMS settings.",
     primary: { label: "Pricing", to: "/pricing" },
-    secondary: { label: "Import data", to: "/import" },
+    secondary: { label: "Accounts & Import", to: "/accounts" },
   },
 ];
 
@@ -131,4 +130,4 @@ export function getRouteMeta(pathname) {
   return ROUTE_META.find((meta) => meta.paths.some((path) => pathname === path || pathname.startsWith(`${path}/`))) || ROUTE_META[0];
 }
 
-export const KEYBOARD_GOTO = { d: "/dashboard", t: "/transactions", b: "/budgets", s: "/subscriptions", r: "/reports", i: "/import", g: "/settings" };
+export const KEYBOARD_GOTO = { d: "/dashboard", t: "/transactions", b: "/budgets", s: "/subscriptions", r: "/reports", a: "/accounts", g: "/settings" };
