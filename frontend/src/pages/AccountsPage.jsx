@@ -21,7 +21,8 @@ function AccountLogo({ account, size = "md" }) {
   const imgSizes = { sm: "h-6 w-6", md: "h-8 w-8", lg: "h-10 w-10" };
   const sizeClass = sizes[size] || sizes.md;
   const imgSize = imgSizes[size] || imgSizes.md;
-  const initials = (account.name || "?")
+  const displayName = account.name || (account.provider ? `${account.provider} Account` : "Unknown Account");
+  const initials = displayName
     .split(" ")
     .map((w) => w[0])
     .join("")
@@ -51,6 +52,8 @@ function AccountCard({ account }) {
   const balanceFmt = Number(account.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const isSavings = account.type === "savings";
 
+  const displayName = account.name || (account.provider ? `${account.provider} Account` : "Unknown Account");
+
   return (
     <Link to={`/accounts/${account.account_id}`}
       className={`group relative block rounded-2xl border border-border/50 bg-card hover:bg-card/80 hover:shadow-lg hover:border-border/80 transition-all duration-300 overflow-hidden ${isSavings ? "opacity-90 hover:opacity-100" : ""}`}>
@@ -63,7 +66,7 @@ function AccountCard({ account }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <h3 className="font-semibold text-sm truncate group-hover:text-emerald transition-colors">
-                {account.name}
+                {displayName}
               </h3>
               {isSavings && (
                 <span className="shrink-0 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-violet/10 text-violet border border-violet/20">

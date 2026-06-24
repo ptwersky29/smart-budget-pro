@@ -72,7 +72,8 @@ export default function AccountDetailPage() {
     try {
       const { data } = await api.get(`/accounts/${accountId}`);
       setAccount(data);
-      document.title = `${data.name} | FinanceAI`;
+      const dispName = data.name || (data.provider ? `${data.provider} Account` : "Unknown Account");
+      document.title = `${dispName} | FinanceAI`;
     } catch (err) {
       setError(formatApiError(err.response?.data?.detail) || "Could not load account");
     } finally { setLoading(false); }
@@ -139,7 +140,8 @@ export default function AccountDetailPage() {
   const currentPage = Math.floor(offset / limit) + 1;
   const meta = ACCOUNT_TYPE_META[account?.type] || ACCOUNT_TYPE_META.current;
   const Icon = meta.icon;
-  const initials = (account?.name || "?")
+  const dispName = account?.name || (account?.provider ? `${account.provider} Account` : "Unknown Account");
+  const initials = dispName
     .split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
   const isSavings = account?.type === "savings";
 
@@ -193,7 +195,7 @@ export default function AccountDetailPage() {
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight">{account.name}</h1>
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight">{dispName}</h1>
                 <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full ${meta.bg} ${meta.color} font-medium`}>
                   <Icon className="h-3 w-3" /> {meta.label}
                 </span>
