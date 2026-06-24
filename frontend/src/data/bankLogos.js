@@ -258,8 +258,8 @@ export function pickBankInstitution(...candidates) {
 export function getBankLogoOrFallback(institution) {
   if (!institution) return null;
   const match = _resolve(institution);
-  if (match?.file) return `${LOCAL_BASE}/${match.file}`;
   if (match?.trustly) return `${TRUSTLY_BASE}/${match.trustly}/round.svg`;
+  if (match?.file) return `${LOCAL_BASE}/${match.file}`;
   const color = match?.color || "#6b7280";
   const name = match?.name || institution;
   return _initialSvg(name, color);
