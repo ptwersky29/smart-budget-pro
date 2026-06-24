@@ -44,6 +44,43 @@ def build_router() -> APIRouter:
     ):
         sm = request.app.state.db
         async with sm() as session:
+            # Auto-migrate any old BankConnections to the new BankAccount table
+            from sqlalchemy import select
+            from db import BankConnection
+            conn_result = await session.execute(
+                select(BankConnection).where(
+                    BankConnection.user_id == user["user_id"],
+                    BankConnection.status == "active"
+                )
+            )
+            for c in conn_result.scalars().all():
+                ba_res = await session.execute(
+                    select(BankAccount).where(
+                        BankAccount.connection_id == c.connection_id,
+                        BankAccount.user_id == user["user_id"]
+                    )
+                )
+                if not ba_res.scalars().first():
+                    acct_type = c.account_type.lower() if c.account_type else "current"
+                    if acct_type not in ("current", "savings", "cash", "credit"):
+                        acct_type = "current"
+                    provider_name = c.config.get("institution", "") if c.config else ""
+                    ba_name = c.nickname or c.account_name or (provider_name + " Account" if provider_name else "Bank Account")
+                    
+                    ba = BankAccount(
+                        account_id=c.account_id or f"acct_{uuid.uuid4().hex[:12]}",
+                        user_id=user["user_id"],
+                        name=ba_name,
+                        type=acct_type,
+                        balance=c.balance if c.balance is not None else 0,
+                        currency=c.balance_currency or "GBP",
+                        provider="truelayer",
+                        connection_id=c.connection_id,
+                        is_offline=False,
+                    )
+                    session.add(ba)
+            await session.commit()
+
             stmt = select(BankAccount).where(
                 BankAccount.user_id == user["user_id"]
             ).order_by(BankAccount.sort_order, BankAccount.created_at.desc())
