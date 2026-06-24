@@ -74,6 +74,8 @@ const Transactions = React.memo(function Transactions() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [selectedCats, setSelectedCats] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [accountsLoading, setAccountsLoading] = useState(false);
   const [classifying, setClassifying] = useState(false);
   const [classification, setClassification] = useState(null);
   const [saveAsRecurring, setSaveAsRecurring] = useState(false);
@@ -83,7 +85,7 @@ const Transactions = React.memo(function Transactions() {
   const [selectedHebrewMonth, setSelectedHebrewMonth] = useState(null);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const defaultFilters = useMemo(() => ({ search: "", category: "", source: "", tx_type: "", date_from: firstOfMonth(), date_to: today(), amount_min: "", amount_max: "", sort: "date", order: "desc" }), []);
+  const defaultFilters = useMemo(() => ({ search: "", category: "", source: "", tx_type: "", date_from: firstOfMonth(), date_to: today(), amount_min: "", amount_max: "", sort: "date", order: "desc", account_id: "" }), []);
   const [filters, setFilters] = useState(() => {
     const fromUrl = {};
     for (const k of Object.keys(defaultFilters)) {
@@ -158,6 +160,7 @@ const Transactions = React.memo(function Transactions() {
       if (filters.date_to) params.date_to = filters.date_to;
       if (filters.amount_min) params.amount_min = parseFloat(filters.amount_min);
       if (filters.amount_max) params.amount_max = parseFloat(filters.amount_max);
+      if (filters.account_id) params.account_id = filters.account_id;
       const { data } = await api.get("/transactions", { params });
       setTxs(data.transactions);
       setTotal(data.total);
@@ -178,6 +181,16 @@ const Transactions = React.memo(function Transactions() {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadCats(); }, [loadCats]);
+
+  const loadAccounts = useCallback(async () => {
+    setAccountsLoading(true);
+    try {
+      const { data } = await api.get("/accounts");
+      setAccounts(data.accounts || []);
+    } catch { /* ignore */ }
+    finally { setAccountsLoading(false); }
+  }, []);
+  useEffect(() => { loadAccounts(); }, [loadAccounts]);
 
   const applyHebrewMonth = useCallback((m) => {
     if (!m) return;
@@ -248,7 +261,7 @@ const Transactions = React.memo(function Transactions() {
   const clearAllFilters = useCallback(() => {
     setSearchInput("");
     setSelectedHebrewMonth(null);
-    setFilters(prev => ({ ...prev, search: "", tx_type: "", source: "", category: "", amount_min: "", amount_max: "", date_from: firstOfMonth(), date_to: today() }));
+    setFilters(prev => ({ ...prev, search: "", tx_type: "", source: "", category: "", amount_min: "", amount_max: "", date_from: firstOfMonth(), date_to: today(), account_id: "" }));
     setOffset(0);
   }, []);
 
@@ -258,7 +271,7 @@ const Transactions = React.memo(function Transactions() {
   const openAdd = useCallback(() => { setEditingId(null); setForm(emptyForm); setOpen(true); }, []);
   const openEdit = useCallback((t) => {
     setEditingId(t.transaction_id);
-    setForm({ description: t.description || "", amount: String(Math.abs(t.amount)), category: t.category || "", is_income: t.amount > 0, budget_type: "", occasion: "", merchant: "" });
+    setForm({ description: t.description || "", amount: String(Math.abs(t.amount)), category: t.category || "", account_id: t.account_id || "", is_income: t.amount > 0, budget_type: "", occasion: "", merchant: "" });
     setOpen(true);
   }, []);
   const closeForm = useCallback(() => { setOpen(false); setEditingId(null); setForm(emptyForm); setClassification(null); setSaveAsRecurring(false); }, []);
@@ -285,14 +298,14 @@ const Transactions = React.memo(function Transactions() {
     const amt = parseFloat(form.amount);
     const signed = form.is_income ? Math.abs(amt) : -Math.abs(amt);
     if (editingId) {
-      const payload = { description: form.description, amount: signed, category: form.category || undefined, is_income: form.is_income };
+      const payload = { description: form.description, amount: signed, category: form.category || undefined, is_income: form.is_income, account_id: form.account_id || undefined };
       const old = txsRef.current.find(t => t.transaction_id === editingId);
       setTxs(prev => prev.map(t => t.transaction_id === editingId ? { ...t, ...payload } : t));
       setOpen(false); setEditingId(null);
       withUndo({
         action: () => api.patch(`/transactions/${editingId}`, payload),
         undo: async () => {
-          if (old) { await api.patch(`/transactions/${editingId}`, { description: old.description, amount: old.amount, category: old.category || undefined, is_income: old.is_income }); }
+          if (old) { await api.patch(`/transactions/${editingId}`, { description: old.description, amount: old.amount, category: old.category || undefined, is_income: old.is_income, account_id: old.account_id || undefined }); }
           await load();
         },
         onError: () => { if (old) setTxs(prev => prev.map(t => t.transaction_id === editingId ? old : t)); load(); },
@@ -312,6 +325,7 @@ const Transactions = React.memo(function Transactions() {
           occasion: form.occasion || suggestions[0]?.occasion || "Monthly Living",
           category: form.category || suggestions[0]?.category || "uncategorized",
           merchant: form.merchant || suggestions[0]?.merchant || "",
+          account_id: form.account_id,
           suggestion_id: classification?.suggestion_id || null,
           suggestion_index: chosenIdx >= 0 ? chosenIdx : null,
           save_as_recurring: saveAsRecurring,
@@ -323,7 +337,7 @@ const Transactions = React.memo(function Transactions() {
         toast.error("Could not add");
       }
     } else {
-      const payload = { description: form.description, amount: signed, category: form.category || undefined, is_income: form.is_income };
+      const payload = { description: form.description, amount: signed, category: form.category || undefined, account_id: form.account_id, is_income: form.is_income };
       setOpen(false); setEditingId(null);
       const optimisticTx = { transaction_id: `optimistic-${Date.now()}`, ...payload, date: new Date().toISOString(), source: "manual" };
       setTxs(prev => [optimisticTx, ...prev]);
@@ -862,7 +876,8 @@ const Transactions = React.memo(function Transactions() {
         onClassify={handleClassify} classifying={classifying} classification={classification}
         onClearClassification={clearClassification}
         saveAsRecurring={saveAsRecurring} setSaveAsRecurring={setSaveAsRecurring}
-        onCategoryCreated={loadCats} />
+        onCategoryCreated={loadCats}
+        accounts={accounts} accountsLoading={accountsLoading} />
 
       <ComparePeriods open={compareOpen} onClose={() => setCompareOpen(false)} />
 

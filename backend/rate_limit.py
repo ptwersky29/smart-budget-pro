@@ -55,7 +55,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
 class CsrfProtectionMiddleware(BaseHTTPMiddleware):
     """CSRF protection for cookie-authenticated state-changing requests.
-    
+
     Requires GET /api/auth/csrf-token to return a CSRF token that is then
     sent as X-CSRF-Token header on POST/PUT/PATCH/DELETE requests.
     Skips CSRF for API-key or Bearer-token authenticated requests.

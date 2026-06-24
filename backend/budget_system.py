@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, func, and_
 
 from db import (
+    BankAccount,
     BudgetOccasion, BudgetOccasionCategory, AISuggestion,
     Transaction, HolidayBudget, RecurringTransaction, CategoryRule,
     get_session_maker,
@@ -252,6 +253,7 @@ class ApproveIn(BaseModel):
     category: str
     merchant: Optional[str] = None
     date: Optional[str] = None
+    account_id: Optional[str] = None
     save_as_recurring: Optional[bool] = False
 
 
@@ -1100,6 +1102,34 @@ def build_router() -> APIRouter:
             # Create the transaction via existing endpoint logic
             from finance_engine import _tx_to_dict
             merchant_name = payload.merchant or payload.occasion or ""
+
+            # Resolve account_id
+            acct_id = payload.account_id
+            if acct_id:
+                acct_check = await session.execute(
+                    select(BankAccount).where(
+                        BankAccount.account_id == acct_id,
+                        BankAccount.user_id == user["user_id"],
+                    )
+                )
+                if not acct_check.scalar_one_or_none():
+                    acct_id = None
+
+            # Update account balance if account specified
+            if acct_id:
+                acct_obj = await session.execute(
+                    select(BankAccount).where(
+                        BankAccount.account_id == acct_id,
+                        BankAccount.user_id == user["user_id"],
+                    )
+                )
+                acct = acct_obj.scalar_one_or_none()
+                if acct:
+                    current_bal = float(acct.balance or 0)
+                    signed_amt = -abs(payload.amount) if payload.amount > 0 else payload.amount
+                    acct.balance = current_bal + signed_amt
+                    acct.balance_updated_at = datetime.now(timezone.utc)
+
             tx = Transaction(
                 transaction_id=f"tx_{uuid.uuid4().hex[:12]}",
                 user_id=user["user_id"],
@@ -1109,6 +1139,7 @@ def build_router() -> APIRouter:
                 merchant_name=merchant_name,
                 normalized_merchant=merchant_name.lower().strip(),
                 date=datetime.fromisoformat(payload.date) if payload.date else datetime.now(timezone.utc),
+                account_id=acct_id or "",
                 source="manual",
                 tx_type="expense",
             )

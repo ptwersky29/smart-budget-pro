@@ -1,10 +1,11 @@
 import {
-  LayoutDashboard, Receipt, PiggyBank, Building2, TrendingUp, Star,
+  LayoutDashboard, Wallet, Receipt, PiggyBank, Building2, TrendingUp, Star,
   Landmark, FileText, Settings, RefreshCcw, MoreHorizontal
 } from "lucide-react";
 
 export const BOTTOM_NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/accounts", label: "Accounts", icon: Wallet },
   { to: "/transactions", label: "Transactions", icon: Receipt },
   { to: "/budgets", label: "Budgets", icon: PiggyBank },
   { to: "/settings", label: "More", icon: MoreHorizontal, isMore: true },
@@ -15,6 +16,7 @@ export const NAV_SECTIONS = [
     label: "Overview",
     items: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/accounts", label: "Accounts", icon: Wallet },
       { to: "/reports", label: "Reports", icon: FileText },
     ],
   },

@@ -50,22 +50,13 @@ import empty_states
 import budget_system
 import notifications
 import manual_accounts
+import bank_accounts
 from exceptions import FinanceAIError
 from rate_limit import RateLimiter, RateLimitMiddleware, CsrfProtectionMiddleware
 from middleware import ErrorMonitorMiddleware, RequestTimerMiddleware, RequestIdMiddleware, SecurityHeadersMiddleware
 from security import generate_csrf_token, _require_jwt_secret
 
 # Optional Sentry integration
-SENTRY_DSN = os.environ.get("SENTRY_DSN")
-if SENTRY_DSN:
-    try:
-        import sentry_sdk
-        sentry_sdk.init(dsn=SENTRY_DSN, traces_sample_rate=0.1)
-        logger.info("Sentry error monitoring enabled")
-    except ImportError:
-        logger.warning("SENTRY_DSN set but sentry-sdk not installed — skipping")
-
-
 class JsonFormatter(logging.Formatter):
     def format(self, record):
         log = {
@@ -85,6 +76,15 @@ _handler.setFormatter(JsonFormatter() if os.environ.get("JSON_LOG") else logging
 ))
 logging.basicConfig(level=logging.INFO, handlers=[_handler])
 logger = logging.getLogger("financeai")
+
+SENTRY_DSN = os.environ.get("SENTRY_DSN")
+if SENTRY_DSN:
+    try:
+        import sentry_sdk
+        sentry_sdk.init(dsn=SENTRY_DSN, traces_sample_rate=0.1)
+        logger.info("Sentry error monitoring enabled")
+    except ImportError:
+        logger.warning("SENTRY_DSN set but sentry-sdk not installed — skipping")
 
 # ── Startup validation ──────────────────────────────────────────────────
 
@@ -205,6 +205,7 @@ api.include_router(empty_states.build_router())
 api.include_router(budget_system.build_router())
 api.include_router(notifications.router)
 api.include_router(manual_accounts.build_router())
+api.include_router(bank_accounts.build_router())
 
 # ── Frontend‑compatibility aliases ───────────────────────────────────────────
 
@@ -241,9 +242,6 @@ async def download_jewish_report(year: int, request: Request, user: dict = Depen
     from reportlab.pdfgen import canvas
     import io
     from jewish_reports import jewish_finance_year_end_report
-    from sqlalchemy import select
-    import os
-
     sm = request.app.state.db
     async with sm() as session:
         result = await session.execute(select(text("1")))

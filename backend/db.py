@@ -618,6 +618,32 @@ async def create_tables():
                     "CREATE INDEX IF NOT EXISTS idx_ai_usage_user_date ON ai_usage(user_id, date)"
                 )
             )
+            # Phase 4 — BankAccount model & balance_type on transactions
+            await conn.execute(
+                text(
+                    "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS balance_type VARCHAR(16) DEFAULT 'available'"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS idx_transactions_account ON transactions(user_id, account_id)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS idx_transactions_balance_type ON transactions(user_id, balance_type)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE bank_accounts ADD COLUMN IF NOT EXISTS image TEXT"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE bank_accounts ADD COLUMN IF NOT EXISTS color VARCHAR(7)"
+                )
+            )
 
 
 async def get_session() -> AsyncSession:
@@ -708,6 +734,9 @@ class User(Base, TimestampMixin):
     bank_connections: Mapped[List["BankConnection"]] = relationship(
         back_populates="user", cascade="all, delete-orphan", lazy="selectin"
     )
+    bank_accounts: Mapped[List["BankAccount"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", lazy="selectin"
+    )
     support_tickets: Mapped[List["SupportTicket"]] = relationship(
         back_populates="user", cascade="all, delete-orphan", lazy="selectin"
     )
@@ -729,6 +758,51 @@ class UserSession(Base, TimestampMixin):
     user_agent: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="sessions")
+
+
+# ── Bank Account (standalone, first-class account entity) ──────────────
+
+
+class BankAccount(Base, TimestampMixin):
+    """A financial account owned by a user — the core entity that transactions belong to.
+
+    This is separate from BankConnection (which handles Open Banking sync).
+    Every transaction MUST reference a BankAccount via account_id.
+    """
+    __tablename__ = "bank_accounts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("users.user_id"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    type: Mapped[str] = mapped_column(
+        String(32), default="current"
+    )  # current, savings, cash, credit
+    balance: Mapped[Optional[float]] = mapped_column(
+        Numeric(14, 2, asdecimal=False), nullable=True, default=0
+    )
+    currency: Mapped[str] = mapped_column(String(3), default="GBP")
+    image: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # base64 data URI or URL
+    color: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)  # hex color
+    provider: Mapped[str] = mapped_column(
+        String(32), default="manual"
+    )  # manual, truelayer, csv
+    connection_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    is_offline: Mapped[bool] = mapped_column(Boolean, default=True)
+    include_in_total: Mapped[bool] = mapped_column(Boolean, default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    balance_updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    user: Mapped["User"] = relationship(back_populates="bank_accounts")
+
+    __table_args__ = (
+        Index("idx_bank_accounts_user", "user_id"),
+        Index("idx_bank_accounts_type", "user_id", "type"),
+    )
 
 
 class TokenBlacklist(Base):
@@ -894,7 +968,9 @@ class Transaction(Base, TimestampMixin):
     user_id: Mapped[str] = mapped_column(
         String(64), ForeignKey("users.user_id"), nullable=False, index=True
     )
-    account_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    account_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("bank_accounts.account_id"), nullable=False, index=True
+    )
     connection_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     amount: Mapped[float] = mapped_column(
         Numeric(12, 2, asdecimal=False), nullable=False
@@ -914,6 +990,9 @@ class Transaction(Base, TimestampMixin):
     )
     pending: Mapped[bool] = mapped_column(Boolean, default=False)
     tx_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    balance_type: Mapped[str] = mapped_column(
+        String(16), default="available"
+    )  # available, savings
     exclude_from_maaser: Mapped[bool] = mapped_column(Boolean, default=False)
     source: Mapped[str] = mapped_column(String(32), default="manual")
     parent_id: Mapped[Optional[str]] = mapped_column(
@@ -927,6 +1006,8 @@ class Transaction(Base, TimestampMixin):
         Index("idx_transactions_user_date_desc", "user_id", text("date DESC")),
         Index("idx_transactions_user_cat", "user_id", "category"),
         Index("idx_transactions_user_merchant", "user_id", "merchant_name"),
+        Index("idx_transactions_account", "user_id", "account_id"),
+        Index("idx_transactions_balance_type", "user_id", "balance_type"),
     )
 
 

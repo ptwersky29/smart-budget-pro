@@ -87,7 +87,7 @@ export default function Investments() {
         </div>
         {priceTab === "crypto" ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {livePrices.map((p) => {
+            {livePrices.length > 0 ? livePrices.map((p) => {
               const up = (p.change_24h_pct || 0) >= 0;
               return (
                 <button key={p.symbol} onClick={() => applyLivePrice(p)} data-testid={`price-${p.symbol}`}
@@ -100,11 +100,11 @@ export default function Investments() {
                   </p>
                 </button>
               );
-            })}
+            }) : <p className="col-span-full text-sm text-muted-foreground py-8 text-center">No live prices available</p>}
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {stocks.map((p) => {
+            {stocks.length > 0 ? stocks.map((p) => {
               const up = (p.change_24h_pct || 0) >= 0;
               const sym = p.currency === "USD" ? "$" : "£";
               return (
@@ -118,7 +118,7 @@ export default function Investments() {
                   </p>
                 </button>
               );
-            })}
+            }) : <p className="col-span-full text-sm text-muted-foreground py-8 text-center">No stock prices available</p>}
           </div>
         )}
         <p className="text-xs text-muted-foreground mt-3">Tap any asset to use its live price as your initial investment value.</p>

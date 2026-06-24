@@ -243,3 +243,72 @@ class TestEmptyStates:
             assert "message" in guide
             assert "actions" in guide
             assert len(guide["actions"]) > 0
+
+
+class TestCSRFProtection:
+    def test_generate_csrf_token_returns_string(self):
+        from security import generate_csrf_token
+        token = generate_csrf_token()
+        assert isinstance(token, str)
+        assert len(token) > 20
+
+    def test_verify_csrf_token_valid(self):
+        from security import generate_csrf_token, verify_csrf_token
+        token = generate_csrf_token()
+        assert verify_csrf_token(token, token) is True
+
+    def test_verify_csrf_token_mismatch(self):
+        from security import generate_csrf_token, verify_csrf_token
+        t1 = generate_csrf_token()
+        t2 = generate_csrf_token()
+        assert verify_csrf_token(t1, t2) is False
+
+    def test_verify_csrf_token_empty(self):
+        from security import verify_csrf_token
+        assert verify_csrf_token("", "something") is False
+        assert verify_csrf_token("something", "") is False
+
+
+class TestJWTAuth:
+    def test_create_access_token_returns_string(self):
+        from auth import create_access_token
+        token = create_access_token("user_test123", "test@test.com")
+        assert isinstance(token, str)
+        assert len(token.split(".")) == 3
+
+    def test_create_refresh_token_returns_string(self):
+        from auth import create_refresh_token
+        token = create_refresh_token("user_test123")
+        assert isinstance(token, str)
+        assert len(token.split(".")) == 3
+
+    def test_decode_access_token_valid(self):
+        from auth import create_access_token
+        import jwt
+        token = create_access_token("user_decode", "decode@test.com")
+        payload = jwt.decode(token, options={"verify_signature": False})
+        assert payload["sub"] == "user_decode"
+        assert payload["email"] == "decode@test.com"
+        assert payload["type"] == "access"
+
+    def test_access_token_has_expiry(self):
+        from auth import create_access_token
+        import jwt
+        token = create_access_token("user_exp", "exp@test.com")
+        payload = jwt.decode(token, options={"verify_signature": False})
+        assert "exp" in payload
+        assert payload["exp"] > 0
+
+    def test_token_has_jti(self):
+        from auth import create_access_token
+        token = create_access_token("user_jti", "jti@test.com")
+        import jwt
+        payload = jwt.decode(token, options={"verify_signature": False})
+        assert "jti" in payload
+
+    def test_different_tokens_have_different_jti(self):
+        from auth import create_access_token
+        import jwt
+        t1 = jwt.decode(create_access_token("u1", "u1@t.com"), options={"verify_signature": False})
+        t2 = jwt.decode(create_access_token("u2", "u2@t.com"), options={"verify_signature": False})
+        assert t1["jti"] != t2["jti"]

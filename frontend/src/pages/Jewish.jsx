@@ -97,9 +97,9 @@ export default function Jewish() {
         </div>
       </details>
 
-      {upcomingHols.length > 0 && (
-        <div className="rounded-2xl border border-border bg-card p-6" data-testid="upcoming-holidays">
-          <p className="label-overline">Upcoming Jewish holidays</p>
+      <div className="rounded-2xl border border-border bg-card p-6" data-testid="upcoming-holidays">
+        <p className="label-overline">Upcoming Jewish holidays</p>
+        {upcomingHols.length > 0 ? (
           <div className="mt-3 grid sm:grid-cols-2 lg:grid-cols-4 gap-2">
             {upcomingHols.slice(0,8).map((h) => (
               <div key={`${h.date}-${h.title}`} className="rounded-xl border border-border p-3 hover:border-topaz transition-colors">
@@ -109,8 +109,8 @@ export default function Jewish() {
               </div>
             ))}
           </div>
-        </div>
-      )}
+        ) : <p className="text-sm text-muted-foreground mt-3">No upcoming holidays found</p>}
+      </div>
     </div>
   );
 }

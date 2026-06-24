@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException, Request, Depends, Query
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select, delete, func
 
-from db import TrueLayerState, BankConnection, TrueLayerLog, SyncLog, Transaction
+from db import TrueLayerState, BankAccount, BankConnection, TrueLayerLog, SyncLog, Transaction
 from auth import get_current_user
 from bank_sync_utils import (
     parse_import_from_date,
@@ -301,6 +301,19 @@ async def _fetch_and_store_balances(session, conn: BankConnection):
                 conn.balance = float(bal.get("current", bal.get("available", 0)))
                 conn.balance_currency = bal.get("currency", "GBP")
                 conn.balance_updated_at = datetime.now(timezone.utc)
+
+                # Also update BankAccount balance
+                ba_result = await session.execute(
+                    select(BankAccount).where(
+                        BankAccount.connection_id == conn.connection_id,
+                    )
+                )
+                ba = ba_result.scalar_one_or_none()
+                if ba:
+                    ba.balance = conn.balance
+                    ba.balance_currency = conn.balance_currency
+                    ba.balance_updated_at = conn.balance_updated_at
+
                 await session.commit()
                 return
         except Exception as e:
@@ -494,6 +507,24 @@ def build_router() -> APIRouter:
                     )
                     session.add(conn)
                     created_connections.append(conn)
+
+                    # Also create a BankAccount entry for the new account system
+                    acct_type = acc.get("account_type", "").lower()
+                    if acct_type not in ("current", "savings", "cash", "credit"):
+                        acct_type = "current"
+                    ba_acct_id = conn.account_id or f"acct_{uuid.uuid4().hex[:12]}"
+                    ba = BankAccount(
+                        account_id=ba_acct_id,
+                        user_id=user_id,
+                        name=acc.get("display_name") or provider_info.get("display_name", "UK Bank"),
+                        type=acct_type,
+                        balance=0,
+                        currency="GBP",
+                        provider="truelayer",
+                        connection_id=connection_id,
+                        is_offline=False,
+                    )
+                    session.add(ba)
                 await session.delete(state_doc)
                 await _log_oauth(session, user_id, "connection_success", {"accounts_count": len(accounts)})
                 await session.commit()

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { api } from "../lib/api";
 import { Landmark, Calculator, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { PageHeader } from "../components/ui/layout";
 import { Button } from "../components/ui/button";
 
@@ -12,12 +13,12 @@ export default function UKTools() {
   const runUC = async () => {
     setUc({ ...uc, busy: true });
     try { const { data } = await api.post("/uk/universal-credit", uc); setUc({ ...uc, result: data, busy: false }); }
-    catch { setUc({ ...uc, busy: false }); }
+    catch { toast.error("Could not calculate UC estimate"); setUc({ ...uc, busy: false }); }
   };
   const runTax = async () => {
     setTax({ ...tax, busy: true });
     try { const { data } = await api.post("/uk/hmrc-estimate", { annual_income: Number(tax.annual_income) }); setTax({ ...tax, result: data, busy: false }); }
-    catch { setTax({ ...tax, busy: false }); }
+    catch { toast.error("Could not calculate tax estimate"); setTax({ ...tax, busy: false }); }
   };
 
   return (

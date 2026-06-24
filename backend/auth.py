@@ -322,14 +322,14 @@ def build_router() -> APIRouter:
                 email_verification_sent_at=datetime.now(timezone.utc),
             )
             session.add(user)
-            
+
             # Seed default budgets for new user
             try:
                 from budget_system import seed_default_budgets_for_user
                 await seed_default_budgets_for_user(session, user_id)
             except Exception as e:
                 logger.warning("Failed to seed budgets for new user: %s", str(e))
-            
+
             await session.commit()
 
             logger.info("User %s registered. Verification token: %s", user_id[:16], verify_token[:16])

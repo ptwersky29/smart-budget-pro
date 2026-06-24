@@ -17,6 +17,7 @@ const emptyForm = {
   description: "",
   amount: "",
   category: "",
+  account_id: "",
   is_income: false,
   budget_type: "",
   occasion: "",
@@ -39,6 +40,8 @@ export default function TransactionForm({
   saveAsRecurring,
   setSaveAsRecurring,
   onCategoryCreated,
+  accounts,
+  accountsLoading,
 }) {
   const [showMore, setShowMore] = useState(false);
 
@@ -75,6 +78,37 @@ export default function TransactionForm({
           className="space-y-3"
           aria-labelledby="transaction-form-title"
         >
+          {/* Account selector — required */}
+          <div>
+            <label htmlFor="tx-account" className="label-overline text-muted-foreground mb-1.5 block">
+              Bank Account <span className="text-ruby">*</span>
+            </label>
+            {accountsLoading ? (
+              <div className="h-10 rounded-xl bg-secondary/30 border border-border flex items-center px-3 text-xs text-muted-foreground">
+                Loading accounts...
+              </div>
+            ) : !accounts || accounts.length === 0 ? (
+              <div className="h-10 rounded-xl bg-secondary/30 border border-dashed border-ruby/30 flex items-center px-3 text-xs text-ruby">
+                No accounts found — create one first
+              </div>
+            ) : (
+              <select
+                id="tx-account"
+                required
+                value={form.account_id}
+                onChange={(e) => setForm({ ...form, account_id: e.target.value })}
+                className="flex h-11 w-full rounded-xl bg-secondary/30 border border-border px-4 text-sm transition-colors placeholder:text-muted-foreground focus:border-emerald/50 focus:ring-2 focus:ring-emerald/20 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="" disabled>Select an account…</option>
+                {accounts.map((a) => (
+                  <option key={a.account_id} value={a.account_id}>
+                    {a.name} {a.type === "savings" ? "(Savings)" : ""} — £{Number(a.balance || 0).toLocaleString()}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
           <div>
             <label htmlFor="tx-desc" className="sr-only">
               Description

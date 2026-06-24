@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Plus, Loader2, Sparkles, Check, X, Brain } from "lucide-react";
 import { Button } from "./ui/button";
 import { api } from "../lib/api";
@@ -8,14 +8,21 @@ export default function QuickAddWidget() {
   const [open, setOpen] = useState(false);
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
+  const [accountId, setAccountId] = useState("");
+  const [accounts, setAccounts] = useState([]);
   const [classifying, setClassifying] = useState(false);
   const [classification, setClassification] = useState(null);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const ref = useRef(null);
 
-  useEffect(() => {
-    if (open) ref.current?.focus();
-  }, [open]);
+  const loadAccounts = useCallback(async () => {
+    try {
+      const { data } = await api.get("/accounts");
+      setAccounts(data.accounts || []);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { if (open) { ref.current?.focus(); loadAccounts(); } }, [open, loadAccounts]);
 
   const suggestions = classification?.suggestions || [];
   const top = suggestions[0];
@@ -34,19 +41,16 @@ export default function QuickAddWidget() {
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !classifying && desc.trim() && amount) {
-      if (classification) {
-        handleApprove();
-      } else {
-        handleClassify();
-      }
+    if (e.key === "Enter" && !classifying && desc.trim() && amount && accountId) {
+      if (classification) handleApprove();
+      else handleClassify();
     }
     if (e.key === "Escape") handleClose();
   };
 
   const handleApprove = async (index) => {
     const s = index !== undefined ? suggestions[index] : selected;
-    if (!s) return;
+    if (!s || !accountId) { toast.error("Select an account first"); return; }
     try {
       const signed = -Math.abs(parseFloat(amount));
       await api.post("/budget-system/approve", {
@@ -56,6 +60,7 @@ export default function QuickAddWidget() {
         occasion: s.occasion || "Monthly Living",
         category: s.category || "uncategorized",
         merchant: s.merchant || "",
+        account_id: accountId,
         suggestion_id: classification.suggestion_id,
         suggestion_index: index !== undefined ? index : selectedIdx,
       });
@@ -68,13 +73,13 @@ export default function QuickAddWidget() {
     setOpen(false);
     setDesc("");
     setAmount("");
+    setAccountId("");
     setClassification(null);
     setSelectedIdx(0);
   };
 
   return (
     <>
-      {/* FAB */}
       {!open && (
         <button onClick={() => setOpen(true)}
           className="fixed bottom-24 lg:bottom-6 right-6 z-50 w-14 h-14 rounded-full gradient-emerald text-white shadow-lg shadow-emerald/30 hover:scale-105 active:scale-95 transition-all flex items-center justify-center">
@@ -82,12 +87,10 @@ export default function QuickAddWidget() {
         </button>
       )}
 
-      {/* Overlay on mobile */}
       {open && (
         <div className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm lg:bg-transparent lg:backdrop-blur-none animate-[fadeIn_0.15s_ease-out]" onClick={handleClose} />
       )}
 
-      {/* Quick form — bottom sheet on mobile, card on desktop */}
       {open && (
         <div className="fixed z-50 bottom-0 left-0 right-0 lg:bottom-6 lg:right-6 lg:left-auto lg:w-96 animate-[slideUp_0.25s_ease-out]">
           <div className="rounded-t-2xl lg:rounded-2xl border-2 border-emerald/30 bg-card p-4 shadow-xl shadow-emerald/10" onClick={(e) => e.stopPropagation()}>
@@ -102,9 +105,20 @@ export default function QuickAddWidget() {
             </div>
 
             <div className="space-y-2">
+              <select value={accountId} onChange={(e) => setAccountId(e.target.value)}
+                className="w-full h-10 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none text-sm">
+                <option value="">Select account…</option>
+                {accounts.map((a) => (
+                  <option key={a.account_id} value={a.account_id}>
+                    {a.name} {a.type === "savings" ? "(Savings)" : ""}
+                  </option>
+                ))}
+              </select>
+
               <input placeholder="Description (e.g. Tesco £84)" value={desc}
                 onChange={e => { setDesc(e.target.value); setClassification(null); }}
                 onKeyDown={handleKeyDown}
+                ref={ref}
                 className="w-full h-10 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none text-sm" />
               <input placeholder="Amount" type="number" value={amount}
                 onChange={e => { setAmount(e.target.value); setClassification(null); }}
@@ -112,14 +126,13 @@ export default function QuickAddWidget() {
                 className="w-full h-10 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none text-sm" />
 
               <Button variant="primary" size="pill" onClick={classification ? () => handleApprove() : handleClassify}
-                disabled={classifying || !desc.trim() || !amount}
+                disabled={classifying || !desc.trim() || !amount || !accountId}
                 className="w-full">
                 {classifying ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
                 {classifying ? "Classifying…" : classification ? `Add as ${selected?.category || "uncategorized"}` : "Classify"}
               </Button>
             </div>
 
-            {/* AI Suggestions — show all 4 as selectable cards */}
             {suggestions.length > 0 && (
               <div className="mt-3 rounded-xl bg-emerald/5 border border-emerald/20 p-3 space-y-2 animate-[fadeUp_0.2s_ease-out]">
                 <div className="flex items-center gap-2">

@@ -635,6 +635,7 @@ def build_router() -> APIRouter:
                     description=t["description"],
                     merchant_name=t.get("merchant"),
                     category=t.get("category", "uncategorized"),
+                    account_id=t.get("account_id", ""),
                     date=datetime.fromisoformat(t["date"]) if t.get("date") else now,
                     source="statement",
                 )

@@ -19,6 +19,7 @@ from category_catalog import (
 )
 from db import (
     AccountNickname,
+    BankAccount,
     BankConnection,
     Budget,
     Category,
@@ -377,11 +378,12 @@ class TransactionIn(BaseModel):
     merchant: Optional[str] = None
     category: Optional[str] = None
     date: Optional[str] = None
-    account_id: Optional[str] = None
+    account_id: str
     is_income: bool = False
     notes: Optional[str] = None
     tags: Optional[dict] = None
     source: Optional[str] = "manual"
+    balance_type: Optional[str] = "available"
 
 
 class TransactionUpdate(BaseModel):
@@ -391,6 +393,8 @@ class TransactionUpdate(BaseModel):
     category: Optional[str] = None
     date: Optional[str] = None
     is_income: Optional[bool] = None
+    account_id: Optional[str] = None
+    balance_type: Optional[str] = None
     notes: Optional[str] = None
     tags: Optional[dict] = None
     pending: Optional[bool] = None
@@ -728,6 +732,7 @@ def _tx_to_dict(
         "connection_id": t.connection_id,
         "institution": institution,
         "is_income": t.amount > 0,
+        "balance_type": t.balance_type,
         "notes": t.notes,
         "tags": t.tags,
         "pending": t.pending,
@@ -1667,6 +1672,16 @@ Output ONLY valid JSON, no markdown, no explanation:
     ):
         sm = request.app.state.db
         async with sm() as session:
+            # Validate account_id exists
+            acct_result = await session.execute(
+                select(BankAccount).where(
+                    BankAccount.account_id == payload.account_id,
+                    BankAccount.user_id == user["user_id"],
+                )
+            )
+            if not acct_result.scalar_one_or_none():
+                raise HTTPException(400, f"Account '{payload.account_id}' not found or does not belong to you")
+
             tx_id = f"tx_{uuid.uuid4().hex[:12]}"
             desc = payload.description or ""
             merch = payload.merchant or ""
@@ -1719,6 +1734,10 @@ Output ONLY valid JSON, no markdown, no explanation:
             signed_amount = (
                 abs(payload.amount) if payload.is_income else -abs(payload.amount)
             )
+            balance_type = payload.balance_type or "available"
+            if balance_type not in ("available", "savings"):
+                balance_type = "available"
+
             tx = Transaction(
                 transaction_id=tx_id,
                 user_id=user["user_id"],
@@ -1732,11 +1751,20 @@ Output ONLY valid JSON, no markdown, no explanation:
                 if payload.date
                 else datetime.now(timezone.utc),
                 account_id=payload.account_id,
+                balance_type=balance_type,
                 notes=payload.notes,
                 tags=payload.tags,
                 source=payload.source or "manual",
             )
             session.add(tx)
+
+            # Update account balance
+            acct = acct_result.scalar_one_or_none()
+            if acct is not None:
+                current_balance = float(acct.balance or 0)
+                acct.balance = current_balance + signed_amount
+                acct.balance_updated_at = datetime.now(timezone.utc)
+
             await session.commit()
             await session.refresh(tx)
             doc = _tx_to_dict(tx)
@@ -1766,6 +1794,19 @@ Output ONLY valid JSON, no markdown, no explanation:
             tx = result.scalar_one_or_none()
             if not tx:
                 raise HTTPException(404, "Not found")
+
+            # Validate account_id if changing
+            if payload.account_id is not None and payload.account_id != tx.account_id:
+                acct_result = await session.execute(
+                    select(BankAccount).where(
+                        BankAccount.account_id == payload.account_id,
+                        BankAccount.user_id == user["user_id"],
+                    )
+                )
+                if not acct_result.scalar_one_or_none():
+                    raise HTTPException(400, f"Account '{payload.account_id}' not found")
+                tx.account_id = payload.account_id
+
             if payload.amount is not None:
                 tx.amount = payload.amount
             if payload.description is not None:
@@ -1788,6 +1829,9 @@ Output ONLY valid JSON, no markdown, no explanation:
                 tx.tags = payload.tags
             if payload.pending is not None:
                 tx.pending = payload.pending
+            if payload.balance_type is not None:
+                if payload.balance_type in ("available", "savings"):
+                    tx.balance_type = payload.balance_type
             if payload.exclude_from_maaser is not None:
                 tx.exclude_from_maaser = payload.exclude_from_maaser
             if category_changed:
@@ -2041,6 +2085,21 @@ Output ONLY valid JSON, no markdown, no explanation:
                 return {"ok": True, "skipped": True}
             from statements import resolve_category as _rc
 
+            # Create a default demo account
+            demo_acct_id = f"acct_{uuid.uuid4().hex[:12]}"
+            demo_acct = BankAccount(
+                account_id=demo_acct_id,
+                user_id=user["user_id"],
+                name="Demo Bank Account",
+                type="current",
+                balance=0,
+                currency="GBP",
+                color="#059669",
+                provider="manual",
+                is_offline=True,
+            )
+            session.add(demo_acct)
+
             sample = [
                 ("Tesco Express", -42.50, "grocery"),
                 ("Salary - Acme Ltd", 3200.00, "salary"),
@@ -2059,6 +2118,7 @@ Output ONLY valid JSON, no markdown, no explanation:
                 ("Council Tax", -185.00, "council_tax"),
             ]
             now = datetime.now(timezone.utc)
+            running_balance = 0
             for i, (desc, amt, cat) in enumerate(sample):
                 merch = desc.split(" - ")[0] if " - " in desc else desc
                 tx = Transaction(
@@ -2070,9 +2130,13 @@ Output ONLY valid JSON, no markdown, no explanation:
                     merchant_name=merch,
                     normalized_merchant=normalize_merchant(merch),
                     category=cat,
+                    account_id=demo_acct_id,
                     date=(now - timedelta(days=i * 3)),
                 )
                 session.add(tx)
+                running_balance += amt
+            demo_acct.balance = running_balance
+            demo_acct.balance_updated_at = now
             await session.commit()
             await maaser.backfill_for_user(session, user["user_id"])
             _query_cache.delete(f"dash:{user['user_id']}")
@@ -3145,43 +3209,33 @@ Output ONLY valid JSON, no markdown, no explanation:
             for t in txs:
                 sources[t.source or "manual"] += 1
 
-            # Real bank balances from TrueLayer connections
-            conn_result = await session.execute(
-                select(BankConnection).where(
-                    BankConnection.user_id == uid,
-                    BankConnection.status == "active",
-                    BankConnection.balance.isnot(None),
+            # Real bank balances from BankAccounts
+            acct_result = await session.execute(
+                select(BankAccount).where(
+                    BankAccount.user_id == uid,
+                    BankAccount.include_in_total == True,
                 )
             )
-            bank_connections = conn_result.scalars().all()
+            bank_accounts = acct_result.scalars().all()
             truelayer_balance = (
-                sum(c.balance for c in bank_connections if c.balance is not None) or 0
+                sum(float(a.balance or 0) for a in bank_accounts) or 0
             )
-            institution_map = {}
-            label_map = {}
-            for c in bank_connections:
-                cfg = c.config or {}
-                inst = cfg.get("institution") if isinstance(cfg, dict) else None
-                inst = inst or c.account_name
-                if inst:
-                    institution_map[c.connection_id] = inst
-                lbl = c.nickname or c.account_name or inst
-                if lbl:
-                    label_map[c.connection_id] = lbl
             accounts = [
                 {
-                    "connection_id": c.connection_id,
-                    "account_name": c.nickname or c.account_name or "Bank Account",
-                    "account_type": c.account_type or "",
-                    "balance": float(c.balance) if c.balance is not None else 0,
-                    "balance_currency": c.balance_currency or "GBP",
-                    "institution": (c.config or {}).get("institution")
-                    or c.account_name,
-                    "balance_updated_at": c.balance_updated_at.isoformat()
-                    if c.balance_updated_at
+                    "account_id": a.account_id,
+                    "connection_id": a.connection_id,
+                    "account_name": a.name,
+                    "account_type": a.type or "",
+                    "balance": float(a.balance or 0),
+                    "balance_currency": a.currency or "GBP",
+                    "institution": a.name,
+                    "color": a.color,
+                    "image": a.image,
+                    "balance_updated_at": a.balance_updated_at.isoformat()
+                    if a.balance_updated_at
                     else None,
                 }
-                for c in bank_connections
+                for a in bank_accounts
             ]
 
             payload = {
