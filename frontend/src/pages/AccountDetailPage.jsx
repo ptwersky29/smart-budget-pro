@@ -13,6 +13,7 @@ import { Input } from "../components/ui/input";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../components/ui/sheet";
 import CategoryCombobox from "../components/CategoryCombobox";
 import AccountFormModal from "../components/AccountFormModal";
+import TransactionForm from "../components/TransactionForm";
 import { useCategories } from "../contexts/CategoriesContext";
 
 const ACCOUNT_TYPE_META = {
@@ -36,6 +37,10 @@ export default function AccountDetailPage() {
   const [txLoading, setTxLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showEdit, setShowEdit] = useState(false);
+  const [txFormOpen, setTxFormOpen] = useState(false);
+  const [txForm, setTxForm] = useState({ description: "", amount: "", category: "", is_income: false, budget_type: "", occasion: "", merchant: "", account_id: accountId });
+  const [allAccounts, setAllAccounts] = useState([]);
+  const [allAccountsLoading, setAllAccountsLoading] = useState(false);
   const { categories: selectedCats, version: categoriesVersion } = useCategories();
 
   const [uploadBusy, setUploadBusy] = useState(false);
@@ -70,6 +75,15 @@ export default function AccountDetailPage() {
     if (filters.date_to) chips.push({ key: "date_to", label: `To ${filters.date_to}` });
     return chips;
   }, [filters]);
+
+  const loadAccounts = useCallback(async () => {
+    setAllAccountsLoading(true);
+    try {
+      const { data } = await api.get("/accounts");
+      setAllAccounts(data.accounts || []);
+    } catch { toast.error("Could not load accounts"); }
+    finally { setAllAccountsLoading(false); }
+  }, []);
 
   const loadAccount = useCallback(async () => {
     try {
@@ -112,6 +126,24 @@ export default function AccountDetailPage() {
 
   useEffect(() => { loadAccount(); loadHistory(); }, [loadAccount, loadHistory]);
   useEffect(() => { if (account) loadTransactions(); }, [account, loadTransactions, categoriesVersion]);
+
+  const handleAddTransaction = useCallback(async (e) => {
+    e.preventDefault();
+    if (!txForm.account_id) { toast.error("Select an account"); return; }
+    const amt = parseFloat(txForm.amount);
+    if (!amt) { toast.error("Enter an amount"); return; }
+    const signed = txForm.is_income ? Math.abs(amt) : -Math.abs(amt);
+    const payload = { description: txForm.description, amount: signed, category: txForm.category || undefined, account_id: txForm.account_id, is_income: txForm.is_income };
+    try {
+      await api.post("/transactions", payload);
+      toast.success("Transaction added");
+      setTxFormOpen(false);
+      setTxForm({ description: "", amount: "", category: "", is_income: false, budget_type: "", occasion: "", merchant: "", account_id: accountId });
+      await loadTransactions();
+    } catch (e) {
+      toast.error(formatApiError(e) || "Could not add transaction");
+    }
+  }, [txForm, accountId, loadTransactions]);
 
   const handleUpload = async (file) => {
     if (!file) return;
@@ -237,6 +269,9 @@ export default function AccountDetailPage() {
 
           {/* Action buttons */}
           <div className="mt-5 flex items-center gap-2">
+            <Button onClick={() => { setTxForm({ description: "", amount: "", category: "", is_income: false, budget_type: "", occasion: "", merchant: "", account_id: accountId }); setTxFormOpen(true); loadAccounts(); }} variant="outlinePill" size="pillSm" className="bg-emerald text-white hover:bg-emerald/90 border-emerald/30">
+              <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Transaction
+            </Button>
             <Button onClick={() => setShowEdit(true)} variant="outlinePill" size="pillSm">
               <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
             </Button>
@@ -442,6 +477,10 @@ export default function AccountDetailPage() {
       </div>
 
       <AccountFormModal open={showEdit} onClose={() => setShowEdit(false)} onCreated={() => { loadAccount(); setShowEdit(false); }} editAccount={account} />
+
+      <TransactionForm open={txFormOpen} editingId={null} form={txForm} setForm={setTxForm}
+        selectedCats={selectedCats} onClose={() => setTxFormOpen(false)} onSubmit={handleAddTransaction}
+        accounts={allAccounts} accountsLoading={allAccountsLoading} />
     </div>
   );
 }

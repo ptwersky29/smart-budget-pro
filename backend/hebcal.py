@@ -176,6 +176,7 @@ def _get_hebrew_months() -> list[dict]:
                 }
             )
 
+    months.sort(key=lambda m: m["gregorian_start"])
     return months
 
 
