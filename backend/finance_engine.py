@@ -802,6 +802,7 @@ def build_router() -> APIRouter:
         merchant: str = Query(None),
         pending: str = Query(None),
         connection_id: str = Query(None),
+        account_id: str = Query(None),
         date_from: str = Query(None),
         date_to: str = Query(None),
         amount_min: float = Query(None),
@@ -817,6 +818,8 @@ def build_router() -> APIRouter:
             stmt = select(Transaction).where(Transaction.user_id == user["user_id"])
             if connection_id:
                 stmt = stmt.where(Transaction.connection_id == connection_id)
+            if account_id:
+                stmt = stmt.where(Transaction.account_id == account_id)
             if category:
                 stmt = stmt.where(Transaction.category == category)
             if source:
@@ -894,6 +897,8 @@ def build_router() -> APIRouter:
                 count_stmt = count_stmt.where(
                     Transaction.connection_id == connection_id
                 )
+            if account_id:
+                count_stmt = count_stmt.where(Transaction.account_id == account_id)
             if category:
                 count_stmt = count_stmt.where(Transaction.category == category)
             if source:
@@ -932,6 +937,8 @@ def build_router() -> APIRouter:
             ).where(Transaction.user_id == user["user_id"])
             if connection_id:
                 agg_stmt = agg_stmt.where(Transaction.connection_id == connection_id)
+            if account_id:
+                agg_stmt = agg_stmt.where(Transaction.account_id == account_id)
             if category:
                 agg_stmt = agg_stmt.where(Transaction.category == category)
             if source:
@@ -3167,6 +3174,10 @@ Output ONLY valid JSON, no markdown, no explanation:
                     "institution": a.name,
                     "color": a.color,
                     "image": a.image,
+                    "provider": a.provider,
+                    "nickname": a.name,
+                    "status": "active",
+                    "config": {"color": a.color} if a.color else {},
                     "balance_updated_at": a.balance_updated_at.isoformat()
                     if a.balance_updated_at
                     else None,

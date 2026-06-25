@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
 import { getDisplayName } from "../lib/utils";
 import { CURRENCY_SYMBOL } from "../data/constants";
+import { getBankLogoOrFallback, pickBankInstitution } from "../data/bankLogos";
 import { ArrowLeft, Wallet, PiggyBank, Lock, Pencil, Trash2, Loader2, Receipt, CreditCard, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Search, X, Filter, Plus, Upload, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, MetricCard, SectionCard, EmptyState } from "../components/ui/layout";
@@ -145,6 +146,8 @@ export default function AccountDetailPage() {
   const initials = dispName
     .split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
   const isSavings = account?.type === "savings";
+  const brandInstitution = pickBankInstitution(account?.provider, account?.name);
+  const bankLogoUrl = !account?.image && brandInstitution ? getBankLogoOrFallback(brandInstitution) : null;
 
   if (loading && !error) return (
     <div className="space-y-6">
@@ -186,6 +189,11 @@ export default function AccountDetailPage() {
             {account.image ? (
               <div className="shrink-0 h-16 w-16 rounded-full overflow-hidden ring-4 ring-white dark:ring-gray-800 shadow-md">
                 <img src={account.image} alt={account.name} className="h-16 w-16 object-cover" />
+              </div>
+            ) : bankLogoUrl ? (
+              <div className="shrink-0 h-16 w-16 rounded-full overflow-hidden ring-4 ring-white dark:ring-gray-800 shadow-md bg-white dark:bg-secondary/40 flex items-center justify-center p-2">
+                <img src={bankLogoUrl} alt={dispName} className="h-full w-full object-contain"
+                  onError={(e) => { e.target.onerror = null; e.target.style.display = "none"; e.target.parentElement.className = "shrink-0 h-16 w-16 rounded-full flex items-center justify-center text-xl font-bold text-white shadow-md ring-4 ring-white dark:ring-gray-800"; e.target.parentElement.style.background = account.color || "#059669"; e.target.parentElement.innerText = initials; }} />
               </div>
             ) : (
               <div className="shrink-0 h-16 w-16 rounded-full flex items-center justify-center text-xl font-bold text-white shadow-md ring-4 ring-white dark:ring-gray-800"

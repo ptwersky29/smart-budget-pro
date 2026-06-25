@@ -106,6 +106,15 @@ def build_router() -> APIRouter:
             )
             a = result.scalar_one_or_none()
             if not a:
+                # Fallback: lookup by connection_id (dashboard links use connection_id)
+                result = await session.execute(
+                    select(BankAccount).where(
+                        BankAccount.connection_id == account_id,
+                        BankAccount.user_id == user["user_id"],
+                    )
+                )
+                a = result.scalar_one_or_none()
+            if not a:
                 raise HTTPException(404, "Account not found")
             return _acct_to_dict(a)
 
