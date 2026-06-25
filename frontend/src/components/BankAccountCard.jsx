@@ -24,7 +24,7 @@ function BankAccountCard({ account, connection, variant = "default" }) {
   const name = c.nickname || c.account_name || "Bank Account";
   const balance = c.balance ?? 0;
   const ccy = c.balance_currency || "GBP";
-  const connId = c.connection_id;
+  const connId = c.connection_id || c.account_id;
   const type = c.account_type;
 
   const balanceFmt = Number(balance).toLocaleString(undefined, {

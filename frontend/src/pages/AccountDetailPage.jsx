@@ -89,9 +89,11 @@ export default function AccountDetailPage() {
   }, [accountId]);
 
   const loadTransactions = useCallback(async () => {
+    const targetId = account?.account_id || accountId;
+    if (!targetId) return;
     setTxLoading(true);
     try {
-      const params = { account_id: accountId, limit, sort: filters.sort, order: filters.order, offset };
+      const params = { account_id: targetId, limit, sort: filters.sort, order: filters.order, offset };
       if (filters.search) params.search = filters.search;
       if (filters.category) params.category = filters.category;
       if (filters.tx_type) params.tx_type = filters.tx_type;
@@ -106,10 +108,10 @@ export default function AccountDetailPage() {
       setExpenseTotal(data.expense_total || 0);
     } catch { toast.error("Could not load transactions"); }
     finally { setTxLoading(false); }
-  }, [accountId, filters, offset]);
+  }, [account, accountId, filters, offset]);
 
   useEffect(() => { loadAccount(); loadHistory(); }, [loadAccount, loadHistory]);
-  useEffect(() => { loadTransactions(); }, [loadTransactions, categoriesVersion]);
+  useEffect(() => { if (account) loadTransactions(); }, [account, loadTransactions, categoriesVersion]);
 
   const handleUpload = async (file) => {
     if (!file) return;

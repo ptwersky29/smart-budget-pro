@@ -79,6 +79,26 @@ def build_router() -> APIRouter:
                         is_offline=False,
                     )
                     session.add(ba)
+
+            # Backfill null connection_ids on existing BankAccounts that have a matching BankConnection
+            orphan_result = await session.execute(
+                select(BankAccount).where(
+                    BankAccount.user_id == user["user_id"],
+                    BankAccount.connection_id.is_(None),
+                )
+            )
+            for ba in orphan_result.scalars().all():
+                bc_lookup = await session.execute(
+                    select(BankConnection).where(
+                        BankConnection.user_id == user["user_id"],
+                        BankConnection.account_id == ba.account_id,
+                    )
+                )
+                bc_match = bc_lookup.scalar_one_or_none()
+                if bc_match:
+                    ba.connection_id = bc_match.connection_id
+                else:
+                    ba.connection_id = ba.account_id
             await session.commit()
 
             stmt = select(BankAccount).where(

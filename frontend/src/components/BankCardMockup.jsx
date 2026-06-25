@@ -35,7 +35,7 @@ function BankCardMockup({ connection, size = "sm", showStatus = false }) {
   const name = c.nickname || c.account_name || "Bank Account";
   const balance = c.balance ?? 0;
   const ccy = c.balance_currency || "GBP";
-  const connId = c.connection_id;
+  const connId = c.connection_id || c.account_id;
   const type = c.account_type;
 
   const statusInfo = STATUS_CONFIG[c.status] || STATUS_CONFIG.active;
