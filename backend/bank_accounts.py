@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Request, Depends
 from sqlalchemy import select, delete, func, or_
 
-from db import BankAccount, Transaction
+from db import BankAccount, BankConnection, Transaction
 from auth import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -90,7 +90,7 @@ def build_router() -> APIRouter:
             rows = result.scalars().all()
             return {"accounts": [_acct_to_dict(a) for a in rows]}
 
-    @router.get("/{account_id:path}")
+    @router.get("/{account_id:str}")
     async def get_account(
         account_id: str,
         request: Request,
@@ -148,11 +148,29 @@ def build_router() -> APIRouter:
                 balance_updated_at=datetime.now(timezone.utc) if balance is not None else None,
             )
             session.add(ba)
+
+            # Also create a BankConnection for backward compatibility
+            bc = BankConnection(
+                user_id=user["user_id"],
+                connection_id=acct_id,
+                provider="manual",
+                account_id=acct_id,
+                account_name=name,
+                account_type=acct_type if acct_type != "credit" else "credit_card",
+                status="active",
+                balance=balance,
+                balance_currency=currency,
+                balance_updated_at=datetime.now(timezone.utc) if balance is not None else None,
+                nickname=name,
+                config={"color": body.get("color")} if body.get("color") else None,
+            )
+            session.add(bc)
+
             await session.commit()
             await session.refresh(ba)
             return _acct_to_dict(ba)
 
-    @router.put("/{account_id:path}")
+    @router.put("/{account_id:str}")
     async def update_account(
         account_id: str,
         body: dict,
@@ -201,11 +219,38 @@ def build_router() -> APIRouter:
             if "sort_order" in body:
                 ba.sort_order = int(body["sort_order"])
 
+            # Sync BankConnection for backward compatibility
+            bc_result = await session.execute(
+                select(BankConnection).where(
+                    BankConnection.connection_id == account_id,
+                    BankConnection.user_id == user["user_id"],
+                )
+            )
+            bc = bc_result.scalar_one_or_none()
+            if bc:
+                if "name" in body:
+                    bc.account_name = body["name"]
+                    bc.nickname = body["name"]
+                if "type" in body:
+                    bc.account_type = body["type"] if body["type"] != "credit" else "credit_card"
+                if "balance" in body:
+                    bc.balance = body["balance"]
+                    bc.balance_updated_at = datetime.now(timezone.utc)
+                if "currency" in body:
+                    bc.balance_currency = body["currency"].upper()
+                config = bc.config or {}
+                if "color" in body:
+                    if body["color"]:
+                        config["color"] = body["color"]
+                    else:
+                        config.pop("color", None)
+                bc.config = config if config else None
+
             await session.commit()
             await session.refresh(ba)
             return _acct_to_dict(ba)
 
-    @router.delete("/{account_id:path}")
+    @router.delete("/{account_id:str}")
     async def delete_account(
         account_id: str,
         request: Request,
@@ -234,13 +279,24 @@ def build_router() -> APIRouter:
             if count > 0:
                 raise HTTPException(400, f"Cannot delete account with {count} transaction(s). Reassign them first.")
 
+            # Also delete BankConnection for backward compatibility
+            bc_result = await session.execute(
+                select(BankConnection).where(
+                    BankConnection.connection_id == account_id,
+                    BankConnection.user_id == user["user_id"],
+                )
+            )
+            bc = bc_result.scalar_one_or_none()
+            if bc:
+                await session.delete(bc)
+
             await session.delete(ba)
             await session.commit()
             return {"deleted": True, "account_id": account_id}
 
     # ── Balance types / savings separation ──
 
-    @router.post("/{account_id:path}/balance-type")
+    @router.post("/{account_id:str}/balance-type")
     async def set_balance_type(
         account_id: str,
         body: dict,
@@ -270,7 +326,7 @@ def build_router() -> APIRouter:
 
     # ── Recalculate balance from transactions ──
 
-    @router.post("/{account_id:path}/recalculate")
+    @router.post("/{account_id:str}/recalculate")
     async def recalculate_balance(
         account_id: str,
         request: Request,

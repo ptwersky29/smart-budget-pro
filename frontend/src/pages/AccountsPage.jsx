@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useState, useRef } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "../lib/api";
+import { getDisplayName } from "../lib/utils";
+import { CURRENCY_SYMBOL } from "../data/constants";
 import { Link } from "react-router-dom";
-import { Plus, Wallet, Landmark, PiggyBank, CreditCard, Banknote, ArrowRight, Lock, Loader2, ChevronRight, Building2, Upload, RefreshCcw, Trash2, AlertCircle, FileText } from "lucide-react";
+import { Plus, Wallet, Landmark, PiggyBank, CreditCard, Banknote, Lock, Loader2, ChevronRight, Building2, RefreshCcw, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { EmptyState, PageHeader, SectionCard } from "../components/ui/layout";
+import { EmptyState, PageHeader } from "../components/ui/layout";
 import Skeleton from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
 import {
@@ -13,7 +15,6 @@ import {
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
 import AccountFormModal from "../components/AccountFormModal";
-import BankCardMockup from "../components/BankCardMockup";
 
 const ACCOUNT_TYPE_META = {
   current: { icon: Wallet, label: "Current Account", color: "bg-emerald/10 text-emerald", border: "border-l-emerald-500" },
@@ -27,14 +28,7 @@ function AccountLogo({ account, size = "md" }) {
   const imgSizes = { sm: "h-6 w-6", md: "h-8 w-8", lg: "h-10 w-10" };
   const sizeClass = sizes[size] || sizes.md;
   const imgSize = imgSizes[size] || imgSizes.md;
-  let name = account.name || "";
-  if (account.provider && account.provider !== "manual") {
-    const isGeneric = !name || name.toLowerCase() === "current account" || name.toLowerCase() === "savings account" || name.toLowerCase() === "statement account" || name.toLowerCase() === "credit card";
-    if (isGeneric) {
-      name = `${account.provider.charAt(0).toUpperCase() + account.provider.slice(1)} ${name || "Account"}`;
-    }
-  }
-  const displayName = name || (account.provider ? `${account.provider} Account` : "Unknown Account");
+  const displayName = getDisplayName(account);
   const initials = displayName
     .split(" ")
     .map((w) => w[0])
@@ -65,14 +59,7 @@ function AccountCard({ account }) {
   const balanceFmt = Number(account.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const isSavings = account.type === "savings";
 
-  let name = account.name || "";
-  if (account.provider && account.provider !== "manual") {
-    const isGeneric = !name || name.toLowerCase() === "current account" || name.toLowerCase() === "savings account" || name.toLowerCase() === "statement account" || name.toLowerCase() === "credit card";
-    if (isGeneric) {
-      name = `${account.provider.charAt(0).toUpperCase() + account.provider.slice(1)} ${name || "Account"}`;
-    }
-  }
-  const displayName = name || (account.provider ? `${account.provider} Account` : "Unknown Account");
+  const displayName = getDisplayName(account);
 
   return (
     <Link to={`/accounts/${account.account_id}`}
@@ -110,7 +97,7 @@ function AccountCard({ account }) {
               {isSavings ? "Saved" : "Available Balance"}
             </p>
             <p className={`text-xl sm:text-2xl font-bold tracking-tight ${isSavings ? "text-violet" : "text-foreground"}`}>
-              £{balanceFmt}
+              {CURRENCY_SYMBOL}{balanceFmt}
             </p>
           </div>
           {account.is_offline ? (
@@ -163,20 +150,20 @@ function TotalBalanceSection({ accounts, loading }) {
         </div>
 
         <p className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mt-2">
-          £{totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {CURRENCY_SYMBOL}{totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
 
         <div className="mt-4 flex flex-wrap items-center gap-4 sm:gap-6">
           <div className="flex items-center gap-2">
             <div className="h-2.5 w-2.5 rounded-full bg-emerald" />
             <span className="text-sm text-muted-foreground">
-              Available <strong className="text-foreground font-semibold">£{currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
+              Available <strong className="text-foreground font-semibold">{CURRENCY_SYMBOL}{currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
             </span>
           </div>
           <div className="flex items-center gap-2">
             <div className="h-2.5 w-2.5 rounded-full bg-violet" />
             <span className="text-sm text-muted-foreground">
-              Savings <strong className="text-violet font-semibold">£{savingsBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
+              Savings <strong className="text-violet font-semibold">{CURRENCY_SYMBOL}{savingsBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
             </span>
           </div>
           <span className="text-xs text-muted-foreground/50">{accounts.length} account{accounts.length !== 1 ? "s" : ""}</span>
@@ -204,10 +191,6 @@ export default function AccountsPage() {
     const d = new Date(); d.setDate(d.getDate() - 90);
     return d.toISOString().slice(0, 10);
   });
-  const [uploadBusy, setUploadBusy] = useState(false);
-  const [uploadHistory, setUploadHistory] = useState([]);
-  const [dragOver, setDragOver] = useState(false);
-  const fileRef = useRef(null);
 
   const loadAccounts = useCallback(async () => {
     setLoading(true);
@@ -233,18 +216,10 @@ export default function AccountsPage() {
     }
   }, []);
 
-  const loadHistory = useCallback(async () => {
-    try {
-      const { data } = await api.get("/statements");
-      setUploadHistory(data.statements || data || []);
-    } catch {}
-  }, []);
-
   useEffect(() => { 
     loadAccounts(); 
     loadConns(); 
-    loadHistory(); 
-  }, [loadAccounts, loadConns, loadHistory]);
+  }, [loadAccounts, loadConns]);
 
   const doSync = useCallback(async () => {
     setSyncing(true);
@@ -276,31 +251,6 @@ export default function AccountsPage() {
         toast.error(msg || "Could not connect");
       }
     }
-  };
-
-  const removeConn = async (id) => {
-    try { 
-      await api.delete(`/truelayer/connections/${id}`); 
-      toast.success("Connection removed"); 
-      await loadConns(); 
-      await loadAccounts();
-    }
-    catch { toast.error("Could not remove"); }
-  };
-
-  const handleUpload = async (file) => {
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { toast.error("File too large — max 5 MB"); return; }
-    setUploadBusy(true);
-    const fd = new FormData();
-    fd.append("file", file);
-    try {
-      const { data } = await api.post("/statements/upload", fd);
-      toast.success(`Statement processed: ${data.transaction_count || 0} transactions found`);
-      await loadHistory();
-      await loadAccounts();
-    } catch (e) { toast.error(formatApiError(e) || "Upload failed"); }
-    finally { setUploadBusy(false); }
   };
 
   const needsReconnect = conns.some((c) => c.status === "reconnect_required");
@@ -432,8 +382,6 @@ export default function AccountsPage() {
           </div>
         </div>
       )}
-
-      {/* Removed Bank Connections and Statement Upload sections from here */}
 
       <AccountFormModal open={showCreateModal} onClose={() => setShowCreateModal(false)} onCreated={() => { loadAccounts(); setShowCreateModal(false); }} />
     </div>

@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Building2 } from "lucide-react";
+import { CURRENCY_SYMBOL } from "../data/constants";
 import {
   getBankLogoOrFallback,
   getBankColor,
@@ -59,7 +60,7 @@ function BankAccountCard({ account, connection, variant = "default" }) {
             {name}
           </p>
           <p className="text-[10px] text-muted-foreground leading-tight">
-            £{balanceFmt}
+            {CURRENCY_SYMBOL}{balanceFmt}
           </p>
         </div>
       </Link>
@@ -110,7 +111,7 @@ function BankAccountCard({ account, connection, variant = "default" }) {
             </div>
             <div className="text-right shrink-0">
               <p className="text-base font-semibold tracking-tight">
-                £{balanceFmt}
+                {CURRENCY_SYMBOL}{balanceFmt}
               </p>
               <p className="text-[10px] text-muted-foreground">{ccy}</p>
             </div>
@@ -147,7 +148,7 @@ function BankAccountCard({ account, connection, variant = "default" }) {
           {name}
         </p>
         <p className="text-[11px] text-muted-foreground leading-tight">
-          £{balanceFmt}
+          {CURRENCY_SYMBOL}{balanceFmt}
         </p>
       </div>
     </Link>

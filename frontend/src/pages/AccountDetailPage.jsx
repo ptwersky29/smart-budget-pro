@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
+import { getDisplayName } from "../lib/utils";
+import { CURRENCY_SYMBOL } from "../data/constants";
 import { ArrowLeft, Wallet, PiggyBank, Lock, Pencil, Trash2, Loader2, Receipt, CreditCard, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Search, X, Filter, Plus, Upload, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, MetricCard, SectionCard, EmptyState } from "../components/ui/layout";
@@ -61,8 +63,8 @@ export default function AccountDetailPage() {
     const chips = [];
     if (filters.tx_type) chips.push({ key: "tx_type", label: filters.tx_type === "income" ? "Income" : "Expense" });
     if (filters.category) chips.push({ key: "category", label: filters.category });
-    if (filters.amount_min) chips.push({ key: "amount_min", label: `≥£${filters.amount_min}` });
-    if (filters.amount_max) chips.push({ key: "amount_max", label: `≤£${filters.amount_max}` });
+    if (filters.amount_min) chips.push({ key: "amount_min", label: `≥${CURRENCY_SYMBOL}${filters.amount_min}` });
+    if (filters.amount_max) chips.push({ key: "amount_max", label: `≤${CURRENCY_SYMBOL}${filters.amount_max}` });
     if (filters.date_from) chips.push({ key: "date_from", label: `From ${filters.date_from}` });
     if (filters.date_to) chips.push({ key: "date_to", label: `To ${filters.date_to}` });
     return chips;
@@ -72,15 +74,7 @@ export default function AccountDetailPage() {
     try {
       const { data } = await api.get(`/accounts/${accountId}`);
       setAccount(data);
-      let name = data.name || "";
-      if (data.provider && data.provider !== "manual") {
-        const isGeneric = !name || name.toLowerCase() === "current account" || name.toLowerCase() === "savings account" || name.toLowerCase() === "statement account" || name.toLowerCase() === "credit card";
-        if (isGeneric) {
-          name = `${data.provider.charAt(0).toUpperCase() + data.provider.slice(1)} ${name || "Account"}`;
-        }
-      }
-      const dispName = name || (data.provider ? `${data.provider} Account` : "Unknown Account");
-      document.title = `${dispName} | FinanceAI`;
+      document.title = `${getDisplayName(data)} | FinanceAI`;
     } catch (err) {
       setError(formatApiError(err.response?.data?.detail) || "Could not load account");
     } finally { setLoading(false); }
@@ -90,7 +84,7 @@ export default function AccountDetailPage() {
     try {
       const { data } = await api.get(`/statements?account_id=${accountId}`);
       setUploadHistory(data.statements || data || []);
-    } catch {}
+    } catch { toast.error("Could not load statement history"); }
   }, [accountId]);
 
   const loadTransactions = useCallback(async () => {
@@ -109,7 +103,7 @@ export default function AccountDetailPage() {
       setTotalTx(data.total);
       setIncomeTotal(data.income_total || 0);
       setExpenseTotal(data.expense_total || 0);
-    } catch { /* ignore */ }
+    } catch { toast.error("Could not load transactions"); }
     finally { setTxLoading(false); }
   }, [accountId, filters, offset]);
 
@@ -147,19 +141,12 @@ export default function AccountDetailPage() {
   const currentPage = Math.floor(offset / limit) + 1;
   const meta = ACCOUNT_TYPE_META[account?.type] || ACCOUNT_TYPE_META.current;
   const Icon = meta.icon;
-  let name = account?.name || "";
-  if (account?.provider && account.provider !== "manual") {
-    const isGeneric = !name || name.toLowerCase() === "current account" || name.toLowerCase() === "savings account" || name.toLowerCase() === "statement account" || name.toLowerCase() === "credit card";
-    if (isGeneric) {
-      name = `${account.provider.charAt(0).toUpperCase() + account.provider.slice(1)} ${name || "Account"}`;
-    }
-  }
-  const dispName = name || (account?.provider ? `${account.provider} Account` : "Unknown Account");
+  const dispName = getDisplayName(account);
   const initials = dispName
     .split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
   const isSavings = account?.type === "savings";
 
-  if (loading) return (
+  if (loading && !error) return (
     <div className="space-y-6">
       <div className="h-12 w-64 rounded-2xl bg-secondary/50 animate-pulse" />
       <div className="h-44 rounded-[1.75rem] bg-secondary/30 animate-pulse" />
@@ -226,7 +213,7 @@ export default function AccountDetailPage() {
                     {isSavings ? "Saved" : "Available Balance"}
                   </p>
                   <p className={`text-3xl sm:text-4xl font-bold tracking-tight ${isSavings ? "text-violet" : ""}`}>
-                    £{balanceFmt}
+                    {CURRENCY_SYMBOL}{balanceFmt}
                   </p>
                 </div>
                 {account.balance_updated_at && (
@@ -252,7 +239,7 @@ export default function AccountDetailPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <MetricCard label="Balance" value={`£${balanceFmt}`} icon={Wallet} tone="emerald" />
+        <MetricCard label="Balance" value={`${CURRENCY_SYMBOL}${balanceFmt}`} icon={Wallet} tone="emerald" />
         <MetricCard label="Transactions" value={totalTx.toLocaleString()} icon={Receipt} />
         <MetricCard label="Type" value={meta.label} icon={Icon} />
         <MetricCard label="Currency" value={account.currency} icon={CreditCard} />
@@ -264,9 +251,9 @@ export default function AccountDetailPage() {
           <SectionCard eyebrow="Transactions" title={`${totalTx} transaction${totalTx !== 1 ? "s" : ""}`}>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 pb-4">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            <span>Income <strong className="text-emerald font-medium tabular-nums">£{incomeTotal.toFixed(2)}</strong></span>
+            <span>Income <strong className="text-emerald font-medium tabular-nums">{CURRENCY_SYMBOL}{incomeTotal.toFixed(2)}</strong></span>
             <span className="text-muted-foreground/30">·</span>
-            <span>Expenses <strong className="text-ruby font-medium tabular-nums">£{expenseTotal.toFixed(2)}</strong></span>
+            <span>Expenses <strong className="text-ruby font-medium tabular-nums">{CURRENCY_SYMBOL}{expenseTotal.toFixed(2)}</strong></span>
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
@@ -302,8 +289,8 @@ export default function AccountDetailPage() {
                     </select>
                     <CategoryCombobox value={filters.category} onChange={(val) => setFilter("category", val)}
                       categories={selectedCats} placeholder="All categories" allowClear />
-                    <Input type="number" placeholder="Min £" value={filters.amount_min} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_min: e.target.value })); }} className="text-sm h-10" />
-                    <Input type="number" placeholder="Max £" value={filters.amount_max} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_max: e.target.value })); }} className="text-sm h-10" />
+                    <Input type="number" placeholder={`Min ${CURRENCY_SYMBOL}`} value={filters.amount_min} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_min: e.target.value })); }} className="text-sm h-10" />
+                    <Input type="number" placeholder={`Max ${CURRENCY_SYMBOL}`} value={filters.amount_max} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_max: e.target.value })); }} className="text-sm h-10" />
                     <Input type="date" value={filters.date_from} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_from: e.target.value })); }} className="text-sm h-10" />
                     <Input type="date" value={filters.date_to} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_to: e.target.value })); }} className="text-sm h-10" />
                   </div>
@@ -370,7 +357,7 @@ export default function AccountDetailPage() {
                           <span className="text-xs px-2 py-1 rounded-full bg-secondary capitalize">{t.category || "uncategorized"}</span>
                         </td>
                         <td className={`px-4 py-3 text-right font-medium tabular-nums whitespace-nowrap ${t.amount >= 0 ? "text-emerald" : "text-ruby"}`}>
-                          {t.amount >= 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}
+                          {t.amount >= 0 ? "+" : ""}{CURRENCY_SYMBOL}{Math.abs(t.amount).toFixed(2)}
                         </td>
                       </tr>
                     ))}

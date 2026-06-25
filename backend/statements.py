@@ -579,6 +579,11 @@ def build_router() -> APIRouter:
                     "total_income": r.total_income,
                     "total_expenses": r.total_expenses,
                     "status": r.status,
+                    "filename": (r.data or {}).get("filename"),
+                    "kind": (r.data or {}).get("kind"),
+                    "size_bytes": (r.data or {}).get("size_bytes"),
+                    "saved": r.status == "final",
+                    "saved_count": len((r.data or {}).get("transactions", [])),
                     "created_at": r.created_at.isoformat() if r.created_at else None,
                 }
                 for r in rows
@@ -628,6 +633,8 @@ def build_router() -> APIRouter:
 
             now = datetime.now(timezone.utc)
             txs_data = (rec.data or {}).get("transactions", [])
+            if not rec.account_id:
+                raise HTTPException(400, "Statement has no target account — assign one before saving")
             docs = []
             for t in txs_data:
                 tx = Transaction(
@@ -638,7 +645,7 @@ def build_router() -> APIRouter:
                     description=t["description"],
                     merchant_name=t.get("merchant"),
                     category=t.get("category", "uncategorized"),
-                    account_id=t.get("account_id") or rec.account_id or "",
+                    account_id=t.get("account_id") or rec.account_id,
                     date=datetime.fromisoformat(t["date"]) if t.get("date") else now,
                     source="statement",
                 )

@@ -167,7 +167,7 @@ export default function Statements() {
         ) : (
           <ul className="divide-y divide-border">
             {history.map((s) => (
-              <li key={s.statement_id} className="px-6 py-4 flex items-center gap-4">
+              <li key={s.id} className="px-6 py-4 flex items-center gap-4">
                 <div className="w-9 h-9 rounded-xl bg-secondary grid place-items-center"><FileText className="h-4 w-4" /></div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm truncate">{s.filename || "Statement"}</p>
@@ -176,7 +176,7 @@ export default function Statements() {
                     {s.saved && <span className="text-emerald"> · {s.saved_count} saved <CheckCircle2 className="h-3 w-3 inline" /></span>}
                   </p>
                 </div>
-                <button onClick={() => removeStmt(s.statement_id)} data-testid={`del-stmt-${s.statement_id}`} className="p-2 text-muted-foreground hover:text-ruby"><Trash2 className="h-4 w-4" /></button>
+                <button onClick={() => removeStmt(s.id)} data-testid={`del-stmt-${s.id}`} className="p-2 text-muted-foreground hover:text-ruby"><Trash2 className="h-4 w-4" /></button>
               </li>
             ))}
           </ul>

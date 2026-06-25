@@ -59,45 +59,45 @@ def build_router() -> APIRouter:
         if image:
             config["image"] = image
 
-            sm = request.app.state.db
-            async with sm() as session:
-                bc = BankConnection(
-                    user_id=user["user_id"],
-                    connection_id=conn_id,
-                    provider="manual",
-                    account_id=conn_id,
-                    account_name=name,
-                    account_type=account_type,
-                    status="active",
-                    balance=balance,
-                    balance_currency=currency,
-                    balance_updated_at=datetime.now(timezone.utc) if balance is not None else None,
-                    nickname=name,
-                    config=config or None,
-                )
-                session.add(bc)
+        sm = request.app.state.db
+        async with sm() as session:
+            bc = BankConnection(
+                user_id=user["user_id"],
+                connection_id=conn_id,
+                provider="manual",
+                account_id=conn_id,
+                account_name=name,
+                account_type=account_type,
+                status="active",
+                balance=balance,
+                balance_currency=currency,
+                balance_updated_at=datetime.now(timezone.utc) if balance is not None else None,
+                nickname=name,
+                config=config or None,
+            )
+            session.add(bc)
 
-                # Also create a BankAccount entry for the new account system
-                ba = BankAccount(
-                    account_id=conn_id,
-                    user_id=user["user_id"],
-                    name=name,
-                    type=account_type if account_type in ("current", "savings", "cash", "credit") else "current",
-                    balance=balance,
-                    currency=currency,
-                    image=image or None,
-                    color=color or None,
-                    provider="manual",
-                    connection_id=conn_id,
-                    is_offline=True,
-                    balance_updated_at=datetime.now(timezone.utc) if balance is not None else None,
-                )
-                session.add(ba)
+            # Also create a BankAccount entry for the new account system
+            ba = BankAccount(
+                account_id=conn_id,
+                user_id=user["user_id"],
+                name=name,
+                type=account_type if account_type in ("current", "savings", "cash", "credit") else "current",
+                balance=balance,
+                currency=currency,
+                image=image or None,
+                color=color or None,
+                provider="manual",
+                connection_id=conn_id,
+                is_offline=True,
+                balance_updated_at=datetime.now(timezone.utc) if balance is not None else None,
+            )
+            session.add(ba)
 
-                await session.commit()
-                await session.refresh(bc)
-                await session.refresh(ba)
-                return _conn_to_dict(bc)
+            await session.commit()
+            await session.refresh(bc)
+            await session.refresh(ba)
+            return _conn_to_dict(bc)
 
     @router.put("/{connection_id}")
     async def update_manual(connection_id: str, body: dict, request: Request, user: dict = Depends(get_current_user)):
