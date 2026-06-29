@@ -380,6 +380,7 @@ class TransactionIn(BaseModel):
     date: Optional[str] = None
     account_id: str
     is_income: bool = False
+    is_transfer: bool = False
     notes: Optional[str] = None
     tags: Optional[dict] = None
     source: Optional[str] = "manual"
@@ -393,6 +394,7 @@ class TransactionUpdate(BaseModel):
     category: Optional[str] = None
     date: Optional[str] = None
     is_income: Optional[bool] = None
+    is_transfer: Optional[bool] = None
     account_id: Optional[str] = None
     balance_type: Optional[str] = None
     notes: Optional[str] = None
@@ -732,6 +734,7 @@ def _tx_to_dict(
         "connection_id": t.connection_id,
         "institution": institution,
         "is_income": t.amount > 0,
+        "is_transfer": t.tx_type == "transfer",
         "balance_type": t.balance_type,
         "notes": t.notes,
         "tags": t.tags,
@@ -1791,6 +1794,8 @@ Output ONLY valid JSON, no markdown, no explanation:
                 notes=payload.notes,
                 tags=payload.tags,
                 source=payload.source or "manual",
+                tx_type="transfer" if payload.is_transfer else None,
+                exclude_from_maaser=payload.is_transfer,
             )
             session.add(tx)
 
@@ -1870,6 +1875,9 @@ Output ONLY valid JSON, no markdown, no explanation:
                     tx.balance_type = payload.balance_type
             if payload.exclude_from_maaser is not None:
                 tx.exclude_from_maaser = payload.exclude_from_maaser
+            if payload.is_transfer is not None:
+                tx.tx_type = "transfer" if payload.is_transfer else None
+                tx.exclude_from_maaser = payload.is_transfer
             if category_changed:
                 await _learn_category_rule(session, user["user_id"], tx, tx.category)
             await session.commit()

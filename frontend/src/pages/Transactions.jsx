@@ -271,7 +271,7 @@ const Transactions = React.memo(function Transactions() {
   const openAdd = useCallback(() => { setEditingId(null); setForm(emptyForm); setOpen(true); }, []);
   const openEdit = useCallback((t) => {
     setEditingId(t.transaction_id);
-    setForm({ description: t.description || "", amount: String(Math.abs(t.amount)), category: t.category || "", account_id: t.account_id || "", is_income: t.amount > 0, budget_type: "", occasion: "", merchant: "" });
+    setForm({ description: t.description || "", amount: String(Math.abs(t.amount)), category: t.category || "", account_id: t.account_id || "", is_income: t.amount > 0, is_transfer: t.is_transfer || false, budget_type: "", occasion: "", merchant: "" });
     setOpen(true);
   }, []);
   const closeForm = useCallback(() => { setOpen(false); setEditingId(null); setForm(emptyForm); setClassification(null); setSaveAsRecurring(false); }, []);
@@ -298,7 +298,7 @@ const Transactions = React.memo(function Transactions() {
     const amt = parseFloat(form.amount);
     const signed = form.is_income ? Math.abs(amt) : -Math.abs(amt);
     if (editingId) {
-      const payload = { description: form.description, amount: signed, category: form.category || undefined, is_income: form.is_income, account_id: form.account_id || undefined };
+      const payload = { description: form.description, amount: signed, category: form.category || undefined, is_income: form.is_income, is_transfer: form.is_transfer || undefined, account_id: form.account_id || undefined };
       const old = txsRef.current.find(t => t.transaction_id === editingId);
       setTxs(prev => prev.map(t => t.transaction_id === editingId ? { ...t, ...payload } : t));
       setOpen(false); setEditingId(null);
@@ -338,7 +338,7 @@ const Transactions = React.memo(function Transactions() {
       }
     } else {
       if (!form.account_id) { toast.error("Select an account first"); return; }
-      const payload = { description: form.description, amount: signed, category: form.category || undefined, account_id: form.account_id, is_income: form.is_income };
+      const payload = { description: form.description, amount: signed, category: form.category || undefined, account_id: form.account_id, is_income: form.is_income, is_transfer: form.is_transfer || undefined };
       setOpen(false); setEditingId(null);
       const optimisticTx = { transaction_id: `optimistic-${Date.now()}`, ...payload, date: new Date().toISOString(), source: "manual" };
       setTxs(prev => [optimisticTx, ...prev]);

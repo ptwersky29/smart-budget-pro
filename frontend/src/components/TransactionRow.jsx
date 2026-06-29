@@ -89,6 +89,11 @@ const TransactionRow = React.memo(
             </td>
             <td className="px-6 py-3">
               <div className="flex flex-wrap items-center gap-2">
+                {t.is_transfer && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky/10 text-sky text-[10px] font-medium">
+                    Transfer
+                  </span>
+                )}
                 <CategoryBadge
                   category={t.category || "uncategorized"}
                   size="sm"

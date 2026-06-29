@@ -14,6 +14,8 @@ import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetDescri
 import CategoryCombobox from "../components/CategoryCombobox";
 import AccountFormModal from "../components/AccountFormModal";
 import TransactionForm from "../components/TransactionForm";
+import TransactionRow from "../components/TransactionRow";
+import { withUndo } from "../lib/undo";
 import { useCategories } from "../contexts/CategoriesContext";
 
 const ACCOUNT_TYPE_META = {
@@ -38,7 +40,8 @@ export default function AccountDetailPage() {
   const [error, setError] = useState(null);
   const [showEdit, setShowEdit] = useState(false);
   const [txFormOpen, setTxFormOpen] = useState(false);
-  const [txForm, setTxForm] = useState({ description: "", amount: "", category: "", is_income: false, budget_type: "", occasion: "", merchant: "", account_id: accountId });
+  const [editingTxId, setEditingTxId] = useState(null);
+  const [txForm, setTxForm] = useState({ description: "", amount: "", category: "", is_income: false, is_transfer: false, budget_type: "", occasion: "", merchant: "", account_id: accountId });
   const [allAccounts, setAllAccounts] = useState([]);
   const [allAccountsLoading, setAllAccountsLoading] = useState(false);
   const { categories: selectedCats, version: categoriesVersion } = useCategories();
@@ -127,23 +130,65 @@ export default function AccountDetailPage() {
   useEffect(() => { loadAccount(); loadHistory(); }, [loadAccount, loadHistory]);
   useEffect(() => { if (account) loadTransactions(); }, [account, loadTransactions, categoriesVersion]);
 
+  const openEditTx = useCallback((t) => {
+    setEditingTxId(t.transaction_id);
+    setTxForm({ description: t.description || "", amount: String(Math.abs(t.amount)), category: t.category || "", account_id: t.account_id || "", is_income: t.amount > 0, is_transfer: t.is_transfer || false, budget_type: "", occasion: "", merchant: "" });
+    setTxFormOpen(true);
+  }, []);
+
+  const closeTxForm = useCallback(() => {
+    setTxFormOpen(false);
+    setEditingTxId(null);
+    setTxForm({ description: "", amount: "", category: "", is_income: false, is_transfer: false, budget_type: "", occasion: "", merchant: "", account_id: accountId });
+  }, [accountId]);
+
+  const deleteTx = useCallback(async (txId) => {
+    const old = txs.find(t => t.transaction_id === txId);
+    setTxs(prev => prev.filter(t => t.transaction_id !== txId));
+    withUndo({
+      action: () => api.delete(`/transactions/${txId}`),
+      undo: async () => {
+        if (old) { await api.post("/transactions", old); }
+        await loadTransactions();
+      },
+      onError: () => { if (old) setTxs(prev => [...prev, old]); loadTransactions(); },
+      successMsg: "Transaction deleted",
+      errorMsg: "Could not delete",
+    });
+  }, [txs, loadTransactions]);
+
   const handleAddTransaction = useCallback(async (e) => {
     e.preventDefault();
     if (!txForm.account_id) { toast.error("Select an account"); return; }
     const amt = parseFloat(txForm.amount);
     if (!amt) { toast.error("Enter an amount"); return; }
     const signed = txForm.is_income ? Math.abs(amt) : -Math.abs(amt);
-    const payload = { description: txForm.description, amount: signed, category: txForm.category || undefined, account_id: txForm.account_id, is_income: txForm.is_income };
-    try {
-      await api.post("/transactions", payload);
-      toast.success("Transaction added");
-      setTxFormOpen(false);
-      setTxForm({ description: "", amount: "", category: "", is_income: false, budget_type: "", occasion: "", merchant: "", account_id: accountId });
-      await loadTransactions();
-    } catch (e) {
-      toast.error(formatApiError(e?.response?.data?.detail) || "Could not add transaction");
+    const payload = { description: txForm.description, amount: signed, category: txForm.category || undefined, account_id: txForm.account_id, is_income: txForm.is_income, is_transfer: txForm.is_transfer || undefined };
+    if (editingTxId) {
+      const old = txs.find(t => t.transaction_id === editingTxId);
+      setTxs(prev => prev.map(t => t.transaction_id === editingTxId ? { ...t, ...payload } : t));
+      closeTxForm();
+      withUndo({
+        action: () => api.patch(`/transactions/${editingTxId}`, payload),
+        undo: async () => {
+          if (old) { await api.patch(`/transactions/${editingTxId}`, { description: old.description, amount: old.amount, category: old.category || undefined, is_income: old.is_income, account_id: old.account_id || undefined }); }
+          await loadTransactions();
+        },
+        onError: () => { if (old) setTxs(prev => prev.map(t => t.transaction_id === editingTxId ? old : t)); loadTransactions(); },
+        successMsg: "Transaction updated",
+        errorMsg: "Could not update",
+      });
+    } else {
+      try {
+        await api.post("/transactions", payload);
+        toast.success("Transaction added");
+        closeTxForm();
+        await loadTransactions();
+      } catch (e) {
+        toast.error(formatApiError(e?.response?.data?.detail) || "Could not add transaction");
+      }
     }
-  }, [txForm, accountId, loadTransactions]);
+  }, [txForm, accountId, editingTxId, txs, loadTransactions, closeTxForm]);
 
   const handleUpload = async (file) => {
     if (!file) return;
@@ -269,7 +314,7 @@ export default function AccountDetailPage() {
 
           {/* Action buttons */}
           <div className="mt-5 flex items-center gap-2">
-            <Button onClick={() => { setTxForm({ description: "", amount: "", category: "", is_income: false, budget_type: "", occasion: "", merchant: "", account_id: accountId }); setTxFormOpen(true); loadAccounts(); }} variant="outlinePill" size="pillSm" className="bg-emerald text-white hover:bg-emerald/90 border-emerald/30">
+            <Button onClick={() => { closeTxForm(); setTxFormOpen(true); loadAccounts(); }} variant="outlinePill" size="pillSm" className="bg-emerald text-white hover:bg-emerald/90 border-emerald/30">
               <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Transaction
             </Button>
             <Button onClick={() => setShowEdit(true)} variant="outlinePill" size="pillSm">
@@ -382,29 +427,20 @@ export default function AccountDetailPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-[11px] text-muted-foreground border-b border-border">
+                      <th className="px-3 py-2.5 w-10"></th>
                       <th className="px-4 py-2.5">Date</th>
                       <th className="px-4 py-2.5">Description</th>
                       <th className="px-4 py-2.5">Category</th>
                       <th className="px-4 py-2.5 text-right">Amount</th>
+                      <th className="px-4 py-2.5 w-10"></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {txs.map((t) => (
-                      <tr key={t.transaction_id} className="border-b border-border last:border-0 hover:bg-secondary/30 transition-colors">
-                        <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">{t.date?.slice(0, 10)}</td>
-                        <td className="px-4 py-3 max-w-[200px]">
-                          <div className="font-medium truncate">{t.description}</div>
-                          {t.normalized_merchant && t.normalized_merchant !== t.description && (
-                            <div className="text-xs text-muted-foreground truncate">{t.normalized_merchant}</div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs px-2 py-1 rounded-full bg-secondary capitalize">{t.category || "uncategorized"}</span>
-                        </td>
-                        <td className={`px-4 py-3 text-right font-medium tabular-nums whitespace-nowrap ${t.amount >= 0 ? "text-emerald" : "text-ruby"}`}>
-                          {t.amount >= 0 ? "+" : ""}{CURRENCY_SYMBOL}{Math.abs(t.amount).toFixed(2)}
-                        </td>
-                      </tr>
+                    {txs.map((t, idx) => (
+                      <TransactionRow key={t.transaction_id} t={t}
+                        isSelected={false} isFocused={false}
+                        onToggleSelect={() => {}} onEdit={openEditTx} onDelete={deleteTx}
+                        onSetFocus={() => {}} />
                     ))}
                   </tbody>
                 </table>
@@ -478,8 +514,8 @@ export default function AccountDetailPage() {
 
       <AccountFormModal open={showEdit} onClose={() => setShowEdit(false)} onCreated={() => { loadAccount(); setShowEdit(false); }} editAccount={account} />
 
-      <TransactionForm open={txFormOpen} editingId={null} form={txForm} setForm={setTxForm}
-        selectedCats={selectedCats} onClose={() => setTxFormOpen(false)} onSubmit={handleAddTransaction}
+      <TransactionForm open={txFormOpen} editingId={editingTxId} form={txForm} setForm={setTxForm}
+        selectedCats={selectedCats} onClose={closeTxForm} onSubmit={handleAddTransaction}
         accounts={allAccounts} accountsLoading={allAccountsLoading} />
     </div>
   );

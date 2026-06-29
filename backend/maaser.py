@@ -13,6 +13,8 @@ INCOME_CATEGORIES = {"salary", "income"}
 
 
 def _is_income_tx(tx: dict) -> bool:
+    if tx.get("exclude_from_maaser") or tx.get("is_transfer"):
+        return False
     if tx.get("is_income"):
         return True
     if (tx.get("category") or "").lower() in INCOME_CATEGORIES:
@@ -93,6 +95,8 @@ async def backfill_for_user(session, user_id: str) -> dict:
             "category": t.category,
             "description": t.description,
             "is_income": t.amount > 0,
+            "exclude_from_maaser": t.exclude_from_maaser,
+            "is_transfer": t.tx_type == "transfer",
         }
         if not _is_income_tx(tx_dict):
             continue

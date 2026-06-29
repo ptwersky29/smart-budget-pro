@@ -19,6 +19,7 @@ const emptyForm = {
   category: "",
   account_id: "",
   is_income: false,
+  is_transfer: false,
   budget_type: "",
   occasion: "",
   merchant: "",
@@ -195,8 +196,9 @@ export default function TransactionForm({
               type="checkbox"
               checked={form.is_income}
               onChange={(e) =>
-                setForm({ ...form, is_income: e.target.checked })
+                setForm({ ...form, is_income: e.target.checked, is_transfer: false })
               }
+              disabled={form.is_transfer}
               className="accent-emerald h-4 w-4"
               aria-describedby={form.is_income ? "income-hint" : undefined}
             />{" "}
@@ -204,6 +206,21 @@ export default function TransactionForm({
           </label>
           <span id="income-hint" className="sr-only">
             Check if this transaction represents money coming in
+          </span>
+
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.is_transfer}
+              onChange={(e) =>
+                setForm({ ...form, is_transfer: e.target.checked, is_income: false })
+              }
+              className="accent-sky h-4 w-4"
+            />{" "}
+            <span>Transfer to another account</span>
+          </label>
+          <span className="text-xs text-muted-foreground ml-6 -mt-2 block">
+            Won't count as income or affect Maaser plan
           </span>
 
           {/* Classify button */}
