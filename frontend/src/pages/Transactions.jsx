@@ -187,7 +187,7 @@ const Transactions = React.memo(function Transactions() {
     try {
       const { data } = await api.get("/accounts");
       setAccounts(data.accounts || []);
-    } catch { /* ignore */ }
+    } catch { toast.error("Could not load accounts"); }
     finally { setAccountsLoading(false); }
   }, []);
   useEffect(() => { loadAccounts(); }, [loadAccounts]);
@@ -337,6 +337,7 @@ const Transactions = React.memo(function Transactions() {
         toast.error("Could not add");
       }
     } else {
+      if (!form.account_id) { toast.error("Select an account first"); return; }
       const payload = { description: form.description, amount: signed, category: form.category || undefined, account_id: form.account_id, is_income: form.is_income };
       setOpen(false); setEditingId(null);
       const optimisticTx = { transaction_id: `optimistic-${Date.now()}`, ...payload, date: new Date().toISOString(), source: "manual" };
