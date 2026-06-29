@@ -1686,8 +1686,37 @@ Output ONLY valid JSON, no markdown, no explanation:
                     BankAccount.user_id == user["user_id"],
                 )
             )
-            if not acct_result.scalar_one_or_none():
-                raise HTTPException(400, f"Account '{payload.account_id}' not found or does not belong to you")
+            acct = acct_result.scalar_one_or_none()
+            if not acct:
+                # Auto-migrate: check if a BankConnection exists for this account_id
+                from db import BankConnection
+                bc_result = await session.execute(
+                    select(BankConnection).where(
+                        BankConnection.account_id == payload.account_id,
+                        BankConnection.user_id == user["user_id"],
+                    )
+                )
+                bc = bc_result.scalar_one_or_none()
+                if bc:
+                    acct_type = (bc.account_type or "current").lower()
+                    if acct_type not in ("current", "savings", "cash", "credit"):
+                        acct_type = "current"
+                    ba_name = bc.nickname or bc.account_name or "Bank Account"
+                    acct = BankAccount(
+                        account_id=bc.account_id or payload.account_id,
+                        user_id=user["user_id"],
+                        name=ba_name,
+                        type=acct_type,
+                        balance=bc.balance if bc.balance is not None else 0,
+                        currency=bc.balance_currency or "GBP",
+                        provider=bc.provider or "truelayer",
+                        connection_id=bc.connection_id,
+                        is_offline=bc.provider == "manual",
+                    )
+                    session.add(acct)
+                    await session.flush()
+                else:
+                    raise HTTPException(400, f"Account '{payload.account_id}' not found or does not belong to you")
 
             tx_id = f"tx_{uuid.uuid4().hex[:12]}"
             desc = payload.description or ""

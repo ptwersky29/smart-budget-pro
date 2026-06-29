@@ -141,7 +141,7 @@ export default function AccountDetailPage() {
       setTxForm({ description: "", amount: "", category: "", is_income: false, budget_type: "", occasion: "", merchant: "", account_id: accountId });
       await loadTransactions();
     } catch (e) {
-      toast.error(formatApiError(e) || "Could not add transaction");
+      toast.error(formatApiError(e?.response?.data?.detail) || "Could not add transaction");
     }
   }, [txForm, accountId, loadTransactions]);
 
