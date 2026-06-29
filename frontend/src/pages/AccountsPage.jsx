@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "../lib/api";
 import { getDisplayName } from "../lib/utils";
 import { CURRENCY_SYMBOL } from "../data/constants";
+import { getBankLogoOrFallback, pickBankInstitution } from "../data/bankLogos";
 import { Link } from "react-router-dom";
 import { Plus, Wallet, Landmark, PiggyBank, CreditCard, Banknote, Lock, Loader2, ChevronRight, Building2, RefreshCcw, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -35,11 +36,22 @@ function AccountLogo({ account, size = "md" }) {
     .join("")
     .toUpperCase()
     .slice(0, 2);
+  const brandInstitution = pickBankInstitution(account?.provider, account?.name);
+  const bankLogoUrl = !account?.image && brandInstitution ? getBankLogoOrFallback(brandInstitution) : null;
 
   if (account.image) {
     return (
       <div className={`shrink-0 rounded-full overflow-hidden ${sizeClass} ring-2 ring-white dark:ring-gray-800 shadow-sm`}>
         <img src={account.image} alt={account.name} className={`${imgSize} object-cover`}
+          onError={(e) => { e.target.onerror = null; e.target.style.display = "none"; e.target.parentElement.className = `shrink-0 rounded-full ${sizeClass} flex items-center justify-center font-bold text-white`; e.target.parentElement.style.background = account.color || "#059669"; e.target.parentElement.innerText = initials; }} />
+      </div>
+    );
+  }
+
+  if (bankLogoUrl) {
+    return (
+      <div className={`shrink-0 rounded-full overflow-hidden ${sizeClass} ring-2 ring-white dark:ring-gray-800 shadow-sm bg-white dark:bg-secondary/40 flex items-center justify-center`}>
+        <img src={bankLogoUrl} alt={displayName} className={`${imgSize} object-contain`}
           onError={(e) => { e.target.onerror = null; e.target.style.display = "none"; e.target.parentElement.className = `shrink-0 rounded-full ${sizeClass} flex items-center justify-center font-bold text-white`; e.target.parentElement.style.background = account.color || "#059669"; e.target.parentElement.innerText = initials; }} />
       </div>
     );
