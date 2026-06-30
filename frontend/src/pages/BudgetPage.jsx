@@ -281,11 +281,11 @@ export default React.memo(function BudgetPage() {
     const optimisticBudget = { budget_id: `optimistic-${Date.now()}`, ...payload, spent: 0, progress_pct: 0 };
     setBudgets(prev => [...prev, optimisticBudget]);
     try {
-      const { data } = await api.post("/budgets", payload);
-      setBudgets(prev => prev.map(b => b.budget_id === optimisticBudget.budget_id ? data : b));
+      await api.post("/budgets", payload);
       setBudgetAdded(form.budget_type !== "event");
       setForm((prev) => ({ ...prev, category: "", limit: "" }));
       toast.success(form.budget_type === "event" ? "Item added to event" : "Budget added");
+      await fetchData();
     } catch (err) {
       setBudgets(prev => prev.filter(b => b.budget_id !== optimisticBudget.budget_id));
       toast.error(err.response?.data?.detail || "Could not save");
@@ -311,7 +311,7 @@ export default React.memo(function BudgetPage() {
   const handleApplyInsight = async (insight) => {
     setApplyingInsight(insight.category);
     try {
-      const existing = budgets.find((b) => b.category === insight.category);
+      const existing = budgetsRef.current.find((b) => b.category === insight.category);
       if (existing) {
         await api.patch(`/budgets/${existing.budget_id}`, { limit: insight.suggested_budget });
       } else {
@@ -413,22 +413,32 @@ export default React.memo(function BudgetPage() {
         const { data } = await api.get("/budgets", { params: { month: prevMonth } });
         prevBudgets = (data.budgets || []).filter((b) => (b.budget_type || "everyday") !== "event");
       }
-      if (prevBudgets.length === 0) { toast.info("No budgets to copy from previous month"); return; }
       let copied = 0;
+      let errors = 0;
       for (const b of prevBudgets) {
         const existing = budgetsRef.current.find((eb) => eb.category === b.category);
         if (existing) continue;
-        await api.post("/budgets", {
-          category: b.category,
-          limit: Number(b.limit),
-          period: "monthly",
-          budget_type: "everyday",
-          month,
-        });
-        copied++;
+        try {
+          await api.post("/budgets", {
+            category: b.category,
+            limit: Number(b.limit),
+            period: "monthly",
+            budget_type: "everyday",
+            month,
+          });
+          copied++;
+        } catch {
+          errors++;
+        }
       }
-      toast.success(`Copied ${copied} budget(s)`);
-      if (copied > 0) await fetchData();
+      if (copied > 0) {
+        toast.success(`Copied ${copied} budget(s)`${errors > 0 ? `, ${errors} failed` : ""});
+        await fetchData();
+      } else if (errors > 0) {
+        toast.error("Could not copy any budgets");
+      } else {
+        toast.info("No budgets to copy from previous month");
+      }
     } catch {
       toast.error("Could not copy budgets");
     } finally {
