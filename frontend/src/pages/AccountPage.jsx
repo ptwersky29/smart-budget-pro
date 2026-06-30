@@ -51,6 +51,7 @@ import {
 import CategoryCombobox from "../components/CategoryCombobox";
 import CategoryBadge from "../components/CategoryBadge";
 import { useCategories } from "../contexts/CategoriesContext";
+import ConfirmModal from "../components/ui/ConfirmModal";
 
 export default function AccountPage() {
   const { connectionId } = useParams();
@@ -70,6 +71,7 @@ export default function AccountPage() {
   const [editingNickname, setEditingNickname] = useState(false);
   const [nicknameValue, setNicknameValue] = useState("");
   const [error, setError] = useState(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const [editingBalance, setEditingBalance] = useState(false);
   const [balanceValue, setBalanceValue] = useState("");
   const {
@@ -249,9 +251,10 @@ export default function AccountPage() {
     }
   };
 
-  const removeConn = async () => {
-    if (!window.confirm("Remove this connection? Transactions will be kept."))
-      return;
+  const removeConn = () => setConfirmRemove(true);
+
+  const handleConfirmRemove = async () => {
+    setConfirmRemove(false);
     try {
       const isManual = conn?.provider === "manual";
       await api.delete(
@@ -904,6 +907,14 @@ export default function AccountPage() {
           )}
         </div>
       </SectionCard>
+      <ConfirmModal
+        open={confirmRemove}
+        title="Remove this connection?"
+        message="Remove this connection? Transactions will be kept."
+        confirmLabel="Yes, remove"
+        onConfirm={handleConfirmRemove}
+        onCancel={() => setConfirmRemove(false)}
+      />
     </div>
   );
 }

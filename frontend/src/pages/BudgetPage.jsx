@@ -613,7 +613,7 @@ export default React.memo(function BudgetPage() {
         }
       }
       if (copied > 0) {
-        toast.success(`Copied ${copied} budget(s)`${errors > 0 ? `, ${errors} failed` : ""});
+        toast.success(errors > 0 ? `Copied ${copied} budget(s), ${errors} failed` : `Copied ${copied} budget(s)`);
         await fetchData();
       } else if (errors > 0) {
         toast.error("Could not copy any budgets");

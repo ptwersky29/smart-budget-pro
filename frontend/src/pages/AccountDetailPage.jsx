@@ -13,6 +13,7 @@ import { Input } from "../components/ui/input";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../components/ui/sheet";
 import CategoryCombobox from "../components/CategoryCombobox";
 import AccountFormModal from "../components/AccountFormModal";
+import ConfirmModal from "../components/ui/ConfirmModal";
 import TransactionForm from "../components/TransactionForm";
 import TransactionRow from "../components/TransactionRow";
 import { withUndo } from "../lib/undo";
@@ -46,6 +47,7 @@ export default function AccountDetailPage() {
   const [allAccountsLoading, setAllAccountsLoading] = useState(false);
   const { categories: selectedCats, version: categoriesVersion } = useCategories();
 
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadHistory, setUploadHistory] = useState([]);
   const [dragOver, setDragOver] = useState(false);
@@ -209,8 +211,10 @@ export default function AccountDetailPage() {
     finally { setUploadBusy(false); }
   };
 
-  const deleteAccount = async () => {
-    if (!window.confirm(`Delete "${account.name}"? Transactions must be reassigned first.`)) return;
+  const deleteAccount = () => setConfirmDelete(true);
+
+  const handleConfirmDelete = async () => {
+    setConfirmDelete(false);
     try {
       await api.delete(`/accounts/${accountId}`);
       toast.success("Account deleted");
@@ -520,6 +524,14 @@ export default function AccountDetailPage() {
       <TransactionForm open={txFormOpen} editingId={editingTxId} form={txForm} setForm={setTxForm}
         selectedCats={selectedCats} onClose={closeTxForm} onSubmit={handleAddTransaction}
         accounts={allAccounts} accountsLoading={allAccountsLoading} />
+      <ConfirmModal
+        open={confirmDelete}
+        title="Delete this account?"
+        message={`Delete "${account?.name}"? Transactions must be reassigned first.`}
+        confirmLabel="Yes, delete"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </div>
   );
 }
