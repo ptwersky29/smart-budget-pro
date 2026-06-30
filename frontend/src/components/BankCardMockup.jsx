@@ -35,7 +35,9 @@ function BankCardMockup({ connection, size = "sm", showStatus = false }) {
   const name = c.nickname || c.account_name || "Bank Account";
   const balance = c.balance ?? 0;
   const ccy = c.balance_currency || "GBP";
-  const connId = c.connection_id || c.account_id;
+  const accountId = c.account_id;
+  const connectionId = c.connection_id;
+  const linkTo = accountId ? `/accounts/${accountId}` : `/accounts/legacy/${connectionId}`;
   const type = c.account_type;
 
   const statusInfo = STATUS_CONFIG[c.status] || STATUS_CONFIG.active;
@@ -84,7 +86,7 @@ function BankCardMockup({ connection, size = "sm", showStatus = false }) {
 
   return (
     <Link
-      to={`/accounts/${connId}`}
+      to={linkTo}
       className={`flex items-center ${sizes.gap} rounded-xl bg-card/90 border border-border/40 px-3 sm:px-4 transition-all duration-200 hover:ring-2 hover:ring-emerald/30 hover:border-emerald/40 cursor-pointer group ${sizes.h}`}
       style={{ borderLeft: `3px solid ${bankColor}` }}
     >

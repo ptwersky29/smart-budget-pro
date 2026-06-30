@@ -24,7 +24,9 @@ function BankAccountCard({ account, connection, variant = "default" }) {
   const name = c.nickname || c.account_name || "Bank Account";
   const balance = c.balance ?? 0;
   const ccy = c.balance_currency || "GBP";
-  const connId = c.connection_id || c.account_id;
+  const accountId = c.account_id;
+  const connectionId = c.connection_id;
+  const linkTo = accountId ? `/accounts/${accountId}` : `/accounts/legacy/${connectionId}`;
   const type = c.account_type;
 
   const balanceFmt = Number(balance).toLocaleString(undefined, {
@@ -35,7 +37,7 @@ function BankAccountCard({ account, connection, variant = "default" }) {
   if (variant === "mini") {
     return (
       <Link
-        to={`/accounts/${connId}`}
+        to={linkTo}
         className="inline-flex items-center gap-2 rounded-xl bg-card/80 border border-border/40 px-3 py-2 hover:ring-2 hover:ring-emerald/30 hover:border-emerald/40 transition-all duration-200 cursor-pointer group"
         style={{ borderLeftColor: bankColor, borderLeftWidth: "3px" }}
       >
@@ -71,7 +73,7 @@ function BankAccountCard({ account, connection, variant = "default" }) {
   if (variant === "full") {
     return (
       <Link
-        to={`/accounts/${connId}`}
+        to={linkTo}
         className="block rounded-xl border border-border/50 bg-card/90 hover:bg-card hover:shadow-md hover:border-border/80 transition-all duration-200 cursor-pointer group overflow-hidden"
       >
         <div className="h-1" style={{ background: bankColor }} />
@@ -123,7 +125,7 @@ function BankAccountCard({ account, connection, variant = "default" }) {
 
   return (
     <Link
-      to={`/accounts/${connId}`}
+      to={linkTo}
       className="inline-flex items-center gap-3 rounded-xl bg-card/80 border border-border/40 px-3.5 py-2.5 hover:ring-2 hover:ring-emerald/30 hover:border-emerald/40 transition-all duration-200 cursor-pointer group"
       style={{ borderLeftColor: bankColor, borderLeftWidth: "3px" }}
     >
