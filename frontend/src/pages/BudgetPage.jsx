@@ -65,7 +65,6 @@ const BudgetCard = React.memo(({ budget, isCurrentMonth, currentDay, monthElapse
   const pct = budget.progress_pct || 0;
   const over = pct >= 100;
   const isEditing = editingId === budget.budget_id;
-  const progressColor = over ? "#e5484d" : pct >= 80 ? "#e8a838" : "#30a46c";
   let paceMessage = null;
   let paceClass = "";
   if (isCurrentMonth && currentDay >= 3 && monthElapsedPct > 0 && budget.limit > 0 && daysInMonth > 0) {
@@ -93,54 +92,48 @@ const BudgetCard = React.memo(({ budget, isCurrentMonth, currentDay, monthElapse
   }
   const isSelected = bulkSelected.has(budget.budget_id);
   const statusLabel = over ? "Over" : pct >= 80 ? "Nearing" : "On track";
-  const bgGlow = over ? "hover:shadow-[0_0_15px_rgba(229,72,77,0.1)]" : pct >= 80 ? "hover:shadow-[0_0_15px_rgba(232,168,56,0.1)]" : "hover:shadow-[0_0_15px_rgba(48,164,108,0.1)]";
   return (
-    <div key={budget.budget_id} className={`rounded-xl border ${isSelected ? "border-emerald bg-emerald/5" : "border-border/50 bg-background/40"} backdrop-blur-xl p-4 hover:border-border ${bgGlow} hover:-translate-y-0.5 transition-all duration-300 group relative overflow-hidden`}>
-      <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-current/10 to-transparent pointer-events-none" />
+    <div key={budget.budget_id} className={`rounded-xl border ${isSelected ? "border-emerald bg-emerald/5" : "border-border/50 bg-background/40"} backdrop-blur-xl p-3 hover:border-border hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 relative`}>
       {isSelected && <div className="absolute inset-0 rounded-xl border-2 border-emerald/40 pointer-events-none" />}
-      <div className="flex items-start gap-4">
-        <div className="relative shrink-0">
-          <input type="checkbox" checked={isSelected} onChange={() => {
-            const next = new Set(bulkSelected);
-            if (isSelected) next.delete(budget.budget_id); else next.add(budget.budget_id);
-            setBulkSelected(next);
-          }} className="absolute -left-1 -top-1 z-10 w-4 h-4 rounded border-border text-emerald focus:ring-emerald/30 opacity-40 hover:opacity-100 focus:opacity-100 transition-opacity" />
-          <ProgressRing pct={pct} size={44} stroke={4} color={progressColor} />
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-[10px] font-bold tabular-nums">{Math.round(pct)}%</span>
-          </div>
+      <div className="flex items-center gap-2 mb-1.5">
+        <input type="checkbox" checked={isSelected} onChange={() => {
+          const next = new Set(bulkSelected);
+          if (isSelected) next.delete(budget.budget_id); else next.add(budget.budget_id);
+          setBulkSelected(next);
+        }} className="shrink-0 w-4 h-4 rounded border-border text-emerald focus:ring-emerald/30" />
+        <h3 className="text-sm font-semibold capitalize truncate leading-tight tracking-tight flex-1">{budget.category}</h3>
+        <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+          over ? "bg-ruby/10 text-ruby" :
+          pct >= 80 ? "bg-topaz/10 text-topaz" :
+          "bg-emerald/10 text-emerald"
+        }`}>
+          {statusLabel}
+        </span>
+      </div>
+      <div className="flex items-baseline gap-1 mb-1.5">
+        <span className={`text-sm font-bold tabular-nums tracking-tight ${over ? "text-ruby" : "text-foreground"}`}>
+          £{budget.spent}
+        </span>
+        <span className="text-xs text-muted-foreground font-medium">/ £{budget.limit}</span>
+        <span className="ml-auto text-[11px] font-medium tabular-nums text-muted-foreground">
+          £{budget.remaining >= 0 ? `${budget.remaining} left` : `${Math.abs(budget.remaining)} over`}
+        </span>
+      </div>
+      <div className="h-2 rounded-full bg-secondary/50 overflow-hidden mb-1 shadow-inner">
+        <div className={`h-full rounded-full ${over ? "bg-ruby" : "bg-gradient-to-r from-emerald to-topaz"}`} style={{ width: `${Math.min(100, pct)}%`, transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)" }} />
+      </div>
+      {paceMessage && (
+        <div className={`text-[10px] px-1.5 py-0.5 rounded font-medium inline-block mb-1.5 ${paceClass}`}>
+          {paceMessage}
         </div>
-        <div className="flex-1 min-w-0 flex flex-col justify-center pt-0.5">
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="text-sm font-semibold capitalize truncate leading-tight tracking-tight">{budget.category}</h3>
-            <div className="flex gap-1.5 items-center">
-              {paceMessage && <span className={`shrink-0 text-[9px] px-1.5 py-0.5 rounded font-medium ${paceClass}`}>{paceMessage}</span>}
-              <span className={`shrink-0 text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
-                over ? "bg-ruby text-white" :
-                pct >= 80 ? "bg-topaz text-white" :
-                "bg-emerald/10 text-emerald"
-              }`}>
-                {statusLabel}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-baseline gap-1 mb-2">
-            <span className={`text-sm font-bold tabular-nums tracking-tight ${over ? "text-ruby" : "text-foreground"}`}>
-              £{budget.spent}
-            </span>
-            <span className="text-xs text-muted-foreground font-medium">/ £{budget.limit}</span>
-            <span className="ml-auto text-[11px] font-medium tabular-nums text-muted-foreground">
-              £{budget.remaining >= 0 ? `${budget.remaining} left` : `${Math.abs(budget.remaining)} over`}
-            </span>
-          </div>
-          <div className="h-1.5 rounded-full bg-secondary/50 overflow-hidden shadow-inner">
-            <div className={`h-full rounded-full ${over ? "bg-ruby" : "bg-gradient-to-r from-emerald to-topaz"}`} style={{ width: `${Math.min(100, pct)}%`, transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)" }} />
-          </div>
-        </div>
-        <div className="absolute inset-x-0 bottom-0 top-0 bg-gradient-to-l from-background via-background/90 to-transparent flex justify-end items-center pr-4 gap-2 opacity-30 hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
-          <button onClick={(e) => { e.preventDefault(); startEdit(budget); }} className="p-2 rounded-full bg-secondary hover:bg-muted text-foreground shadow-sm" aria-label={`Edit ${budget.category}`}><Pencil className="h-4 w-4" /></button>
-          <button onClick={(e) => { e.preventDefault(); setConfirmDelete({ type: 'budget', id: budget.budget_id }); }} className="p-2 rounded-full bg-ruby/10 hover:bg-ruby/20 text-ruby shadow-sm" aria-label={`Delete ${budget.category}`}><Trash2 className="h-4 w-4" /></button>
-        </div>
+      )}
+      <div className="flex items-center gap-1.5 pt-1.5 border-t border-border/40 mt-1.5">
+        <button onClick={() => startEdit(budget)} className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-secondary hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" aria-label={`Edit ${budget.category}`}>
+          <Pencil className="h-3 w-3" /> Edit
+        </button>
+        <button onClick={() => setConfirmDelete({ type: 'budget', id: budget.budget_id })} className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-ruby/10 hover:bg-ruby/20 text-ruby transition-colors" aria-label={`Delete ${budget.category}`}>
+          <Trash2 className="h-3 w-3" /> Delete
+        </button>
       </div>
     </div>
   );
@@ -151,77 +144,84 @@ const EventGroupCard = React.memo(({ group, setConfirmDelete, fetchData }) => {
   const totalSpent = group.total_spent || 0;
   const pct = totalLimit ? Math.min(100, (totalSpent / totalLimit) * 100) : 0;
   const over = pct >= 100;
-  const eventColor = over ? "#e5484d" : pct >= 80 ? "#e8a838" : "#30a46c";
+  const [showAdd, setShowAdd] = useState(false);
   return (
-    <div key={group.event_group_id} className={`rounded-lg border border-border bg-card/80 p-2.5 hover:border-muted-foreground/20 hover:shadow-sm transition-all relative overflow-hidden ${over ? "border-l-ruby" : pct >= 80 ? "border-l-topaz" : "border-l-emerald"} border-l-2`}>
-      <div className="flex items-center gap-2">
+    <div key={group.event_group_id} className={`rounded-xl border border-border/50 bg-background/40 backdrop-blur-xl p-3 hover:border-border hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden ${over ? "border-l-ruby" : pct >= 80 ? "border-l-topaz" : "border-l-emerald"} border-l-2`}>
+      <div className="flex items-center gap-2 mb-1.5">
         {group.event_date && (
-          <div className="shrink-0 flex flex-col items-center w-7">
-            <span className="text-[8px] uppercase font-bold text-muted-foreground leading-tight">{parseISO(group.event_date).toLocaleDateString("en-GB", { month: "short" })}</span>
+          <div className="shrink-0 flex flex-col items-center w-8">
+            <span className="text-[9px] uppercase font-bold text-muted-foreground leading-tight">{parseISO(group.event_date).toLocaleDateString("en-GB", { month: "short" })}</span>
             <span className="text-xs font-bold leading-none">{parseISO(group.event_date).getDate()}</span>
           </div>
         )}
-        <div className="relative shrink-0">
-          <ProgressRing pct={pct} size={28} stroke={3} color={eventColor} />
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-[7px] font-bold tabular-nums">{Math.round(pct)}%</span>
-          </div>
-        </div>
-        <div className="flex-1 min-w-0">
-          <h3 className="text-[13px] font-medium truncate leading-tight">{group.event_group_name || group.category}</h3>
-          <div className="flex items-baseline gap-1">
-            <span className={`text-xs font-semibold tabular-nums ${over ? "text-ruby" : "text-foreground"}`}>£{totalSpent.toFixed(2)}</span>
-            <span className="text-[10px] text-muted-foreground">/ £{totalLimit.toFixed(2)}</span>
-          </div>
-        </div>
-        <button onClick={() => setConfirmDelete({ type: 'group', id: group.event_group_id })} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-ruby shrink-0 opacity-30 hover:opacity-100 focus:opacity-100 transition-opacity" aria-label={`Delete event ${group.event_group_name}`}><Trash2 className="h-3 w-3" /></button>
+        <h3 className="text-sm font-semibold truncate leading-tight flex-1">{group.event_group_name || group.category}</h3>
+        <button onClick={() => setConfirmDelete({ type: 'group', id: group.event_group_id })} className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-ruby/10 hover:bg-ruby/20 text-ruby transition-colors shrink-0" aria-label={`Delete event ${group.event_group_name}`}>
+          <Trash2 className="h-3 w-3" /> Delete
+        </button>
+      </div>
+      <div className="h-2 rounded-full bg-secondary/50 overflow-hidden mb-1 shadow-inner">
+        <div className={`h-full rounded-full ${over ? "bg-ruby" : "bg-gradient-to-r from-emerald to-topaz"}`} style={{ width: `${Math.min(100, pct)}%`, transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)" }} />
+      </div>
+      <div className="flex items-baseline gap-1 mb-1.5">
+        <span className={`text-sm font-bold tabular-nums tracking-tight ${over ? "text-ruby" : "text-foreground"}`}>
+          £{totalSpent.toFixed(2)}
+        </span>
+        <span className="text-xs text-muted-foreground font-medium">/ £{totalLimit.toFixed(2)}</span>
       </div>
       {group.items && group.items.length > 0 && (
-        <div className="mt-1.5 pt-1.5 border-t border-border space-y-0.5">
+        <div className="mt-1.5 pt-1.5 border-t border-border/40 space-y-1">
           {group.items.map((item) => {
             const itemPct = item.limit ? Math.min(100, (item.spent / item.limit) * 100) : 0;
             return (
-              <div key={item.budget_id} className="flex items-center gap-1 text-[10px] py-0.5">
-                <div className="w-1 h-1 rounded-full bg-muted-foreground/30 shrink-0" />
+              <div key={item.budget_id} className="flex items-center gap-1.5 text-[11px] py-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
                 <span className="flex-1 truncate text-muted-foreground">{item.category}</span>
                 <span className="tabular-nums text-muted-foreground">£{item.spent.toFixed(2)}</span>
-                <div className="w-8 h-1 rounded-full bg-muted/40 overflow-hidden shrink-0">
-                  <div className={`h-full rounded-full ${itemPct >= 100 ? "bg-ruby" : "bg-emerald"}`} style={{ width: `${Math.min(100, itemPct)}%` }} />
+                <div className="w-12 h-1.5 rounded-full bg-muted/40 overflow-hidden shrink-0">
+                  <div className={`h-full rounded-full ${itemPct >= 100 ? "bg-ruby" : "bg-gradient-to-r from-emerald to-topaz"}`} style={{ width: `${Math.min(100, itemPct)}%` }} />
                 </div>
-                <button onClick={() => setConfirmDelete({ type: 'budget', id: item.budget_id })} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-ruby" aria-label={`Remove ${item.category} from event`}><X className="h-2.5 w-2.5" /></button>
+                <button onClick={() => setConfirmDelete({ type: 'budget', id: item.budget_id })} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-ruby" aria-label={`Remove ${item.category} from event`}><X className="h-3 w-3" /></button>
               </div>
             );
           })}
         </div>
       )}
-      <div className="mt-1.5 pt-1.5 border-t border-border">
-        <form onSubmit={async (e) => {
-          e.preventDefault();
-          const input = e.target.elements.namedItem("newItemCat");
-          const amt = e.target.elements.namedItem("newItemAmt");
-          if (!input?.value || !amt?.value) return;
-          try {
-            await api.post("/budgets", {
-              category: input.value.toLowerCase().trim(),
-              limit: parseFloat(amt.value),
-              budget_type: "event",
-              event_date: group.event_date,
-              event_group_id: group.event_group_id,
-              event_group_name: group.event_group_name,
-            });
-            toast.success("Item added");
-            input.value = ""; amt.value = "";
-            await fetchData();
-          } catch { toast.error("Could not add item"); }
-        }} className="flex items-end gap-1">
-          <div className="flex-1">
-            <input name="newItemCat" placeholder="Category" aria-label="New item category" className="w-full h-6 rounded bg-secondary/30 border border-transparent px-1.5 text-[10px] placeholder:text-muted-foreground focus:border-ring focus:outline-none" />
-          </div>
-          <div className="w-14">
-            <input name="newItemAmt" type="number" step="0.01" min="0.01" placeholder="£0" aria-label="New item amount" className="w-full h-6 rounded bg-secondary/30 border border-transparent px-1.5 text-[10px] text-right placeholder:text-muted-foreground focus:border-ring focus:outline-none" />
-          </div>
-          <button type="submit" className="h-6 px-1.5 rounded bg-emerald text-white text-[10px] hover:bg-emerald/90"><Plus className="h-2.5 w-2.5" /></button>
-        </form>
+      <div className="mt-1.5 pt-1.5 border-t border-border/40">
+        {showAdd ? (
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            const input = e.target.elements.namedItem("newItemCat");
+            const amt = e.target.elements.namedItem("newItemAmt");
+            if (!input?.value || !amt?.value) return;
+            try {
+              await api.post("/budgets", {
+                category: input.value.toLowerCase().trim(),
+                limit: parseFloat(amt.value),
+                budget_type: "event",
+                event_date: group.event_date,
+                event_group_id: group.event_group_id,
+                event_group_name: group.event_group_name,
+              });
+              toast.success("Item added");
+              input.value = ""; amt.value = "";
+              setShowAdd(false);
+              await fetchData();
+            } catch { toast.error("Could not add item"); }
+          }} className="flex items-end gap-1.5">
+            <div className="flex-1">
+              <input name="newItemCat" placeholder="Item name" aria-label="New item category" className="w-full h-7 rounded bg-secondary/30 border border-transparent px-2 text-[11px] placeholder:text-muted-foreground focus:border-ring focus:outline-none" />
+            </div>
+            <div className="w-16">
+              <input name="newItemAmt" type="number" step="0.01" min="0.01" placeholder="£0" aria-label="New item amount" className="w-full h-7 rounded bg-secondary/30 border border-transparent px-2 text-[11px] text-right placeholder:text-muted-foreground focus:border-ring focus:outline-none" />
+            </div>
+            <button type="submit" className="h-7 w-7 rounded bg-emerald text-white hover:bg-emerald/90 flex items-center justify-center"><Plus className="h-3.5 w-3.5" /></button>
+            <button type="button" onClick={() => setShowAdd(false)} className="h-7 px-2 rounded bg-secondary text-muted-foreground hover:text-foreground text-[11px]">Cancel</button>
+          </form>
+        ) : (
+          <button onClick={() => setShowAdd(true)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-full justify-center py-1.5 rounded-lg hover:bg-secondary/50">
+            <Plus className="h-3 w-3" /> Add item
+          </button>
+        )}
       </div>
     </div>
   );
@@ -850,9 +850,9 @@ export default React.memo(function BudgetPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {items.map((b) => <BudgetCard key={b.budget_id} budget={b} isCurrentMonth={isCurrentMonth} currentDay={currentDay} monthElapsedPct={monthElapsedPct} daysInMonth={daysInMonth} editingId={editingId} form={form} cancelEdit={cancelEdit} handleUpdate={handleUpdate} startEdit={startEdit} bulkSelected={bulkSelected} setBulkSelected={setBulkSelected} setConfirmDelete={setConfirmDelete} />)}
                   <button onClick={() => openAddBudget("everyday")}
-                    className="rounded-xl border-2 border-dashed border-border/40 hover:border-emerald/40 hover:bg-emerald/5 hover:text-emerald hover:scale-[1.02] active:scale-[0.98] text-muted-foreground/50 transition-all duration-200 flex flex-col items-center justify-center p-3 min-h-[88px] w-full group/add">
-                    <Plus className="h-4 w-4 mb-1 group-hover/add:rotate-90 transition-transform duration-300" />
-                    <span className="text-[10px] font-medium">Add {section}</span>
+                    className="rounded-xl border-2 border-dashed border-border/40 hover:border-emerald/40 hover:bg-emerald/5 hover:text-emerald hover:scale-[1.02] active:scale-[0.98] text-muted-foreground/50 transition-all duration-200 flex flex-col items-center justify-center p-3 w-full group/add">
+                    <Plus className="h-5 w-5 mb-1.5 group-hover/add:rotate-90 transition-transform duration-300" />
+                    <span className="text-xs font-medium">Add {section}</span>
                   </button>
                 </div>
               </div>
