@@ -41,12 +41,12 @@ function BankAccountCard({ account, connection, variant = "default" }) {
         className="inline-flex items-center gap-2 rounded-xl bg-card/80 border border-border/40 px-3 py-2 hover:ring-2 hover:ring-emerald/30 hover:border-emerald/40 transition-all duration-200 cursor-pointer group"
         style={{ borderLeftColor: bankColor, borderLeftWidth: "3px" }}
       >
-        <div className="relative shrink-0 h-8 w-8 rounded-lg bg-white dark:bg-secondary/40 border border-border/30 flex items-center justify-center overflow-hidden">
+        <div className="relative shrink-0 h-10 w-10 rounded-lg bg-white dark:bg-secondary/40 border border-border/30 flex items-center justify-center overflow-hidden">
           {logoUrl ? (
             <img
               src={logoUrl}
               alt={brandInstitution || institution}
-              className="h-6 w-6 object-contain group-hover:scale-110 transition-transform duration-200"
+              className="h-8 w-8 object-contain group-hover:scale-110 transition-transform duration-200"
               loading="lazy"
               onError={(e) => {
                 e.target.onerror = null;
@@ -55,7 +55,7 @@ function BankAccountCard({ account, connection, variant = "default" }) {
             />
           ) : null}
           {!logoUrl ? (
-            <Building2 className="h-3 w-3 text-muted-foreground" />
+            <Building2 className="h-5 w-5 text-muted-foreground" />
           ) : null}
         </div>
         <div>
@@ -79,12 +79,12 @@ function BankAccountCard({ account, connection, variant = "default" }) {
         <div className="h-1" style={{ background: bankColor }} />
         <div className="p-4">
           <div className="flex items-start gap-3">
-            <div className="relative shrink-0 h-11 w-11 rounded-xl bg-white dark:bg-secondary/40 border border-border/30 flex items-center justify-center overflow-hidden shadow-sm">
+            <div className="relative shrink-0 h-14 w-14 rounded-xl bg-white dark:bg-secondary/40 border border-border/30 flex items-center justify-center overflow-hidden shadow-sm">
               {logoUrl ? (
                 <img
                   src={logoUrl}
                   alt={brandInstitution || institution}
-                  className="h-8 w-8 object-contain group-hover:scale-110 transition-transform duration-200"
+                  className="h-11 w-11 object-contain group-hover:scale-110 transition-transform duration-200"
                   loading="lazy"
                   onError={(e) => {
                     e.target.onerror = null;
@@ -93,7 +93,7 @@ function BankAccountCard({ account, connection, variant = "default" }) {
                 />
               ) : null}
               {!logoUrl ? (
-                <Building2 className="h-5 w-5 text-muted-foreground" />
+                <Building2 className="h-7 w-7 text-muted-foreground" />
               ) : null}
             </div>
             <div className="flex-1 min-w-0">
@@ -129,12 +129,12 @@ function BankAccountCard({ account, connection, variant = "default" }) {
       className="inline-flex items-center gap-3 rounded-xl bg-card/80 border border-border/40 px-3.5 py-2.5 hover:ring-2 hover:ring-emerald/30 hover:border-emerald/40 transition-all duration-200 cursor-pointer group"
       style={{ borderLeftColor: bankColor, borderLeftWidth: "3px" }}
     >
-      <div className="relative shrink-0 h-9 w-9 rounded-lg bg-white dark:bg-secondary/40 border border-border/30 flex items-center justify-center overflow-hidden">
+      <div className="relative shrink-0 h-12 w-12 rounded-lg bg-white dark:bg-secondary/40 border border-border/30 flex items-center justify-center overflow-hidden">
         {logoUrl ? (
           <img
             src={logoUrl}
             alt={brandInstitution || institution}
-            className="h-7 w-7 object-contain group-hover:scale-110 transition-transform duration-200"
+            className="h-10 w-10 object-contain group-hover:scale-110 transition-transform duration-200"
             loading="lazy"
             onError={(e) => {
               e.target.onerror = null;
@@ -143,7 +143,7 @@ function BankAccountCard({ account, connection, variant = "default" }) {
           />
         ) : null}
         {!logoUrl ? (
-          <Building2 className="h-4 w-4 text-muted-foreground" />
+          <Building2 className="h-6 w-6 text-muted-foreground" />
         ) : null}
       </div>
       <div>

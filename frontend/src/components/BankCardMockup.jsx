@@ -51,8 +51,8 @@ function BankCardMockup({ connection, size = "sm", showStatus = false }) {
     {
       xs: {
         h: "h-14",
-        logoBox: "h-7 w-7",
-        logoImg: "h-4 w-4",
+        logoBox: "h-8 w-8",
+        logoImg: "h-6 w-6",
         nameSize: "text-xs",
         metaSize: "text-[10px]",
         balanceSize: "text-sm",
@@ -62,8 +62,8 @@ function BankCardMockup({ connection, size = "sm", showStatus = false }) {
       },
       sm: {
         h: "h-16",
-        logoBox: "h-8 w-8",
-        logoImg: "h-5 w-5",
+        logoBox: "h-10 w-10",
+        logoImg: "h-7 w-7",
         nameSize: "text-sm",
         metaSize: "text-[11px]",
         balanceSize: "text-base",
@@ -73,8 +73,8 @@ function BankCardMockup({ connection, size = "sm", showStatus = false }) {
       },
       md: {
         h: "h-20",
-        logoBox: "h-10 w-10",
-        logoImg: "h-7 w-7",
+        logoBox: "h-12 w-12",
+        logoImg: "h-9 w-9",
         nameSize: "text-sm sm:text-base",
         metaSize: "text-xs",
         balanceSize: "text-lg sm:text-xl",
@@ -106,10 +106,10 @@ function BankCardMockup({ connection, size = "sm", showStatus = false }) {
           }}
         />
         {isManual ? (
-          <Wallet className="h-3.5 w-3.5 text-muted-foreground"
+          <Wallet className="h-6 w-6 text-muted-foreground"
             style={{ display: logoUrl ? "none" : "block" }} />
         ) : (
-          <Building2 className="h-3.5 w-3.5 text-muted-foreground"
+          <Building2 className="h-6 w-6 text-muted-foreground"
             style={{ display: logoUrl ? "none" : "block" }} />
         )}
       </div>
