@@ -95,6 +95,9 @@ export default React.memo(function BudgetPage() {
   const [budgetAdded, setBudgetAdded] = useState(false);
   const [alerts, setAlerts] = useState([]);
   const [dismissedAlerts, setDismissedAlerts] = useState(new Set());
+  const dismissedAlertsRef = useRef(dismissedAlerts);
+  dismissedAlertsRef.current = dismissedAlerts;
+  const notifiedAlertsRef = useRef(new Set());
   const [insights, setInsights] = useState([]);
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [showInsights, setShowInsights] = useState(false);
@@ -232,6 +235,7 @@ export default React.memo(function BudgetPage() {
       const { data } = await api.get("/budgets", { params });
       setBudgets(data.budgets || []);
       setEventGroups(data.event_groups || {});
+      fetchAlerts();
     } catch {
       toast.error("Failed to load budgets");
     } finally {
@@ -250,9 +254,18 @@ export default React.memo(function BudgetPage() {
   const fetchAlerts = useCallback(async () => {
     try {
       const { data } = await api.get("/budgets/alerts");
-      setAlerts(data.alerts || []);
+      const newAlerts = data.alerts || [];
+      newAlerts.forEach(a => {
+        const key = a.category + a.severity;
+        if (a.severity === "critical" && !dismissedAlertsRef.current.has(key) && !notifiedAlertsRef.current.has(key)) {
+          notifiedAlertsRef.current.add(key);
+          toast.error(a.message, { duration: 8000 });
+        }
+      });
+      setAlerts(newAlerts);
     } catch { console.warn("[budgets] failed to load alerts"); }
   }, []);
+
 
   const fetchInsights = useCallback(async () => {
     setInsightsLoading(true);
