@@ -84,6 +84,7 @@ export default React.memo(function BudgetPage() {
   const budgetsRef = useRef(budgets);
   budgetsRef.current = budgets;
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [bulkSelected, setBulkSelected] = useState(new Set());
@@ -113,7 +114,7 @@ export default React.memo(function BudgetPage() {
   }, []);
 
   const { year, month: mNum } = parseMonth(month);
-  const monthLabel = `${MONTH_NAMES[mNum - 1]} ${year}`;
+  const monthLabel = mNum >= 1 && mNum <= 12 ? `${MONTH_NAMES[mNum - 1]} ${year}` : month;
   const isCurrentMonth = month === fmtMonth(now.getFullYear(), now.getMonth() + 1);
 
   const currentHebrewMonth = useMemo(() => {
@@ -230,8 +231,9 @@ export default React.memo(function BudgetPage() {
       const { data } = await api.get("/budgets", { params });
       setBudgets(data.budgets || []);
       setEventGroups(data.event_groups || {});
-    } catch {
-      toast.error("Failed to load budgets");
+      setLoadError(null);
+    } catch (err) {
+      setLoadError(err.response?.data?.detail || "Failed to load budgets");
     } finally {
       setLoading(false);
     }
@@ -466,7 +468,7 @@ export default React.memo(function BudgetPage() {
     // Forecasting
     let paceMessage = null;
     let paceClass = "";
-    if (isCurrentMonth && monthElapsedPct > 0 && b.limit > 0 && daysInMonth > 0) {
+    if (isCurrentMonth && currentDay >= 3 && monthElapsedPct > 0 && b.limit > 0 && daysInMonth > 0) {
       const projectedSpend = b.spent / monthElapsedPct;
       const projectedDeficit = projectedSpend - b.limit;
       if (projectedDeficit > 5 && !over) {
@@ -763,6 +765,20 @@ export default React.memo(function BudgetPage() {
         </div>
       )}
 
+      {/* Error */}
+      {!loading && loadError && (
+        <div className="rounded-2xl border border-ruby/20 bg-ruby/5 p-8 text-center">
+          <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-ruby/10 text-ruby">
+            <AlertCircle className="h-6 w-6" />
+          </div>
+          <h3 className="text-lg font-medium">Failed to load budgets</h3>
+          <p className="text-sm text-muted-foreground mt-1 mb-5">{loadError}</p>
+          <Button variant="primary" size="pill" onClick={fetchData}>
+            <RefreshCw className="h-4 w-4 mr-1.5" /> Try again
+          </Button>
+        </div>
+      )}
+
       {/* Bulk actions toolbar */}
       {!loading && bulkSelected.size > 0 && (
         <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald/5 border border-emerald/20">
@@ -791,7 +807,7 @@ export default React.memo(function BudgetPage() {
         </div>
       )}
 
-      {!loading && budgets.length === 0 && (
+      {!loading && !loadError && budgets.length === 0 && (
         <div className="rounded-2xl border border-dashed border-border bg-card/60 p-12 text-center">
           <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-emerald/10 text-emerald">
             <Wallet className="h-7 w-7" />
@@ -809,11 +825,11 @@ export default React.memo(function BudgetPage() {
         </div>
       )}
 
-      {!loading && budgets.length > 0 && (
+      {!loading && !loadError && budgets.length > 0 && (
         <>
           {/* Budget Sections */}
           <section>
-            {Object.entries(sectionsForDisplay).length === 0 && searchQuery.trim() && (
+            {Object.entries(sectionsForDisplay).length === 0 && upcomingEventGroups.length === 0 && searchQuery.trim() && (
               <div className="rounded-xl border border-dashed border-border bg-card/40 p-6 text-center">
                 <p className="text-sm text-muted-foreground">No budgets match "{searchQuery}"</p>
               </div>
