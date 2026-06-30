@@ -284,6 +284,8 @@ export default React.memo(function BudgetPage() {
   const gregMonth = currentHebrewMonth ? currentHebrewMonth.gregorian_start.slice(0, 7) : month;
   const { year, month: mNum } = parseMonth(gregMonth);
   const monthLabel = mNum >= 1 && mNum <= 12 ? `${MONTH_NAMES[mNum - 1]} ${year}` : gregMonth;
+  const isCurrentMonth = currentHebrewMonth ? currentHebrewMonth.is_current : month === fmtMonth(now.getFullYear(), now.getMonth() + 1);
+  const daysInMonth = useMemo(() => getDaysInMonth(new Date(year, mNum - 1)), [year, mNum]);
 
   const hebrewLabel = currentHebrewMonth ? (
     <span>
@@ -304,9 +306,6 @@ export default React.memo(function BudgetPage() {
       {monthLabel}
     </span>
   );
-
-  const isCurrentMonth = currentHebrewMonth ? currentHebrewMonth.is_current : month === fmtMonth(now.getFullYear(), now.getMonth() + 1);
-  const daysInMonth = useMemo(() => getDaysInMonth(new Date(year, mNum - 1)), [year, mNum]);
   const currentDay = isCurrentMonth ? getDate(now) : daysInMonth;
   const monthElapsedPct = daysInMonth ? currentDay / daysInMonth : 1;
 
