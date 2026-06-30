@@ -484,7 +484,7 @@ export default React.memo(function BudgetPage() {
               const next = new Set(bulkSelected);
               if (isSelected) next.delete(b.budget_id); else next.add(b.budget_id);
               setBulkSelected(next);
-            }} className="absolute -left-1 -top-1 z-10 w-4 h-4 rounded border-border text-emerald focus:ring-emerald/30 opacity-0 group-hover:opacity-100 transition-opacity" />
+            }} className="absolute -left-1 -top-1 z-10 w-4 h-4 rounded border-border text-emerald focus:ring-emerald/30 opacity-40 hover:opacity-100 focus:opacity-100 transition-opacity" />
             <ProgressRing pct={pct} size={44} stroke={4} color={progressColor} />
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <span className="text-[10px] font-bold tabular-nums">{Math.round(pct)}%</span>
@@ -517,9 +517,9 @@ export default React.memo(function BudgetPage() {
               <div className={`h-full rounded-full ${over ? "bg-ruby" : "bg-gradient-to-r from-emerald to-topaz"}`} style={{ width: `${Math.min(100, pct)}%`, transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)" }} />
             </div>
           </div>
-          <div className="absolute inset-x-0 bottom-0 top-0 bg-gradient-to-l from-background via-background/90 to-transparent flex justify-end items-center pr-4 gap-2 opacity-0 group-hover:opacity-100 transition-opacity translate-x-4 group-hover:translate-x-0 duration-200 pointer-events-none">
-            <button onClick={(e) => { e.preventDefault(); startEdit(b); }} className="p-2 rounded-full bg-secondary hover:bg-muted text-foreground shadow-sm pointer-events-auto" aria-label={`Edit ${b.category}`}><Pencil className="h-4 w-4" /></button>
-            <button onClick={(e) => { e.preventDefault(); setConfirmDelete(b.budget_id); }} className="p-2 rounded-full bg-ruby/10 hover:bg-ruby/20 text-ruby shadow-sm pointer-events-auto" aria-label={`Delete ${b.category}`}><Trash2 className="h-4 w-4" /></button>
+          <div className="absolute inset-x-0 bottom-0 top-0 bg-gradient-to-l from-background via-background/90 to-transparent flex justify-end items-center pr-4 gap-2 opacity-30 hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
+            <button onClick={(e) => { e.preventDefault(); startEdit(b); }} className="p-2 rounded-full bg-secondary hover:bg-muted text-foreground shadow-sm" aria-label={`Edit ${b.category}`}><Pencil className="h-4 w-4" /></button>
+            <button onClick={(e) => { e.preventDefault(); setConfirmDelete(b.budget_id); }} className="p-2 rounded-full bg-ruby/10 hover:bg-ruby/20 text-ruby shadow-sm" aria-label={`Delete ${b.category}`}><Trash2 className="h-4 w-4" /></button>
           </div>
         </div>
       </div>
@@ -558,7 +558,7 @@ export default React.memo(function BudgetPage() {
             if (window.confirm(`Delete entire event "${g.event_group_name}" and all ${g.item_count} items?`)) {
               api.delete(`/budgets/group/${g.event_group_id}`).then(() => { fetchData(); toast.success("Event deleted"); }).catch(() => toast.error("Could not delete event"));
             }
-          }} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-ruby shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" aria-label={`Delete event ${g.event_group_name}`}><Trash2 className="h-3 w-3" /></button>
+          }} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-ruby shrink-0 opacity-30 hover:opacity-100 focus:opacity-100 transition-opacity" aria-label={`Delete event ${g.event_group_name}`}><Trash2 className="h-3 w-3" /></button>
         </div>
 
         {g.items && g.items.length > 0 && (
