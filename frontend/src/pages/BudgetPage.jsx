@@ -96,6 +96,7 @@ const BudgetCard = React.memo(({ budget, isCurrentMonth, currentDay, monthElapse
   const bgGlow = over ? "hover:shadow-[0_0_15px_rgba(229,72,77,0.1)]" : pct >= 80 ? "hover:shadow-[0_0_15px_rgba(232,168,56,0.1)]" : "hover:shadow-[0_0_15px_rgba(48,164,108,0.1)]";
   return (
     <div key={budget.budget_id} className={`rounded-xl border ${isSelected ? "border-emerald bg-emerald/5" : "border-border/50 bg-background/40"} backdrop-blur-xl p-4 hover:border-border ${bgGlow} hover:-translate-y-0.5 transition-all duration-300 group relative overflow-hidden`}>
+      <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-current/10 to-transparent pointer-events-none" />
       {isSelected && <div className="absolute inset-0 rounded-xl border-2 border-emerald/40 pointer-events-none" />}
       <div className="flex items-start gap-4">
         <div className="relative shrink-0">
@@ -152,7 +153,7 @@ const EventGroupCard = React.memo(({ group, setConfirmDelete, fetchData }) => {
   const over = pct >= 100;
   const eventColor = over ? "#e5484d" : pct >= 80 ? "#e8a838" : "#30a46c";
   return (
-    <div key={group.event_group_id} className="rounded-lg border border-border bg-card/80 p-2.5 hover:border-muted-foreground/20 hover:shadow-sm transition-all">
+    <div key={group.event_group_id} className={`rounded-lg border border-border bg-card/80 p-2.5 hover:border-muted-foreground/20 hover:shadow-sm transition-all relative overflow-hidden ${over ? "border-l-ruby" : pct >= 80 ? "border-l-topaz" : "border-l-emerald"} border-l-2`}>
       <div className="flex items-center gap-2">
         {group.event_date && (
           <div className="shrink-0 flex flex-col items-center w-7">
@@ -292,12 +293,16 @@ export default React.memo(function BudgetPage() {
   ) : null;
 
   const monthLabelWithHebrew = currentHebrewMonth ? (
-    <span>
+    <span className="inline-flex items-center gap-1.5">
+      {isCurrentMonth && <span className="h-2 w-2 rounded-full bg-emerald animate-pulse shrink-0" />}
       <span className="text-xs font-normal text-muted-foreground mr-1">{monthLabel} ·</span>
       {hebrewLabel}
     </span>
   ) : (
-    <span>{monthLabel}</span>
+    <span className="inline-flex items-center gap-1.5">
+      {isCurrentMonth && <span className="h-2 w-2 rounded-full bg-emerald animate-pulse shrink-0" />}
+      {monthLabel}
+    </span>
   );
 
   const isCurrentMonth = currentHebrewMonth ? currentHebrewMonth.is_current : month === fmtMonth(now.getFullYear(), now.getMonth() + 1);
@@ -689,8 +694,8 @@ export default React.memo(function BudgetPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <div className="relative w-full sm:w-36 lg:w-44">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <div className="relative w-full sm:w-36 lg:w-44 group/search">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none transition-transform duration-200 group-focus-within/search:scale-110" />
               <input type="search" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} aria-label="Search budgets"
                 className="w-full h-8 pl-8 pr-3 rounded-full bg-secondary/40 border border-transparent text-xs placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring/30 focus:outline-none transition-all" />
             </div>
@@ -736,19 +741,23 @@ export default React.memo(function BudgetPage() {
 
       {/* Quick stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 relative z-10">
-        <div className="rounded-2xl border border-border/50 bg-background/50 backdrop-blur-sm p-4 text-center hover:bg-secondary/20 transition-colors">
+        <div className="rounded-2xl border border-border/50 bg-gradient-to-br from-background/80 to-emerald/[0.02] backdrop-blur-sm p-4 text-center hover:scale-[1.02] hover:shadow-md transition-all duration-300">
+          <div className="mx-auto mb-2 grid h-8 w-8 place-items-center rounded-full bg-emerald/10 text-emerald"><Wallet className="h-4 w-4" /></div>
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Budgets</p>
           <p className="text-2xl sm:text-3xl font-bold tracking-tight">{summary.count}</p>
         </div>
-        <div className="rounded-2xl border border-border/50 bg-background/50 backdrop-blur-sm p-4 text-center hover:bg-secondary/20 transition-colors">
+        <div className="rounded-2xl border border-border/50 bg-gradient-to-br from-background/80 to-blue/[0.02] backdrop-blur-sm p-4 text-center hover:scale-[1.02] hover:shadow-md transition-all duration-300">
+          <div className="mx-auto mb-2 grid h-8 w-8 place-items-center rounded-full bg-blue/10 text-blue"><Target className="h-4 w-4" /></div>
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Budgeted</p>
           <p className="text-2xl sm:text-3xl font-bold tracking-tight tabular-nums">£{summary.totalPlanned.toLocaleString()}</p>
         </div>
-        <div className="rounded-2xl border border-border/50 bg-background/50 backdrop-blur-sm p-4 text-center hover:bg-secondary/20 transition-colors">
+        <div className="rounded-2xl border border-border/50 bg-gradient-to-br from-background/80 to-ruby/[0.02] backdrop-blur-sm p-4 text-center hover:scale-[1.02] hover:shadow-md transition-all duration-300">
+          <div className="mx-auto mb-2 grid h-8 w-8 place-items-center rounded-full bg-ruby/10 text-ruby"><TrendingDown className="h-4 w-4" /></div>
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Spent</p>
           <p className={`text-2xl sm:text-3xl font-bold tracking-tight tabular-nums ${summary.overCount > 0 ? "text-ruby" : "text-emerald"}`}>£{summary.totalSpent.toLocaleString()}</p>
         </div>
-        <div className="rounded-2xl border border-border/50 bg-background/50 backdrop-blur-sm p-4 text-center hover:bg-secondary/20 transition-colors">
+        <div className={`rounded-2xl border border-border/50 bg-gradient-to-br from-background/80 to-emerald/[0.02] backdrop-blur-sm p-4 text-center hover:scale-[1.02] hover:shadow-md transition-all duration-300 ${summary.totalRemaining < 0 ? "border-ruby/20" : ""}`}>
+          <div className={`mx-auto mb-2 grid h-8 w-8 place-items-center rounded-full ${summary.totalRemaining < 0 ? "bg-ruby/10 text-ruby" : "bg-emerald/10 text-emerald"}`}><PiggyBank className="h-4 w-4" /></div>
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Remaining</p>
           <p className={`text-2xl sm:text-3xl font-bold tracking-tight tabular-nums ${summary.totalRemaining < 0 ? "text-ruby" : "text-emerald"}`}>£{Math.abs(summary.totalRemaining).toLocaleString()}</p>
         </div>
@@ -827,11 +836,11 @@ export default React.memo(function BudgetPage() {
               const totalRemaining = items.reduce((s, b) => s + Number(b.remaining || 0), 0);
               return (
               <div key={section} className="mb-5">
-                <div className="flex items-center justify-between mb-3 bg-gradient-to-r from-secondary/50 via-secondary/20 to-transparent px-4 py-2 rounded-xl border border-border/50">
+                <div className="sticky top-[115px] z-10 flex items-center justify-between mb-3 bg-gradient-to-r from-secondary/70 via-secondary/40 to-transparent backdrop-blur-md px-4 py-2 rounded-xl border border-border/50 shadow-sm">
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <SecIcon className="h-3.5 w-3.5 text-muted-foreground/70" />
+                    <span className="grid h-5 w-5 place-items-center rounded-md bg-muted/70"><SecIcon className="h-3 w-3 text-muted-foreground/80" /></span>
                     {section}
-                    <span className="text-[10px] font-normal text-muted-foreground/60 bg-muted/50 px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] font-normal text-muted-foreground/60 bg-muted/50 px-1.5 py-0.5 rounded-full">
                       {items.length} · £{items.reduce((s, b) => s + Number(b.limit || 0), 0).toFixed(0)}
                     </span>
                   </h3>
@@ -842,8 +851,8 @@ export default React.memo(function BudgetPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {items.map((b) => <BudgetCard key={b.budget_id} budget={b} isCurrentMonth={isCurrentMonth} currentDay={currentDay} monthElapsedPct={monthElapsedPct} daysInMonth={daysInMonth} editingId={editingId} form={form} cancelEdit={cancelEdit} handleUpdate={handleUpdate} startEdit={startEdit} bulkSelected={bulkSelected} setBulkSelected={setBulkSelected} setConfirmDelete={setConfirmDelete} />)}
                   <button onClick={() => openAddBudget("everyday")}
-                    className="rounded-xl border-2 border-dashed border-border/40 hover:border-emerald/40 hover:bg-emerald/5 hover:text-emerald text-muted-foreground/50 transition-all flex flex-col items-center justify-center p-3 min-h-[88px] w-full">
-                    <Plus className="h-4 w-4 mb-1" />
+                    className="rounded-xl border-2 border-dashed border-border/40 hover:border-emerald/40 hover:bg-emerald/5 hover:text-emerald hover:scale-[1.02] active:scale-[0.98] text-muted-foreground/50 transition-all duration-200 flex flex-col items-center justify-center p-3 min-h-[88px] w-full group/add">
+                    <Plus className="h-4 w-4 mb-1 group-hover/add:rotate-90 transition-transform duration-300" />
                     <span className="text-[10px] font-medium">Add {section}</span>
                   </button>
                 </div>
@@ -855,17 +864,17 @@ export default React.memo(function BudgetPage() {
           {/* Upcoming Event Groups */}
           {upcomingEventGroups.length > 0 && (
             <section>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
+              <div className="sticky top-[115px] z-10 flex items-center justify-between mb-3 bg-gradient-to-r from-secondary/70 via-secondary/40 to-transparent backdrop-blur-md px-4 py-2 rounded-xl border border-border/50 shadow-sm">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-foreground flex items-center gap-2">
+                  <span className="grid h-5 w-5 place-items-center rounded-md bg-muted/70"><Calendar className="h-3 w-3 text-muted-foreground/80" /></span>
                   Upcoming Events
                 </h2>
                 <div className="flex items-center gap-2">
                   <button onClick={() => openAddBudget("event")}
-                    className="h-6 w-6 rounded-full bg-topaz/10 text-topaz hover:bg-topaz/20 flex items-center justify-center transition-all" aria-label="Add event">
+                    className="h-6 w-6 rounded-full bg-topaz/10 text-topaz hover:bg-topaz/20 hover:scale-110 active:scale-95 flex items-center justify-center transition-all duration-200" aria-label="Add event">
                     <Plus className="h-3.5 w-3.5" />
                   </button>
-                  <span className="text-xs text-muted-foreground">{upcomingEventGroups.length} events</span>
+                  <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">{upcomingEventGroups.length}</span>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -877,28 +886,28 @@ export default React.memo(function BudgetPage() {
           {/* Past event groups */}
           {pastEventGroups.length > 0 && isCurrentMonth && (
             <section>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
+              <div className="sticky top-[115px] z-10 flex items-center justify-between mb-3 bg-gradient-to-r from-secondary/70 via-secondary/40 to-transparent backdrop-blur-md px-4 py-2 rounded-xl border border-border/50 shadow-sm">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-foreground flex items-center gap-2">
+                  <span className="grid h-5 w-5 place-items-center rounded-md bg-muted/70"><Calendar className="h-3 w-3 text-muted-foreground/80" /></span>
                   Past Events
                 </h2>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {pastEventGroups.map((g) => renderEventGroup(g))}
+                {pastEventGroups.map((g) => <EventGroupCard key={g.event_group_id} group={g} setConfirmDelete={setConfirmDelete} fetchData={fetchData} />)}
               </div>
             </section>
           )}
 
           {Object.keys(eventGroups).length > 0 && upcomingEventGroups.length === 0 && pastEventGroups.length === 0 && (
             <section>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
+              <div className="sticky top-[115px] z-10 flex items-center justify-between mb-3 bg-gradient-to-r from-secondary/70 via-secondary/40 to-transparent backdrop-blur-md px-4 py-2 rounded-xl border border-border/50 shadow-sm">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-foreground flex items-center gap-2">
+                  <span className="grid h-5 w-5 place-items-center rounded-md bg-muted/70"><Calendar className="h-3 w-3 text-muted-foreground/80" /></span>
                   Planned Events
                 </h2>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {Object.values(eventGroups).filter((g) => !g.event_date).map((g) => renderEventGroup(g))}
+                {Object.values(eventGroups).filter((g) => !g.event_date).map((g) => <EventGroupCard key={g.event_group_id} group={g} setConfirmDelete={setConfirmDelete} fetchData={fetchData} />)}
               </div>
             </section>
           )}
