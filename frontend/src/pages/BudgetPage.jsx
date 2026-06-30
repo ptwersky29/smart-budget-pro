@@ -100,6 +100,7 @@ export default React.memo(function BudgetPage() {
   const [showInsights, setShowInsights] = useState(false);
   const [applyingInsight, setApplyingInsight] = useState(null);
   const [seeding, setSeeding] = useState(false);
+  const [copying, setCopying] = useState(false);
   const [eventGroups, setEventGroups] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOption, setSortOption] = useState("progress");
@@ -289,10 +290,11 @@ export default React.memo(function BudgetPage() {
     }
     const optimisticBudget = { budget_id: `optimistic-${Date.now()}`, ...payload, spent: 0, progress_pct: 0 };
     setBudgets(prev => [...prev, optimisticBudget]);
-    setForm((prev) => ({ ...prev, category: "", limit: "" }));
     try {
       const { data } = await api.post("/budgets", payload);
       setBudgets(prev => prev.map(b => b.budget_id === optimisticBudget.budget_id ? data : b));
+      setBudgetAdded(form.budget_type !== "event");
+      setForm((prev) => ({ ...prev, category: "", limit: "" }));
       toast.success(form.budget_type === "event" ? "Item added to event" : "Budget added");
     } catch (err) {
       setBudgets(prev => prev.filter(b => b.budget_id !== optimisticBudget.budget_id));
@@ -396,6 +398,7 @@ export default React.memo(function BudgetPage() {
       const { data } = await api.post("/budgets/seed-defaults");
       toast.success(data.message || "Default budgets loaded");
       await fetchData();
+      await fetchCategories();
     } catch (err) {
       toast.error(err.response?.data?.detail || "Could not load defaults");
     } finally {
@@ -404,36 +407,43 @@ export default React.memo(function BudgetPage() {
   };
 
   const handleCopyPreviousMonth = async () => {
-    let prevBudgets;
-    if (currentHebrewMonth) {
-      const idx = hebrewMonths.findIndex((hm) => hm.gregorian_start === currentHebrewMonth.gregorian_start);
-      if (idx <= 0) { toast.info("No previous month to copy from"); return; }
-      const prevMonth = hebrewMonths[idx - 1];
-      const { data } = await api.get("/budgets", {
-        params: { date_from: prevMonth.gregorian_start, date_to: prevMonth.gregorian_end }
-      });
-      prevBudgets = (data.budgets || []).filter((b) => (b.budget_type || "everyday") !== "event");
-    } else {
-      const prevMonth = addMonth(month, -1);
-      const { data } = await api.get("/budgets", { params: { month: prevMonth } });
-      prevBudgets = (data.budgets || []).filter((b) => (b.budget_type || "everyday") !== "event");
+    setCopying(true);
+    try {
+      let prevBudgets;
+      if (currentHebrewMonth) {
+        const idx = hebrewMonths.findIndex((hm) => hm.gregorian_start === currentHebrewMonth.gregorian_start);
+        if (idx <= 0) { toast.info("No previous month to copy from"); setCopying(false); return; }
+        const prevMonth = hebrewMonths[idx - 1];
+        const { data } = await api.get("/budgets", {
+          params: { date_from: prevMonth.gregorian_start, date_to: prevMonth.gregorian_end }
+        });
+        prevBudgets = (data.budgets || []).filter((b) => (b.budget_type || "everyday") !== "event");
+      } else {
+        const prevMonth = addMonth(month, -1);
+        const { data } = await api.get("/budgets", { params: { month: prevMonth } });
+        prevBudgets = (data.budgets || []).filter((b) => (b.budget_type || "everyday") !== "event");
+      }
+      if (prevBudgets.length === 0) { toast.info("No budgets to copy from previous month"); return; }
+      let copied = 0;
+      for (const b of prevBudgets) {
+        const existing = budgetsRef.current.find((eb) => eb.category === b.category);
+        if (existing) continue;
+        await api.post("/budgets", {
+          category: b.category,
+          limit: Number(b.limit),
+          period: "monthly",
+          budget_type: "everyday",
+          month,
+        });
+        copied++;
+      }
+      toast.success(`Copied ${copied} budget(s)`);
+      if (copied > 0) await fetchData();
+    } catch {
+      toast.error("Could not copy budgets");
+    } finally {
+      setCopying(false);
     }
-    if (prevBudgets.length === 0) { toast.info("No budgets to copy from previous month"); return; }
-    let copied = 0;
-    for (const b of prevBudgets) {
-      const existing = budgets.find((eb) => eb.category === b.category);
-      if (existing) continue;
-      await api.post("/budgets", {
-        category: b.category,
-        limit: Number(b.limit),
-        period: "monthly",
-        budget_type: "everyday",
-        month,
-      });
-      copied++;
-    }
-    toast.success(`Copied ${copied} budget(s)`);
-    if (copied > 0) await fetchData();
   };
 
   const criticalAlerts = useMemo(() => alerts.filter((a) => a.severity === "critical"), [alerts]);
@@ -765,8 +775,8 @@ export default React.memo(function BudgetPage() {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem onClick={handleCopyPreviousMonth}>
-                  <Copy className="h-4 w-4 mr-2" /> Copy Previous
+                <DropdownMenuItem onClick={handleCopyPreviousMonth} disabled={copying}>
+                  <Copy className={`h-4 w-4 mr-2 ${copying ? "animate-pulse" : ""}`} /> {copying ? "Copying..." : "Copy Previous"}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleSeedDefaults} disabled={seeding || loading}>
                   <Download className={`h-4 w-4 mr-2 ${seeding ? "animate-pulse" : ""}`} /> {seeding ? "Loading..." : "Load Defaults"}
@@ -1076,7 +1086,7 @@ export default React.memo(function BudgetPage() {
                 <div className="flex items-center justify-between mt-2">
                   <button type="button" onClick={() => setQuickForm({ ...quickForm, description: quickForm.description ? "" : " " })}
                     className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                    {quickForm.description ? "Remove description" : "+ Add description"}
+                    {quickForm.description?.trim() ? "Remove description" : "+ Add description"}
                   </button>
                   <button type="button" onClick={() => { setShowAdd(false); resetQuickForm(); }}
                     className="text-xs text-muted-foreground hover:text-foreground transition-colors">
