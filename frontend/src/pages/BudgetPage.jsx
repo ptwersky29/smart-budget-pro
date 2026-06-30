@@ -138,7 +138,7 @@ const BudgetCard = React.memo(({ budget, isCurrentMonth, currentDay, monthElapse
         </div>
         <div className="absolute inset-x-0 bottom-0 top-0 bg-gradient-to-l from-background via-background/90 to-transparent flex justify-end items-center pr-4 gap-2 opacity-30 hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
           <button onClick={(e) => { e.preventDefault(); startEdit(budget); }} className="p-2 rounded-full bg-secondary hover:bg-muted text-foreground shadow-sm" aria-label={`Edit ${budget.category}`}><Pencil className="h-4 w-4" /></button>
-          <button onClick={(e) => { e.preventDefault(); setConfirmDelete(budget.budget_id); }} className="p-2 rounded-full bg-ruby/10 hover:bg-ruby/20 text-ruby shadow-sm" aria-label={`Delete ${budget.category}`}><Trash2 className="h-4 w-4" /></button>
+          <button onClick={(e) => { e.preventDefault(); setConfirmDelete({ type: 'budget', id: budget.budget_id }); }} className="p-2 rounded-full bg-ruby/10 hover:bg-ruby/20 text-ruby shadow-sm" aria-label={`Delete ${budget.category}`}><Trash2 className="h-4 w-4" /></button>
         </div>
       </div>
     </div>
@@ -173,11 +173,7 @@ const EventGroupCard = React.memo(({ group, setConfirmDelete, fetchData }) => {
             <span className="text-[10px] text-muted-foreground">/ £{totalLimit.toFixed(2)}</span>
           </div>
         </div>
-        <button onClick={() => {
-          if (window.confirm(`Delete entire event "${group.event_group_name}" and all ${group.item_count} items?`)) {
-            api.delete(`/budgets/group/${group.event_group_id}`).then(() => { fetchData(); toast.success("Event deleted"); }).catch(() => toast.error("Could not delete event"));
-          }
-        }} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-ruby shrink-0 opacity-30 hover:opacity-100 focus:opacity-100 transition-opacity" aria-label={`Delete event ${group.event_group_name}`}><Trash2 className="h-3 w-3" /></button>
+        <button onClick={() => setConfirmDelete({ type: 'group', id: group.event_group_id })} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-ruby shrink-0 opacity-30 hover:opacity-100 focus:opacity-100 transition-opacity" aria-label={`Delete event ${group.event_group_name}`}><Trash2 className="h-3 w-3" /></button>
       </div>
       {group.items && group.items.length > 0 && (
         <div className="mt-1.5 pt-1.5 border-t border-border space-y-0.5">
@@ -191,7 +187,7 @@ const EventGroupCard = React.memo(({ group, setConfirmDelete, fetchData }) => {
                 <div className="w-8 h-1 rounded-full bg-muted/40 overflow-hidden shrink-0">
                   <div className={`h-full rounded-full ${itemPct >= 100 ? "bg-ruby" : "bg-emerald"}`} style={{ width: `${Math.min(100, itemPct)}%` }} />
                 </div>
-                <button onClick={() => setConfirmDelete(item.budget_id)} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-ruby" aria-label={`Remove ${item.category} from event`}><X className="h-2.5 w-2.5" /></button>
+                <button onClick={() => setConfirmDelete({ type: 'budget', id: item.budget_id })} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-ruby" aria-label={`Remove ${item.category} from event`}><X className="h-2.5 w-2.5" /></button>
               </div>
             );
           })}
@@ -248,7 +244,8 @@ export default React.memo(function BudgetPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [editingId, setEditingId] = useState(null);
-  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null); // { type: 'budget'|'group', id }
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkSelected, setBulkSelected] = useState(new Set());
   const [allCats, setAllCats] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
@@ -540,13 +537,22 @@ export default React.memo(function BudgetPage() {
     });
   };
 
-  const handleDelete = async (id) => {
-    const old = budgetsRef.current.find(b => b.budget_id === id);
+  const handleDelete = async (item) => {
+    if (item.type === "group") {
+      setConfirmDelete(null);
+      try {
+        await api.delete(`/budgets/group/${item.id}`);
+        toast.success("Event deleted");
+        await fetchData();
+      } catch { toast.error("Could not delete event"); }
+      return;
+    }
+    const old = budgetsRef.current.find(b => b.budget_id === item.id);
     if (!old) return;
-    setBudgets(prev => prev.filter(b => b.budget_id !== id));
+    setBudgets(prev => prev.filter(b => b.budget_id !== item.id));
     setConfirmDelete(null);
     withUndo({
-      action: () => api.delete(`/budgets/${id}`),
+      action: () => api.delete(`/budgets/${item.id}`),
       undo: async () => {
         setBudgets(prev => [...prev, old]);
         await api.post("/budgets", old);
@@ -775,15 +781,7 @@ export default React.memo(function BudgetPage() {
             }}>
               {bulkSelected.size === budgets.length ? "Deselect all" : "Select all"}
             </Button>
-            <Button variant="primary" size="pillSm" className="bg-ruby hover:bg-ruby/90" onClick={async () => {
-              if (!window.confirm(`Delete ${bulkSelected.size} budget(s)?`)) return;
-              try {
-                await api.post("/budgets/bulk-delete", { budget_ids: [...bulkSelected] });
-                toast.success(`${bulkSelected.size} budget(s) deleted`);
-                setBulkSelected(new Set());
-                await fetchData();
-              } catch { toast.error("Could not delete"); }
-            }}>
+            <Button variant="primary" size="pillSm" className="bg-ruby hover:bg-ruby/90" onClick={() => setConfirmBulkDelete(true)}>
               <Trash2 className="h-3 w-3 mr-1" /> Delete {bulkSelected.size}
             </Button>
           </div>
@@ -1171,11 +1169,27 @@ export default React.memo(function BudgetPage() {
 
       <ConfirmModal
         open={!!confirmDelete}
-        title="Remove this budget?"
-        message="This will permanently delete this budget item."
+        title={confirmDelete?.type === "group" ? "Delete this event?" : "Remove this budget?"}
+        message={confirmDelete?.type === "group" ? "This will permanently delete this entire event and all its items." : "This will permanently delete this budget item."}
         confirmLabel="Yes, remove"
         onConfirm={() => handleDelete(confirmDelete)}
         onCancel={() => setConfirmDelete(null)}
+      />
+      <ConfirmModal
+        open={confirmBulkDelete}
+        title={`Delete ${bulkSelected.size} budget(s)?`}
+        message="This will permanently delete all selected budget items."
+        confirmLabel="Yes, delete all"
+        onConfirm={async () => {
+          setConfirmBulkDelete(false);
+          try {
+            await api.post("/budgets/bulk-delete", { budget_ids: [...bulkSelected] });
+            toast.success(`${bulkSelected.size} budget(s) deleted`);
+            setBulkSelected(new Set());
+            await fetchData();
+          } catch { toast.error("Could not delete"); }
+        }}
+        onCancel={() => setConfirmBulkDelete(false)}
       />
     </div>
   );
