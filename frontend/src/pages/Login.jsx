@@ -6,8 +6,7 @@ import { toast } from "sonner";
 import { Loader2, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-
-const AUTH_BG = "https://images.unsplash.com/photo-1618556450991-2f1af64e8191?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzR8MHwxfHNlYXJjaHwzfHxhYnN0cmF0dW0lMjBwcmVtaXVtJTIwZmluYW5jZSUyMHRlY2glMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc3OTE5OTExOXww&ixlib=rb-4.1.0&q=85";
+import AuthVisual from "../components/AuthVisual";
 
 export default function Login() {
   const { login } = useAuth();
@@ -186,15 +185,7 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Illustration side */}
-      <div className="hidden lg:block relative overflow-hidden">
-        <img src={AUTH_BG} alt="" className="absolute inset-0 w-full h-full object-cover" aria-hidden="true" />
-        <div className="absolute inset-0 bg-gradient-to-tr from-black/70 via-black/30 to-transparent" />
-        <div className="absolute bottom-12 left-12 right-12 text-white">
-          <p className="label-overline opacity-80">FinanceAI</p>
-          <p className="text-3xl font-medium tracking-tight mt-2 leading-snug">Premium money,<br />quietly automated.</p>
-        </div>
-      </div>
+      <AuthVisual title="Premium money, quietly automated." />
     </div>
   );
 }

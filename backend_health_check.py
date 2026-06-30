@@ -10,6 +10,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple, Any
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 # Color codes for console output
 class Colors:
     GREEN = '\033[92m'
@@ -142,14 +145,22 @@ class EnvironmentValidator:
         }
         
         if db_url:
-            result['valid_format'] = db_url.startswith('postgresql://') or db_url.startswith('postgres://') or db_url.startswith('postgresql+asyncpg://')
+            result['valid_format'] = (
+                db_url.startswith('postgresql://') or
+                db_url.startswith('postgres://') or
+                db_url.startswith('postgresql+asyncpg://') or
+                db_url.startswith('sqlite+aiosqlite:///')
+            )
             result['passed'] = result['valid_format']
             if result['valid_format']:
-                # Mask password in display
-                masked_url = db_url.split('@')[0] + '@***:***@' + db_url.split('@')[1] if '@' in db_url else db_url[:30] + '...'
-                result['detail'] = f"PostgreSQL URL configured: {masked_url}"
+                if db_url.startswith('sqlite+aiosqlite:///'):
+                    result['detail'] = "SQLite URL configured for local development"
+                else:
+                    # Mask password in display
+                    masked_url = db_url.split('@')[0] + '@***:***@' + db_url.split('@')[1] if '@' in db_url else db_url[:30] + '...'
+                    result['detail'] = f"PostgreSQL URL configured: {masked_url}"
             else:
-                result['detail'] = f"Invalid format. Expected: postgresql://user:pass@host:port/db"
+                result['detail'] = "Invalid format. Expected: postgresql://... or sqlite+aiosqlite:///..."
         else:
             result['detail'] = "DATABASE_URL not set"
         
@@ -254,8 +265,16 @@ class DependencyValidator:
 class DatabaseValidator:
     """Validate database connectivity and schema"""
     
-    def __init__(self):
+    def __init__(self, backend_path: str):
         self.db_url = os.getenv('DATABASE_URL')
+        self.backend_path = Path(backend_path)
+
+    def _sqlite_path(self) -> str:
+        sqlite_path = self.db_url.replace('sqlite+aiosqlite:///', '', 1)
+        path = Path(sqlite_path)
+        if not path.is_absolute():
+            path = self.backend_path / path
+        return str(path)
         
     async def validate(self) -> Dict[str, Any]:
         """Run database validations"""
@@ -267,7 +286,7 @@ class DatabaseValidator:
         return result
     
     async def _test_connection(self) -> Dict[str, Any]:
-        """Test PostgreSQL connection"""
+        """Test database connection"""
         result = {
             'passed': False,
             'connected': False,
@@ -277,6 +296,21 @@ class DatabaseValidator:
         
         if not self.db_url:
             return result
+
+        if self.db_url.startswith('sqlite+aiosqlite:///'):
+            try:
+                import aiosqlite
+                sqlite_path = self._sqlite_path()
+                async with aiosqlite.connect(sqlite_path) as conn:
+                    await conn.execute('SELECT 1')
+                result['passed'] = True
+                result['connected'] = True
+                result['detail'] = "SQLite connected successfully"
+                return result
+            except Exception as e:
+                result['error'] = str(e)[:100]
+                result['detail'] = f"Connection failed: {result['error']}"
+                return result
 
         try:
             import asyncpg
@@ -310,6 +344,19 @@ class DatabaseValidator:
         }
         
         if not self.db_url:
+            return result
+
+        if self.db_url.startswith('sqlite+aiosqlite:///'):
+            try:
+                import aiosqlite
+                sqlite_path = self._sqlite_path()
+                async with aiosqlite.connect(sqlite_path) as conn:
+                    cursor = await conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                    rows = await cursor.fetchall()
+                result['tables'] = [row[0] for row in rows]
+                result['passed'] = len(result['tables']) > 0
+            except Exception as e:
+                result['error'] = str(e)[:100]
             return result
 
         try:
@@ -440,7 +487,7 @@ class BackendHealthCheck:
         
         # 4. Database
         print(f"\n{colored('4. DATABASE CONNECTIVITY', Colors.BLUE)}")
-        db_validator = DatabaseValidator()
+        db_validator = DatabaseValidator(self.backend_path)
         self.results['database'] = await db_validator.validate()
         self._print_database_results()
         
@@ -533,6 +580,7 @@ class BackendHealthCheck:
             self.results['environment']['required_vars']['passed'],
             self.results['file_structure']['required_files']['passed'],
             self.results['dependencies']['critical_packages']['passed'],
+            self.results['database']['connection']['passed'],
         ])
         
         status = colored('✅ READY', Colors.GREEN) if all_passed else colored('⚠️  NEEDS ATTENTION', Colors.YELLOW)
@@ -544,13 +592,18 @@ class BackendHealthCheck:
 
 async def main():
     """Main entry point"""
-    backend_path = os.path.dirname(os.path.abspath(__file__))
+    repo_path = Path(__file__).resolve().parent
+    backend_path = repo_path / 'backend'
     
-    # Load environment
+    # Load environment the same way the FastAPI app does.
     env_file = Path(backend_path) / '.env'
     if env_file.exists():
         from dotenv import load_dotenv
         load_dotenv(env_file)
+    env_local_file = Path(backend_path) / '.env.local'
+    if env_local_file.exists():
+        from dotenv import load_dotenv
+        load_dotenv(env_local_file, override=True)
     
     # Run health check
     health_check = BackendHealthCheck(backend_path)

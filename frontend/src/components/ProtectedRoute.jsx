@@ -7,7 +7,7 @@ export default function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
   const location = useLocation();
   const navState = useMemo(() => ({ from: location }), [location]);
-  if (loading) return <AppSplash text="Signing in…" />;
+  if (loading) return <AppSplash text="Signing in..." />;
   if (!user) return <Navigate to="/login" state={navState} replace />;
   return children;
 }

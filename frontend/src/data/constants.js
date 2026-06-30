@@ -1,7 +1,7 @@
 export const APP_NAME = "FinanceAI";
 export const APP_TAGLINE = "Premium money workspace";
-export const COPYRIGHT = "© 2026 FinanceAI. Built for the UK & the heimishe community.";
-export const CURRENCY_SYMBOL = "£";
+export const COPYRIGHT = "\u00a9 2026 FinanceAI. Built for the UK & the heimishe community.";
+export const CURRENCY_SYMBOL = "\u00a3";
 
 export const PAGES = {
   DASHBOARD: "/dashboard",

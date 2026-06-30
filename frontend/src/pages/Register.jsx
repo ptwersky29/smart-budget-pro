@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Loader2, ShieldCheck, Eye, EyeOff, Check } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import AuthVisual from "../components/AuthVisual";
 
 function PasswordStrength({ password }) {
   const checks = [
@@ -59,7 +60,7 @@ export default function Register() {
     setBusy(true);
     try {
       await register(form);
-      toast.success("Account created — welcome to FinanceAI!");
+      toast.success("Account created - welcome to FinanceAI!");
       navigate("/onboarding");
     } catch (err) {
       const msg = formatApiError(err.response?.data?.detail) || "Could not create account. Please try again.";
@@ -81,7 +82,7 @@ export default function Register() {
       <div className="flex items-center justify-center p-8">
         <div className="w-full max-w-sm">
           <Link to="/" className="flex items-center gap-2 mb-10">
-            <div className="w-9 h-9 rounded-xl gradient-emerald grid place-items-center text-white font-bold">£</div>
+            <div className="w-9 h-9 rounded-xl gradient-emerald grid place-items-center text-white font-bold">&pound;</div>
             <span className="font-semibold tracking-tight text-lg">FinanceAI</span>
           </Link>
 
@@ -245,31 +246,7 @@ export default function Register() {
           </div>
         </div>
       </div>
-
-      {/* Illustration side */}
-      <div className="hidden lg:block bg-gradient-to-br from-emerald-900 via-slate-900 to-black p-12 text-white">
-        <div className="h-full flex flex-col justify-between">
-          <div className="w-8 h-8 rounded-xl gradient-emerald grid place-items-center font-bold text-sm">£</div>
-          <div>
-            <p className="text-4xl font-medium tracking-tight leading-tight">
-              A finance workspace that respects your time, your tax band, and your community.
-            </p>
-            <ul className="mt-8 space-y-3 text-sm opacity-90">
-              {[
-                "UK bank sync via TrueLayer — 2,400+ banks",
-                "Claude Sonnet AI coach, built in",
-                "Maaser & Tzedakah tracking",
-                "Universal Credit & HMRC estimator",
-              ].map((item) => (
-                <li key={item} className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-emerald shrink-0" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </div>
+      <AuthVisual title="A finance workspace that respects your time, your tax band, and your community." />
     </div>
   );
 }

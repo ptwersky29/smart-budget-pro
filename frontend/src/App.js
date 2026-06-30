@@ -51,7 +51,6 @@ function AppRouter() {
     authHash.includes("refresh_token=") ||
     authHash.includes("session_id=")
   ) {
-    console.log("[AppRouter] hash detected, rendering AuthCallback");
     return <AuthCallback />;
   }
 

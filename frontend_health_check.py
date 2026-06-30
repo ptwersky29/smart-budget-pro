@@ -8,6 +8,9 @@ from pathlib import Path
 from typing import Dict, List, Any
 import re
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 # Color codes
 class Colors:
     GREEN = '\033[92m'
@@ -460,7 +463,8 @@ class FrontendHealthCheck:
 
 def main():
     """Main entry point"""
-    frontend_path = os.path.dirname(os.path.abspath(__file__))
+    repo_path = Path(__file__).resolve().parent
+    frontend_path = repo_path / 'frontend'
     health_check = FrontendHealthCheck(frontend_path)
     results = health_check.run()
     return results
