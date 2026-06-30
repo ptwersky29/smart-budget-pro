@@ -4,7 +4,7 @@ import {
   RefreshCw, Wallet, ShoppingCart, Calendar, Plus, Pencil, Trash2,
   Check, X, Target, TrendingDown, ChevronDown, ChevronUp,
   Sparkles, TrendingUp, Download, Search, Copy, MoreHorizontal,
-  Lock, PiggyBank, Home,
+  Lock, PiggyBank, Home, AlertCircle,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
@@ -747,7 +747,7 @@ export default React.memo(function BudgetPage() {
           <p className="text-2xl sm:text-3xl font-bold tracking-tight">{summary.count}</p>
         </div>
         <div className="rounded-2xl border border-border/50 bg-gradient-to-br from-background/80 to-blue/[0.02] backdrop-blur-sm p-4 text-center hover:scale-[1.02] hover:shadow-md transition-all duration-300">
-          <div className="mx-auto mb-2 grid h-8 w-8 place-items-center rounded-full bg-blue/10 text-blue"><Target className="h-4 w-4" /></div>
+          <div className="mx-auto mb-2 grid h-8 w-8 place-items-center rounded-full bg-primary/10 text-primary"><Target className="h-4 w-4" /></div>
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Budgeted</p>
           <p className="text-2xl sm:text-3xl font-bold tracking-tight tabular-nums">£{summary.totalPlanned.toLocaleString()}</p>
         </div>
