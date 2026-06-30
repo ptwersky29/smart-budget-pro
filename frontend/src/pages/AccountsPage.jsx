@@ -4,7 +4,7 @@ import { getDisplayName } from "../lib/utils";
 import { CURRENCY_SYMBOL } from "../data/constants";
 import { getBankLogoOrFallback, pickBankInstitution } from "../data/bankLogos";
 import { Link } from "react-router-dom";
-import { Plus, Wallet, Landmark, PiggyBank, CreditCard, Banknote, Lock, Loader2, ChevronRight, Building2, RefreshCcw, AlertCircle } from "lucide-react";
+import { Plus, Wallet, Landmark, PiggyBank, CreditCard, Banknote, Lock, Loader2, ChevronRight, Building2, RefreshCcw, AlertCircle, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, PageHeader } from "../components/ui/layout";
 import Skeleton from "../components/ui/Skeleton";
@@ -22,6 +22,9 @@ const ACCOUNT_TYPE_META = {
   savings: { icon: PiggyBank, label: "Savings", color: "bg-violet/10 text-violet", border: "border-l-violet-500" },
   cash: { icon: Banknote, label: "Cash", color: "bg-topaz/10 text-topaz", border: "border-l-topaz-500" },
   credit: { icon: CreditCard, label: "Credit Card", color: "bg-ruby/10 text-ruby", border: "border-l-ruby-500" },
+  credit_card: { icon: CreditCard, label: "Credit Card", color: "bg-ruby/10 text-ruby", border: "border-l-ruby-500" },
+  investment: { icon: TrendingUp, label: "Investment", color: "bg-chart-1/10 text-chart-1", border: "border-l-chart-1-500" },
+  other: { icon: Wallet, label: "Other", color: "bg-secondary/10 text-muted-foreground", border: "border-l-gray-500" },
 };
 
 function AccountLogo({ account, size = "md" }) {

@@ -363,7 +363,7 @@ export default function OnboardingWizard() {
 
   const current = STEPS[step];
   const Icon = current.icon;
-  const pct = Math.round(((step) / STEPS.length) * 100);
+  const pct = Math.round(((step + 1) / STEPS.length) * 100);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

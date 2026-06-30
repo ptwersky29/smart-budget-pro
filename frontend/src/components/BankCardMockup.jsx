@@ -92,25 +92,24 @@ function BankCardMockup({ connection, size = "sm", showStatus = false }) {
       <div
         className={`shrink-0 rounded-lg bg-white dark:bg-secondary/40 border border-border/30 flex items-center justify-center overflow-hidden ${sizes.logoBox}`}
       >
-        {logoUrl ? (
-          <img
-            src={logoUrl}
-            alt={brandInstitution || institution}
-            className={`object-contain ${sizes.logoImg} group-hover:scale-110 transition-transform duration-200`}
-            loading="lazy"
-            onError={(e) => {
-              e.target.onerror = null;
-              e.target.style.display = "none";
-              e.target.nextSibling.style.display = "flex";
-            }}
-          />
-        ) : null}
-        {!logoUrl &&
-          (isManual ? (
-            <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
-          ) : (
-            <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-          ))}
+        <img
+          src={logoUrl || ""}
+          alt={brandInstitution || institution}
+          className={`object-contain ${sizes.logoImg} group-hover:scale-110 transition-transform duration-200`}
+          loading="lazy"
+          style={{ display: logoUrl ? "block" : "none" }}
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.style.display = "none";
+          }}
+        />
+        {isManual ? (
+          <Wallet className="h-3.5 w-3.5 text-muted-foreground"
+            style={{ display: logoUrl ? "none" : "block" }} />
+        ) : (
+          <Building2 className="h-3.5 w-3.5 text-muted-foreground"
+            style={{ display: logoUrl ? "none" : "block" }} />
+        )}
       </div>
 
       {/* Name + type */}

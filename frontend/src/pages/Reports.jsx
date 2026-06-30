@@ -43,6 +43,7 @@ export default function Reports() {
   const { user } = useAuth();
   const { version: categoriesVersion } = useCategories();
   const [data, setData] = useState(null);
+  const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState(null);
   const today = () => new Date().toISOString().slice(0, 10);
   const firstOfMonth = () => {
@@ -53,18 +54,21 @@ export default function Reports() {
   const [dateFrom, setDateFrom] = useState(firstOfMonth);
   const [dateTo, setDateTo] = useState(today);
 
-  useEffect(() => {
+  const loadReport = () => {
     (async () => {
       try {
+        setLoadError(false);
         const { data } = await api.get("/dashboard/overview", {
           params: { date_from: dateFrom, date_to: dateTo },
         });
         setData(data);
       } catch {
+        setLoadError(true);
         toast.error("Could not load report data");
       }
     })();
-  }, [dateFrom, dateTo, categoriesVersion]);
+  };
+  useEffect(loadReport, [dateFrom, dateTo, categoriesVersion]);
 
   const isPremium = user?.tier === "premium" || user?.role === "admin";
 
@@ -119,6 +123,18 @@ export default function Reports() {
       setBusy(null);
     }
   };
+
+  if (loadError)
+    return (
+      <div className="grid place-items-center min-h-[60vh] text-center p-8">
+        <div>
+          <p className="text-lg font-medium text-muted-foreground">Could not load report data</p>
+          <Button onClick={loadReport} variant="outlinePill" size="pillSm" className="mt-4">
+            Try again
+          </Button>
+        </div>
+      </div>
+    );
 
   if (!data)
     return (

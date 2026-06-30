@@ -186,7 +186,7 @@ export default function Integrations({ embedded }) {
       {/* TrueLayer — moved to /import page for a clean end-user flow */}
       <LinkCard icon={Building2} title="TrueLayer (UK Open Banking)"
                 subtitle="Connect your bank to auto-sync transactions"
-                status={navigate ? "configured" : "info"}
+                status="configured"
                 statusLabel="Open"
                 href="/accounts"
                 navigate={navigate}>
@@ -249,7 +249,7 @@ export default function Integrations({ embedded }) {
                 subtitle="AI-powered bank SMS parsing"
                 status="configured"
                 statusLabel="Active"
-                href="/settings"
+                href="/sms"
                 navigate={navigate}>
         <p className="text-sm text-muted-foreground">Paste bank SMS texts to auto-parse transactions. Configure Twilio webhook for automatic SMS-to-transaction pipeline.</p>
       </LinkCard>

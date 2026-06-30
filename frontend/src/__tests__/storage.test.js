@@ -28,7 +28,7 @@ test("isTokenExpired returns false for valid token", () => {
 test("setToken stores in localStorage when persistent", () => {
   setToken("access_token", "test-value", true);
   expect(localStorage.getItem("access_token")).toBe("test-value");
-  expect(sessionStorage.getItem("access_token")).toBe("test-value");
+  expect(sessionStorage.getItem("access_token")).toBeNull();
 });
 
 test("setToken stores only in sessionStorage when not persistent", () => {

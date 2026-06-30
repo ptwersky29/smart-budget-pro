@@ -116,10 +116,10 @@ export default function App() {
                   <AppRouter />
                 </Suspense>
                 <ConsentBanner />
+                <Toaster richColors position="top-right" />
               </ErrorBoundary>
             </CategoriesProvider>
           </SettingsProvider>
-          <Toaster richColors position="top-right" />
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>

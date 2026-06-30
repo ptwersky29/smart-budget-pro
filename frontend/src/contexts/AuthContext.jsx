@@ -40,14 +40,13 @@ export const AuthProvider = ({ children }) => {
   }, [stripTokens]);
 
   useEffect(() => {
-    syncTokensFromLocation();
-    // If URL hash has OAuth tokens, AuthCallback will handle auth — skip
-    // checkAuth to avoid race where it sets user=false before AuthCallback finishes
+    const hasHash = syncTokensFromLocation();
+    // If URL hash has OAuth tokens, keep loading true so ProtectedRoute
+    // doesn't redirect before AuthCallback mounts and completes
     if (window.location.hash.includes("access_token=")) {
-      setLoading(false);
       return;
     }
-    checkAuth();
+    if (!hasHash) checkAuth();
   }, [checkAuth, syncTokensFromLocation]);
 
   const login = useCallback(async (email, password, rememberMe = false) => {

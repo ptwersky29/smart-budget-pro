@@ -28,6 +28,7 @@ export default function AddManualAccountModal({ open, onClose, onCreated }) {
   const fileRef = useRef(null);
 
   if (!open) return null;
+  const formKey = "manual-account-form";
 
   const handleFile = (e) => {
     const file = e.target.files?.[0];
@@ -86,7 +87,7 @@ export default function AddManualAccountModal({ open, onClose, onCreated }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form key={formKey} onSubmit={handleSubmit} className="space-y-4">
           {/* Name */}
           <div>
             <label className="label-overline text-muted-foreground mb-1.5 block">Account Name</label>

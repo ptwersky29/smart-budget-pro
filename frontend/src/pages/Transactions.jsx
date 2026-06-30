@@ -158,8 +158,8 @@ const Transactions = React.memo(function Transactions() {
       if (filters.tx_type) params.tx_type = filters.tx_type;
       if (filters.date_from) params.date_from = filters.date_from;
       if (filters.date_to) params.date_to = filters.date_to;
-      if (filters.amount_min) params.amount_min = parseFloat(filters.amount_min);
-      if (filters.amount_max) params.amount_max = parseFloat(filters.amount_max);
+      if (filters.amount_min && !isNaN(filters.amount_min)) params.amount_min = parseFloat(filters.amount_min);
+      if (filters.amount_max && !isNaN(filters.amount_max)) params.amount_max = parseFloat(filters.amount_max);
       if (filters.account_id) params.account_id = filters.account_id;
       const { data } = await api.get("/transactions", { params });
       setTxs(data.transactions);

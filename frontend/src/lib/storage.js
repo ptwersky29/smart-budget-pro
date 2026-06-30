@@ -9,8 +9,13 @@ export function getToken(key) {
 }
 
 export function setToken(key, value, persistent = true) {
-  if (persistent) localStorage.setItem(key, value);
-  sessionStorage.setItem(key, value);
+  if (persistent) {
+    localStorage.setItem(key, value);
+    sessionStorage.removeItem(key);
+  } else {
+    sessionStorage.setItem(key, value);
+    localStorage.removeItem(key);
+  }
 }
 
 export function clearTokens() {

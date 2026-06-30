@@ -74,9 +74,9 @@ def build_router() -> APIRouter:
                         type=acct_type,
                         balance=c.balance if c.balance is not None else 0,
                         currency=c.balance_currency or "GBP",
-                        provider="truelayer",
+                        provider=c.provider or "truelayer",
                         connection_id=c.connection_id,
-                        is_offline=False,
+                        is_offline=(c.provider == "manual"),
                     )
                     session.add(ba)
 
@@ -135,7 +135,35 @@ def build_router() -> APIRouter:
                 )
                 a = result.scalar_one_or_none()
             if not a:
-                raise HTTPException(404, "Account not found")
+                # Fallback: look up BankConnection and auto-create BankAccount
+                bc_result = await session.execute(
+                    select(BankConnection).where(
+                        BankConnection.connection_id == account_id,
+                        BankConnection.user_id == user["user_id"],
+                    )
+                )
+                bc = bc_result.scalar_one_or_none()
+                if not bc:
+                    raise HTTPException(404, "Account not found")
+                acct_type = bc.account_type.lower() if bc.account_type else "current"
+                if acct_type not in ("current", "savings", "cash", "credit"):
+                    acct_type = "current"
+                provider_name = bc.config.get("institution", "") if bc.config else ""
+                ba_name = bc.nickname or bc.account_name or (provider_name + " Account" if provider_name else "Bank Account")
+                a = BankAccount(
+                    account_id=bc.account_id or f"acct_{uuid.uuid4().hex[:12]}",
+                    user_id=user["user_id"],
+                    name=ba_name,
+                    type=acct_type,
+                    balance=bc.balance if bc.balance is not None else 0,
+                    currency=bc.balance_currency or "GBP",
+                    provider=bc.provider or "truelayer",
+                    connection_id=bc.connection_id,
+                    is_offline=(bc.provider == "manual"),
+                )
+                session.add(a)
+                await session.commit()
+                await session.refresh(a)
             return _acct_to_dict(a)
 
     @router.post("")

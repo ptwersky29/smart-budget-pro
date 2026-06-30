@@ -116,8 +116,8 @@ export default function AccountDetailPage() {
       if (filters.tx_type) params.tx_type = filters.tx_type;
       if (filters.date_from) params.date_from = filters.date_from;
       if (filters.date_to) params.date_to = filters.date_to;
-      if (filters.amount_min) params.amount_min = parseFloat(filters.amount_min);
-      if (filters.amount_max) params.amount_max = parseFloat(filters.amount_max);
+      if (filters.amount_min && !isNaN(filters.amount_min)) params.amount_min = parseFloat(filters.amount_min);
+      if (filters.amount_max && !isNaN(filters.amount_max)) params.amount_max = parseFloat(filters.amount_max);
       const { data } = await api.get("/transactions", { params });
       setTxs(data.transactions);
       setTotalTx(data.total);
@@ -125,10 +125,10 @@ export default function AccountDetailPage() {
       setExpenseTotal(data.expense_total || 0);
     } catch { toast.error("Could not load transactions"); }
     finally { setTxLoading(false); }
-  }, [account, accountId, filters, offset]);
+  }, [account?.account_id, accountId, filters, offset]);
 
   useEffect(() => { loadAccount(); loadHistory(); }, [loadAccount, loadHistory]);
-  useEffect(() => { if (account) loadTransactions(); }, [account, loadTransactions, categoriesVersion]);
+  useEffect(() => { if (account) loadTransactions(); }, [account?.account_id, loadTransactions]);
 
   const openEditTx = useCallback((t) => {
     setEditingTxId(t.transaction_id);
@@ -142,8 +142,11 @@ export default function AccountDetailPage() {
     setTxForm({ description: "", amount: "", category: "", is_income: false, is_transfer: false, budget_type: "", occasion: "", merchant: "", account_id: accountId });
   }, [accountId]);
 
+  const txsRef = useRef(txs);
+  txsRef.current = txs;
+
   const deleteTx = useCallback(async (txId) => {
-    const old = txs.find(t => t.transaction_id === txId);
+    const old = txsRef.current.find(t => t.transaction_id === txId);
     setTxs(prev => prev.filter(t => t.transaction_id !== txId));
     withUndo({
       action: () => api.delete(`/transactions/${txId}`),
@@ -155,7 +158,7 @@ export default function AccountDetailPage() {
       successMsg: "Transaction deleted",
       errorMsg: "Could not delete",
     });
-  }, [txs, loadTransactions]);
+  }, [loadTransactions]);
 
   const handleAddTransaction = useCallback(async (e) => {
     e.preventDefault();
@@ -167,7 +170,6 @@ export default function AccountDetailPage() {
     if (editingTxId) {
       const old = txs.find(t => t.transaction_id === editingTxId);
       setTxs(prev => prev.map(t => t.transaction_id === editingTxId ? { ...t, ...payload } : t));
-      closeTxForm();
       withUndo({
         action: () => api.patch(`/transactions/${editingTxId}`, payload),
         undo: async () => {
@@ -178,6 +180,7 @@ export default function AccountDetailPage() {
         successMsg: "Transaction updated",
         errorMsg: "Could not update",
       });
+      closeTxForm();
     } else {
       try {
         await api.post("/transactions", payload);

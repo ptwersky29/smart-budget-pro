@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { lazy, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PageHeader } from "../components/ui/layout";
 import SettingsLayout from "../components/SettingsLayout";
@@ -9,7 +9,8 @@ import AutomationSettings from "../components/settings/AutomationSettings";
 import NotificationSettings from "../components/settings/NotificationSettings";
 import AccessibilitySettings from "../components/settings/AccessibilitySettings";
 import AccountSettings from "../components/settings/AccountSettings";
-import CategoryManager from "./CategoryManager";
+
+const CategoryManager = lazy(() => import("./CategoryManager"));
 
 export default function Settings() {
   useEffect(() => { document.title = "Settings | FinanceAI"; }, []);
@@ -38,7 +39,7 @@ export default function Settings() {
         {activeSection === "notifications" && <NotificationSettings />}
         {activeSection === "accessibility" && <AccessibilitySettings />}
         {activeSection === "account" && <AccountSettings />}
-        {activeSection === "categories" && <CategoryManager />}
+        {activeSection === "categories" && <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}><CategoryManager /></Suspense>}
       </SettingsLayout>
     </div>
   );

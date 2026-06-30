@@ -38,6 +38,19 @@ export function dedupe(url, params, fetcher) {
   return promise;
 }
 
+export function dedupeOrFetch(url, params, fetcher, ttl = DEFAULT_TTL) {
+  const cached = cacheGet(url, params);
+  if (cached) return cached;
+  const k = key(url, params);
+  const existing = inFlight.get(k);
+  if (existing) return existing;
+  const promise = fetcher()
+    .then((data) => { cacheSet(url, params, data, ttl); return data; })
+    .finally(() => { inFlight.delete(k); });
+  inFlight.set(k, promise);
+  return promise;
+}
+
 export function abortPrevious(signalRef, url, params) {
   if (signalRef.current) signalRef.current.abort();
   const controller = new AbortController();

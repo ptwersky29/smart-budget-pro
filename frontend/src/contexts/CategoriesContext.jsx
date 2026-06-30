@@ -83,7 +83,8 @@ export function CategoriesProvider({ children }) {
 
   const resolveCategory = useCallback((value, overrides = {}) => {
     if (!value) return buildFallbackCategory("uncategorized", overrides);
-    return categoryMap[value] || buildFallbackCategory(value, overrides);
+    const normalized = slugifyCategoryName(value);
+    return categoryMap[normalized] || categoryMap[value] || buildFallbackCategory(value, overrides);
   }, [categoryMap]);
 
   const getReplacementOptions = useCallback((currentName) => {

@@ -48,12 +48,13 @@ function BankAccountCard({ account, connection, variant = "default" }) {
               loading="lazy"
               onError={(e) => {
                 e.target.onerror = null;
-                e.target.src = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="${bankColor}"/><text x="16" y="22" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="700" font-size="18" fill="white">${(name || "?")[0].toUpperCase()}</text></svg>`)}`;
+                e.target.style.display = "none";
               }}
             />
-          ) : (
+          ) : null}
+          {!logoUrl ? (
             <Building2 className="h-3 w-3 text-muted-foreground" />
-          )}
+          ) : null}
         </div>
         <div>
           <p className="text-xs font-medium leading-tight group-hover:text-emerald transition-colors">
@@ -86,13 +87,12 @@ function BankAccountCard({ account, connection, variant = "default" }) {
                   onError={(e) => {
                     e.target.onerror = null;
                     e.target.style.display = "none";
-                    e.target.nextSibling.style.display = "flex";
                   }}
                 />
               ) : null}
-              {!logoUrl && (
+              {!logoUrl ? (
                 <Building2 className="h-5 w-5 text-muted-foreground" />
-              )}
+              ) : null}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
@@ -136,12 +136,13 @@ function BankAccountCard({ account, connection, variant = "default" }) {
             loading="lazy"
             onError={(e) => {
               e.target.onerror = null;
-              e.target.src = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="${bankColor}"/><text x="16" y="22" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="700" font-size="18" fill="white">${(name || "?")[0].toUpperCase()}</text></svg>`)}`;
+              e.target.style.display = "none";
             }}
           />
-        ) : (
+        ) : null}
+        {!logoUrl ? (
           <Building2 className="h-4 w-4 text-muted-foreground" />
-        )}
+        ) : null}
       </div>
       <div>
         <p className="text-sm font-medium leading-tight group-hover:text-emerald transition-colors">

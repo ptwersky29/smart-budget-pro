@@ -124,9 +124,10 @@ export default React.memo(function BudgetPage() {
     const nextM = m === 12 ? 1 : m + 1;
     const nextY = m === 12 ? y + 1 : y;
     const end = fmtMonth(nextY, nextM);
-    return hebrewMonths.find(
+    const matched = hebrewMonths.filter(
       (hm) => hm.gregorian_start < end && hm.gregorian_end >= start
     );
+    return matched.find((hm) => hm.is_current) || matched[0] || null;
   }, [hebrewMonths, month]);
 
   const hebrewSuffix = currentHebrewMonth ? (
@@ -448,7 +449,7 @@ export default React.memo(function BudgetPage() {
     // Forecasting
     let paceMessage = null;
     let paceClass = "";
-    if (isCurrentMonth && monthElapsedPct > 0 && b.limit > 0) {
+    if (isCurrentMonth && monthElapsedPct > 0 && b.limit > 0 && daysInMonth > 0) {
       const projectedSpend = b.spent / monthElapsedPct;
       const projectedDeficit = projectedSpend - b.limit;
       if (projectedDeficit > 5 && !over) {

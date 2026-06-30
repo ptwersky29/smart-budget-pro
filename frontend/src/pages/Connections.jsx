@@ -12,7 +12,8 @@ import AddManualAccountModal from "../components/AddManualAccountModal";
 
 export default function Connections() {
   useEffect(() => { document.title = "Bank Connections | FinanceAI"; }, []);
-  const [params] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const params = searchParams.toString();
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState(null);
   const [conns, setConns] = useState([]);
@@ -83,9 +84,10 @@ export default function Connections() {
   const totalBalance = allAccounts.reduce((sum, c) => sum + (c.balance || 0), 0);
 
   useEffect(() => {
-    const s = params.get("status");
-    const reason = params.get("reason");
-    const accts = parseInt(params.get("accounts") || "0", 10);
+    const sp = new URLSearchParams(params);
+    const s = sp.get("status");
+    const reason = sp.get("reason");
+    const accts = parseInt(sp.get("accounts") || "0", 10);
     if (s === "success") {
       setStatus("success");
       toast.success(`Bank connected — ${params.get("accounts") || ""} account(s) linked`);

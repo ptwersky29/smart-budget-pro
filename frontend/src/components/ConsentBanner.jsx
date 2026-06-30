@@ -41,6 +41,10 @@ export default function ConsentBanner() {
         consent_type: "privacy",
         granted: false,
       });
+      await api.post("/gdpr/consent", {
+        consent_type: "terms",
+        granted: false,
+      });
       setVisible(false);
     } catch {
       toast.error("Could not save consent preference");

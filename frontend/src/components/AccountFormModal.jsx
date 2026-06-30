@@ -48,7 +48,7 @@ function CirclePreview({ image, color, name, size = "lg" }) {
 }
 
 function cropToCircle(file, size = 256) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
@@ -73,6 +73,10 @@ function cropToCircle(file, size = 256) {
         reader.readAsDataURL(blob);
       }, "image/png", 0.9);
     };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Failed to load image"));
+    };
     img.src = url;
   });
 }
@@ -87,6 +91,7 @@ export default function AccountFormModal({ open, onClose, onCreated, editAccount
   const [cropping, setCropping] = useState(false);
   const fileRef = useRef(null);
 
+  const formKey = editAccount?.account_id || "new";
   if (!open) return null;
 
   const handleFile = async (e) => {
@@ -125,7 +130,7 @@ export default function AccountFormModal({ open, onClose, onCreated, editAccount
       };
       if (imageDataUri) payload.image = imageDataUri;
 
-      if (editAccount) {
+      if (editAccount?.account_id) {
         await api.put(`/accounts/${editAccount.account_id}`, payload);
         toast.success(`"${name.trim()}" updated`);
       } else {
@@ -159,7 +164,7 @@ export default function AccountFormModal({ open, onClose, onCreated, editAccount
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form key={formKey} onSubmit={handleSubmit} className="space-y-4">
           {/* Circle preview */}
           <CirclePreview image={imageDataUri} color={color} name={name} size="lg" />
 

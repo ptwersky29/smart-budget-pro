@@ -155,6 +155,7 @@ export default function AccountPage() {
   }, [filters, resolveCategory]);
 
   const clearAllFilters = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     setSearchInput("");
     setFilters(defaultFilters);
     setOffset(0);
@@ -162,8 +163,12 @@ export default function AccountPage() {
 
   const loadConnection = useCallback(async () => {
     try {
-      const { data } = await api.get(`/truelayer/connections/${connectionId}`);
-      setConn(data);
+      const isManual = connectionId?.startsWith("manual-");
+      const endpoint = isManual
+        ? `/accounts/manual/${connectionId.replace("manual-", "")}`
+        : `/truelayer/connections/${connectionId}`;
+      const { data } = await api.get(endpoint);
+      setConn({ ...data, provider: isManual ? "manual" : data.provider });
       setNicknameValue(data.nickname || data.account_name || "");
       document.title = `${data.account_name || "Account"} | FinanceAI`;
     } catch (err) {
@@ -189,8 +194,8 @@ export default function AccountPage() {
     if (filters.tx_type) params.tx_type = filters.tx_type;
     if (filters.date_from) params.date_from = filters.date_from;
     if (filters.date_to) params.date_to = filters.date_to;
-    if (filters.amount_min) params.amount_min = parseFloat(filters.amount_min);
-    if (filters.amount_max) params.amount_max = parseFloat(filters.amount_max);
+    if (filters.amount_min && !isNaN(filters.amount_min)) params.amount_min = parseFloat(filters.amount_min);
+    if (filters.amount_max && !isNaN(filters.amount_max)) params.amount_max = parseFloat(filters.amount_max);
     return params;
   }, [connectionId, filters, offset]);
 
@@ -215,7 +220,7 @@ export default function AccountPage() {
   }, [loadConnection]);
   useEffect(() => {
     loadTransactions();
-  }, [loadTransactions, categoriesVersion]);
+  }, [loadTransactions]);
 
   const saveNickname = async () => {
     try {
@@ -255,7 +260,7 @@ export default function AccountPage() {
           : `/truelayer/connections/${connectionId}`,
       );
       toast.success("Account removed");
-      navigate("/connections");
+      navigate("/accounts");
     } catch {
       toast.error("Could not remove account");
     }
@@ -303,12 +308,12 @@ export default function AccountPage() {
         <div>
           <p className="text-lg font-medium text-muted-foreground">{error}</p>
           <Button
-            onClick={() => navigate("/connections")}
+            onClick={() =>             navigate("/accounts")}
             variant="outlinePill"
             size="pillSm"
             className="mt-4"
           >
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back to connections
+            <ArrowLeft className="h-4 w-4 mr-2" /> Back to accounts
           </Button>
         </div>
       </div>
@@ -316,12 +321,6 @@ export default function AccountPage() {
 
   if (!conn) return null;
 
-  const income = txs
-    .filter((t) => t.amount > 0)
-    .reduce((s, t) => s + t.amount, 0);
-  const expenses = txs
-    .filter((t) => t.amount < 0)
-    .reduce((s, t) => s + Math.abs(t.amount), 0);
   const netTotal = incomeTotal - expenseTotal;
 
   return (
@@ -391,11 +390,11 @@ export default function AccountPage() {
         {/* Income / Expenses chips */}
         <div className="mt-3 flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-emerald/10 text-emerald font-medium">
-            +£{income.toLocaleString(undefined, { minimumFractionDigits: 2 })}{" "}
+            +£{incomeTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}{" "}
             income
           </span>
           <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-ruby/10 text-ruby font-medium">
-            -£{expenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}{" "}
+            -£{expenseTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}{" "}
             spending
           </span>
           <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-secondary/80 text-muted-foreground">

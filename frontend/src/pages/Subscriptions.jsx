@@ -133,7 +133,9 @@ export default function Subscriptions() {
     });
   };
 
-  const monthlyTotal = subs.filter((s) => s.active).reduce((sum, s) => sum + Math.abs(s.amount), 0);
+  const monthlyTotal = useMemo(() => {
+    return subs.filter((s) => s.active).reduce((sum, s) => sum + Math.abs(s.amount), 0);
+  }, [subs]);
   const annualTotal = useMemo(() => {
     return subs.filter((s) => s.active).reduce((sum, s) => {
       switch (s.frequency) {
