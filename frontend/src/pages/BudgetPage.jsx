@@ -3,7 +3,7 @@ import { parseISO, isBefore, getDaysInMonth, getDate } from "date-fns";
 import {
   RefreshCw, Wallet, ShoppingCart, Calendar, Plus, Pencil, Trash2,
   Check, X, Target, TrendingDown, ChevronDown, ChevronUp,
-  Sparkles, AlertTriangle, TrendingUp, Zap, Download, Search, Copy, MoreHorizontal,
+  Sparkles, TrendingUp, Download, Search, Copy, MoreHorizontal,
   Lock, PiggyBank, Home,
 } from "lucide-react";
 import { api } from "../lib/api";
@@ -93,11 +93,6 @@ export default React.memo(function BudgetPage() {
   const [form, setForm] = useState({ category: "", limit: "", budget_type: "everyday", event_date: "", event_group_id: "", event_group_name: "" });
   const [quickForm, setQuickForm] = useState({ amount: "", description: "", category: "" });
   const [budgetAdded, setBudgetAdded] = useState(false);
-  const [alerts, setAlerts] = useState([]);
-  const [dismissedAlerts, setDismissedAlerts] = useState(new Set());
-  const dismissedAlertsRef = useRef(dismissedAlerts);
-  dismissedAlertsRef.current = dismissedAlerts;
-  const notifiedAlertsRef = useRef(new Set());
   const [insights, setInsights] = useState([]);
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [showInsights, setShowInsights] = useState(false);
@@ -235,7 +230,6 @@ export default React.memo(function BudgetPage() {
       const { data } = await api.get("/budgets", { params });
       setBudgets(data.budgets || []);
       setEventGroups(data.event_groups || {});
-      fetchAlerts();
     } catch {
       toast.error("Failed to load budgets");
     } finally {
@@ -251,22 +245,6 @@ export default React.memo(function BudgetPage() {
     } catch { console.warn("[budgets] failed to load categories"); }
   }, []);
 
-  const fetchAlerts = useCallback(async () => {
-    try {
-      const { data } = await api.get("/budgets/alerts");
-      const newAlerts = data.alerts || [];
-      newAlerts.forEach(a => {
-        const key = a.category + a.severity;
-        if (a.severity === "critical" && !dismissedAlertsRef.current.has(key) && !notifiedAlertsRef.current.has(key)) {
-          notifiedAlertsRef.current.add(key);
-          toast.error(a.message, { duration: 8000 });
-        }
-      });
-      setAlerts(newAlerts);
-    } catch { console.warn("[budgets] failed to load alerts"); }
-  }, []);
-
-
   const fetchInsights = useCallback(async () => {
     setInsightsLoading(true);
     try {
@@ -279,7 +257,6 @@ export default React.memo(function BudgetPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
   useEffect(() => { fetchCategories(); }, []);
-  useEffect(() => { fetchAlerts(); }, []);
   useEffect(() => { fetchInsights(); }, []);
 
   const resetForm = () => setForm({ category: "", limit: "", budget_type: "everyday", event_date: "", event_group_id: "", event_group_name: "" });
@@ -458,10 +435,6 @@ export default React.memo(function BudgetPage() {
       setCopying(false);
     }
   };
-
-  const criticalAlerts = useMemo(() => alerts.filter((a) => a.severity === "critical"), [alerts]);
-  const warningAlerts = useMemo(() => alerts.filter((a) => a.severity === "warning"), [alerts]);
-  const spikeAlerts = useMemo(() => alerts.filter((a) => a.severity === "spike"), [alerts]);
 
   const renderBudgetCard = (b, showDate = false) => {
     const pct = b.progress_pct || 0;
@@ -644,68 +617,6 @@ export default React.memo(function BudgetPage() {
 
   return (
     <div className="space-y-5">
-
-      {/* Smart Alerts Banner */}
-      {alerts.length > 0 && (
-        <div className="space-y-3">
-          {criticalAlerts.length > 0 && criticalAlerts.map((a) => (
-            !dismissedAlerts.has(a.category + a.severity) && (
-              <div key={`critical-${a.category}`} className="flex items-start gap-3 rounded-xl border border-ruby/30 bg-ruby/5 p-3">
-                <AlertTriangle className="h-5 w-5 text-ruby shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-ruby">{a.message}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">£{a.spent} of £{a.budget} used</p>
-                </div>
-                <button onClick={() => setDismissedAlerts(new Set([...dismissedAlerts, a.category + a.severity]))} className="p-1 rounded hover:bg-ruby/10 text-ruby/60 hover:text-ruby" aria-label="Dismiss alert"><X className="h-4 w-4" /></button>
-              </div>
-            )
-          ))}
-          {warningAlerts.length > 0 && warningAlerts.filter((a) => !dismissedAlerts.has(a.category + a.severity)).length > 0 && (
-            <details className="group">
-              <summary className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer hover:text-foreground">
-                <TrendingUp className="h-4 w-4" />
-                <span>{warningAlerts.filter((a) => !dismissedAlerts.has(a.category + a.severity)).length} budgets nearing limit</span>
-              </summary>
-              <div className="mt-2 space-y-2">
-                {warningAlerts.map((a) => (
-                  !dismissedAlerts.has(a.category + a.severity) && (
-                    <div key={`warning-${a.category}`} className="flex items-start gap-3 rounded-xl border border-topaz/30 bg-topaz/5 p-3">
-                      <TrendingUp className="h-5 w-5 text-topaz shrink-0 mt-0.5" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">{a.message}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">£{a.spent} of £{a.budget} used</p>
-                      </div>
-                      <button onClick={() => setDismissedAlerts(new Set([...dismissedAlerts, a.category + a.severity]))} className="p-1 rounded hover:bg-topaz/10 text-muted-foreground hover:text-foreground" aria-label="Dismiss warning"><X className="h-4 w-4" /></button>
-                    </div>
-                  )
-                ))}
-              </div>
-            </details>
-          )}
-          {spikeAlerts.length > 0 && spikeAlerts.filter((a) => !dismissedAlerts.has(a.category + a.severity)).length > 0 && (
-            <details className="group">
-              <summary className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer hover:text-foreground">
-                <Zap className="h-4 w-4" />
-                <span>{spikeAlerts.filter((a) => !dismissedAlerts.has(a.category + a.severity)).length} spending spikes</span>
-              </summary>
-              <div className="mt-2 space-y-2">
-                {spikeAlerts.map((a) => (
-                  !dismissedAlerts.has(a.category + a.severity) && (
-                    <div key={`spike-${a.category}`} className="flex items-start gap-3 rounded-xl border border-chart-1/30 bg-chart-1/5 p-3">
-                      <Zap className="h-5 w-5 text-chart-1 shrink-0 mt-0.5" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">{a.message}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">3-month avg: £{a.avg_3m}</p>
-                      </div>
-                      <button onClick={() => setDismissedAlerts(new Set([...dismissedAlerts, a.category + a.severity]))} className="p-1 rounded hover:bg-chart-1/10 text-muted-foreground hover:text-foreground" aria-label="Dismiss spike alert"><X className="h-4 w-4" /></button>
-                    </div>
-                  )
-                ))}
-              </div>
-            </details>
-          )}
-        </div>
-      )}
 
       {/* Dashboard overview */}
       <div className="sticky top-0 z-20 -mx-4 px-4 sm:-mx-8 sm:px-8 bg-background/70 backdrop-blur-xl border-b border-border/40 pb-4 pt-2 shadow-sm transition-all duration-300">
