@@ -265,40 +265,42 @@ export default React.memo(function BudgetPage() {
   const [sortOrder, setSortOrder] = useState("desc");
   const [categoryHierarchy, setCategoryHierarchy] = useState({});
   const [hebrewMonths, setHebrewMonths] = useState([]);
+  const [selectedHebrewMonth, setSelectedHebrewMonth] = useState(null);
 
   useEffect(() => {
     api.get("/jewish/hebcal/months")
-      .then(({ data }) => setHebrewMonths(data.months || []))
+      .then(({ data }) => {
+        const ms = data.months || [];
+        setHebrewMonths(ms);
+        const current = ms.find((m) => m.is_current);
+        if (current) setSelectedHebrewMonth(current);
+      })
       .catch(() => { console.warn("[budgets] failed to load Hebrew months"); });
   }, []);
 
-  const { year, month: mNum } = parseMonth(month);
-  const monthLabel = mNum >= 1 && mNum <= 12 ? `${MONTH_NAMES[mNum - 1]} ${year}` : month;
-  const isCurrentMonth = month === fmtMonth(now.getFullYear(), now.getMonth() + 1);
+  const currentHebrewMonth = selectedHebrewMonth;
 
-  const currentHebrewMonth = useMemo(() => {
-    if (!hebrewMonths.length) return null;
-    const start = `${month}-01`;
-    const { year: y, month: m } = parseMonth(month);
-    const nextM = m === 12 ? 1 : m + 1;
-    const nextY = m === 12 ? y + 1 : y;
-    const end = fmtMonth(nextY, nextM);
-    const matched = hebrewMonths.filter(
-      (hm) => hm.gregorian_start < end && hm.gregorian_end >= start
-    );
-    return matched.find((hm) => hm.is_current) || matched[0] || null;
-  }, [hebrewMonths, month]);
+  const gregMonth = currentHebrewMonth ? currentHebrewMonth.gregorian_start.slice(0, 7) : month;
+  const { year, month: mNum } = parseMonth(gregMonth);
+  const monthLabel = mNum >= 1 && mNum <= 12 ? `${MONTH_NAMES[mNum - 1]} ${year}` : gregMonth;
 
-  const hebrewSuffix = currentHebrewMonth ? (
-    <span className="text-xs font-normal text-muted-foreground">
-      {" "}·{" "}<span dir="rtl" lang="he">{YIDDISH[currentHebrewMonth.month_name] || currentHebrewMonth.month_name}</span>{" "}{currentHebrewMonth.hebrew_year}
+  const hebrewLabel = currentHebrewMonth ? (
+    <span>
+      <span dir="rtl" lang="he" className="inline-block">{YIDDISH[currentHebrewMonth.month_name] || currentHebrewMonth.month_name}</span>
+      {" "}{currentHebrewMonth.hebrew_year}
     </span>
   ) : null;
 
-  const monthLabelWithHebrew = (
-    <span>{monthLabel}{hebrewSuffix}</span>
+  const monthLabelWithHebrew = currentHebrewMonth ? (
+    <span>
+      <span className="text-xs font-normal text-muted-foreground mr-1">{monthLabel} ·</span>
+      {hebrewLabel}
+    </span>
+  ) : (
+    <span>{monthLabel}</span>
   );
 
+  const isCurrentMonth = currentHebrewMonth ? currentHebrewMonth.is_current : month === fmtMonth(now.getFullYear(), now.getMonth() + 1);
   const daysInMonth = useMemo(() => getDaysInMonth(new Date(year, mNum - 1)), [year, mNum]);
   const currentDay = isCurrentMonth ? getDate(now) : daysInMonth;
   const monthElapsedPct = daysInMonth ? currentDay / daysInMonth : 1;
@@ -442,7 +444,7 @@ export default React.memo(function BudgetPage() {
       limit: parseFloat(form.limit),
       period: "monthly",
       budget_type: form.budget_type,
-      month: month,
+      month: selectedHebrewMonth ? selectedHebrewMonth.gregorian_start.slice(0, 7) : month,
     };
     if (form.budget_type === "event") {
       if (form.event_date) payload.event_date = form.event_date;
@@ -581,8 +583,9 @@ export default React.memo(function BudgetPage() {
     setCopying(true);
     try {
       let prevBudgets;
-      if (currentHebrewMonth) {
-        const idx = hebrewMonths.findIndex((hm) => hm.gregorian_start === currentHebrewMonth.gregorian_start);
+      const currentMonthStr = selectedHebrewMonth ? selectedHebrewMonth.gregorian_start.slice(0, 7) : month;
+      if (selectedHebrewMonth && hebrewMonths.length) {
+        const idx = hebrewMonths.findIndex((m) => m.hebrew_month === selectedHebrewMonth.hebrew_month && m.hebrew_year === selectedHebrewMonth.hebrew_year);
         if (idx <= 0) { toast.info("No previous month to copy from"); setCopying(false); return; }
         const prevMonth = hebrewMonths[idx - 1];
         const { data } = await api.get("/budgets", {
@@ -605,7 +608,7 @@ export default React.memo(function BudgetPage() {
             limit: Number(b.limit),
             period: "monthly",
             budget_type: "everyday",
-            month,
+            month: currentMonthStr,
           });
           copied++;
         } catch {
@@ -647,22 +650,26 @@ export default React.memo(function BudgetPage() {
                 <MonthPicker
                   label={monthLabelWithHebrew}
                   onPrev={() => {
-                    if (currentHebrewMonth) {
-                      const idx = hebrewMonths.findIndex((hm) => hm.gregorian_start === currentHebrewMonth.gregorian_start);
-                      if (idx > 0) setMonth(hebrewMonths[idx - 1].gregorian_start.slice(0, 7));
+                    if (selectedHebrewMonth && hebrewMonths.length) {
+                      const idx = hebrewMonths.findIndex((m) => m.hebrew_month === selectedHebrewMonth.hebrew_month && m.hebrew_year === selectedHebrewMonth.hebrew_year);
+                      if (idx > 0) setSelectedHebrewMonth(hebrewMonths[idx - 1]);
                     } else {
                       setMonth(addMonth(month, -1));
                     }
                   }}
                   onNext={() => {
-                    if (currentHebrewMonth) {
-                      const idx = hebrewMonths.findIndex((hm) => hm.gregorian_start === currentHebrewMonth.gregorian_start);
-                      if (idx < hebrewMonths.length - 1) setMonth(hebrewMonths[idx + 1].gregorian_start.slice(0, 7));
+                    if (selectedHebrewMonth && hebrewMonths.length) {
+                      const idx = hebrewMonths.findIndex((m) => m.hebrew_month === selectedHebrewMonth.hebrew_month && m.hebrew_year === selectedHebrewMonth.hebrew_year);
+                      if (idx < hebrewMonths.length - 1) setSelectedHebrewMonth(hebrewMonths[idx + 1]);
                     } else {
                       setMonth(addMonth(month, 1));
                     }
                   }}
-                  onToday={() => setMonth(fmtMonth(now.getFullYear(), now.getMonth() + 1))}
+                  onToday={() => {
+                    const current = hebrewMonths.find((m) => m.is_current);
+                    if (current) setSelectedHebrewMonth(current);
+                    else setMonth(fmtMonth(now.getFullYear(), now.getMonth() + 1));
+                  }}
                   isToday={isCurrentMonth}
                 />
               </div>
