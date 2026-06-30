@@ -91,7 +91,7 @@ export default React.memo(function BudgetPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [addTab, setAddTab] = useState("expense");
   const [form, setForm] = useState({ category: "", limit: "", budget_type: "everyday", event_date: "", event_group_id: "", event_group_name: "" });
-  const [quickForm, setQuickForm] = useState({ amount: "", description: "", category: "" });
+  const [quickForm, setQuickForm] = useState({ amount: "", description: "", category: "", showDesc: false });
   const [budgetAdded, setBudgetAdded] = useState(false);
   const [insights, setInsights] = useState([]);
   const [insightsLoading, setInsightsLoading] = useState(false);
@@ -260,7 +260,18 @@ export default React.memo(function BudgetPage() {
   useEffect(() => { fetchInsights(); }, []);
 
   const resetForm = () => setForm({ category: "", limit: "", budget_type: "everyday", event_date: "", event_group_id: "", event_group_name: "" });
-  const resetQuickForm = () => setQuickForm({ amount: "", description: "", category: "" });
+  const resetQuickForm = () => setQuickForm({ amount: "", description: "", category: "", showDesc: false });
+  const openAddBudget = (budgetType = "everyday") => {
+    resetForm();
+    setAddTab("budget");
+    setForm((prev) => ({ ...prev, budget_type: budgetType }));
+    setShowAdd(true);
+  };
+  const openAddExpense = () => {
+    resetQuickForm();
+    setAddTab("expense");
+    setShowAdd(true);
+  };
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -470,8 +481,8 @@ export default React.memo(function BudgetPage() {
     if (isEditing) {
       return (
         <div key={b.budget_id} className="rounded-xl border border-border bg-card/50 backdrop-blur-md p-3 space-y-2">
-          <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full text-xs rounded border border-border bg-transparent px-2 py-1.5 focus:outline-none focus:border-ring" />
-          <input type="number" step="0.01" value={form.limit} onChange={(e) => setForm({ ...form, limit: e.target.value })} className="w-full text-xs rounded border border-border bg-transparent px-2 py-1.5 focus:outline-none focus:border-ring" />
+          <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} aria-label="Edit category" className="w-full text-xs rounded border border-border bg-transparent px-2 py-1.5 focus:outline-none focus:border-ring" />
+          <input type="number" step="0.01" value={form.limit} onChange={(e) => setForm({ ...form, limit: e.target.value })} aria-label="Edit limit" className="w-full text-xs rounded border border-border bg-transparent px-2 py-1.5 focus:outline-none focus:border-ring" />
           <div className="flex gap-2 justify-end">
             <button onClick={cancelEdit} className="text-xs px-3 py-1.5 rounded-lg bg-secondary text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
             <button onClick={() => handleUpdate(b.budget_id)} className="text-xs px-3 py-1.5 rounded-lg bg-emerald text-white hover:bg-emerald/90 transition-colors">Save</button>
@@ -611,10 +622,10 @@ export default React.memo(function BudgetPage() {
               } catch { toast.error("Could not add item"); }
             }} className="flex items-end gap-1">
               <div className="flex-1">
-                <input name="newItemCat" placeholder="Category" className="w-full h-6 rounded bg-secondary/30 border border-transparent px-1.5 text-[10px] placeholder:text-muted-foreground focus:border-ring focus:outline-none" />
+                <input name="newItemCat" placeholder="Category" aria-label="New item category" className="w-full h-6 rounded bg-secondary/30 border border-transparent px-1.5 text-[10px] placeholder:text-muted-foreground focus:border-ring focus:outline-none" />
               </div>
               <div className="w-14">
-                <input name="newItemAmt" type="number" step="0.01" min="0.01" placeholder="£0" className="w-full h-6 rounded bg-secondary/30 border border-transparent px-1.5 text-[10px] text-right placeholder:text-muted-foreground focus:border-ring focus:outline-none" />
+                <input name="newItemAmt" type="number" step="0.01" min="0.01" placeholder="£0" aria-label="New item amount" className="w-full h-6 rounded bg-secondary/30 border border-transparent px-1.5 text-[10px] text-right placeholder:text-muted-foreground focus:border-ring focus:outline-none" />
               </div>
               <button type="submit" className="h-6 px-1.5 rounded bg-emerald text-white text-[10px] hover:bg-emerald/90"><Plus className="h-2.5 w-2.5" /></button>
             </form>
@@ -682,11 +693,11 @@ export default React.memo(function BudgetPage() {
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <div className="relative w-full sm:w-36 lg:w-44">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-              <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+              <input type="search" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} aria-label="Search budgets"
                 className="w-full h-8 pl-8 pr-3 rounded-full bg-secondary/40 border border-transparent text-xs placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring/30 focus:outline-none transition-all" />
             </div>
             <div className="flex items-center gap-0.5">
-              <select value={sortOption} onChange={(e) => setSortOption(e.target.value)}
+              <select value={sortOption} onChange={(e) => setSortOption(e.target.value)} aria-label="Sort budgets"
                 className="h-8 px-2 rounded-lg bg-secondary/50 border border-border/50 text-[11px] font-medium focus:outline-none focus:border-ring">
                 <option value="progress">Progress</option>
                 <option value="name">Name</option>
@@ -695,11 +706,11 @@ export default React.memo(function BudgetPage() {
                 <option value="remaining">Remaining</option>
               </select>
               <button onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
-                className="h-8 w-7 grid place-items-center rounded-lg bg-secondary/50 border border-border/50 hover:bg-secondary/80 transition-colors">
-                {sortOrder === "desc" ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronUp className="h-3 w-3 text-muted-foreground" />}
+                className="h-8 w-7 grid place-items-center rounded-lg bg-secondary/50 border border-border/50 hover:bg-secondary/80 transition-colors" aria-label={`Sort ${sortOrder === "desc" ? "ascending" : "descending"}`}>
+                {sortOrder === "desc" ? <ChevronDown className="h-3 w-3 text-muted-foreground" aria-hidden="true" /> : <ChevronUp className="h-3 w-3 text-muted-foreground" aria-hidden="true" />}
               </button>
             </div>
-            <Button variant="primary" size="sm" onClick={() => { setAddTab("budget"); setShowAdd(true); setForm((prev) => ({ ...prev, budget_type: "everyday" })); }}>
+            <Button variant="primary" size="sm" onClick={() => openAddBudget("everyday")}>
               <Plus className="h-3.5 w-3.5" /> Add
             </Button>
             <DropdownMenu>
@@ -826,7 +837,7 @@ export default React.memo(function BudgetPage() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {items.map((b) => renderBudgetCard(b))}
-                  <button onClick={() => { setAddTab("budget"); setShowAdd(true); setForm((prev) => ({ ...prev, category: "", limit: "", budget_type: "everyday" })); }}
+                  <button onClick={() => openAddBudget("everyday")}
                     className="rounded-xl border-2 border-dashed border-border/40 hover:border-emerald/40 hover:bg-emerald/5 hover:text-emerald text-muted-foreground/50 transition-all flex flex-col items-center justify-center p-3 min-h-[88px] w-full">
                     <Plus className="h-4 w-4 mb-1" />
                     <span className="text-[10px] font-medium">Add {section}</span>
@@ -846,7 +857,7 @@ export default React.memo(function BudgetPage() {
                   Upcoming Events
                 </h2>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => { setAddTab("budget"); setShowAdd(true); setForm((prev) => ({ ...prev, budget_type: "event", event_group_id: "", event_group_name: "" })); }}
+                  <button onClick={() => openAddBudget("event")}
                     className="h-6 w-6 rounded-full bg-topaz/10 text-topaz hover:bg-topaz/20 flex items-center justify-center transition-all" aria-label="Add event">
                     <Plus className="h-3.5 w-3.5" />
                   </button>
@@ -1005,22 +1016,22 @@ export default React.memo(function BudgetPage() {
                   </div>
                   <div className="w-28">
                     <Input type="number" step="0.01" min="0.01" placeholder="£0.00" value={quickForm.amount}
-                      onChange={(e) => setQuickForm({ ...quickForm, amount: e.target.value })} required autoFocus className="text-right" />
+                      onChange={(e) => setQuickForm({ ...quickForm, amount: e.target.value })} required autoFocus className="text-right" aria-label="Expense amount" />
                   </div>
                   <Button type="submit" variant="primary" size="pill" className="shrink-0 h-11 px-4">
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
-                {quickForm.description && (
+                {quickForm.showDesc && (
                   <div className="mt-2">
-                    <Input placeholder="Description (optional)" value={quickForm.description}
-                      onChange={(e) => setQuickForm({ ...quickForm, description: e.target.value })} />
+                    <Input placeholder="Description (optional)" value={quickForm.description || ""}
+                      onChange={(e) => setQuickForm({ ...quickForm, description: e.target.value })} aria-label="Expense description" />
                   </div>
                 )}
                 <div className="flex items-center justify-between mt-2">
-                  <button type="button" onClick={() => setQuickForm({ ...quickForm, description: quickForm.description ? "" : " " })}
+                  <button type="button" onClick={() => setQuickForm({ ...quickForm, showDesc: !quickForm.showDesc, description: quickForm.showDesc ? "" : quickForm.description })}
                     className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                    {quickForm.description?.trim() ? "Remove description" : "+ Add description"}
+                    {quickForm.showDesc ? "Remove description" : "+ Add description"}
                   </button>
                   <button type="button" onClick={() => { setShowAdd(false); resetQuickForm(); }}
                     className="text-xs text-muted-foreground hover:text-foreground transition-colors">
@@ -1064,7 +1075,7 @@ export default React.memo(function BudgetPage() {
                       </div>
                       <div className="w-28">
                         <Input type="number" step="0.01" min="0" placeholder="£0.00" value={form.limit}
-                          onChange={(e) => { setForm({ ...form, limit: e.target.value }); setBudgetAdded(false); }} required className="text-right" />
+                          onChange={(e) => { setForm({ ...form, limit: e.target.value }); setBudgetAdded(false); }} required className="text-right" aria-label="Budget limit" />
                       </div>
                       <Button type="submit" variant="primary" size="pill" className="shrink-0 h-11 px-4">
                         <Plus className="h-4 w-4" />
@@ -1078,12 +1089,12 @@ export default React.memo(function BudgetPage() {
                         <div className="flex items-end gap-3">
                           <div className="flex-[2]">
                             <Input placeholder="Event name (e.g. Pesach 2026)" value={form.event_group_name}
-                              onChange={(e) => setForm({ ...form, event_group_name: e.target.value })} required />
+                              onChange={(e) => setForm({ ...form, event_group_name: e.target.value })} required aria-label="Event name" />
                           </div>
                           <div className="w-auto">
                             <Input type="date" value={form.event_date}
                               onChange={(e) => setForm({ ...form, event_date: e.target.value })}
-                              className="text-sm" />
+                              className="text-sm" aria-label="Event date" />
                           </div>
                         </div>
                         <div className="mt-3 p-3 rounded-xl bg-secondary/20 border border-border">
@@ -1099,8 +1110,8 @@ export default React.memo(function BudgetPage() {
                               />
                             </div>
                             <div className="w-28">
-                              <Input type="number" step="0.01" min="0" placeholder="£0.00" value={form.limit}
-                                onChange={(e) => setForm({ ...form, limit: e.target.value })} required className="text-right" />
+                               <Input type="number" step="0.01" min="0" placeholder="£0.00" value={form.limit}
+                                onChange={(e) => setForm({ ...form, limit: e.target.value })} required className="text-right" aria-label="Item budget limit" />
                             </div>
                             <Button type="submit" variant="primary" size="pill" className="shrink-0 h-11 px-4">
                               <Plus className="h-4 w-4" />
@@ -1129,8 +1140,8 @@ export default React.memo(function BudgetPage() {
                             />
                           </div>
                           <div className="w-28">
-                            <Input type="number" step="0.01" min="0" placeholder="£0.00" value={form.limit}
-                              onChange={(e) => setForm({ ...form, limit: e.target.value })} required className="text-right" />
+                              <Input type="number" step="0.01" min="0" placeholder="£0.00" value={form.limit}
+                                onChange={(e) => setForm({ ...form, limit: e.target.value })} required className="text-right" aria-label="Item budget limit" />
                           </div>
                           <Button type="submit" variant="primary" size="pill" className="shrink-0 h-11 px-4">
                             <Plus className="h-4 w-4" />
