@@ -204,6 +204,7 @@ const ALIASES = {
   sainsburysgb: "sainsbury",
 };
 
+const SKIP_FALLBACK = new Set(["manual", "truelayer", "provider"]);
 const STRIP_WORDS = [
   "bank",
   "plc",
@@ -252,7 +253,8 @@ export function pickBankInstitution(...candidates) {
   for (const value of values) {
     if (_resolve(value)) return value;
   }
-  return values[0] || null;
+  const best = values.find((v) => !SKIP_FALLBACK.has(v.toLowerCase().trim()));
+  return best || values[0] || null;
 }
 
 export function getBankLogoOrFallback(institution) {
