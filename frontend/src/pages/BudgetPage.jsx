@@ -61,7 +61,7 @@ function ProgressRing({ pct, size = 40, stroke = 3.5, color }) {
   );
 }
 
-const BudgetCard = React.memo(({ budget, isCurrentMonth, currentDay, monthElapsedPct, daysInMonth, editingId, form, cancelEdit, handleUpdate, startEdit, bulkSelected, setBulkSelected, setConfirmDelete }) => {
+const BudgetCard = React.memo(({ budget, isCurrentMonth, currentDay, monthElapsedPct, daysInMonth, editingId, form, setForm, cancelEdit, handleUpdate, startEdit, bulkSelected, setBulkSelected, setConfirmDelete }) => {
   const pct = budget.progress_pct || 0;
   const over = pct >= 100;
   const isEditing = editingId === budget.budget_id;
@@ -892,7 +892,7 @@ export default React.memo(function BudgetPage() {
                   </span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {items.map((b) => <BudgetCard key={b.budget_id} budget={b} isCurrentMonth={isCurrentMonth} currentDay={currentDay} monthElapsedPct={monthElapsedPct} daysInMonth={daysInMonth} editingId={editingId} form={form} cancelEdit={cancelEdit} handleUpdate={handleUpdate} startEdit={startEdit} bulkSelected={bulkSelected} setBulkSelected={setBulkSelected} setConfirmDelete={setConfirmDelete} />)}
+                  {items.map((b) => <BudgetCard key={b.budget_id} budget={b} isCurrentMonth={isCurrentMonth} currentDay={currentDay} monthElapsedPct={monthElapsedPct} daysInMonth={daysInMonth} editingId={editingId} form={form} setForm={setForm} cancelEdit={cancelEdit} handleUpdate={handleUpdate} startEdit={startEdit} bulkSelected={bulkSelected} setBulkSelected={setBulkSelected} setConfirmDelete={setConfirmDelete} />)}
                   <button onClick={() => openAddBudget("everyday")}
                     className="rounded-xl border-2 border-dashed border-border/40 hover:border-emerald/40 hover:bg-emerald/5 hover:text-emerald hover:scale-[1.02] active:scale-[0.98] text-muted-foreground/50 transition-all duration-200 flex flex-col items-center justify-center p-3 w-full group/add">
                     <Plus className="h-5 w-5 mb-1.5 group-hover/add:rotate-90 transition-transform duration-300" />
