@@ -538,237 +538,239 @@ const Transactions = React.memo(function Transactions() {
   }, [txs, aiResults]);
 
   return (
-    <div className="space-y-3" data-testid="transactions-root">
+    <div className="space-y-4" data-testid="transactions-root">
 
-      {/* ─── Unified Header Card ─── */}
-      <PageHeader eyebrow="Transactions" title="Transactions">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-border/70">
-          {/* Wallet badge */}
-          <div className="relative shrink-0 h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center drop-shadow-[0_0_8px_rgba(48,164,108,0.2)]">
-            <Wallet className="h-6 w-6 sm:h-8 sm:w-8 text-emerald" />
-          </div>
-
-          {/* Middle: Month picker + stats */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <MonthPicker
-                label={hebrewMonthLabel}
-                onPrev={() => toggleHebrewMonth("prev")}
-                onNext={() => toggleHebrewMonth("next")}
-                onToday={() => { const c = hebrewMonths.find(m => m.is_current); if (c) applyHebrewMonth(c); }}
-                isToday={isCurrentHebrewMonth}
-              />
-            </div>
-            {(!someSelected) ? (
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                <span>Income <strong className="text-emerald font-medium tabular-nums">{fmt(incomeTotal)}</strong></span>
-                <span className="text-muted-foreground/30">·</span>
-                <span>Expenses <strong className="text-ruby font-medium tabular-nums">{fmt(expenseTotal)}</strong></span>
-                <span className="text-muted-foreground/30">·</span>
-                <span>Net <strong className={`font-medium tabular-nums ${netTotal >= 0 ? "text-emerald" : "text-ruby"}`}>{netTotal >= 0 ? "+" : ""}{fmt(netTotal)}</strong></span>
-                <span className="ml-auto text-xs text-muted-foreground/50">{total} transaction{total !== 1 ? "s" : ""}</span>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-muted-foreground">{selectedIds.size} selected</span>
-                  <button onClick={() => setSelectedIds(new Set())} className="text-muted-foreground hover:text-foreground">Clear</button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="text-xs px-2.5 py-1 rounded-full border border-ruby/40 text-ruby hover:bg-ruby/5 transition-colors">
-                        <Trash2 className="h-3 w-3 inline mr-1" /> Bulk ({selectedIds.size})
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger>Set category</DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent>
-                          {Object.entries(groupCatsBySection(selectedCats)).map(([section, cats]) => (
-                            <React.Fragment key={section}>
-                              <DropdownMenuLabel className="text-xs text-muted-foreground font-semibold uppercase tracking-wider px-2 py-1">{section}</DropdownMenuLabel>
-                              {cats.map(c => (
-                                <DropdownMenuItem key={c.name} onClick={() => bulkCategory(c.name)}>{c.name}</DropdownMenuItem>
-                              ))}
-                            </React.Fragment>
-                          ))}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => { const c = prompt("New category name:"); if (c) bulkCategory(c.trim().toLowerCase().replace(/\s+/g, "_")); }}>
-                            ➕ Add custom category
-                          </DropdownMenuItem>
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={bulkDelete} className="text-ruby">
-                        <Trash2 className="h-4 w-4 mr-2" /> Delete {selectedIds.size}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Right: Action buttons */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            {/* Search toggle */}
-            <button
-              onClick={() => setShowSearch((s) => !s)}
-              className={`h-8 w-8 rounded-full grid place-items-center transition-all duration-200 ${
-                showSearch || filters.search
-                  ? "bg-emerald text-white shadow-sm"
-                  : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
-              }`}
-              aria-label="Search"
-            >
-              <Search className="h-3.5 w-3.5" />
-            </button>
-
-            {/* Sort + order */}
-            <div className="flex items-center gap-0.5">
-              <select value={filters.sort} onChange={(e) => setFilter("sort", e.target.value)}
-                className="h-8 px-2 rounded-lg bg-secondary/50 border border-border/50 text-[11px] font-medium focus:outline-none focus:border-ring">
-                <option value="date">Date</option>
-                <option value="amount">Amount</option>
-                <option value="description">Description</option>
-              </select>
-              <button onClick={() => setFilter("order", filters.order === "desc" ? "asc" : "desc")}
-                className="h-8 w-7 grid place-items-center rounded-lg bg-secondary/50 border border-border/50 hover:bg-secondary/80 transition-colors">
-                {filters.order === "desc" ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronUp className="h-3 w-3 text-muted-foreground" />}
-              </button>
+      {/* ─── Sticky Header ─── */}
+      <div className="sticky top-0 z-20 -mx-4 px-4 sm:-mx-8 sm:px-8 bg-background/70 backdrop-blur-xl border-b border-border/40 pb-4 pt-2 shadow-sm transition-all duration-300">
+        <PageHeader eyebrow="Transactions" title="Transactions" hideDivider>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 mt-2 pt-2">
+            {/* Wallet badge */}
+            <div className="relative shrink-0 h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center drop-shadow-[0_0_8px_rgba(48,164,108,0.2)]">
+              <Wallet className="h-6 w-6 sm:h-8 sm:w-8 text-emerald" />
             </div>
 
-            {/* Filter */}
-            <Sheet>
-              <SheetTrigger asChild>
-                <button className={`h-8 px-3 rounded-full text-xs font-medium transition-all duration-200 ${
-                  activeFilters.length > 0
-                    ? "bg-emerald/10 text-emerald border border-emerald/20"
-                    : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
-                }`}>
-                  <Filter className="h-3 w-3 mr-1 inline" /> Filters{activeFilters.length > 0 && <span className="ml-1">{activeFilters.length}</span>}
-                </button>
-              </SheetTrigger>
-            <SheetContent side="right" className="w-full sm:max-w-md">
-              <SheetHeader>
-                <SheetTitle>Filters</SheetTitle>
-                <SheetDescription className="text-xs sm:text-sm">Refine your transaction list</SheetDescription>
-              </SheetHeader>
-              <div className="mt-4 sm:mt-6 space-y-4 sm:space-y-5">
-                <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                  <select value={filters.tx_type} onChange={(e) => toggleFilter("tx_type", e.target.value)} className="h-10 px-4 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors">
-                    <option value="">All types</option><option value="income">Income</option><option value="expense">Expense</option>
-                  </select>
-                  <select value={filters.source} onChange={(e) => toggleFilter("source", e.target.value)} className="h-10 px-4 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors">
-                    <option value="">All sources</option>
-                    {Object.entries(SOURCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                  </select>
-                  <CategoryCombobox
-                    value={filters.category}
-                    onChange={(val) => toggleFilter("category", val)}
-                    categories={selectedCats}
-                    placeholder="All categories"
-                    allowClear
-                    onCategoryCreated={loadCats}
-                  />
-                  <Input type="number" min="0" step="0.01" placeholder="Min £" value={filters.amount_min}
-                    onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_min: e.target.value })); }}
-                    className="text-sm h-10" />
-                  <Input type="number" min="0" step="0.01" placeholder="Max £" value={filters.amount_max}
-                    onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_max: e.target.value })); }}
-                    className="text-sm h-10" />
-                  <Input type="date" value={filters.date_from} onChange={(e) => { if (!e.target.value) { setSelectedHebrewMonth(null); } setOffset(0); setFilters(p => ({ ...p, date_from: e.target.value })); }} className="text-sm h-10" />
-                  <Input type="date" value={filters.date_to} onChange={(e) => { if (!e.target.value) { setSelectedHebrewMonth(null); } setOffset(0); setFilters(p => ({ ...p, date_to: e.target.value })); }} className="text-sm h-10" />
+            {/* Middle: Month picker + stats */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <MonthPicker
+                  label={hebrewMonthLabel}
+                  onPrev={() => toggleHebrewMonth("prev")}
+                  onNext={() => toggleHebrewMonth("next")}
+                  onToday={() => { const c = hebrewMonths.find(m => m.is_current); if (c) applyHebrewMonth(c); }}
+                  isToday={isCurrentHebrewMonth}
+                />
+              </div>
+              {(!someSelected) ? (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                  <span>Income <strong className="text-emerald font-medium tabular-nums">{fmt(incomeTotal)}</strong></span>
+                  <span className="text-muted-foreground/30">·</span>
+                  <span>Expenses <strong className="text-ruby font-medium tabular-nums">{fmt(expenseTotal)}</strong></span>
+                  <span className="text-muted-foreground/30">·</span>
+                  <span>Net <strong className={`font-medium tabular-nums ${netTotal >= 0 ? "text-emerald" : "text-ruby"}`}>{netTotal >= 0 ? "+" : ""}{fmt(netTotal)}</strong></span>
+                  <span className="ml-auto text-xs text-muted-foreground/50">{total} transaction{total !== 1 ? "s" : ""}</span>
                 </div>
-
-                <div className="border-t border-border pt-4 space-y-3">
-                  <p className="text-xs font-medium text-muted-foreground">AI search</p>
-                  <div className="flex items-center gap-2">
-                    <Input value={aiQuery} onChange={(e) => setAiQuery(e.target.value)}
-                      placeholder="e.g. 'grocery spending last month'"
-                      className="flex-1 text-sm h-10" onKeyDown={(e) => e.key === "Enter" && runAiSearch()} />
-                    <Button onClick={runAiSearch} disabled={aiLoading || !aiQuery.trim()} variant="outlinePill" size="pillSm">
-                      {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                      Search
-                    </Button>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-muted-foreground">{selectedIds.size} selected</span>
+                    <button onClick={() => setSelectedIds(new Set())} className="text-muted-foreground hover:text-foreground">Clear</button>
                   </div>
-                  {aiResults && (
-                    <div className="rounded-xl border border-emerald/30 bg-emerald/5 p-3 text-sm">
-                      <p className="font-medium text-emerald mb-1">AI results for &ldquo;{aiResults.query}&rdquo; ({aiResults.total} matches)</p>
-                      <button onClick={() => { setAiResults(null); setAiQuery(""); }} className="text-xs text-muted-foreground hover:text-foreground">Clear</button>
+                  <div className="flex items-center gap-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="text-xs px-2.5 py-1 rounded-full border border-ruby/40 text-ruby hover:bg-ruby/5 transition-colors">
+                          <Trash2 className="h-3 w-3 inline mr-1" /> Bulk ({selectedIds.size})
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger>Set category</DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent>
+                            {Object.entries(groupCatsBySection(selectedCats)).map(([section, cats]) => (
+                              <React.Fragment key={section}>
+                                <DropdownMenuLabel className="text-xs text-muted-foreground font-semibold uppercase tracking-wider px-2 py-1">{section}</DropdownMenuLabel>
+                                {cats.map(c => (
+                                  <DropdownMenuItem key={c.name} onClick={() => bulkCategory(c.name)}>{c.name}</DropdownMenuItem>
+                                ))}
+                              </React.Fragment>
+                            ))}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => { const c = prompt("New category name:"); if (c) bulkCategory(c.trim().toLowerCase().replace(/\s+/g, "_")); }}>
+                              ➕ Add custom category
+                            </DropdownMenuItem>
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={bulkDelete} className="text-ruby">
+                          <Trash2 className="h-4 w-4 mr-2" /> Delete {selectedIds.size}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right: Action buttons */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* Search toggle */}
+              <button
+                onClick={() => setShowSearch((s) => !s)}
+                className={`h-8 w-8 rounded-full grid place-items-center transition-all duration-200 ${
+                  showSearch || filters.search
+                    ? "bg-emerald text-white shadow-sm"
+                    : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                }`}
+                aria-label="Search"
+              >
+                <Search className="h-3.5 w-3.5" />
+              </button>
+
+              {/* Sort + order */}
+              <div className="flex items-center gap-0.5">
+                <select value={filters.sort} onChange={(e) => setFilter("sort", e.target.value)}
+                  className="h-8 px-2 rounded-lg bg-secondary/50 border border-border/50 text-[11px] font-medium focus:outline-none focus:border-ring">
+                  <option value="date">Date</option>
+                  <option value="amount">Amount</option>
+                  <option value="description">Description</option>
+                </select>
+                <button onClick={() => setFilter("order", filters.order === "desc" ? "asc" : "desc")}
+                  className="h-8 w-7 grid place-items-center rounded-lg bg-secondary/50 border border-border/50 hover:bg-secondary/80 transition-colors">
+                  {filters.order === "desc" ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronUp className="h-3 w-3 text-muted-foreground" />}
+                </button>
+              </div>
+
+              {/* Filter */}
+              <Sheet>
+                <SheetTrigger asChild>
+                  <button className={`h-8 px-3 rounded-full text-xs font-medium transition-all duration-200 ${
+                    activeFilters.length > 0
+                      ? "bg-emerald/10 text-emerald border border-emerald/20"
+                      : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                  }`}>
+                    <Filter className="h-3 w-3 mr-1 inline" /> Filters{activeFilters.length > 0 && <span className="ml-1">{activeFilters.length}</span>}
+                  </button>
+                </SheetTrigger>
+              <SheetContent side="right" className="w-full sm:max-w-md">
+                <SheetHeader>
+                  <SheetTitle>Filters</SheetTitle>
+                  <SheetDescription className="text-xs sm:text-sm">Refine your transaction list</SheetDescription>
+                </SheetHeader>
+                <div className="mt-4 sm:mt-6 space-y-4 sm:space-y-5">
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                    <select value={filters.tx_type} onChange={(e) => toggleFilter("tx_type", e.target.value)} className="h-10 px-4 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors">
+                      <option value="">All types</option><option value="income">Income</option><option value="expense">Expense</option>
+                    </select>
+                    <select value={filters.source} onChange={(e) => toggleFilter("source", e.target.value)} className="h-10 px-4 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors">
+                      <option value="">All sources</option>
+                      {Object.entries(SOURCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </select>
+                    <CategoryCombobox
+                      value={filters.category}
+                      onChange={(val) => toggleFilter("category", val)}
+                      categories={selectedCats}
+                      placeholder="All categories"
+                      allowClear
+                      onCategoryCreated={loadCats}
+                    />
+                    <Input type="number" min="0" step="0.01" placeholder="Min £" value={filters.amount_min}
+                      onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_min: e.target.value })); }}
+                      className="text-sm h-10" />
+                    <Input type="number" min="0" step="0.01" placeholder="Max £" value={filters.amount_max}
+                      onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_max: e.target.value })); }}
+                      className="text-sm h-10" />
+                    <Input type="date" value={filters.date_from} onChange={(e) => { if (!e.target.value) { setSelectedHebrewMonth(null); } setOffset(0); setFilters(p => ({ ...p, date_from: e.target.value })); }} className="text-sm h-10" />
+                    <Input type="date" value={filters.date_to} onChange={(e) => { if (!e.target.value) { setSelectedHebrewMonth(null); } setOffset(0); setFilters(p => ({ ...p, date_to: e.target.value })); }} className="text-sm h-10" />
+                  </div>
+
+                  <div className="border-t border-border pt-4 space-y-3">
+                    <p className="text-xs font-medium text-muted-foreground">AI search</p>
+                    <div className="flex items-center gap-2">
+                      <Input value={aiQuery} onChange={(e) => setAiQuery(e.target.value)}
+                        placeholder="e.g. 'grocery spending last month'"
+                        className="flex-1 text-sm h-10" onKeyDown={(e) => e.key === "Enter" && runAiSearch()} />
+                      <Button onClick={runAiSearch} disabled={aiLoading || !aiQuery.trim()} variant="outlinePill" size="pillSm">
+                        {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                        Search
+                      </Button>
+                    </div>
+                    {aiResults && (
+                      <div className="rounded-xl border border-emerald/30 bg-emerald/5 p-3 text-sm">
+                        <p className="font-medium text-emerald mb-1">AI results for &ldquo;{aiResults.query}&rdquo; ({aiResults.total} matches)</p>
+                        <button onClick={() => { setAiResults(null); setAiQuery(""); }} className="text-xs text-muted-foreground hover:text-foreground">Clear</button>
+                      </div>
+                    )}
+                  </div>
+
+                  {(filters.source || filters.category || filters.tx_type || filters.search) && total > 0 && (
+                    <div className="border-t border-border pt-4 flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">
+                        {total} transaction{total !== 1 ? "s" : ""} match current filters
+                      </p>
+                      <button onClick={clearAllMatching}
+                        className="text-xs px-3 py-1.5 rounded-full border border-ruby/40 text-ruby hover:bg-ruby/5 transition-colors">
+                        <Trash2 className="h-3 w-3 inline mr-1" />
+                        Delete all {total}
+                      </button>
                     </div>
                   )}
-                </div>
 
-                {(filters.source || filters.category || filters.tx_type || filters.search) && total > 0 && (
-                  <div className="border-t border-border pt-4 flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground">
-                      {total} transaction{total !== 1 ? "s" : ""} match current filters
-                    </p>
-                    <button onClick={clearAllMatching}
-                      className="text-xs px-3 py-1.5 rounded-full border border-ruby/40 text-ruby hover:bg-ruby/5 transition-colors">
-                      <Trash2 className="h-3 w-3 inline mr-1" />
-                      Delete all {total}
+                  <div className="border-t border-border pt-4 flex justify-end">
+                    <button onClick={clearAllFilters} className="text-sm text-muted-foreground hover:text-foreground">
+                      Clear all filters
                     </button>
                   </div>
-                )}
-
-                <div className="border-t border-border pt-4 flex justify-end">
-                  <button onClick={clearAllFilters} className="text-sm text-muted-foreground hover:text-foreground">
-                    Clear all filters
-                  </button>
                 </div>
-              </div>
-            </SheetContent>
-          </Sheet>
+              </SheetContent>
+            </Sheet>
 
-          <button onClick={openAdd} className="h-8 px-3.5 rounded-full bg-emerald text-white text-xs font-medium hover:bg-emerald/90 active:scale-95 transition-all duration-200 shadow-sm" data-testid="add-transaction">
-            <Plus className="h-3 w-3 mr-1 inline" /> Add
-          </button>
+            <button onClick={openAdd} className="h-8 px-3.5 rounded-full bg-emerald text-white text-xs font-medium hover:bg-emerald/90 active:scale-95 transition-all duration-200 shadow-sm" data-testid="add-transaction">
+              <Plus className="h-3 w-3 mr-1 inline" /> Add
+            </button>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="h-8 w-8 rounded-full grid place-items-center text-muted-foreground hover:bg-secondary/60 hover:text-foreground transition-all duration-200">
-                <MoreHorizontal className="h-3.5 w-3.5" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => setCompareOpen(true)}>
-                <BarChart3 className="h-4 w-4 mr-2" /> Compare periods
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={exportCsv}>
-                <Download className="h-4 w-4 mr-2" /> Export CSV
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="h-8 w-8 rounded-full grid place-items-center text-muted-foreground hover:bg-secondary/60 hover:text-foreground transition-all duration-200">
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => setCompareOpen(true)}>
+                  <BarChart3 className="h-4 w-4 mr-2" /> Compare periods
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportCsv}>
+                  <Download className="h-4 w-4 mr-2" /> Export CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
+        </PageHeader>
+
+        {/* Inline search bar */}
+        {showSearch && (
+          <div className="mt-3 flex items-center gap-2 rounded-full border border-border bg-card/70 backdrop-blur-xl px-4 h-9 shadow-sm transition-all duration-200">
+            <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <input ref={searchRef} value={searchInput} onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
+              placeholder="Search transactions... (/)"
+              className="w-full bg-transparent outline-none text-xs" />
+            {filters.search && <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="text-muted-foreground hover:text-foreground transition-colors"><X className="h-3.5 w-3.5" /></button>}
+          </div>
+        )}
+
+        {/* Active filter chips (except date range, handled by month strip) */}
+        {activeFilters.filter(c => c.key !== "date_from" && c.key !== "date_to").length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            {activeFilters.filter(c => c.key !== "date_from" && c.key !== "date_to").map((chip) => (
+              <span key={chip.key} className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald/10 text-emerald border border-emerald/20">
+                {chip.label}
+                <button onClick={() => { setFilter(chip.key, ""); setOffset(0); }} className="hover:text-emerald/80"><X className="h-2.5 w-2.5" /></button>
+              </span>
+            ))}
+            <button onClick={clearAllFilters} className="text-[10px] px-2 py-0.5 rounded-full border border-border text-muted-foreground hover:text-foreground">Clear</button>
+          </div>
+        )}
       </div>
-      </PageHeader>
-
-      {/* Inline search bar */}
-      {showSearch && (
-        <div className="mt-3 flex items-center gap-2 rounded-full border border-border bg-card/70 backdrop-blur-xl px-4 h-9 shadow-sm transition-all duration-200">
-          <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          <input ref={searchRef} value={searchInput} onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
-            placeholder="Search transactions... (/)"
-            className="w-full bg-transparent outline-none text-xs" />
-          {filters.search && <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="text-muted-foreground hover:text-foreground transition-colors"><X className="h-3.5 w-3.5" /></button>}
-        </div>
-      )}
-
-      {/* Active filter chips (except date range, handled by month strip) */}
-      {activeFilters.filter(c => c.key !== "date_from" && c.key !== "date_to").length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {activeFilters.filter(c => c.key !== "date_from" && c.key !== "date_to").map((chip) => (
-            <span key={chip.key} className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald/10 text-emerald border border-emerald/20">
-              {chip.label}
-              <button onClick={() => { setFilter(chip.key, ""); setOffset(0); }} className="hover:text-emerald/80"><X className="h-2.5 w-2.5" /></button>
-            </span>
-          ))}
-          <button onClick={clearAllFilters} className="text-[10px] px-2 py-0.5 rounded-full border border-border text-muted-foreground hover:text-foreground">Clear</button>
-        </div>
-      )}
 
       {/* ─── Tabs ─── */}
       <div className="flex gap-1 border-b border-border">
