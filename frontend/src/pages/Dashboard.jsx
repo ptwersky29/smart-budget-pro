@@ -183,7 +183,7 @@ const Dashboard = React.memo(function Dashboard() {
       </div>
     );
 
-  const empty = !overview.recent || overview.recent.length === 0 || (!overview.total_transactions && !overview.total_accounts && !overview.total_budgets);
+  const empty = (!overview.recent || overview.recent.length === 0) && (!overview.accounts || overview.accounts.length === 0) && (!budgets || budgets.length === 0);
 
   return (
     <div className="space-y-6" data-testid="dashboard-root">
