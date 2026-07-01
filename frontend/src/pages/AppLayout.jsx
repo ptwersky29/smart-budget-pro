@@ -125,7 +125,10 @@ export default function AppLayout() {
               <span className="block font-semibold tracking-tight leading-none">{APP_NAME}</span>
               <span className="block text-[11px] text-muted-foreground mt-0.5">{APP_TAGLINE}</span>
             </div>
-            <span className="text-[10px] font-bold uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-topaz/15 text-topaz border border-topaz/30 leading-none shrink-0 mt-2 self-start shadow-sm">v{pkg.version}</span>
+            <div className="flex gap-2 mt-2 self-start shrink-0">
+              <span className="text-[10px] font-bold uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-topaz/15 text-topaz border border-topaz/30 leading-none shadow-sm">BETA</span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-emerald/15 text-emerald border border-emerald/30 leading-none shadow-sm">v{pkg.version}</span>
+            </div>
           </Link>
           <button className="lg:hidden h-11 w-11 rounded-full grid place-items-center hover:bg-secondary" onClick={() => setOpen(false)} data-testid="sidebar-close" aria-label="Close navigation menu">
             <X className="h-5 w-5" />
