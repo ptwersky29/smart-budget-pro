@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
-import { Plus, Trash2, Loader2, Pencil, Search, Sparkles, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, BarChart3, Star, Receipt, Download, MoreHorizontal, Wallet, PieChart as PieChartIcon, TrendingDown } from "lucide-react";
+import { Plus, Trash2, Loader2, Pencil, Search, Sparkles, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, BarChart3, Star, Receipt, Download, MoreHorizontal, Wallet, PieChart as PieChartIcon } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, PageHeader } from "../components/ui/layout";
 import { SkeletonTable } from "../components/ui/Skeleton";
