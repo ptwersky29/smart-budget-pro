@@ -2,14 +2,11 @@ import axios from "axios";
 import { cacheGet, cacheSet, cacheInvalidate, dedupe } from "./cache";
 import { getToken, setToken, clearTokens } from "./storage";
 
-const fallbackBackend = typeof window !== "undefined" && (
-  window.location.hostname !== "localhost" &&
-  window.location.hostname !== "127.0.0.1"
-)
-  ? (process.env.REACT_APP_BACKEND_URL || "https://budget-pro-4jlg.onrender.com")
-  : "http://localhost:8000";
+// Always use the configured backend URL (Render), even when running locally.
+// This avoids needing a local backend server to use the deployed app.
+const DEFAULT_BACKEND = "https://budget-pro-4jlg.onrender.com";
 
-export const BACKEND_URL = (process.env.REACT_APP_BACKEND_URL || fallbackBackend).replace(/\/+$/, "");
+export const BACKEND_URL = (process.env.REACT_APP_BACKEND_URL || DEFAULT_BACKEND).replace(/\/+$/, "");
 export const API = `${BACKEND_URL}/api`;
 
 export const api = axios.create({
