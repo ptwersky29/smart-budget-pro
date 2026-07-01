@@ -40,13 +40,8 @@ export const AuthProvider = ({ children }) => {
   }, [stripTokens]);
 
   useEffect(() => {
-    const hasHash = syncTokensFromLocation();
-    // If URL hash has OAuth tokens, keep loading true so ProtectedRoute
-    // doesn't redirect before AuthCallback mounts and completes
-    if (window.location.hash.includes("access_token=")) {
-      return;
-    }
-    if (!hasHash) checkAuth();
+    syncTokensFromLocation();
+    checkAuth();
   }, [checkAuth, syncTokensFromLocation]);
 
   const login = useCallback(async (email, password, rememberMe = false) => {
