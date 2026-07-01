@@ -63,6 +63,7 @@ function AppRouter() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/privacy" element={<Privacy />} />
+      <Route path="/callback" element={<AuthCallback />} />
       <Route
         path="/onboarding"
         element={
