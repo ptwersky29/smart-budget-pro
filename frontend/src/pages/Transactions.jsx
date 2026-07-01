@@ -514,6 +514,7 @@ const Transactions = React.memo(function Transactions() {
         errorMsg: "Could not update",
       });
     } else if (classification || form.budget_type) {
+      if (!form.account_id) { toast.error("Select an account first"); return; }
       const suggestions = classification?.suggestions || [];
       const chosenIdx = suggestions.findIndex(s => s.category === form.category);
       setOpen(false); setEditingId(null);
