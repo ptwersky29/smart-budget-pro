@@ -17,7 +17,7 @@ const PROVIDERS = [
 ];
 
 export default function Integrations({ embedded }) {
-  useEffect(() => { if (!embedded) document.title = "Integrations | FinanceAI"; }, [embedded]);
+  useEffect(() => { if (!embedded) document.title = "Integrations | Penni"; }, [embedded]);
   const navigate = useNavigate();
 
   // Twilio (per-user)
@@ -120,7 +120,7 @@ export default function Integrations({ embedded }) {
         <PageHeader
           eyebrow="Settings"
           title="Connect everything in one place."
-          description="Wire up TrueLayer, Twilio, and AI providers in a layout that matches the rest of FinanceAI."
+          description="Wire up TrueLayer, Twilio, and AI providers in a layout that matches the rest of Penni."
         />
       )}
 
@@ -179,7 +179,7 @@ export default function Integrations({ embedded }) {
           </div>
         </form>
         <div className="mt-4 p-3 rounded-xl bg-emerald/5 border border-emerald/30 text-xs text-muted-foreground leading-relaxed">
-          <span className="font-medium text-foreground">How it works:</span> When you add a key here, FinanceAI will use <span className="font-medium text-foreground">your provider</span> for AI insights — unlimited calls, billed directly to your provider account. Without a key, free users get 5 insights/day on the shared service; Premium users get unlimited.
+          <span className="font-medium text-foreground">How it works:</span> When you add a key here, Penni will use <span className="font-medium text-foreground">your provider</span> for AI insights — unlimited calls, billed directly to your provider account. Without a key, free users get 5 insights/day on the shared service; Premium users get unlimited.
         </div>
       </Card>
 

@@ -13,7 +13,7 @@ import AccountSettings from "../components/settings/AccountSettings";
 const CategoryManager = lazy(() => import("./CategoryManager"));
 
 export default function Settings() {
-  useEffect(() => { document.title = "Settings | FinanceAI"; }, []);
+  useEffect(() => { document.title = "Settings | Penni"; }, []);
   const [searchParams, setSearchParams] = useSearchParams();
   const sectionFromUrl = searchParams.get("section") || "appearance";
   const [activeSection, setActiveSection] = useState(sectionFromUrl);

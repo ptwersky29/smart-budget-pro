@@ -11,7 +11,7 @@ import BankCardMockup from "../components/BankCardMockup";
 import AddManualAccountModal from "../components/AddManualAccountModal";
 
 export default function Connections() {
-  useEffect(() => { document.title = "Bank Connections | FinanceAI"; }, []);
+  useEffect(() => { document.title = "Bank Connections | Penni"; }, []);
   const [searchParams] = useSearchParams();
   const params = searchParams.toString();
   const [status, setStatus] = useState("idle");

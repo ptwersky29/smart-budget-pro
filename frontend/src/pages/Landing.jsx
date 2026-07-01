@@ -19,7 +19,7 @@ export default function Landing() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { theme, setTheme } = useTheme();
   const dark = theme === "dark";
-  useEffect(() => { document.title = "FinanceAI | Premium AI Personal Finance"; }, []);
+  useEffect(() => { document.title = "Penni | Premium AI Personal Finance"; }, []);
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Nav */}
@@ -27,7 +27,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2" data-testid="landing-logo">
             <div className="w-8 h-8 rounded-xl gradient-emerald grid place-items-center text-white font-bold">£</div>
-            <span className="font-semibold tracking-tight text-lg">FinanceAI</span>
+            <span className="font-semibold tracking-tight text-lg">Penni</span>
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
             <a href="#features" className="hover:text-foreground">Features</a>
@@ -52,7 +52,7 @@ export default function Landing() {
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMobileNavOpen(false)} />
           <div className="fixed top-0 right-0 h-full w-3/4 max-w-sm bg-card border-l border-border p-6 shadow-2xl animate-[fadeUp_0.2s_ease-out]">
             <div className="flex items-center justify-between mb-8">
-              <span className="font-semibold tracking-tight text-lg">FinanceAI</span>
+              <span className="font-semibold tracking-tight text-lg">Penni</span>
               <button className="p-3" onClick={() => setMobileNavOpen(false)} aria-label="Close navigation menu">
                 <X className="h-5 w-5" />
               </button>
@@ -80,7 +80,7 @@ export default function Landing() {
               Your money,<br />reading <span className="italic text-emerald" style={{fontFamily:'Fraunces'}}>your mind.</span>
             </h1>
             <p className="text-lg text-muted-foreground max-w-xl leading-relaxed">
-              FinanceAI sees every penny you spend, every bracha you make, every bill you forgot — and quietly keeps your budget, your forecasts, and your maaser in line.
+              Penni sees every penny you spend, every bracha you make, every bill you forgot — and quietly keeps your budget, your forecasts, and your maaser in line.
             </p>
             <div className="flex flex-wrap gap-3">
               <Button variant="primary" size="pill" asChild>
@@ -98,7 +98,7 @@ export default function Landing() {
           </div>
           <div className="lg:col-span-5 relative fade-up delay-2">
             <div className="relative rounded-3xl overflow-hidden border border-border shadow-2xl">
-              <img src={HERO_IMG} alt="FinanceAI" className="w-full h-auto" />
+              <img src={HERO_IMG} alt="Penni" className="w-full h-auto" />
             </div>
             <div className="absolute -bottom-6 -left-6 glass rounded-2xl p-4 w-56 hidden sm:block">
               <p className="label-overline">Cash Flow</p>
@@ -127,7 +127,7 @@ export default function Landing() {
             <h2 className="text-4xl lg:text-5xl tracking-tight mt-3 font-medium">Six tools, one premium brain.</h2>
           </div>
           <div className="lg:col-span-6 lg:col-start-7 text-muted-foreground leading-relaxed">
-            Most finance apps show you numbers. FinanceAI explains them, predicts the next ones, and quietly takes action — from your inbox, your SMS, and your bank.
+            Most finance apps show you numbers. Penni explains them, predicts the next ones, and quietly takes action — from your inbox, your SMS, and your bank.
           </div>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -147,7 +147,7 @@ export default function Landing() {
           <div className="lg:col-span-6">
             <p className="label-overline text-topaz">Built for our community</p>
             <h2 className="text-4xl lg:text-5xl tracking-tight mt-3 font-medium">Maaser, Pesach, Yom Tov — handled.</h2>
-            <p className="text-muted-foreground mt-4 leading-relaxed">FinanceAI is the only platform that natively understands Jewish life. Auto-calculates Maaser on every paycheck, forecasts Pesach 6 weeks ahead, and tracks every penny of Tzedakah for the year-end.</p>
+            <p className="text-muted-foreground mt-4 leading-relaxed">Penni is the only platform that natively understands Jewish life. Auto-calculates Maaser on every paycheck, forecasts Pesach 6 weeks ahead, and tracks every penny of Tzedakah for the year-end.</p>
             <ul className="mt-6 space-y-2 text-sm">
               {["10% Maaser automation", "Tzedakah ledger with receipts", "Yom Tov spending forecasts", "Hebrew calendar integration"].map((t) => (
                 <li key={t} className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald" /> {t}</li>
@@ -207,7 +207,7 @@ export default function Landing() {
       </section>
 
       <footer className="border-t border-border py-12 text-center text-sm text-muted-foreground">
-        <p>© 2026 FinanceAI. Built for the UK & the heimishe community.</p>
+        <p>© 2026 Penni. Built for the UK & the heimishe community.</p>
         <div className="flex items-center justify-center gap-4 mt-2">
           <a href="/privacy" className="hover:text-foreground">Privacy Policy</a>
           <a href="/login" className="hover:text-foreground">Sign In</a>

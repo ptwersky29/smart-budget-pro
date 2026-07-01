@@ -1,6 +1,6 @@
-export const APP_NAME = "FinanceAI";
-export const APP_TAGLINE = "Premium money workspace";
-export const COPYRIGHT = "\u00a9 2026 FinanceAI. Built for the UK & the heimishe community.";
+export const APP_NAME = "Penni";
+export const APP_TAGLINE = "Your penny, planned.";
+export const COPYRIGHT = "\u00a9 2026 Penni. Built for the UK & the heimishe community.";
 export const CURRENCY_SYMBOL = "\u00a3";
 
 export const PAGES = {

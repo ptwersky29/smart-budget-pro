@@ -6,7 +6,7 @@ import { PageHeader } from "../components/ui/layout";
 import { Button } from "../components/ui/button";
 
 export default function UKTools() {
-  useEffect(() => { document.title = "UK Tools | FinanceAI"; }, []);
+  useEffect(() => { document.title = "UK Tools | Penni"; }, []);
   const [uc, setUc] = useState({ monthly_earnings: 0, children: 0, housing_cost: 0, couple: false, has_disability: false, result: null, busy: false });
   const [tax, setTax] = useState({ annual_income: 35000, result: null, busy: false });
 

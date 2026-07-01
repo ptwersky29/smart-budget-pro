@@ -9,7 +9,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 
 export default function Statements() {
-  useEffect(() => { document.title = "Statements | FinanceAI"; }, []);
+  useEffect(() => { document.title = "Statements | Penni"; }, []);
   const { user } = useAuth();
   const fileRef = useRef(null);
   const [busy, setBusy] = useState(false);

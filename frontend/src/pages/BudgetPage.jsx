@@ -15,7 +15,6 @@ import { PageHeader } from "../components/ui/layout";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import CategoryCombobox from "../components/CategoryCombobox";
 import MonthPicker, { YIDDISH } from "../components/MonthPicker";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -40,8 +39,6 @@ const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
-
-const PIE_COLORS = ["#30a46c", "#e8a838", "#60a5fa", "#a78bfa", "#f472b6", "#fb923c", "#34d399", "#818cf8", "#f87171", "#2dd4bf", "#fbbf24", "#e879f9"];
 
 const SECTION_ICONS = {
   income: TrendingUp,
@@ -295,7 +292,7 @@ export default React.memo(function BudgetPage() {
   useEffect(() => {
     api.get("/jewish/hebcal/months")
       .then(({ data }) => {
-        const ms = data.months || [];
+        const ms = (data.months || []).sort((a, b) => a.gregorian_start.localeCompare(b.gregorian_start));
         setHebrewMonths(ms);
         const current = ms.find((m) => m.is_current);
         if (current) setSelectedHebrewMonth(current);
@@ -807,51 +804,6 @@ export default React.memo(function BudgetPage() {
         </div>
       </div>
 
-      {/* Spend breakdown pie chart */}
-      {!loading && categorySpend.length > 0 && (
-        <div className="rounded-2xl border border-border/50 bg-card/40 backdrop-blur-sm p-4 sm:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <span className="grid h-6 w-6 place-items-center rounded-md bg-muted/70"><TrendingDown className="h-3 w-3 text-muted-foreground/80" /></span>
-              Spend breakdown
-            </h3>
-            <span className="text-xs text-muted-foreground">{categorySpend.length} categories</span>
-          </div>
-          <div className="flex flex-col sm:flex-row items-center gap-6">
-            <div className="relative shrink-0" style={{ width: 220, height: 220 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={categorySpend} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={2} strokeWidth={0}>
-                    {categorySpend.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", fontSize: "13px" }}
-                    labelStyle={{ fontWeight: 600 }}
-                    formatter={(value) => [`£${Number(value).toLocaleString()}`, "Spent"]}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <p className="text-2xl font-bold tabular-nums tracking-tight">£{categorySpend.reduce((s, c) => s + (c.value || 0), 0).toLocaleString()}</p>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total spent</p>
-              </div>
-            </div>
-            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-1.5 w-full">
-              {categorySpend.slice(0, 8).map((cat, i) => (
-                <div key={cat.name} className="flex items-center gap-2 text-xs py-1 px-2 rounded-lg hover:bg-secondary/50 transition-colors">
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                  <span className="flex-1 truncate capitalize text-muted-foreground">{cat.name}</span>
-                  <span className="font-semibold tabular-nums text-foreground">£{Number(cat.value).toLocaleString()}</span>
-                </div>
-              ))}
-              {categorySpend.length > 8 && (
-                <div className="text-[11px] text-muted-foreground text-center col-span-2 pt-1">+{categorySpend.length - 8} more</div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Loading */}
       {loading && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1061,7 +1013,7 @@ export default React.memo(function BudgetPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-foreground">
-                    FinanceAI Coach
+                    Penni Coach
                   </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">I have {insights.length} personalized suggestions to improve your cash flow.</p>
                 </div>

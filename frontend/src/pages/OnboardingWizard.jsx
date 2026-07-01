@@ -311,7 +311,7 @@ export default function OnboardingWizard() {
   const finishOnboarding = async () => {
     try {
       await api.post("/onboarding/progress", { step: "complete" });
-      toast.success("You're all set — welcome to FinanceAI!");
+      toast.success("You're all set — welcome to Penni!");
     } catch {
       // best-effort
     }
@@ -345,7 +345,7 @@ export default function OnboardingWizard() {
             </div>
             <h1 className="text-3xl tracking-tight font-semibold">You're all set!</h1>
             <p className="text-muted-foreground max-w-sm mx-auto leading-relaxed">
-              Your FinanceAI workspace is ready. Start by exploring your dashboard or adding more data.
+              Your Penni workspace is ready. Start by exploring your dashboard or adding more data.
             </p>
             <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto">
               <Button variant="primary" size="pill" onClick={finishOnboarding} disabled={busy}>
@@ -373,7 +373,7 @@ export default function OnboardingWizard() {
           <div className="flex items-center justify-between mb-10">
             <Link to="/" className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-xl gradient-emerald grid place-items-center text-white font-bold text-sm">£</div>
-              <span className="font-semibold tracking-tight">FinanceAI</span>
+              <span className="font-semibold tracking-tight">Penni</span>
             </Link>
             <button onClick={skipAll} className="text-sm text-muted-foreground hover:text-foreground">
               Skip setup

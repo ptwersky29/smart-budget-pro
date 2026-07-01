@@ -13,7 +13,7 @@ const STOCK_TICKERS = ["VUSA","VWRL","VUKE","IWDA","EQQQ","ISF","FTSE","SP500","
 const CHART_TOOLTIP_STYLE = { backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px" };
 
 export default function Investments() {
-  useEffect(() => { document.title = "Investments | FinanceAI"; }, []);
+  useEffect(() => { document.title = "Investments | Penni"; }, []);
   const [form, setForm] = useState({ symbol: "VUSA", monthly_contribution: 500, years: 20, initial_value: 5000 });
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);

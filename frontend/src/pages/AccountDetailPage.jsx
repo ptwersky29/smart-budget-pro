@@ -29,7 +29,7 @@ const ACCOUNT_TYPE_META = {
 export default function AccountDetailPage() {
   const { accountId } = useParams();
   const navigate = useNavigate();
-  useEffect(() => { document.title = "Account | FinanceAI"; }, []);
+  useEffect(() => { document.title = "Account | Penni"; }, []);
 
   const [account, setAccount] = useState(null);
   const [txs, setTxs] = useState([]);
@@ -94,7 +94,7 @@ export default function AccountDetailPage() {
     try {
       const { data } = await api.get(`/accounts/${accountId}`);
       setAccount(data);
-      document.title = `${getDisplayName(data)} | FinanceAI`;
+      document.title = `${getDisplayName(data)} | Penni`;
     } catch (err) {
       setError(formatApiError(err.response?.data?.detail) || "Could not load account");
     } finally { setLoading(false); }

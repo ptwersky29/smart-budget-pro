@@ -18,7 +18,7 @@ import RecurringTransactionManager from "../components/RecurringTransactionManag
 const emptyForm = { name: "", amount: "", category: "", frequency: "monthly", merchant: "", notes: "" };
 
 export default function Subscriptions() {
-  useEffect(() => { document.title = "Subscriptions | FinanceAI"; }, []);
+  useEffect(() => { document.title = "Subscriptions | Penni"; }, []);
   const [subs, setSubs] = useState([]);
   const subsRef = useRef(subs);
   subsRef.current = subs;

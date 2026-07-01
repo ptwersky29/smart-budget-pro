@@ -17,7 +17,7 @@ export default function AuthVisual({ title = "Premium money, quietly automated."
             &pound;
           </div>
           <div>
-            <p className="text-sm font-semibold">FinanceAI</p>
+            <p className="text-sm font-semibold">Penni</p>
             <p className="text-xs text-white/60">Live money workspace</p>
           </div>
         </div>

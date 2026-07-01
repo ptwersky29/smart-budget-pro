@@ -19,7 +19,7 @@ export default function Login() {
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState({});
 
-  useEffect(() => { document.title = "Sign In | FinanceAI"; }, []);
+  useEffect(() => { document.title = "Sign In | Penni"; }, []);
 
   useEffect(() => {
     if (searchParams.get("expired") === "1") {
@@ -67,7 +67,7 @@ export default function Login() {
         <div className="w-full max-w-sm">
           <Link to="/" className="flex items-center gap-2 mb-10">
             <div className="w-9 h-9 rounded-xl gradient-emerald grid place-items-center text-white font-bold">&pound;</div>
-            <span className="font-semibold tracking-tight text-lg">FinanceAI</span>
+            <span className="font-semibold tracking-tight text-lg">Penni</span>
           </Link>
 
           <h1 className="text-3xl tracking-tight font-semibold">Welcome back.</h1>

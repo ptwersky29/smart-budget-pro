@@ -4,7 +4,7 @@ import { Home, ArrowLeft } from "lucide-react";
 import { Button } from "../components/ui/button";
 
 export default function NotFound() {
-  useEffect(() => { document.title = "404 | FinanceAI"; }, []);
+  useEffect(() => { document.title = "404 | Penni"; }, []);
   return (
     <div className="min-h-screen grid place-items-center p-4">
       <div className="text-center max-w-md">

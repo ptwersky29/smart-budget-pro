@@ -48,7 +48,7 @@ const Dashboard = React.memo(function Dashboard() {
   const { version: categoriesVersion } = useCategories();
   const navigate = useNavigate();
   useEffect(() => {
-    document.title = "Dashboard | FinanceAI";
+    document.title = "Dashboard | Penni";
   }, []);
   const [overview, setOverview] = useState(null);
   const [budgets, setBudgets] = useState([]);
@@ -217,7 +217,7 @@ const Dashboard = React.memo(function Dashboard() {
       {empty && (
         <EmptyState
           icon={Wallet}
-          title="Welcome to FinanceAI"
+          title="Welcome to Penni"
           description="Connect your bank to import transactions automatically, upload a CSV statement, or add your first transaction manually to get started."
           action={
             <div className="flex flex-wrap gap-3 justify-center">

@@ -38,7 +38,7 @@ export default function Register() {
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState({});
 
-  useEffect(() => { document.title = "Create Account | FinanceAI"; }, []);
+  useEffect(() => { document.title = "Create Account | Penni"; }, []);
 
   const validate = () => {
     const e = {};
@@ -60,7 +60,7 @@ export default function Register() {
     setBusy(true);
     try {
       await register(form);
-      toast.success("Account created - welcome to FinanceAI!");
+      toast.success("Account created - welcome to Penni!");
       navigate("/onboarding");
     } catch (err) {
       const msg = formatApiError(err.response?.data?.detail) || "Could not create account. Please try again.";
@@ -83,7 +83,7 @@ export default function Register() {
         <div className="w-full max-w-sm">
           <Link to="/" className="flex items-center gap-2 mb-10">
             <div className="w-9 h-9 rounded-xl gradient-emerald grid place-items-center text-white font-bold">&pound;</div>
-            <span className="font-semibold tracking-tight text-lg">FinanceAI</span>
+            <span className="font-semibold tracking-tight text-lg">Penni</span>
           </Link>
 
           <h1 className="text-3xl tracking-tight font-semibold">Create your account.</h1>

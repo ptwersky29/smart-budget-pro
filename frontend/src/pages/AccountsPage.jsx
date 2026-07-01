@@ -189,7 +189,7 @@ function TotalBalanceSection({ accounts, loading }) {
 }
 
 export default function AccountsPage() {
-  useEffect(() => { document.title = "Accounts & Import | FinanceAI"; }, []);
+  useEffect(() => { document.title = "Accounts & Import | Penni"; }, []);
   
   // Accounts state
   const [accounts, setAccounts] = useState([]);

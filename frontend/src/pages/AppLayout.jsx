@@ -116,7 +116,7 @@ export default function AppLayout() {
       <aside className={`${open ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:sticky top-0 left-0 z-40 h-screen w-[19rem] border-r border-border bg-card/85 backdrop-blur-xl transition-transform duration-300`}>
         <div className="flex items-center justify-between px-6 h-16 border-b border-border/70">
           <Link to="/dashboard" className="flex items-center gap-3" data-testid="sidebar-logo">
-            <div className="w-9 h-9 rounded-2xl gradient-emerald grid place-items-center text-white font-bold shadow-lg shadow-emerald/20">£</div>
+            <div className="w-9 h-9 rounded-2xl gradient-emerald grid place-items-center text-white font-bold text-lg shadow-lg shadow-emerald/20">P</div>
             <div>
               <span className="block font-semibold tracking-tight leading-none">{APP_NAME}</span>
               <span className="block text-[11px] text-muted-foreground mt-1">{APP_TAGLINE}</span>

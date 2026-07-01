@@ -17,7 +17,7 @@ export default function Pricing() {
   const navigate = useNavigate();
   const [busy, setBusy] = useState({ monthly: false, yearly: false });
 
-  useEffect(() => { document.title = "Pricing | FinanceAI"; }, []);
+  useEffect(() => { document.title = "Pricing | Penni"; }, []);
 
   const upgrade = async (packageId) => {
     if (!user) { navigate("/login"); return; }
@@ -41,7 +41,7 @@ export default function Pricing() {
       <div className="max-w-5xl mx-auto pt-6 sm:pt-12">
         <Link to="/" className="inline-flex items-center gap-2 mb-6 sm:mb-8">
           <div className="w-8 h-8 rounded-xl gradient-emerald grid place-items-center text-white font-bold">£</div>
-          <span className="font-semibold tracking-tight text-lg">FinanceAI</span>
+          <span className="font-semibold tracking-tight text-lg">Penni</span>
         </Link>
         <div className="text-center mb-8 sm:mb-12">
           <p className="label-overline text-emerald">Pricing</p>

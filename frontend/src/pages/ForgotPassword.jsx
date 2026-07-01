@@ -11,7 +11,7 @@ export default function ForgotPassword() {
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
 
-  useEffect(() => { document.title = "Reset Password | FinanceAI"; }, []);
+  useEffect(() => { document.title = "Reset Password | Penni"; }, []);
 
   const onSubmit = async (e) => {
     e.preventDefault();

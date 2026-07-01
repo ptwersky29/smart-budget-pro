@@ -38,7 +38,7 @@ const GRADE_COLOURS = {
 
 export default function Reports() {
   useEffect(() => {
-    document.title = "Reports | FinanceAI";
+    document.title = "Reports | Penni";
   }, []);
   const { user } = useAuth();
   const { version: categoriesVersion } = useCategories();
@@ -94,7 +94,7 @@ export default function Reports() {
     }
     setBusy(kind);
     try {
-      await downloadBlob(`/reports/${kind}`, {}, `financeai-${kind}.pdf`);
+      await downloadBlob(`/reports/${kind}`, {}, `Penni-${kind}.pdf`);
       toast.success("Report downloaded");
     } catch (e) {
       console.error("download failed", e);
@@ -114,7 +114,7 @@ export default function Reports() {
       await downloadBlob(
         "/reports/monthly",
         { format: "csv", date_from: dateFrom, date_to: dateTo },
-        `financeai-${dateFrom}-${dateTo}.csv`,
+        `Penni-${dateFrom}-${dateTo}.csv`,
       );
       toast.success("CSV downloaded");
     } catch (e) {

@@ -14,7 +14,7 @@ function titleCase(s) {
 }
 
 export default function Jewish() {
-  useEffect(() => { document.title = "Jewish Calendar | FinanceAI"; }, []);
+  useEffect(() => { document.title = "Jewish Calendar | Penni"; }, []);
   // Hebcal widget state
   const [hebDate, setHebDate] = useState(null);
   const [zmanim, setZmanim] = useState(null);

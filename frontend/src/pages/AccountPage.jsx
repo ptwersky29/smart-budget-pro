@@ -57,7 +57,7 @@ export default function AccountPage() {
   const { connectionId } = useParams();
   const navigate = useNavigate();
   useEffect(() => {
-    document.title = "Account | FinanceAI";
+    document.title = "Account | Penni";
   }, []);
 
   const [conn, setConn] = useState(null);
@@ -172,7 +172,7 @@ export default function AccountPage() {
       const { data } = await api.get(endpoint);
       setConn({ ...data, provider: isManual ? "manual" : data.provider });
       setNicknameValue(data.nickname || data.account_name || "");
-      document.title = `${data.account_name || "Account"} | FinanceAI`;
+      document.title = `${data.account_name || "Account"} | Penni`;
     } catch (err) {
       setError(
         formatApiError(err.response?.data?.detail) || "Could not load account",
