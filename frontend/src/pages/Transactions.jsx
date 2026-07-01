@@ -827,17 +827,14 @@ const Transactions = React.memo(function Transactions() {
                   <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Total spent</p>
                 </div>
               </div>
-              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-1 w-full">
-                {categorySpend.slice(0, 8).map((cat, i) => (
+              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 w-full">
+                {categorySpend.map((cat, i) => (
                   <div key={cat.name} className="flex items-center gap-2 text-xs py-1 px-2 rounded-lg hover:bg-secondary/50 transition-colors">
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
                     <span className="flex-1 truncate capitalize text-muted-foreground">{cat.name}</span>
                     <span className="font-semibold tabular-nums text-foreground">£{Number(cat.value).toLocaleString()}</span>
                   </div>
                 ))}
-                {categorySpend.length > 8 && (
-                  <div className="text-[11px] text-muted-foreground text-center col-span-2 pt-1">+{categorySpend.length - 8} more</div>
-                )}
               </div>
             </div>
           )}
