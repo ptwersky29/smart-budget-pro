@@ -13,7 +13,27 @@ export default function AuthCallback() {
   useEffect(() => {
     (async () => {
       const hash = window.location.hash;
-      if (!hash) return;
+      
+      // If no hash, check if we already have stored tokens
+      if (!hash || hash === "#") {
+        console.log("[AuthCallback] No hash fragment found, checking stored tokens");
+        const stored = getToken("access_token");
+        if (stored) {
+          try {
+            const { data: me } = await api.get("/auth/me");
+            setUser(me);
+            navigate("/dashboard", { replace: true });
+            return;
+          } catch (e) {
+            console.error("[AuthCallback] Stored token invalid:", e);
+          }
+        }
+        // No valid stored token, redirect to login
+        toast.error("Authentication failed. Please try again.");
+        navigate("/login?error=no_callback_data", { replace: true });
+        return;
+      }
+
       const params = new URLSearchParams(hash.replace(/^#?/, "?"));
       const accessToken = params.get("access_token");
       const refreshToken = params.get("refresh_token");
@@ -38,20 +58,22 @@ export default function AuthCallback() {
         setToken("access_token", accessToken, true);
         if (refreshToken) setToken("refresh_token", refreshToken, true);
         window.location.hash = "";
-      }
-
-      try {
-        const stored = getToken("access_token");
-        if (stored) {
+        
+        try {
           const { data: me } = await api.get("/auth/me");
           setUser(me);
+          toast.success("Welcome back!");
           navigate("/dashboard", { replace: true });
-        } else {
-          navigate("/login?error=no_token", { replace: true });
+        } catch (e) {
+          console.error("[AuthCallback] Token validation failed:", e?.response?.status, e?.response?.data?.detail);
+          toast.error("Login failed. Please try again.");
+          navigate("/login?error=token_validation_failed", { replace: true });
         }
-      } catch (e) {
-        console.error("[AuthCallback] session validation failed:", e?.response?.status, e?.response?.data?.detail);
-        navigate("/login?error=auth_failed", { replace: true });
+      } else {
+        // Hash exists but no access token - something went wrong
+        console.error("[AuthCallback] Hash exists but no access_token found:", hash);
+        toast.error("Authentication incomplete. Please try again.");
+        navigate("/login?error=missing_token", { replace: true });
       }
     })();
   }, [navigate, setUser]);

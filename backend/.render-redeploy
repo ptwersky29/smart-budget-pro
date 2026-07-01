@@ -1,0 +1,3 @@
+# Trigger file to force Render redeploy
+# Last updated: 2026-07-01
+DEPLOYMENT_VERSION=v1.1.2
