@@ -171,8 +171,13 @@ const Transactions = React.memo(function Transactions() {
       setIncomeTotal(data.income_total || 0);
       setExpenseTotal(data.expense_total || 0);
       if (filters.date_from && filters.date_to) {
-        api.get("/dashboard/overview", { params: { date_from: filters.date_from, date_to: filters.date_to } })
-          .then((res) => setCategorySpend(res.data.categories || []))
+        const from = filters.date_from, to = filters.date_to;
+        api.get("/dashboard/overview", { params: { date_from: from, date_to: to } })
+          .then((res) => {
+            if (filters.date_from === from && filters.date_to === to) {
+              setCategorySpend(res.data.categories || []);
+            }
+          })
           .catch(() => {});
       }
     } catch (err) { toast.error("Could not load transactions"); }

@@ -13,8 +13,9 @@ export default function AuthVisual({ title = "Premium money, quietly automated."
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(16,185,129,0.25),transparent_32%),radial-gradient(circle_at_80%_10%,rgba(245,158,11,0.18),transparent_28%)]" />
       <div className="relative z-10 flex h-full w-full flex-col justify-between">
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald text-sm font-bold text-white">
-            &pound;
+          <div className="relative grid h-10 w-10 place-items-center rounded-xl bg-emerald text-sm font-bold text-white overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent rounded-xl pointer-events-none" />
+            <span className="relative z-10">&pound;</span>
           </div>
           <div>
             <p className="text-sm font-semibold">Penni</p>
