@@ -58,7 +58,13 @@ const Dashboard = React.memo(function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
 
   const dashboardPrefs = settings.preferences?.dashboard || {};
-  const activeWidgets = dashboardPrefs.widgets || [];
+  const activeWidgets = dashboardPrefs.widgets && dashboardPrefs.widgets.length > 0
+    ? dashboardPrefs.widgets
+    : [
+        "net_worth", "income", "spending", "health_score", 
+        "cash_flow", "budgets_overview", "quick_actions", 
+        "ai_insights", "maaser_balance", "recent_transactions"
+      ];
   const chartStyle = dashboardPrefs.chart_style || "smooth";
   const showWidget = (key) => activeWidgets.includes(key);
 
