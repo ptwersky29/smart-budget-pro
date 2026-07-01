@@ -172,11 +172,19 @@ const Transactions = React.memo(function Transactions() {
       setExpenseTotal(data.expense_total || 0);
       if (filters.date_from && filters.date_to) {
         const from = filters.date_from, to = filters.date_to;
-        api.get("/dashboard/overview", { params: { date_from: from, date_to: to } })
+        api.get("/transactions", { params: { date_from: from, date_to: to, limit: 1000, sort: "date", order: "desc" } })
           .then((res) => {
-            if (filters.date_from === from && filters.date_to === to) {
-              setCategorySpend(res.data.categories || []);
-            }
+            if (filters.date_from !== from || filters.date_to !== to) return;
+            const spend = {};
+            (res.data.transactions || []).forEach((tx) => {
+              const cat = (tx.category || "uncategorized").toLowerCase().trim();
+              const amt = Math.abs(parseFloat(tx.amount) || 0);
+              if (tx.tx_type === "expense" || tx.is_income === false || (!tx.is_income && amt > 0)) {
+                spend[cat] = (spend[cat] || 0) + amt;
+              }
+            });
+            const cats = Object.entries(spend).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+            setCategorySpend(cats);
           })
           .catch(() => {});
       }
