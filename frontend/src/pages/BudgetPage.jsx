@@ -72,10 +72,10 @@ const BudgetCard = React.memo(({ budget, isCurrentMonth, currentDay, monthElapse
     const projectedDeficit = projectedSpend - budget.limit;
     if (projectedDeficit > 5 && !over) {
       paceMessage = `Pacing £${Math.round(projectedDeficit)} over`;
-      paceClass = "text-ruby bg-ruby/10";
+      paceClass = "text-ruby";
     } else if (projectedDeficit < -5 && pct < 100) {
       paceMessage = `Pacing £${Math.abs(Math.round(projectedDeficit))} under`;
-      paceClass = "text-emerald bg-emerald/10";
+      paceClass = "text-emerald";
     }
   }
   if (isEditing) {
@@ -93,47 +93,53 @@ const BudgetCard = React.memo(({ budget, isCurrentMonth, currentDay, monthElapse
   const isSelected = bulkSelected.has(budget.budget_id);
   const statusLabel = over ? "Over" : pct >= 80 ? "Nearing" : "On track";
   return (
-    <div key={budget.budget_id} className={`rounded-xl border ${isSelected ? "border-emerald bg-emerald/5" : "border-border/50 bg-background/40"} backdrop-blur-xl p-3 hover:border-border hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 relative`}>
-      {isSelected && <div className="absolute inset-0 rounded-xl border-2 border-emerald/40 pointer-events-none" />}
-      <div className="flex items-center gap-2 mb-1.5">
+    <div key={budget.budget_id} className={`rounded-xl border ${isSelected ? "border-emerald bg-emerald/[0.03] ring-1 ring-emerald/30" : "border-border/50 bg-background/40"} backdrop-blur-xl p-3 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-border transition-all duration-300 relative overflow-hidden border-l-[3px] ${over ? "border-l-ruby" : pct >= 80 ? "border-l-topaz" : "border-l-emerald"}`}>
+      <div className="flex items-start gap-2.5 mb-2">
         <input type="checkbox" checked={isSelected} onChange={() => {
           const next = new Set(bulkSelected);
           if (isSelected) next.delete(budget.budget_id); else next.add(budget.budget_id);
           setBulkSelected(next);
-        }} className="shrink-0 w-4 h-4 rounded border-border text-emerald focus:ring-emerald/30" />
-        <h3 className="text-sm font-semibold capitalize truncate leading-tight tracking-tight flex-1">{budget.category}</h3>
-        <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-          over ? "bg-ruby/10 text-ruby" :
-          pct >= 80 ? "bg-topaz/10 text-topaz" :
-          "bg-emerald/10 text-emerald"
-        }`}>
-          {statusLabel}
-        </span>
-      </div>
-      <div className="flex items-baseline gap-1 mb-1.5">
-        <span className={`text-sm font-bold tabular-nums tracking-tight ${over ? "text-ruby" : "text-foreground"}`}>
-          £{budget.spent}
-        </span>
-        <span className="text-xs text-muted-foreground font-medium">/ £{budget.limit}</span>
-        <span className="ml-auto text-[11px] font-medium tabular-nums text-muted-foreground">
-          £{budget.remaining >= 0 ? `${budget.remaining} left` : `${Math.abs(budget.remaining)} over`}
-        </span>
-      </div>
-      <div className="h-2 rounded-full bg-secondary/50 overflow-hidden mb-1 shadow-inner">
-        <div className={`h-full rounded-full ${over ? "bg-ruby" : "bg-gradient-to-r from-emerald to-topaz"}`} style={{ width: `${Math.min(100, pct)}%`, transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)" }} />
-      </div>
-      {paceMessage && (
-        <div className={`text-[10px] px-1.5 py-0.5 rounded font-medium inline-block mb-1.5 ${paceClass}`}>
-          {paceMessage}
+        }} className="shrink-0 w-4 h-4 rounded border-border text-emerald focus:ring-emerald/30 mt-0.5" />
+        <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${over ? "from-ruby to-ruby/70" : pct >= 80 ? "from-topaz to-topaz/70" : "from-emerald to-emerald/70"} flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-sm`}>
+          {budget.category[0].toUpperCase()}
         </div>
-      )}
-      <div className="flex items-center gap-1.5 pt-1.5 border-t border-border/40 mt-1.5">
-        <button onClick={() => startEdit(budget)} className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-secondary hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" aria-label={`Edit ${budget.category}`}>
-          <Pencil className="h-3 w-3" /> Edit
-        </button>
-        <button onClick={() => setConfirmDelete({ type: 'budget', id: budget.budget_id })} className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-ruby/10 hover:bg-ruby/20 text-ruby transition-colors" aria-label={`Delete ${budget.category}`}>
-          <Trash2 className="h-3 w-3" /> Delete
-        </button>
+        <h3 className="text-sm font-semibold capitalize truncate leading-tight tracking-tight flex-1 pt-0.5">{budget.category}</h3>
+        <div className="flex items-center gap-1 mt-1">
+          <span className={`w-1.5 h-1.5 rounded-full ${over ? "bg-ruby" : pct >= 80 ? "bg-topaz" : "bg-emerald"} shrink-0`} />
+          <span className={`text-[10px] font-semibold ${over ? "text-ruby" : pct >= 80 ? "text-topaz" : "text-emerald"} hidden sm:inline`}>{statusLabel}</span>
+        </div>
+        <div className="flex gap-0.5">
+          <button onClick={() => startEdit(budget)} className="p-1.5 rounded-lg bg-secondary/30 hover:bg-secondary text-muted-foreground hover:text-foreground transition-all" aria-label={`Edit ${budget.category}`}>
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          <button onClick={() => setConfirmDelete({ type: 'budget', id: budget.budget_id })} className="p-1.5 rounded-lg bg-transparent hover:bg-ruby/10 text-muted-foreground hover:text-ruby transition-all" aria-label={`Delete ${budget.category}`}>
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+      <div className="pl-9 space-y-1.5">
+        <div className="flex items-baseline gap-1.5">
+          <span className={`text-2xl font-bold tabular-nums tracking-tight ${over ? "text-ruby" : "text-foreground"}`}>
+            £{budget.spent}
+          </span>
+          <span className="text-xs text-muted-foreground font-medium">of £{budget.limit}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-semibold tabular-nums ${budget.remaining >= 0 ? "text-emerald" : "text-ruby"}`}>
+            £{budget.remaining >= 0 ? `${budget.remaining} left` : `${Math.abs(budget.remaining)} over`}
+          </span>
+          {paceMessage && (
+            <span className={`text-[10px] font-medium ${paceClass}`}>
+              · {paceMessage}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-2.5 rounded-full bg-secondary/50 overflow-hidden shadow-inner">
+            <div className={`h-full rounded-full ${over ? "bg-ruby" : "bg-gradient-to-r from-emerald to-topaz"}`} style={{ width: `${Math.min(100, pct)}%`, transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)" }} />
+          </div>
+          <span className="text-[11px] font-bold tabular-nums text-muted-foreground">{Math.round(pct)}%</span>
+        </div>
       </div>
     </div>
   );
@@ -145,48 +151,62 @@ const EventGroupCard = React.memo(({ group, setConfirmDelete, fetchData }) => {
   const pct = totalLimit ? Math.min(100, (totalSpent / totalLimit) * 100) : 0;
   const over = pct >= 100;
   const [showAdd, setShowAdd] = useState(false);
+  const parsedDate = group.event_date ? parseISO(group.event_date) : null;
   return (
-    <div key={group.event_group_id} className={`rounded-xl border border-border/50 bg-background/40 backdrop-blur-xl p-3 hover:border-border hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden ${over ? "border-l-ruby" : pct >= 80 ? "border-l-topaz" : "border-l-emerald"} border-l-2`}>
-      <div className="flex items-center gap-2 mb-1.5">
-        {group.event_date && (
-          <div className="shrink-0 flex flex-col items-center w-8">
-            <span className="text-[9px] uppercase font-bold text-muted-foreground leading-tight">{parseISO(group.event_date).toLocaleDateString("en-GB", { month: "short" })}</span>
-            <span className="text-xs font-bold leading-none">{parseISO(group.event_date).getDate()}</span>
+    <div key={group.event_group_id} className={`rounded-xl border border-border/50 bg-background/40 backdrop-blur-xl p-3 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-border transition-all duration-300 relative overflow-hidden border-l-[3px] ${over ? "border-l-ruby" : pct >= 80 ? "border-l-topaz" : "border-l-emerald"}`}>
+      <div className="flex items-start gap-2.5 mb-2">
+        {parsedDate ? (
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-muted-foreground/30 to-muted-foreground/10 flex flex-col items-center justify-center text-[8px] font-bold text-muted-foreground leading-tight shrink-0 shadow-sm">
+            <span>{parsedDate.toLocaleDateString("en-GB", { month: "short" })}</span>
+            <span className="text-[11px]">{parsedDate.getDate()}</span>
+          </div>
+        ) : (
+          <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${over ? "from-ruby to-ruby/70" : pct >= 80 ? "from-topaz to-topaz/70" : "from-emerald to-emerald/70"} flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-sm`}>
+            <Calendar className="h-3.5 w-3.5" />
           </div>
         )}
-        <h3 className="text-sm font-semibold truncate leading-tight flex-1">{group.event_group_name || group.category}</h3>
-        <button onClick={() => setConfirmDelete({ type: 'group', id: group.event_group_id })} className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-ruby/10 hover:bg-ruby/20 text-ruby transition-colors shrink-0" aria-label={`Delete event ${group.event_group_name}`}>
-          <Trash2 className="h-3 w-3" /> Delete
+        <h3 className="text-sm font-semibold truncate leading-tight flex-1 pt-0.5">{group.event_group_name || group.category}</h3>
+        <div className="flex items-center gap-1 mt-1">
+          <span className={`w-1.5 h-1.5 rounded-full ${over ? "bg-ruby" : pct >= 80 ? "bg-topaz" : "bg-emerald"} shrink-0`} />
+          <span className={`text-[10px] font-semibold ${over ? "text-ruby" : pct >= 80 ? "text-topaz" : "text-emerald"} hidden sm:inline`}>{over ? "Over" : pct >= 80 ? "Nearing" : "On track"}</span>
+        </div>
+        <button onClick={() => setConfirmDelete({ type: 'group', id: group.event_group_id })} className="p-1.5 rounded-lg bg-transparent hover:bg-ruby/10 text-muted-foreground hover:text-ruby transition-all shrink-0" aria-label={`Delete event ${group.event_group_name}`}>
+          <Trash2 className="h-3.5 w-3.5" />
         </button>
       </div>
-      <div className="h-2 rounded-full bg-secondary/50 overflow-hidden mb-1 shadow-inner">
-        <div className={`h-full rounded-full ${over ? "bg-ruby" : "bg-gradient-to-r from-emerald to-topaz"}`} style={{ width: `${Math.min(100, pct)}%`, transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)" }} />
-      </div>
-      <div className="flex items-baseline gap-1 mb-1.5">
-        <span className={`text-sm font-bold tabular-nums tracking-tight ${over ? "text-ruby" : "text-foreground"}`}>
-          £{totalSpent.toFixed(2)}
-        </span>
-        <span className="text-xs text-muted-foreground font-medium">/ £{totalLimit.toFixed(2)}</span>
+      <div className="pl-9 space-y-1.5">
+        <div className="flex items-baseline gap-1.5">
+          <span className={`text-2xl font-bold tabular-nums tracking-tight ${over ? "text-ruby" : "text-foreground"}`}>
+            £{totalSpent.toFixed(2)}
+          </span>
+          <span className="text-xs text-muted-foreground font-medium">of £{totalLimit.toFixed(2)}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-2.5 rounded-full bg-secondary/50 overflow-hidden shadow-inner">
+            <div className={`h-full rounded-full ${over ? "bg-ruby" : "bg-gradient-to-r from-emerald to-topaz"}`} style={{ width: `${Math.min(100, pct)}%`, transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)" }} />
+          </div>
+          <span className="text-[11px] font-bold tabular-nums text-muted-foreground">{Math.round(pct)}%</span>
+        </div>
       </div>
       {group.items && group.items.length > 0 && (
-        <div className="mt-1.5 pt-1.5 border-t border-border/40 space-y-1">
+        <div className="mt-2 pt-2 border-t border-border/40 space-y-0.5 pl-9">
           {group.items.map((item) => {
             const itemPct = item.limit ? Math.min(100, (item.spent / item.limit) * 100) : 0;
             return (
-              <div key={item.budget_id} className="flex items-center gap-1.5 text-[11px] py-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
+              <div key={item.budget_id} className="flex items-center gap-2 text-[11px] py-1">
+                <div className="w-1 h-1 rounded-full bg-muted-foreground/30 shrink-0" />
                 <span className="flex-1 truncate text-muted-foreground">{item.category}</span>
-                <span className="tabular-nums text-muted-foreground">£{item.spent.toFixed(2)}</span>
-                <div className="w-12 h-1.5 rounded-full bg-muted/40 overflow-hidden shrink-0">
+                <span className="tabular-nums text-muted-foreground font-medium">£{item.spent.toFixed(2)}</span>
+                <div className="w-12 h-1 rounded-full bg-muted/40 overflow-hidden shrink-0">
                   <div className={`h-full rounded-full ${itemPct >= 100 ? "bg-ruby" : "bg-gradient-to-r from-emerald to-topaz"}`} style={{ width: `${Math.min(100, itemPct)}%` }} />
                 </div>
-                <button onClick={() => setConfirmDelete({ type: 'budget', id: item.budget_id })} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-ruby" aria-label={`Remove ${item.category} from event`}><X className="h-3 w-3" /></button>
+                <button onClick={() => setConfirmDelete({ type: 'budget', id: item.budget_id })} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-ruby transition-colors" aria-label={`Remove ${item.category} from event`}><X className="h-3 w-3" /></button>
               </div>
             );
           })}
         </div>
       )}
-      <div className="mt-1.5 pt-1.5 border-t border-border/40">
+      <div className={group.items && group.items.length > 0 ? "mt-2" : "mt-2 pl-9"}>
         {showAdd ? (
           <form onSubmit={async (e) => {
             e.preventDefault();
@@ -219,7 +239,7 @@ const EventGroupCard = React.memo(({ group, setConfirmDelete, fetchData }) => {
           </form>
         ) : (
           <button onClick={() => setShowAdd(true)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-full justify-center py-1.5 rounded-lg hover:bg-secondary/50">
-            <Plus className="h-3 w-3" /> Add item
+            <Plus className="h-3.5 w-3.5" /> Add item
           </button>
         )}
       </div>
