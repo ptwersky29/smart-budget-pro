@@ -1,13 +1,6 @@
 # Render Blueprint — Smart Budget Pro
 # Preview environments inherit envVars from master branch
 
-databases:
-  - name: financeai-db
-    databaseName: financeai
-    region: frankfurt
-    plan: starter
-    ipAllowList: []
-
 services:
   - type: web
     name: financeai-api
