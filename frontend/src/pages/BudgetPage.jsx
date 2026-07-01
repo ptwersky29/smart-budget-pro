@@ -287,6 +287,7 @@ export default React.memo(function BudgetPage() {
   const [categoryHierarchy, setCategoryHierarchy] = useState({});
   const [hebrewMonths, setHebrewMonths] = useState([]);
   const [selectedHebrewMonth, setSelectedHebrewMonth] = useState(null);
+  const [categorySpend, setCategorySpend] = useState([]);
 
   useEffect(() => {
     api.get("/jewish/hebcal/months")
@@ -403,6 +404,13 @@ export default React.memo(function BudgetPage() {
     return ordered;
   }, [filteredEveryday, sectionForCategory, categoryHierarchy]);
 
+  const unbudgetedCategories = useMemo(() => {
+    if (!categorySpend.length) return [];
+    const budgetedCats = new Set(budgets.map((b) => b.category.toLowerCase().trim()));
+    return categorySpend
+      .filter((c) => c.name && c.value > 0 && !budgetedCats.has(c.name.toLowerCase().trim()))
+      .sort((a, b) => b.value - a.value);
+  }, [categorySpend, budgets]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -417,6 +425,13 @@ export default React.memo(function BudgetPage() {
       setBudgets(data.budgets || []);
       setEventGroups(data.event_groups || {});
       setLoadError(null);
+      // Fetch category spend data for unbudgeted detection
+      const overviewParams = currentHebrewMonth
+        ? { date_from: currentHebrewMonth.gregorian_start, date_to: currentHebrewMonth.gregorian_end }
+        : { date_from: `${month}-01`, date_to: `${month}-${getDaysInMonth(new Date(parseInt(month.slice(0, 4), 10), parseInt(month.slice(5, 7), 10) - 1))}` };
+      api.get("/dashboard/overview", { params: overviewParams })
+        .then((res) => setCategorySpend(res.data.categories || []))
+        .catch(() => {});
     } catch (err) {
       setLoadError(err.response?.data?.detail || "Failed to load budgets");
     } finally {
@@ -448,10 +463,10 @@ export default React.memo(function BudgetPage() {
 
   const resetForm = () => setForm({ category: "", limit: "", budget_type: "everyday", event_date: "", event_group_id: "", event_group_name: "" });
   const resetQuickForm = () => setQuickForm({ amount: "", description: "", category: "", showDesc: false });
-  const openAddBudget = (budgetType = "everyday") => {
+  const openAddBudget = (budgetType = "everyday", category = "") => {
     resetForm();
     setAddTab("budget");
-    setForm((prev) => ({ ...prev, budget_type: budgetType }));
+    setForm((prev) => ({ ...prev, budget_type: budgetType, category }));
     setShowAdd(true);
   };
   const openAddExpense = () => {
@@ -886,6 +901,47 @@ export default React.memo(function BudgetPage() {
               );
             })}
           </section>
+
+          {/* Unbudgeted categories */}
+          {unbudgetedCategories.length > 0 && (
+            <section className="mb-5">
+              <div className="sticky top-[115px] z-10 flex items-center justify-between mb-3 bg-gradient-to-r from-topaz/10 via-topaz/5 to-transparent backdrop-blur-md px-4 py-2 rounded-xl border border-topaz/20 shadow-sm">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-topaz flex items-center gap-2">
+                  <span className="grid h-5 w-5 place-items-center rounded-md bg-topaz/20"><AlertCircle className="h-3 w-3 text-topaz" /></span>
+                  Unbudgeted
+                  <span className="text-[10px] font-normal text-topaz/60 bg-topaz/10 px-1.5 py-0.5 rounded-full">{unbudgetedCategories.length}</span>
+                </h2>
+                <span className="text-[10px] text-topaz font-medium">Categories with spend, no budget</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {unbudgetedCategories.map((cat) => (
+                  <div key={cat.name} className="rounded-xl border border-dashed border-topaz/30 bg-background/40 backdrop-blur-xl p-3 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-topaz/50 transition-all duration-300 relative overflow-hidden border-l-[3px] border-l-topaz">
+                    <div className="flex items-start gap-2.5 mb-2">
+                      <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-topaz to-topaz/70 flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-sm">
+                        {cat.name[0].toUpperCase()}
+                      </div>
+                      <h3 className="text-sm font-semibold capitalize truncate leading-tight flex-1 pt-0.5">{cat.name}</h3>
+                      <button onClick={() => openAddBudget("everyday", cat.name)} className="p-1.5 rounded-lg bg-emerald/10 hover:bg-emerald/20 text-emerald transition-all" aria-label={`Create budget for ${cat.name}`}>
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <div className="pl-9 space-y-1.5">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-2xl font-bold tabular-nums tracking-tight text-ruby">£{cat.value}</span>
+                        <span className="text-xs text-muted-foreground font-medium">no budget</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-2.5 rounded-full bg-secondary/50 overflow-hidden shadow-inner">
+                          <div className="h-full rounded-full bg-topaz/60" style={{ width: "100%" }} />
+                        </div>
+                        <span className="text-[11px] font-bold tabular-nums text-topaz">—%</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Upcoming Event Groups */}
           {upcomingEventGroups.length > 0 && (
