@@ -463,8 +463,15 @@ export default React.memo(function BudgetPage() {
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!form.category.trim() || !form.limit) { toast.error("Enter a category and amount"); return; }
+    const cat = form.category.toLowerCase().trim();
+    const dup = budgets.find((b) => {
+      if (b.category.toLowerCase().trim() !== cat) return false;
+      if (form.budget_type === "event") return b.event_group_id === form.event_group_id;
+      return (b.budget_type || "everyday") !== "event";
+    });
+    if (dup) { toast.error(`Budget for "${cat}" already exists`); return; }
     const payload = {
-      category: form.category.toLowerCase().trim(),
+      category: cat,
       limit: parseFloat(form.limit),
       period: "monthly",
       budget_type: form.budget_type,
