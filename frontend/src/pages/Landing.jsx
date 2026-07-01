@@ -26,8 +26,8 @@ export default function Landing() {
       <header className="sticky top-0 z-40 backdrop-blur-xl bg-background/70 border-b border-border">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2" data-testid="landing-logo">
-            <div className="relative w-8 h-8 rounded-xl gradient-emerald grid place-items-center text-white font-bold overflow-hidden shadow-md shadow-emerald/20">
-              <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent rounded-xl pointer-events-none" />
+            <div className="relative w-8 h-8 rounded-full gradient-emerald grid place-items-center text-white font-bold overflow-hidden shadow-md shadow-emerald/20 ring-1 ring-white/15">
+              <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent rounded-full pointer-events-none" />
               <span className="relative z-10">£</span>
             </div>
             <span className="font-semibold tracking-tight text-lg">Penni</span>

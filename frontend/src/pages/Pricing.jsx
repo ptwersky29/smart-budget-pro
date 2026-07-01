@@ -40,7 +40,7 @@ export default function Pricing() {
     <div className="min-h-screen bg-background p-4 sm:p-8">
       <div className="max-w-5xl mx-auto pt-6 sm:pt-12">
         <Link to="/" className="inline-flex items-center gap-2 mb-6 sm:mb-8">
-          <div className="w-8 h-8 rounded-xl gradient-emerald grid place-items-center text-white font-bold">£</div>
+          <div className="w-8 h-8 rounded-full gradient-emerald grid place-items-center text-white font-bold shadow-md shadow-emerald/20 ring-1 ring-white/15">£</div>
           <span className="font-semibold tracking-tight text-lg">Penni</span>
         </Link>
         <div className="text-center mb-8 sm:mb-12">

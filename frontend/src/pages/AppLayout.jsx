@@ -116,13 +116,13 @@ export default function AppLayout() {
       <aside className={`${open ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:sticky top-0 left-0 z-40 h-screen w-[19rem] border-r border-border bg-card/85 backdrop-blur-xl transition-transform duration-300`}>
         <div className="flex items-center justify-between px-6 h-16 border-b border-border/70">
           <Link to="/dashboard" className="flex items-center gap-3" data-testid="sidebar-logo">
-            <div className="relative w-9 h-9 rounded-2xl gradient-emerald grid place-items-center text-white font-bold text-lg shadow-lg shadow-emerald/20 overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent rounded-2xl pointer-events-none" />
+            <div className="relative w-10 h-10 rounded-full gradient-emerald grid place-items-center text-white font-bold text-lg shadow-lg shadow-emerald/20 overflow-hidden ring-1 ring-white/15">
+              <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent rounded-full pointer-events-none" />
               <span className="relative z-10">P</span>
             </div>
             <div>
               <span className="block font-semibold tracking-tight leading-none">{APP_NAME}</span>
-              <span className="block text-[11px] text-muted-foreground mt-1">{APP_TAGLINE}</span>
+              <span className="block text-[11px] text-muted-foreground mt-0.5">{APP_TAGLINE}</span>
             </div>
             <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-topaz/10 text-topaz border border-topaz/20 leading-none shrink-0 mt-2 self-start">Beta</span>
           </Link>

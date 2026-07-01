@@ -372,7 +372,7 @@ export default function OnboardingWizard() {
           {/* Header */}
           <div className="flex items-center justify-between mb-10">
             <Link to="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl gradient-emerald grid place-items-center text-white font-bold text-sm">£</div>
+              <div className="w-8 h-8 rounded-full gradient-emerald grid place-items-center text-white font-bold text-sm shadow-md shadow-emerald/20 ring-1 ring-white/15">£</div>
               <span className="font-semibold tracking-tight">Penni</span>
             </Link>
             <button onClick={skipAll} className="text-sm text-muted-foreground hover:text-foreground">
