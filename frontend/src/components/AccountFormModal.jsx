@@ -29,12 +29,13 @@ function CirclePreview({ image, color, name, size = "lg" }) {
   const sizes = { sm: "h-10 w-10 text-xs", md: "h-14 w-14 text-sm", lg: "h-20 w-20 text-xl" };
   const imgSizes = { sm: "h-8 w-8", md: "h-12 w-12", lg: "h-16 w-16" };
   const initials = getInitials(name || "?");
+  const [imgError, setImgError] = useState(false);
 
-  if (image) {
+  if (image && !imgError) {
     return (
       <div className={`${sizes[size]} rounded-full overflow-hidden ring-2 ring-white dark:ring-gray-800 shadow-md mx-auto`}>
         <img src={image} alt={name} className={`${imgSizes[size]} object-cover`}
-          onError={(e) => { e.target.onerror = null; e.target.style.display = "none"; e.target.parentElement.className = `${sizes[size]} rounded-full flex items-center justify-center font-bold text-white mx-auto`; e.target.parentElement.style.background = color || "#059669"; e.target.parentElement.innerText = initials; }} />
+          onError={() => setImgError(true)} />
       </div>
     );
   }

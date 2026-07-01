@@ -211,7 +211,7 @@ export default function AccountPage() {
       setIncomeTotal(data.income_total || 0);
       setExpenseTotal(data.expense_total || 0);
     } catch {
-      /* ignore */
+      toast.error("Failed to load transactions");
     } finally {
       setTxLoading(false);
     }

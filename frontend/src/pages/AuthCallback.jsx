@@ -13,6 +13,7 @@ export default function AuthCallback() {
   useEffect(() => {
     (async () => {
       const hash = window.location.hash;
+      if (!hash) return;
       const params = new URLSearchParams(hash.replace(/^#?/, "?"));
       const accessToken = params.get("access_token");
       const refreshToken = params.get("refresh_token");

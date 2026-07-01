@@ -18,7 +18,7 @@ function getPaceStatus(budgetPct, monthPct) {
 }
 
 export default React.memo(function PacingIndicator({ totalBudgeted, totalSpent, compact }) {
-  const monthPct = useMemo(() => getMonthProgress(), []);
+  const monthPct = getMonthProgress();
   const budgetPct = useMemo(() => (totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0), [totalBudgeted, totalSpent]);
   const pace = useMemo(() => getPaceStatus(budgetPct, monthPct * 100), [budgetPct, monthPct]);
 

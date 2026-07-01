@@ -263,7 +263,11 @@ def build_router() -> APIRouter:
     @router.post("/webhook/stripe")
     async def stripe_webhook(request: Request):
         stripe.api_key = _get_stripe_key()
-        body = await request.body()
+        try:
+            body = await request.body()
+        except Exception as e:
+            logger.error("webhook body read failed: %s", e)
+            raise HTTPException(400, "Invalid payload")
         sig = request.headers.get("Stripe-Signature", "")
         endpoint_secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
         if not endpoint_secret:
@@ -271,9 +275,15 @@ def build_router() -> APIRouter:
             raise HTTPException(500, "Webhook not configured")
         try:
             evt = stripe.Webhook.construct_event(payload=body, sig_header=sig, secret=endpoint_secret)
-        except (ValueError, stripe.error.StripeError) as e:
-            logger.error(f"webhook error: {e}")
-            raise HTTPException(400, "Invalid webhook")
+        except ValueError as e:
+            logger.error("webhook value error: %s", e)
+            raise HTTPException(400, "Invalid payload")
+        except stripe.error.SignatureVerificationError as e:
+            logger.error("webhook signature verification failed: %s", e)
+            raise HTTPException(400, "Invalid signature")
+        except stripe.error.StripeError as e:
+            logger.error("webhook stripe error: %s", e)
+            raise HTTPException(400, f"Stripe error: {e}")
 
         sm = request.app.state.db
         async with sm() as session:

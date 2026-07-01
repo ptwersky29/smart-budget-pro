@@ -42,7 +42,7 @@ export function CategoriesProvider({ children }) {
       return { categories: nextCategories, hierarchy: nextHierarchy };
     } catch (error) {
       if (!silent) {
-        toast.error(formatApiError(error?.response?.data?.detail) || "Failed to load categories");
+        toast.error(formatApiError(error?.response?.data?.detail));
       }
       throw error;
     } finally {

@@ -1,4 +1,5 @@
-"""One-shot: create all tables in Supabase (or any PostgreSQL)."""
+"""One-shot: create all tables in Supabase (or any PostgreSQL).
+Safe to run multiple times — uses IF NOT EXISTS internally."""
 import os
 import sys
 from pathlib import Path

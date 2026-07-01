@@ -13,7 +13,7 @@ export default React.memo(function WidgetWrapper({ title, subtitle, visibility =
           {actions && <div className="shrink-0">{actions}</div>}
         </div>
       )}
-      <div className={title ? "" : ""}>{children}</div>
+      <div>{children}</div>
     </div>
   );
 });

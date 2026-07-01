@@ -164,6 +164,7 @@ const TransactionRow = React.memo(
       </ContextMenu>
     );
   },
+  (prev, next) => prev.t.transaction_id === next.t.transaction_id && prev.t.amount === next.t.amount
 );
 
 export default TransactionRow;

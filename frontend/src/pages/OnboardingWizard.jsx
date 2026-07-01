@@ -39,8 +39,8 @@ const STEPS = [
 function StepImport({ onDone }) {
   return (
     <div className="space-y-3 mt-6">
-      <a
-        href="/accounts"
+      <Link
+        to="/accounts"
         className="flex items-center gap-4 p-4 rounded-2xl border border-border bg-card hover:border-emerald transition-colors group"
       >
         <span className="w-11 h-11 rounded-xl bg-emerald/10 text-emerald grid place-items-center shrink-0">
@@ -51,9 +51,9 @@ function StepImport({ onDone }) {
           <p className="text-xs text-muted-foreground mt-0.5">2,400+ UK banks via TrueLayer. Auto-imports transactions.</p>
         </div>
         <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-emerald transition-colors shrink-0" />
-      </a>
-      <a
-        href="/accounts"
+      </Link>
+      <Link
+        to="/accounts"
         className="flex items-center gap-4 p-4 rounded-2xl border border-border bg-card hover:border-emerald transition-colors group"
       >
         <span className="w-11 h-11 rounded-xl bg-topaz/10 text-topaz grid place-items-center shrink-0">
@@ -64,7 +64,7 @@ function StepImport({ onDone }) {
           <p className="text-xs text-muted-foreground mt-0.5">CSV or PDF from your bank. We'll extract everything automatically.</p>
         </div>
         <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-emerald transition-colors shrink-0" />
-      </a>
+      </Link>
       <button
         onClick={onDone}
         className="flex items-center gap-4 p-4 rounded-2xl border border-border bg-card hover:border-emerald transition-colors group w-full text-left"

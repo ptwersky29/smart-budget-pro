@@ -238,7 +238,7 @@ export default function Connections() {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <MetricCard label="Connections" value={conns.length.toString()} icon={Building2} />
         <MetricCard label="Transactions synced" value={totalTx.toLocaleString()} icon={Clock} />
-        <MetricCard label="Total Balance" value={totalBalance !== 0 ? `£${totalBalance.toLocaleString()}` : "—"} icon={Wallet} tone="emerald" />
+        <MetricCard label="Total Balance" value={`£${totalBalance.toLocaleString()}`} icon={Wallet} tone="emerald" />
         <MetricCard label="Reconnect needed" value={reconnectCount.toString()} tone={reconnectCount ? "ruby" : "emerald"} />
       </div>
 

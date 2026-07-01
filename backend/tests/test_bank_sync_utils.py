@@ -18,12 +18,9 @@ def test_parse_import_from_date_normalizes_iso_date():
 
 
 def test_parse_import_from_date_rejects_invalid_values():
-    try:
-        parse_import_from_date("28/05/2026")
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("expected ValueError for invalid date input")
+    assert parse_import_from_date("28/05/2026") is None
+    assert parse_import_from_date("not-a-date") is None
+    assert parse_import_from_date("") is None
 
 
 def test_reauth_error_classification_is_broad_but_practical():

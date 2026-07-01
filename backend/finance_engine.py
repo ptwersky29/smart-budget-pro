@@ -1770,8 +1770,8 @@ Output ONLY valid JSON, no markdown, no explanation:
                     except Exception:
                         pass
             normalized = normalize_merchant(merch or desc)
-            signed_amount = (
-                abs(payload.amount) if payload.is_income else -abs(payload.amount)
+            signed_amount = round(
+                abs(payload.amount) if payload.is_income else -abs(payload.amount), 2
             )
             balance_type = payload.balance_type or "available"
             if balance_type not in ("available", "savings"):
@@ -1803,7 +1803,7 @@ Output ONLY valid JSON, no markdown, no explanation:
             acct = acct_result.scalar_one_or_none()
             if acct is not None:
                 current_balance = float(acct.balance or 0)
-                acct.balance = current_balance + signed_amount
+                acct.balance = round(current_balance + signed_amount, 2)
                 acct.balance_updated_at = datetime.now(timezone.utc)
 
             await session.commit()

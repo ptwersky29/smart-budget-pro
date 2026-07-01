@@ -40,7 +40,7 @@ export function dedupe(url, params, fetcher) {
 
 export function dedupeOrFetch(url, params, fetcher, ttl = DEFAULT_TTL) {
   const cached = cacheGet(url, params);
-  if (cached) return cached;
+  if (cached) return Promise.resolve(cached);
   const k = key(url, params);
   const existing = inFlight.get(k);
   if (existing) return existing;

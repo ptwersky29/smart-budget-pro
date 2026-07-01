@@ -106,7 +106,7 @@ export function SettingsProvider({ children }) {
       debounceTimer.current = setTimeout(async () => {
         setSaving(true);
         try {
-          const { data } = await api.put("/settings/app", patch);
+          const { data } = await api.put("/settings/app", merged);
           setSettings(data);
           saveToStorage(data);
           resolve(data);

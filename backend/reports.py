@@ -237,29 +237,41 @@ def build_router() -> APIRouter:
                       user: dict = Depends(require_premium)):
         if not month:
             month = datetime.now(timezone.utc).strftime("%Y-%m")
-        sm = request.app.state.db
-        async with sm() as session:
-            data = await _gather(session, user["user_id"], month=month)
-        return _build_pdf(user, data, kind=f"Monthly report · {month}", filename=f"financeai-{month}.pdf")
+        try:
+            sm = request.app.state.db
+            async with sm() as session:
+                data = await _gather(session, user["user_id"], month=month)
+            return _build_pdf(user, data, kind=f"Monthly report · {month}", filename=f"financeai-{month}.pdf")
+        except Exception as e:
+            logger.exception("Monthly report generation failed for user %s: %s", user.get("user_id"), e)
+            raise HTTPException(500, "Report generation failed. Please try again.")
 
     @router.get("/yearly")
     async def yearly(request: Request, year: int = Query(None),
                      user: dict = Depends(require_premium)):
         if not year:
             year = datetime.now(timezone.utc).year
-        sm = request.app.state.db
-        async with sm() as session:
-            data = await _gather(session, user["user_id"], year=year)
-        return _build_pdf(user, data, kind=f"Yearly report · {year}", filename=f"financeai-{year}.pdf", yearly=True)
+        try:
+            sm = request.app.state.db
+            async with sm() as session:
+                data = await _gather(session, user["user_id"], year=year)
+            return _build_pdf(user, data, kind=f"Yearly report · {year}", filename=f"financeai-{year}.pdf", yearly=True)
+        except Exception as e:
+            logger.exception("Yearly report generation failed for user %s: %s", user.get("user_id"), e)
+            raise HTTPException(500, "Report generation failed. Please try again.")
 
     @router.get("/full")
     async def full(request: Request, user: dict = Depends(require_premium)):
-        sm = request.app.state.db
-        async with sm() as session:
-            data = await _gather(session, user["user_id"])
-        return _build_pdf(user, data, kind="Full financial snapshot",
-                          filename=f"financeai-snapshot-{datetime.now(timezone.utc).strftime('%Y%m%d')}.pdf",
-                          full=True)
+        try:
+            sm = request.app.state.db
+            async with sm() as session:
+                data = await _gather(session, user["user_id"])
+            return _build_pdf(user, data, kind="Full financial snapshot",
+                              filename=f"financeai-snapshot-{datetime.now(timezone.utc).strftime('%Y%m%d')}.pdf",
+                              full=True)
+        except Exception as e:
+            logger.exception("Full report generation failed for user %s: %s", user.get("user_id"), e)
+            raise HTTPException(500, "Report generation failed. Please try again.")
 
     return router
 

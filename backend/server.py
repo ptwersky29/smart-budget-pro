@@ -103,7 +103,7 @@ from auth import get_current_user
 
 app = FastAPI(title="FinanceAI API", version="1.1.1")
 
-GIT_COMMIT = "17a2c91"
+GIT_COMMIT = os.environ.get("GIT_COMMIT", "17a2c91")
 app.state.db = get_session_maker()
 
 # Middleware stack (order matters: outermost first)

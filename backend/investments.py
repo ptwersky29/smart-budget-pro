@@ -106,15 +106,18 @@ def _m_to_dict(m: MarketData) -> dict:
 
 async def _seed_market_data(session):
     for ticker, info in MARKET_SEED.items():
-        existing = await session.execute(select(MarketData).where(MarketData.ticker == ticker))
-        if not existing.scalar_one_or_none():
-            md = MarketData(
-                ticker=ticker, name=info["name"], type=info["type"],
-                price=info["price"], high_52w=info.get("high_52w"),
-                low_52w=info.get("low_52w"), currency=info.get("currency", "GBP"),
-                last_updated=datetime.now(timezone.utc), source="seed",
-            )
-            session.add(md)
+        try:
+            existing = await session.execute(select(MarketData).where(MarketData.ticker == ticker))
+            if not existing.scalar_one_or_none():
+                md = MarketData(
+                    ticker=ticker, name=info["name"], type=info["type"],
+                    price=info["price"], high_52w=info.get("high_52w"),
+                    low_52w=info.get("low_52w"), currency=info.get("currency", "GBP"),
+                    last_updated=datetime.now(timezone.utc), source="seed",
+                )
+                session.add(md)
+        except Exception as e:
+            logger.error("Failed to seed market data for %s: %s", ticker, e)
 
 
 def build_router() -> APIRouter:
@@ -429,18 +432,22 @@ def build_router() -> APIRouter:
     async def refresh_market_data(request: Request, user: dict = Depends(require_admin)):
         sm = request.app.state.db
         async with sm() as session:
-            await _seed_market_data(session)
-            rows = (await session.execute(select(MarketData))).scalars().all()
-            updated = 0
-            for m in rows:
-                old_price = m.price
-                jitter = 1 + (0.01 * (datetime.now(timezone.utc).timestamp() % 1 - 0.5))
-                m.price = round(m.price * jitter, 2)
-                m.previous_close = old_price
-                m.change_pct = round((m.price - old_price) / old_price * 100, 2)
-                m.last_updated = datetime.now(timezone.utc)
-                updated += 1
-            await session.commit()
-            return {"ok": True, "tickers_updated": updated}
+            try:
+                await _seed_market_data(session)
+                rows = (await session.execute(select(MarketData))).scalars().all()
+                updated = 0
+                for m in rows:
+                    old_price = m.price
+                    jitter = 1 + (0.01 * (datetime.now(timezone.utc).timestamp() % 1 - 0.5))
+                    m.price = round(m.price * jitter, 2)
+                    m.previous_close = old_price
+                    m.change_pct = round((m.price - old_price) / old_price * 100, 2)
+                    m.last_updated = datetime.now(timezone.utc)
+                    updated += 1
+                await session.commit()
+                return {"ok": True, "tickers_updated": updated}
+            except Exception as e:
+                logger.exception("Market data refresh failed: %s", e)
+                raise HTTPException(500, f"Market refresh failed: {str(e)[:200]}")
 
     return router

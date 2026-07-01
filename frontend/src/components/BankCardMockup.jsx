@@ -18,7 +18,7 @@ const STATUS_CONFIG = {
 };
 
 function BankCardMockup({ connection, size = "sm", showStatus = false }) {
-  const c = connection;
+  const c = connection || {};
   const isManual = c.provider === "manual";
   const customImage = c.config?.image;
   const customColor = c.config?.color;

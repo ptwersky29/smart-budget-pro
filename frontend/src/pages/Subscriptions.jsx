@@ -235,7 +235,7 @@ export default function Subscriptions() {
             <div className="px-6 py-2 text-xs font-medium text-emerald">AI detected — review and save</div>
             <div className="divide-y divide-border/40 text-sm">
               {detected.map((item, i) => (
-                <div key={i} className="px-6 py-3 flex items-center justify-between gap-3">
+                <div key={item.merchant + item.amount + i} className="px-6 py-3 flex items-center justify-between gap-3">
                   <div>
                     <p className="font-medium">{item.normalized_merchant || item.description}</p>
                     <p className="text-xs text-muted-foreground">£{item.amount.toFixed(2)} / {item.frequency} &middot; {item.occurrences} occurrences</p>

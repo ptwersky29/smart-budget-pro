@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -54,7 +54,7 @@ export default function Reports() {
   const [dateFrom, setDateFrom] = useState(firstOfMonth);
   const [dateTo, setDateTo] = useState(today);
 
-  const loadReport = () => {
+  const loadReport = useCallback(() => {
     (async () => {
       try {
         setLoadError(false);
@@ -67,8 +67,8 @@ export default function Reports() {
         toast.error("Could not load report data");
       }
     })();
-  };
-  useEffect(loadReport, [dateFrom, dateTo, categoriesVersion]);
+  }, [dateFrom, dateTo]);
+  useEffect(loadReport, [loadReport, categoriesVersion]);
 
   const isPremium = user?.tier === "premium" || user?.role === "admin";
 

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
-import { Plus, Trash2, Loader2, Pencil, Search, Sparkles, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, BarChart3, Star, Receipt, Download, MoreHorizontal, Wallet, PieChart as PieChartIcon } from "lucide-react";
+import { Plus, Trash2, Loader2, Pencil, Search, Sparkles, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, BarChart3, Star, Receipt, Download, MoreHorizontal, Wallet, RefreshCw, CheckCircle2, PieChart as PieChartIcon } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, PageHeader } from "../components/ui/layout";
 import { SkeletonTable } from "../components/ui/Skeleton";
@@ -27,7 +27,6 @@ import {
   SheetDescription,
 } from "../components/ui/sheet";
 import ComparePeriods from "../components/ComparePeriods";
-import MaaserPanel from "../components/MaaserPanel";
 import MonthPicker, { YIDDISH } from "../components/MonthPicker";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import TransactionRow from "../components/TransactionRow";
@@ -75,7 +74,7 @@ const Transactions = React.memo(function Transactions() {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
-  const [selectedCats, setSelectedCats] = useState([]);
+  const [selectedCats, setSelectedCats] = useState({ categories: [], hierarchy: {} });
   const [accounts, setAccounts] = useState([]);
   const [accountsLoading, setAccountsLoading] = useState(false);
   const [classifying, setClassifying] = useState(false);
@@ -111,6 +110,188 @@ const Transactions = React.memo(function Transactions() {
   const [confirmTitle, setConfirmTitle] = useState("");
   const [confirmMessage, setConfirmMessage] = useState("");
   const confirmCb = useRef(null);
+  const [newCategoryModal, setNewCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+
+  // ── Maaser ledger state ──
+  const [maaserCfg, setMaaserCfg] = useState({ enabled: false, percent: 10 });
+  const [maaserSum, setMaaserSum] = useState(null);
+  const [maaserBusy, setMaaserBusy] = useState(false);
+  const [maaserLoading, setMaaserLoading] = useState(true);
+  const [maaserConfirmReset, setMaaserConfirmReset] = useState(false);
+  const [maaserShowGive, setMaaserShowGive] = useState(false);
+  const [maaserGiveAmount, setMaaserGiveAmount] = useState("");
+  const [maaserGiveRecipient, setMaaserGiveRecipient] = useState("");
+  const [maaserLedger, setMaaserLedger] = useState([]);
+  const [maaserLedgerLoading, setMaaserLedgerLoading] = useState(true);
+  const [maaserEditEntry, setMaaserEditEntry] = useState(null);
+  const [maaserEditAmount, setMaaserEditAmount] = useState("");
+  const [maaserEditPaidTo, setMaaserEditPaidTo] = useState("");
+  const [maaserEditNote, setMaaserEditNote] = useState("");
+
+  const refreshMaaser = useCallback(async () => {
+    try {
+      const [s, sum] = await Promise.all([
+        api.get("/jewish/maaser/settings"),
+        api.get("/jewish/maaser/summary"),
+      ]);
+      setMaaserCfg(s.data || { enabled: false, percent: 10 });
+      setMaaserSum(sum.data || null);
+    } catch {}
+    try {
+      const { data } = await api.get("/jewish/maaser/ledger?include_tx=true&limit=500");
+      setMaaserLedger(data?.entries || []);
+    } catch {}
+  }, []);
+
+  const loadMaaserSummary = useCallback(async () => {
+    setMaaserLoading(true);
+    try {
+      const [s, sum] = await Promise.all([
+        api.get("/jewish/maaser/settings"),
+        api.get("/jewish/maaser/summary"),
+      ]);
+      setMaaserCfg(s.data || { enabled: false, percent: 10 });
+      setMaaserSum(sum.data || null);
+    } catch {}
+    finally { setMaaserLoading(false); }
+  }, []);
+
+  const loadMaaserLedger = useCallback(async () => {
+    setMaaserLedgerLoading(true);
+    try {
+      const { data } = await api.get("/jewish/maaser/ledger?include_tx=true&limit=500");
+      setMaaserLedger(data?.entries || []);
+    } catch {}
+    finally { setMaaserLedgerLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "maaser") {
+      loadMaaserSummary();
+      loadMaaserLedger();
+    }
+  }, [activeTab, loadMaaserSummary, loadMaaserLedger]);
+
+  const handleMaaserSaveCfg = async (next) => {
+    setMaaserBusy(true);
+    try {
+      await api.put("/jewish/maaser/settings", next);
+      setMaaserCfg(next);
+      toast.success(`Auto-Maaser ${next.enabled ? "enabled" : "disabled"}`);
+      await refreshMaaser();
+    } catch (e) {
+      toast.error(formatApiError(e?.response?.data?.detail) || "Could not save");
+    }
+    finally { setMaaserBusy(false); }
+  };
+
+  const handleMaaserRecalc = async () => {
+    setMaaserBusy(true);
+    try {
+      const { data } = await api.post("/jewish/maaser/backfill");
+      if (data.enabled === false) {
+        toast.error("Turn auto-Maaser on first");
+      } else {
+        toast.success(`Accrued maaser for ${data.created} income tx · ${fmt(data.total_amount)}`);
+      }
+      await refreshMaaser();
+    } catch (e) {
+      toast.error(formatApiError(e?.response?.data?.detail) || "Recalculate failed");
+    }
+    finally { setMaaserBusy(false); }
+  };
+
+  const handleMaaserReset = () => setMaaserConfirmReset(true);
+
+  const handleMaaserDoReset = async () => {
+    setMaaserConfirmReset(false);
+    setMaaserBusy(true);
+    try {
+      await api.post("/jewish/maaser/reset");
+      toast.success("Maaser audit log reset");
+      await refreshMaaser();
+    } catch (e) {
+      toast.error(formatApiError(e?.response?.data?.detail) || "Reset failed");
+    }
+    finally { setMaaserBusy(false); }
+  };
+
+  const handleMaaserGive = () => {
+    if (!maaserSum || maaserSum.balance_owed <= 0) {
+      toast.success("Nothing owed — you're up to date!");
+      return;
+    }
+    setMaaserGiveAmount(maaserSum.balance_owed.toFixed(2));
+    setMaaserGiveRecipient("");
+    setMaaserShowGive(true);
+  };
+
+  const handleMaaserSubmitGive = async () => {
+    const num = parseFloat(maaserGiveAmount);
+    if (isNaN(num) || num <= 0) {
+      toast.error("Enter a valid amount");
+      return;
+    }
+    const recipient = maaserGiveRecipient.trim() || "Tzedakah";
+    try {
+      await api.post("/jewish/tzedakah", { amount: num, recipient, note: "Maaser given against balance" });
+      toast.success("Maaser given");
+      setMaaserShowGive(false);
+      await refreshMaaser();
+    } catch (e) {
+      toast.error(formatApiError(e?.response?.data?.detail) || "Could not record");
+    }
+  };
+
+  const handleMaaserEdit = (entry) => {
+    setMaaserEditEntry(entry);
+    setMaaserEditAmount(String(entry.maaser_paid || entry.amount || ""));
+    setMaaserEditPaidTo(entry.paid_to || "");
+    setMaaserEditNote(entry.note || "");
+  };
+
+  const handleMaaserSaveEdit = async () => {
+    const num = parseFloat(maaserEditAmount);
+    if (isNaN(num) || num < 0) {
+      toast.error("Enter a valid amount");
+      return;
+    }
+    try {
+      await api.put(`/jewish/maaser/ledger/${maaserEditEntry.entry_id}`, {
+        amount: num,
+        recipient: maaserEditPaidTo || "Tzedakah",
+        note: maaserEditNote,
+      });
+      toast.success("Entry updated");
+      setMaaserEditEntry(null);
+      await refreshMaaser();
+    } catch (e) {
+      toast.error(formatApiError(e?.response?.data?.detail) || "Could not update");
+    }
+  };
+
+  const handleMaaserDelete = (entryId) => {
+    showConfirm("Delete maaser entry", "Are you sure you want to delete this maaser ledger entry?", async () => {
+      try {
+        await api.delete(`/jewish/maaser/ledger/${entryId}`);
+        toast.success("Entry deleted");
+        await refreshMaaser();
+      } catch (e) {
+        toast.error(formatApiError(e?.response?.data?.detail) || "Could not delete");
+      }
+    });
+  };
+
+  const handleMaaserPay = async (entryId) => {
+    try {
+      await api.post(`/jewish/maaser/pay/${entryId}`);
+      toast.success("Entry marked as paid");
+      await refreshMaaser();
+    } catch (e) {
+      toast.error(formatApiError(e?.response?.data?.detail) || "Could not mark paid");
+    }
+  };
 
   const showConfirm = useCallback((title, message, cb) => {
     setConfirmTitle(title);
@@ -195,9 +376,7 @@ const Transactions = React.memo(function Transactions() {
   const loadCats = useCallback(async () => {
     try {
       const { data } = await api.get("/categories");
-      const cats = data.categories || [];
-      cats.hierarchy = data.hierarchy || {};
-      setSelectedCats(cats);
+      setSelectedCats({ categories: data.categories || [], hierarchy: data.hierarchy || {} });
     } catch { console.warn("[transactions] failed to load categories"); }
   }, []);
 
@@ -608,7 +787,7 @@ const Transactions = React.memo(function Transactions() {
                         <DropdownMenuSub>
                           <DropdownMenuSubTrigger>Set category</DropdownMenuSubTrigger>
                           <DropdownMenuSubContent>
-                            {Object.entries(groupCatsBySection(selectedCats)).map(([section, cats]) => (
+                            {Object.entries(groupCatsBySection(selectedCats.categories || [])).map(([section, cats]) => (
                               <React.Fragment key={section}>
                                 <DropdownMenuLabel className="text-xs text-muted-foreground font-semibold uppercase tracking-wider px-2 py-1">{section}</DropdownMenuLabel>
                                 {cats.map(c => (
@@ -617,7 +796,7 @@ const Transactions = React.memo(function Transactions() {
                               </React.Fragment>
                             ))}
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => { const c = prompt("New category name:"); if (c) bulkCategory(c.trim().toLowerCase().replace(/\s+/g, "_")); }}>
+                            <DropdownMenuItem onClick={() => { setNewCategoryName(""); setNewCategoryModal(true); }}>
                               ➕ Add custom category
                             </DropdownMenuItem>
                           </DropdownMenuSubContent>
@@ -690,7 +869,7 @@ const Transactions = React.memo(function Transactions() {
                     <CategoryCombobox
                       value={filters.category}
                       onChange={(val) => toggleFilter("category", val)}
-                      categories={selectedCats}
+                      categories={selectedCats.categories || selectedCats}
                       placeholder="All categories"
                       allowClear
                       onCategoryCreated={loadCats}
@@ -940,11 +1119,260 @@ const Transactions = React.memo(function Transactions() {
 
       {/* ───── Maaser tab ───── */}
       {activeTab === "maaser" && <>
-        <MaaserPanel />
+        {/* Summary Stats */}
+        {maaserLoading ? (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            {[1,2,3,4].map(i => (
+              <div key={i} className="rounded-2xl border border-border bg-background/60 p-4 animate-pulse">
+                <div className="h-3 w-20 bg-secondary rounded mb-2" />
+                <div className="h-7 w-16 bg-secondary rounded" />
+              </div>
+            ))}
+          </div>
+        ) : maaserSum ? (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            <div className="rounded-2xl border border-border bg-background/60 p-4">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Income to date</p>
+              <p className="mt-1 text-2xl tracking-tight font-medium text-emerald">{fmt(maaserSum.total_income)}</p>
+            </div>
+            <div className="rounded-2xl border border-border bg-background/60 p-4">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Maaser obligation ({maaserSum.percent}%)</p>
+              <p className="mt-1 text-2xl tracking-tight font-medium text-topaz">{fmt(maaserSum.obligation)}</p>
+            </div>
+            <div className="rounded-2xl border border-border bg-background/60 p-4">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Given so far</p>
+              <p className="mt-1 text-2xl tracking-tight font-medium text-emerald">{fmt(maaserSum.given_total)}</p>
+            </div>
+            <div className="rounded-2xl border border-border bg-background/60 p-4">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">{maaserSum.credit > 0 ? "Credit (over-given)" : "Balance owed"}</p>
+              <p className={`mt-1 text-2xl tracking-tight font-medium ${maaserSum.balance_owed > 0 ? "text-ruby" : "text-emerald"}`}>
+                {fmt(maaserSum.balance_owed > 0 ? maaserSum.balance_owed : maaserSum.credit)}
+              </p>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Settings + Actions Row */}
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <Input type="number" min={0} max={100} step={0.5}
+            value={maaserCfg.percent}
+            onChange={(e) => setMaaserCfg({ ...maaserCfg, percent: parseFloat(e.target.value) || 0 })}
+            onBlur={() => handleMaaserSaveCfg(maaserCfg)}
+            className="w-20 text-center font-mono"
+            title="Maaser percent" />
+          <label className="inline-flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={maaserCfg.enabled} disabled={maaserBusy}
+              onChange={(e) => handleMaaserSaveCfg({ ...maaserCfg, enabled: e.target.checked })}
+              className="sr-only peer" />
+            <span className="w-11 h-6 bg-secondary rounded-full peer-checked:bg-emerald relative transition-colors">
+              <span className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform"
+                style={{ transform: maaserCfg.enabled ? "translateX(20px)" : "translateX(0)" }} />
+            </span>
+            <span className="text-sm">{maaserCfg.enabled ? "On" : "Off"}</span>
+          </label>
+          {maaserSum?.balance_owed > 0 && (
+            <button onClick={handleMaaserGive} disabled={maaserBusy}
+              className="inline-flex items-center gap-1 text-sm px-4 py-2.5 rounded-full bg-emerald text-white hover:opacity-90 disabled:opacity-50 ml-auto">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Give {fmt(maaserSum.balance_owed)}
+            </button>
+          )}
+          <button onClick={handleMaaserRecalc} disabled={maaserBusy}
+            className="inline-flex items-center gap-2 text-sm px-4 py-2.5 rounded-full border border-border hover:border-emerald hover:text-emerald disabled:opacity-50">
+            <RefreshCw className={`h-3.5 w-3.5 ${maaserBusy ? "animate-spin" : ""}`} /> Recalculate
+          </button>
+          <button onClick={handleMaaserReset} disabled={maaserBusy}
+            className="text-sm px-4 py-2.5 rounded-full border border-border hover:border-ruby hover:text-ruby disabled:opacity-50">
+            Reset audit
+          </button>
+        </div>
+
+        {/* Ledger Table */}
+        <div className="rounded-xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden">
+          {maaserLedgerLoading ? (
+            <SkeletonTable rows={6} className="p-3" />
+          ) : maaserLedger.length === 0 ? (
+            <EmptyState icon={Star} title="No maaser entries"
+              description="Income transactions with auto-maaser or manual ledger entries will appear here." />
+          ) : (
+            <>
+              {/* Mobile card view */}
+              <div className="block sm:hidden divide-y divide-border">
+                {maaserLedger.map(e => (
+                  <div key={e.entry_id} className="px-4 py-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">{e.date || e.income_date ? new Date(e.date || e.income_date).toLocaleDateString("en-GB") : "-"}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${e.status === "given" ? "bg-emerald/10 text-emerald" : "bg-amber/10 text-amber-500"}`}>
+                        {e.status === "given" ? "Given" : "Pending"}
+                      </span>
+                    </div>
+                    {e.income_description && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                        <span className="truncate max-w-[160px]">{e.income_description}</span>
+                        {e.income_category && <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-secondary text-[10px] capitalize">{e.income_category}</span>}
+                        <span className="font-medium">{fmt(e.income_amount)}</span>
+                      </p>
+                    )}
+                    <div className="grid grid-cols-2 gap-1 text-xs">
+                      <div><span className="text-muted-foreground">Due: </span><span className="font-medium">{fmt(e.maaser_due)}</span></div>
+                      <div><span className="text-muted-foreground">Paid: </span>
+                        {e.status === "pending" ? <span className="text-amber-500 font-medium">Pending</span> : <span className="font-medium">{fmt(e.maaser_paid)}</span>}
+                      </div>
+                      <div className="col-span-2"><span className="text-muted-foreground">To: </span>{e.paid_to || "-"}</div>
+                      {e.note && <div className="col-span-2"><span className="text-muted-foreground">Note: </span><span className="truncate">{e.note}</span></div>}
+                    </div>
+                    <div className="flex justify-end gap-1 pt-1">
+                      <button onClick={() => handleMaaserEdit(e)} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
+                      {e.status === "pending" && <button onClick={() => handleMaaserPay(e.entry_id)} className="p-1.5 rounded-lg hover:bg-secondary text-emerald"><CheckCircle2 className="h-3.5 w-3.5" /></button>}
+                      <button onClick={() => handleMaaserDelete(e.entry_id)} className="p-1.5 rounded-lg hover:bg-secondary text-ruby"><Trash2 className="h-3.5 w-3.5" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Desktop table */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-[11px] text-muted-foreground border-b border-border">
+                      <th className="px-4 py-2.5">Date</th>
+                      <th className="px-4 py-2.5">Income</th>
+                      <th className="px-4 py-2.5 text-right">Maaser Due</th>
+                      <th className="px-4 py-2.5 text-right">Paid</th>
+                      <th className="px-4 py-2.5">Paid To</th>
+                      <th className="px-4 py-2.5">Note</th>
+                      <th className="px-4 py-2.5">Status</th>
+                      <th className="px-4 py-2.5 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {maaserLedger.map(e => (
+                      <tr key={e.entry_id} className="border-b border-border last:border-0 hover:bg-secondary/30 transition-colors">
+                        <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                          {e.date || e.income_date ? new Date(e.date || e.income_date).toLocaleDateString("en-GB") : "-"}
+                        </td>
+                        <td className="px-4 py-3">
+                          {e.income_description ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs truncate max-w-[140px]">{e.income_description}</span>
+                              {e.income_category && <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-secondary capitalize">{e.income_category}</span>}
+                              <span className="text-xs font-medium">{fmt(e.income_amount)}</span>
+                            </div>
+                          ) : <span className="text-xs text-muted-foreground">-</span>}
+                        </td>
+                        <td className="px-4 py-3 text-right font-medium text-xs">{fmt(e.maaser_due)}</td>
+                        <td className="px-4 py-3 text-right text-xs">
+                          {e.status === "pending" ? (
+                            <span className="text-amber-500 font-medium">Pending</span>
+                          ) : (
+                            <span className="font-medium">{fmt(e.maaser_paid)}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs">{e.paid_to || "-"}</td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground truncate max-w-[160px]">{e.note || "-"}</td>
+                        <td className="px-4 py-3">
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${e.status === "given" ? "bg-emerald/10 text-emerald" : "bg-amber/10 text-amber-500"}`}>
+                            {e.status === "given" ? "Given" : "Pending"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleMaaserEdit(e)}>
+                                <Pencil className="h-4 w-4 mr-2" /> Edit
+                              </DropdownMenuItem>
+                              {e.status === "pending" && (
+                                <DropdownMenuItem onClick={() => handleMaaserPay(e.entry_id)}>
+                                  <CheckCircle2 className="h-4 w-4 mr-2" /> Mark Paid
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleMaaserDelete(e.entry_id)} className="text-ruby">
+                                <Trash2 className="h-4 w-4 mr-2" /> Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Edit Modal */}
+        {maaserEditEntry && (
+          <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={() => setMaaserEditEntry(null)}>
+            <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl tracking-tight font-medium">Edit Maaser Entry</h3>
+                <button onClick={() => setMaaserEditEntry(null)} className="p-3 rounded-lg hover:bg-secondary text-muted-foreground"><X className="h-4 w-4" /></button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="label-overline">Amount (£)</label>
+                  <Input type="number" step="0.01" value={maaserEditAmount}
+                    onChange={(e) => setMaaserEditAmount(e.target.value)} className="mt-1 w-full" />
+                </div>
+                <div>
+                  <label className="label-overline">Recipient / Paid To</label>
+                  <Input value={maaserEditPaidTo}
+                    onChange={(e) => setMaaserEditPaidTo(e.target.value)} className="mt-1 w-full" />
+                </div>
+                <div>
+                  <label className="label-overline">Note</label>
+                  <Input value={maaserEditNote}
+                    onChange={(e) => setMaaserEditNote(e.target.value)} className="mt-1 w-full" />
+                </div>
+                <div className="flex gap-3 justify-end pt-2">
+                  <Button variant="outlinePill" size="pill" onClick={() => setMaaserEditEntry(null)}>Cancel</Button>
+                  <Button variant="primary" size="pill" onClick={handleMaaserSaveEdit}>Save</Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Give Modal */}
+        {maaserShowGive && (
+          <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={() => setMaaserShowGive(false)}>
+            <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl tracking-tight font-medium">Give Maaser</h3>
+                <button onClick={() => setMaaserShowGive(false)} className="p-3 rounded-lg hover:bg-secondary text-muted-foreground"><X className="h-4 w-4" /></button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="label-overline">Amount (£)</label>
+                  <Input type="number" step="0.01" value={maaserGiveAmount}
+                    onChange={(e) => setMaaserGiveAmount(e.target.value)} className="mt-1 w-full" />
+                </div>
+                <div>
+                  <label className="label-overline">Recipient</label>
+                  <Input value={maaserGiveRecipient}
+                    onChange={(e) => setMaaserGiveRecipient(e.target.value)}
+                    placeholder="e.g. local shul, JNF, charity" className="mt-1 w-full" />
+                </div>
+                <div className="flex gap-3 justify-end pt-2">
+                  <Button variant="outlinePill" size="pill" onClick={() => setMaaserShowGive(false)}>Cancel</Button>
+                  <Button variant="primary" size="pill" onClick={handleMaaserSubmitGive}>Give</Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Confirm Reset */}
+        <ConfirmModal open={maaserConfirmReset} title="Reset Maaser audit"
+          message="Clear the auto-Maaser audit log? Manual ledger entries are kept."
+          onConfirm={handleMaaserDoReset} onCancel={() => setMaaserConfirmReset(false)} />
       </>}
 
       <TransactionForm open={open} editingId={editingId} form={form} setForm={setForm}
-        selectedCats={selectedCats} onClose={closeForm} onSubmit={submit}
+        selectedCats={selectedCats.categories || selectedCats} onClose={closeForm} onSubmit={submit}
         onClassify={handleClassify} classifying={classifying} classification={classification}
         onClearClassification={clearClassification}
         saveAsRecurring={saveAsRecurring} setSaveAsRecurring={setSaveAsRecurring}
@@ -953,13 +1381,29 @@ const Transactions = React.memo(function Transactions() {
 
       <ComparePeriods open={compareOpen} onClose={() => setCompareOpen(false)} />
 
-      <ConfirmModal
+        <ConfirmModal
         open={confirmOpen}
         title={confirmTitle}
         message={confirmMessage}
         onConfirm={() => { confirmCb.current?.(); setConfirmOpen(false); }}
         onCancel={() => setConfirmOpen(false)}
       />
+
+      {newCategoryModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={() => setNewCategoryModal(false)}>
+          <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-medium mb-4">Add Custom Category</h3>
+            <input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)}
+              placeholder="Category name" autoFocus
+              className="w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none text-sm"
+              onKeyDown={(e) => { if (e.key === "Enter" && newCategoryName.trim()) { bulkCategory(newCategoryName.trim().toLowerCase().replace(/\s+/g, "_")); setNewCategoryModal(false); } }} />
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setNewCategoryModal(false)} className="flex-1 h-10 rounded-xl bg-secondary text-sm font-medium text-muted-foreground hover:text-foreground">Cancel</button>
+              <button onClick={() => { if (newCategoryName.trim()) { bulkCategory(newCategoryName.trim().toLowerCase().replace(/\s+/g, "_")); setNewCategoryModal(false); } }} className="flex-1 h-10 rounded-xl bg-emerald text-white text-sm font-medium hover:bg-emerald/90">Add</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 });

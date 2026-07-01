@@ -183,7 +183,7 @@ const Dashboard = React.memo(function Dashboard() {
       </div>
     );
 
-  const empty = !overview.recent || overview.recent.length === 0;
+  const empty = !overview.recent || overview.recent.length === 0 || (!overview.total_transactions && !overview.total_accounts && !overview.total_budgets);
 
   return (
     <div className="space-y-6" data-testid="dashboard-root">
@@ -293,7 +293,7 @@ const Dashboard = React.memo(function Dashboard() {
                 <div className="space-y-3">
                   <SectionHeading
                     icon={AlertTriangle}
-                    label="Alerts &amp; Upcoming"
+                    label="Alerts & Upcoming"
                   />
                   <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden">
                     {topAlerts.length > 0 && (

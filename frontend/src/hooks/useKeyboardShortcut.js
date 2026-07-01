@@ -9,6 +9,9 @@ import { useEffect, useRef, useCallback } from "react";
  * when: boolean expression; enabled: boolean
  */
 export function useKeyboardShortcut(key, handler, { enabled = true, when = true } = {}) {
+  const handlerRef = useRef(handler);
+  handlerRef.current = handler;
+
   useEffect(() => {
     if (!enabled || !when) return;
     const isMatch = (e) => {
@@ -30,11 +33,11 @@ export function useKeyboardShortcut(key, handler, { enabled = true, when = true 
     };
     const listener = (e) => {
       if (e.target.closest("input, textarea, select, [contenteditable]")) return;
-      if (isMatch(e)) { e.preventDefault(); handler(e); }
+      if (isMatch(e)) { e.preventDefault(); handlerRef.current(e); }
     };
     document.addEventListener("keydown", listener);
     return () => document.removeEventListener("keydown", listener);
-  }, [key, handler, enabled, when]);
+  }, [key, enabled, when]);
 }
 
 /**

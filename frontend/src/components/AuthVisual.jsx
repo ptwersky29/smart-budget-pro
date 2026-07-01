@@ -59,7 +59,7 @@ export default function AuthVisual({ title = "Premium money, quietly automated."
               <div key={row.label} className="flex items-center justify-between rounded-2xl bg-white/10 px-4 py-3 text-sm">
                 <span className="text-white/75">{row.label}</span>
                 <span className={row.tone === "emerald" ? "text-emerald" : row.tone === "topaz" ? "text-topaz" : "text-ruby"}>
-                  {row.value.startsWith("+") ? "+" : "-"}&pound;{row.value.replace(/^[+-]/, "")}
+                  {row.value.startsWith("-") ? "-" : "+"}&pound;{row.value.replace(/^[+-]/, "")}
                 </span>
               </div>
             ))}

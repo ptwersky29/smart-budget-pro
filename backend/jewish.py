@@ -183,6 +183,10 @@ def build_router() -> APIRouter:
 
     @router.post("/maaser/calc")
     async def maaser_calc(income: float = Query(...), percent: float = Query(10.0)):
+        if income < 0:
+            raise HTTPException(400, "income must be a positive number")
+        if percent < 0 or percent > 100:
+            raise HTTPException(400, "percent must be between 0 and 100")
         amount = round(income * (percent / 100), 2)
         return {"income": income, "percent": percent, "maaser_amount": amount}
 
@@ -287,7 +291,8 @@ def build_router() -> APIRouter:
 
     @router.get("/maaser/ledger")
     async def ledger(request: Request, user: dict = Depends(get_current_user),
-                     status: str = Query(None), limit: int = Query(200)):
+                     status: str = Query(None), limit: int = Query(200, ge=1, le=1000),
+                     offset: int = Query(0, ge=0), include_tx: bool = Query(False)):
         sm = request.app.state.db
         async with sm() as session:
             q = select(MaaserLedger).where(MaaserLedger.user_id == user["user_id"])
@@ -295,12 +300,33 @@ def build_router() -> APIRouter:
                 q = q.where(MaaserLedger.maaser_paid == 0)
             elif status == "given":
                 q = q.where(MaaserLedger.maaser_paid > 0)
-            result = await session.execute(q.order_by(MaaserLedger.date.desc()).limit(limit))
+            result = await session.execute(q.order_by(MaaserLedger.date.desc()).offset(offset).limit(limit))
             rows = result.scalars().all()
             total = sum(r.maaser_paid or r.income_amount or 0 for r in rows)
             total_pending = sum(r.maaser_due or 0 for r in rows if r.maaser_paid == 0)
+            entries = []
+            for r in rows:
+                d = _tz_to_dict(r)
+                if include_tx and r.transaction_id:
+                    tx_result = await session.execute(
+                        select(Transaction).where(Transaction.transaction_id == r.transaction_id)
+                    )
+                    tx = tx_result.scalar_one_or_none()
+                    if tx:
+                        d["income_description"] = tx.description
+                        d["income_date"] = tx.date.isoformat() if tx.date else None
+                        d["income_category"] = tx.category
+                    else:
+                        d["income_description"] = None
+                        d["income_date"] = None
+                        d["income_category"] = None
+                elif include_tx:
+                    d["income_description"] = None
+                    d["income_date"] = None
+                    d["income_category"] = None
+                entries.append(d)
             return {
-                "entries": [_tz_to_dict(r) for r in rows],
+                "entries": entries,
                 "total_given": round(total, 2),
                 "total_pending": round(total_pending, 2),
             }
@@ -425,13 +451,14 @@ def build_router() -> APIRouter:
 
     @router.get("/tzedakah")
     async def list_tzedakah(request: Request, user: dict = Depends(get_current_user),
-                            recipient: str = Query(None), limit: int = Query(200)):
+                            recipient: str = Query(None), limit: int = Query(200, ge=1, le=1000),
+                            offset: int = Query(0, ge=0)):
         sm = request.app.state.db
         async with sm() as session:
             q = select(MaaserLedger).where(MaaserLedger.user_id == user["user_id"])
             if recipient:
                 q = q.where(MaaserLedger.paid_to.ilike(f"%{recipient}%"))
-            result = await session.execute(q.order_by(MaaserLedger.date.desc()).limit(limit))
+            result = await session.execute(q.order_by(MaaserLedger.date.desc()).offset(offset).limit(limit))
             rows = result.scalars().all()
             total = sum(r.maaser_paid or r.income_amount or 0 for r in rows)
             by_recipient = {}

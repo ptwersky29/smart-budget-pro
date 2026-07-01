@@ -145,7 +145,8 @@ export default function AccountDetailPage() {
   }, [accountId]);
 
   const txsRef = useRef(txs);
-  txsRef.current = txs;
+
+  useEffect(() => { txsRef.current = txs; }, [txs]);
 
   const deleteTx = useCallback(async (txId) => {
     const old = txsRef.current.find(t => t.transaction_id === txId);

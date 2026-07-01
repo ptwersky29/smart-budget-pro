@@ -9,7 +9,7 @@ import { Button } from "../components/ui/button";
 export default function PaymentSuccess() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { refresh } = useAuth();
+  const { refresh } = useAuth() || {};
   const [status, setStatus] = useState("loading");
 
   const sessionId = params.get("session_id") || "";
@@ -36,7 +36,7 @@ export default function PaymentSuccess() {
         } else {
           setStatus("success");
         }
-        await refresh();
+        if (refresh) await refresh();
       } catch {
         setStatus("pending");
       }

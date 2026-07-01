@@ -18,14 +18,14 @@ export async function withUndo({ action, undo, onError, successMsg = "Done", err
         label: undoLabel,
         onClick: () => {
           undone = true;
-          undo().catch(() => toast.error(errorMsg));
+          if (typeof undo === "function") undo().catch(() => toast.error(errorMsg));
         },
       },
       duration: 6000,
     });
   } catch (err) {
     if (!undone) {
-      if (onError) onError(err);
+      if (onError && typeof onError === "function") onError(err);
       toast.error(errorMsg);
     }
   }

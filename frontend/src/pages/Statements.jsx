@@ -21,7 +21,7 @@ export default function Statements() {
   const loadHistory = useCallback(async () => {
     try {
       const { data } = await api.get("/statements");
-      setHistory(data.statements);
+      setHistory(data.statements || []);
     } catch (err) { toast.error("Could not load statement history"); }
   }, []);
 

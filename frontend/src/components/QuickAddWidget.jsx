@@ -52,7 +52,9 @@ export default function QuickAddWidget() {
     const s = index !== undefined ? suggestions[index] : selected;
     if (!s || !accountId) { toast.error("Select an account first"); return; }
     try {
-      const signed = -Math.abs(parseFloat(amount));
+      const parsed = parseFloat(amount);
+      if (isNaN(parsed)) { toast.error("Invalid amount"); return; }
+      const signed = s.is_income ? Math.abs(parsed) : -Math.abs(parsed);
       await api.post("/budget-system/approve", {
         description: desc.trim(),
         amount: signed,

@@ -316,7 +316,7 @@ const LinkCard = ({ icon: Icon, title, subtitle, status, statusLabel, href, navi
     info: { label: statusLabel || "Loading…", color: "bg-secondary text-muted-foreground", Icon: ShieldCheck },
   }[status] || { label: statusLabel || status, color: "bg-secondary text-muted-foreground", Icon: AlertCircle };
   return (
-    <div className="rounded-2xl border border-border bg-card p-6 cursor-pointer hover:border-emerald/50 transition-colors" onClick={() => navigate(href)}>
+    <div className="rounded-2xl border border-border bg-card p-6 cursor-pointer hover:border-emerald/50 transition-colors" onClick={() => navigate(href)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(href); } }} role="button" tabIndex={0}>
       <div className="flex items-center gap-3 mb-1">
         <div className="w-10 h-10 rounded-xl bg-secondary grid place-items-center"><Icon className="h-5 w-5 text-emerald" /></div>
         <div className="flex-1">

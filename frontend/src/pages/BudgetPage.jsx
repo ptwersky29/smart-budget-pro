@@ -479,9 +479,11 @@ export default React.memo(function BudgetPage() {
     e.preventDefault();
     if (!form.category.trim() || !form.limit) { toast.error("Enter a category and amount"); return; }
     const cat = form.category.toLowerCase().trim();
+    const currentMonth = selectedHebrewMonth ? selectedHebrewMonth.gregorian_start.slice(0, 7) : month;
     const dup = budgets.find((b) => {
       if (b.category.toLowerCase().trim() !== cat) return false;
       if (form.budget_type === "event") return b.event_group_id === form.event_group_id;
+      if (b.month && b.month !== currentMonth) return false;
       return (b.budget_type || "everyday") !== "event";
     });
     if (dup) { toast.error(`Budget for "${cat}" already exists`); return; }
@@ -552,7 +554,7 @@ export default React.memo(function BudgetPage() {
     }
   };
 
-  const startEdit = (b) => {
+  const startEdit = useCallback((b) => {
     setEditingId(b.budget_id);
     setForm({
       category: b.category,
@@ -562,11 +564,11 @@ export default React.memo(function BudgetPage() {
       event_group_id: b.event_group_id || "",
       event_group_name: b.event_group_name || "",
     });
-  };
+  }, []);
 
-  const cancelEdit = () => { setEditingId(null); resetForm(); };
+  const cancelEdit = useCallback(() => { setEditingId(null); resetForm(); }, []);
 
-  const handleUpdate = async (id) => {
+  const handleUpdate = useCallback(async (id) => {
     if (!form.category.trim() || !form.limit) { toast.error("Enter a category and amount"); return; }
     const payload = { category: form.category.toLowerCase().trim(), limit: parseFloat(form.limit) };
     if (form.budget_type === "event") payload.event_date = form.event_date || null;
@@ -583,7 +585,7 @@ export default React.memo(function BudgetPage() {
       successMsg: "Budget updated",
       errorMsg: "Could not update",
     });
-  };
+  }, [form, cancelEdit, fetchData]);
 
   const handleDelete = async (item) => {
     if (item.type === "group") {

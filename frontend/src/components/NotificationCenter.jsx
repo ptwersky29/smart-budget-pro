@@ -8,20 +8,20 @@ export default function NotificationCenter() {
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(false);
 
+  const fetchNotifications = async () => {
+    try {
+      const { data } = await api.get("/notifications");
+      if (Array.isArray(data)) {
+        setNotifications(data);
+        setUnread(data.filter(n => !n.read).length);
+      }
+    } catch (error) {
+      console.error("Failed to fetch notifications", error);
+    }
+  };
+
   // Fetch notifications on mount and periodically
   useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        const { data } = await api.get("/notifications");
-        if (Array.isArray(data)) {
-          setNotifications(data);
-          setUnread(data.filter(n => !n.read).length);
-        }
-      } catch (error) {
-        console.error("Failed to fetch notifications", error);
-      }
-    };
-
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 30000); // Poll every 30 seconds
     return () => clearInterval(interval);
@@ -30,12 +30,7 @@ export default function NotificationCenter() {
   const markAsRead = async (notificationId) => {
     try {
       await api.put(`/notifications/${notificationId}`, { read: true });
-      setNotifications(prev =>
-        prev.map(n =>
-          n.id === notificationId ? { ...n, read: true } : n
-        )
-      );
-      setUnread(prev => Math.max(0, prev - 1));
+      fetchNotifications();
     } catch (error) {
       console.error("Failed to mark notification as read", error);
     }
@@ -44,7 +39,7 @@ export default function NotificationCenter() {
   const deleteNotification = async (notificationId) => {
     try {
       await api.delete(`/notifications/${notificationId}`);
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      fetchNotifications();
     } catch (error) {
       console.error("Failed to delete notification", error);
     }
@@ -53,8 +48,7 @@ export default function NotificationCenter() {
   const clearAll = async () => {
     try {
       await api.post("/notifications/clear");
-      setNotifications([]);
-      setUnread(0);
+      fetchNotifications();
     } catch (error) {
       console.error("Failed to clear notifications", error);
     }

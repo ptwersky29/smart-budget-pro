@@ -26,7 +26,7 @@ export default class ErrorBoundary extends React.Component {
             <p className="text-sm text-muted-foreground mt-2 mb-6">
               {this.state.error?.message || "An unexpected error occurred."}
             </p>
-            <Button variant="primary" onClick={() => { this.setState({ hasError: false, error: null }); window.location.href = "/dashboard"; }}>
+            <Button variant="primary" onClick={() => { this.setState({ hasError: false, error: null }); window.history.pushState(null, "", "/dashboard"); }}>
               <RefreshCw className="h-4 w-4" /> Go to Dashboard
             </Button>
           </div>

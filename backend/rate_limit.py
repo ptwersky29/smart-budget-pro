@@ -12,6 +12,10 @@ DEFAULT_WINDOW = 60
 CSRF_SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 CSRF_SAFE_PATH_PREFIXES = ("/api/auth/",)
 
+# Stricter limits for sensitive endpoints
+AUTH_LIMIT = 20
+AUTH_WINDOW = 300  # 5 minutes
+
 
 class RateLimiter:
     def __init__(self, limit: int = DEFAULT_LIMIT, window: int = DEFAULT_WINDOW):
@@ -22,9 +26,9 @@ class RateLimiter:
     def _key(self, request: Request) -> str:
         user_id = getattr(request.state, "user_id", None)
         if user_id:
-            return f"user:{user_id}"
+            return f"user:{user_id}:{request.url.path}"
         ip = request.client.host if request.client else "unknown"
-        return f"ip:{ip}"
+        return f"ip:{ip}:{request.url.path}"
 
     def check(self, request: Request) -> bool:
         key = self._key(request)
@@ -39,16 +43,26 @@ class RateLimiter:
         return True
 
 
+class AuthRateLimiter(RateLimiter):
+    """Stricter rate limiter for auth endpoints (login, forgot-password, reset-password)."""
+    def __init__(self):
+        super().__init__(limit=AUTH_LIMIT, window=AUTH_WINDOW)
+
+
 class RateLimitMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, limiter: RateLimiter):
         super().__init__(app)
         self.limiter = limiter
+        self.auth_limiter = AuthRateLimiter()
 
     async def dispatch(self, request: Request, call_next):
         if request.url.path in ("/api/health", "/api/"):
             return await call_next(request)
-        if not self.limiter.check(request):
-            logger.warning("Rate limit exceeded for %s", self.limiter._key(request))
+        # Sensitive auth endpoints get stricter rate limiting
+        auth_paths = ("/api/auth/login", "/api/auth/forgot-password", "/api/auth/reset-password")
+        limiter = self.auth_limiter if request.url.path in auth_paths else self.limiter
+        if not limiter.check(request):
+            logger.warning("Rate limit exceeded for %s", limiter._key(request))
             raise HTTPException(429, "Too many requests. Please slow down.")
         return await call_next(request)
 

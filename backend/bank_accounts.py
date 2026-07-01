@@ -3,7 +3,7 @@ import uuid
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi import APIRouter, HTTPException, Request, Depends, Query
 from sqlalchemy import select, delete, func, or_
 
 from db import BankAccount, BankConnection, Transaction
@@ -41,6 +41,8 @@ def build_router() -> APIRouter:
         request: Request,
         user: dict = Depends(get_current_user),
         type: str = None,
+        limit: int = Query(100, ge=1, le=1000),
+        offset: int = Query(0, ge=0),
     ):
         sm = request.app.state.db
         async with sm() as session:
@@ -106,6 +108,7 @@ def build_router() -> APIRouter:
             ).order_by(BankAccount.sort_order, BankAccount.created_at.desc())
             if type:
                 stmt = stmt.where(BankAccount.type == type)
+            stmt = stmt.offset(offset).limit(limit)
             result = await session.execute(stmt)
             rows = result.scalars().all()
             return {"accounts": [_acct_to_dict(a) for a in rows]}
@@ -175,6 +178,8 @@ def build_router() -> APIRouter:
         name = (body.get("name") or "").strip()
         if not name:
             raise HTTPException(400, "name is required")
+        if len(name) > 255:
+            raise HTTPException(400, "name must not exceed 255 characters")
         acct_type = (body.get("type") or "current").lower()
         if acct_type not in VALID_TYPES:
             raise HTTPException(400, f"invalid type; must be one of {', '.join(sorted(VALID_TYPES))}")
@@ -185,6 +190,8 @@ def build_router() -> APIRouter:
             except (TypeError, ValueError):
                 raise HTTPException(400, "balance must be a number")
         currency = (body.get("currency") or "GBP").upper()
+        if len(currency) > 4:
+            raise HTTPException(400, "invalid currency code")
         acct_id = f"acct_{uuid.uuid4().hex[:12]}"
 
         sm = request.app.state.db
@@ -250,6 +257,8 @@ def build_router() -> APIRouter:
                 n = (body["name"] or "").strip()
                 if not n:
                     raise HTTPException(400, "name cannot be empty")
+                if len(n) > 255:
+                    raise HTTPException(400, "name must not exceed 255 characters")
                 ba.name = n
             if "type" in body:
                 t = body["type"].lower()

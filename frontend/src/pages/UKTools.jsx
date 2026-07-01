@@ -12,7 +12,8 @@ export default function UKTools() {
 
   const runUC = async () => {
     setUc({ ...uc, busy: true });
-    try { const { data } = await api.post("/uk/universal-credit", uc); setUc({ ...uc, result: data, busy: false }); }
+    const { monthly_earnings, children, housing_cost, couple, has_disability } = uc;
+    try { const { data } = await api.post("/uk/universal-credit", { monthly_earnings, children, housing_cost, couple, has_disability }); setUc({ ...uc, result: data, busy: false }); }
     catch { toast.error("Could not calculate UC estimate"); setUc({ ...uc, busy: false }); }
   };
   const runTax = async () => {

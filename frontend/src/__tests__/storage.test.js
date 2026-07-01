@@ -48,8 +48,8 @@ test("getToken falls back to sessionStorage when localStorage is empty", () => {
   expect(getToken("access_token")).toBe("session-value");
 });
 
-test("getToken returns empty string when no token exists", () => {
-  expect(getToken("nonexistent")).toBe("");
+test("getToken returns null when no token exists", () => {
+  expect(getToken("nonexistent")).toBeNull();
 });
 
 test("clearTokens removes all keys from both storages", () => {

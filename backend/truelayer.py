@@ -24,6 +24,9 @@ from bank_sync_utils import (
     connection_error_message,
     transaction_sync_id,
 )
+
+# Lock to prevent concurrent syncs for the same connection
+_sync_lock = asyncio.Lock()
 from statements import _ai_categorise
 
 logger = logging.getLogger("truelayer")
@@ -674,27 +677,28 @@ def build_router() -> APIRouter:
 
     @router.post("/sync")
     async def sync_transactions(request: Request, user: dict = Depends(get_current_user)):
-        sm = request.app.state.db
-        async with sm() as session:
-            result = await session.execute(select(BankConnection).where(BankConnection.user_id == user["user_id"], BankConnection.status == "active"))
-            conns = result.scalars().all()
-            if not conns:
-                raise HTTPException(400, "No active bank connections")
-            total_new = 0
-            total_dup = 0
-            errors = []
-            for conn in conns:
-                try:
-                    new, dup = await _sync_connection(session, conn, user["user_id"])
-                    total_new += new
-                    total_dup += dup
-                except Exception as e:
-                    logger.error(f"sync failed for {conn.connection_id}: {e}")
-                    errors.append({"connection_id": conn.connection_id, "error": str(e)[:200]})
-                    await _log_sync(session, user["user_id"], conn.connection_id, "sync_failed", "error", str(e)[:500])
-            await _log_sync(session, user["user_id"], "all", "sync_complete", "success",
-                           f"Imported {total_new} new, skipped {total_dup} duplicates across {len(conns)} connections")
-            return {"ok": True, "connections_synced": len(conns), "new_transactions": total_new, "duplicates_skipped": total_dup, "errors": errors}
+        async with _sync_lock:
+            sm = request.app.state.db
+            async with sm() as session:
+                result = await session.execute(select(BankConnection).where(BankConnection.user_id == user["user_id"], BankConnection.status == "active"))
+                conns = result.scalars().all()
+                if not conns:
+                    raise HTTPException(400, "No active bank connections")
+                total_new = 0
+                total_dup = 0
+                errors = []
+                for conn in conns:
+                    try:
+                        new, dup = await _sync_connection(session, conn, user["user_id"])
+                        total_new += new
+                        total_dup += dup
+                    except Exception as e:
+                        logger.error(f"sync failed for {conn.connection_id}: {e}")
+                        errors.append({"connection_id": conn.connection_id, "error": str(e)[:200]})
+                        await _log_sync(session, user["user_id"], conn.connection_id, "sync_failed", "error", str(e)[:500])
+                await _log_sync(session, user["user_id"], "all", "sync_complete", "success",
+                               f"Imported {total_new} new, skipped {total_dup} duplicates across {len(conns)} connections")
+                return {"ok": True, "connections_synced": len(conns), "new_transactions": total_new, "duplicates_skipped": total_dup, "errors": errors}
 
     @router.post("/sync/all")
     async def sync_all_users(request: Request):
@@ -755,22 +759,23 @@ def build_router() -> APIRouter:
 # Exported for background scheduler (module-level, not inside build_router)
 async def run_background_sync(db_maker) -> dict:
     """Sync all active connections. Can be called from scheduler or endpoint."""
-    sm = db_maker
-    async with sm() as session:
-        result = await session.execute(select(BankConnection).where(BankConnection.status == "active"))
-        conns = result.scalars().all()
-        total_new = 0
-        total_dup = 0
-        for conn in conns:
-            try:
-                new, dup = await _sync_connection(session, conn, conn.user_id)
-                total_new += new
-                total_dup += dup
-            except Exception as e:
-                logger.error(f"background sync failed for {conn.connection_id}: {e}")
-                await _log_sync(session, conn.user_id, conn.connection_id, "background_sync_failed", "error", str(e)[:500])
-        logger.info(f"Background sync: {total_new} new, {total_dup} duplicates, {len(conns)} connections")
-        return {"ok": True, "connections_synced": len(conns), "new_transactions": total_new, "duplicates_skipped": total_dup}
+    async with _sync_lock:
+        sm = db_maker
+        async with sm() as session:
+            result = await session.execute(select(BankConnection).where(BankConnection.status == "active"))
+            conns = result.scalars().all()
+            total_new = 0
+            total_dup = 0
+            for conn in conns:
+                try:
+                    new, dup = await _sync_connection(session, conn, conn.user_id)
+                    total_new += new
+                    total_dup += dup
+                except Exception as e:
+                    logger.error(f"background sync failed for {conn.connection_id}: {e}")
+                    await _log_sync(session, conn.user_id, conn.connection_id, "background_sync_failed", "error", str(e)[:500])
+            logger.info(f"Background sync: {total_new} new, {total_dup} duplicates, {len(conns)} connections")
+            return {"ok": True, "connections_synced": len(conns), "new_transactions": total_new, "duplicates_skipped": total_dup}
 
 
 # ── Sync engine ───────────────────────────────────────────────────────────

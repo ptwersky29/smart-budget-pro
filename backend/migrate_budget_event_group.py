@@ -1,4 +1,5 @@
-"""One-shot migration: add event_group_id, event_group_name, partial unique index to budgets table."""
+"""One-shot migration: add event_group_id, event_group_name, partial unique index to budgets table.
+Safe to run multiple times — all operations use IF NOT EXISTS / idempotent guards."""
 import os
 import sys
 from pathlib import Path

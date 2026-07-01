@@ -230,12 +230,14 @@ export default function TransactionForm({
                 variant="outlinePill"
                 size="pillSm"
                 className="border-emerald text-emerald flex-1"
-                onClick={() =>
+                onClick={() => {
+                  const parsed = parseFloat(form.amount);
+                  if (isNaN(parsed)) { toast.error("Invalid amount"); return; }
                   onClassify({
                     description: form.description,
-                    amount: parseFloat(form.amount),
-                  })
-                }
+                    amount: parsed,
+                  });
+                }}
                 disabled={!canClassify}
               >
                 {classifying ? (

@@ -67,8 +67,8 @@ export default function YearEndJewishReport({ year }) {
     );
   }
 
-  const maaser = report.sections.maaser;
-  const holidays = report.sections.holidays;
+  const maaser = report?.sections?.maaser || {};
+  const holidays = report?.sections?.holidays || {};
 
   return (
     <div className="space-y-6">
@@ -146,7 +146,7 @@ export default function YearEndJewishReport({ year }) {
         )}
 
         {/* Monthly Breakdown */}
-        {Object.keys(maaser.monthly_breakdown).length > 0 && (
+        {maaser?.monthly_breakdown && Object.keys(maaser.monthly_breakdown).length > 0 && (
           <div className="mt-6">
             <h4 className="font-medium text-sm mb-3">Monthly Breakdown</h4>
             <div className="overflow-x-auto">
@@ -174,7 +174,7 @@ export default function YearEndJewishReport({ year }) {
       </div>
 
       {/* Holiday Budgets Section */}
-      {holidays.holidays.length > 0 && (
+      {holidays?.holidays?.length > 0 && (
         <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl p-6 shadow-card">
           <h3 className="text-lg font-semibold mb-4">Holiday Budgets</h3>
 
@@ -182,18 +182,18 @@ export default function YearEndJewishReport({ year }) {
           <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="rounded-xl border border-border bg-secondary/30 p-4 text-center">
               <p className="label-overline">Budgeted</p>
-              <p className="mt-2 text-xl font-semibold">£{holidays.summary.total_budgeted.toFixed(2)}</p>
+              <p className="mt-2 text-xl font-semibold">£{holidays?.summary?.total_budgeted?.toFixed(2) || "0.00"}</p>
             </div>
             <div className="rounded-xl border border-border bg-secondary/30 p-4 text-center">
               <p className="label-overline">Spent</p>
-              <p className="mt-2 text-xl font-semibold text-topaz">£{holidays.summary.total_spent.toFixed(2)}</p>
+              <p className="mt-2 text-xl font-semibold text-topaz">£{holidays?.summary?.total_spent?.toFixed(2) || "0.00"}</p>
             </div>
             <div className={`rounded-xl border border-border bg-secondary/30 p-4 text-center`}>
               <p className="label-overline">Balance</p>
               <p className={`mt-2 text-xl font-semibold ${
-                holidays.summary.total_balance >= 0 ? "text-emerald" : "text-ruby"
+                (holidays?.summary?.total_balance ?? 0) >= 0 ? "text-emerald" : "text-ruby"
               }`}>
-                £{Math.abs(holidays.summary.total_balance).toFixed(2)}
+                £{Math.abs(holidays?.summary?.total_balance ?? 0).toFixed(2)}
               </p>
             </div>
           </div>

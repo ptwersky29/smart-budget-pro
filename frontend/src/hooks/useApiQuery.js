@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 
 export function useApiQuery(url, params = {}, options = {}) {
-  const { ttl, enabled = true } = options;
+  const { ttl, enabled = true, cache } = options;
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -21,7 +21,7 @@ export function useApiQuery(url, params = {}, options = {}) {
 
     try {
       let result;
-      if (options.cache !== false) {
+      if (cache !== false) {
         result = await api.cachedGet(url, paramsRef.current, ttl);
       } else {
         const { data: d } = await api.get(url, { params: paramsRef.current, signal: controller.signal });
@@ -38,7 +38,7 @@ export function useApiQuery(url, params = {}, options = {}) {
         setLoading(false);
       }
     }
-  }, [url, enabled, ttl, options.cache]);
+  }, [url, enabled, ttl, cache]);
 
   useEffect(() => {
     mountedRef.current = true;

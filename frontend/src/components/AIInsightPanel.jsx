@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { api } from "../lib/api";
 import { Sparkles, Loader2, TrendingUp, TrendingDown, AlertCircle, Wallet, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -26,7 +26,8 @@ export default function AIInsightPanel({ title = "AI Insights", subtitle, endpoi
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  const generate = async () => {
+  const generateRef = useRef();
+  generateRef.current = async () => {
     setBusy(true);
     try {
       const { data: resp } = await api.post(endpoint, body || {});
@@ -38,16 +39,15 @@ export default function AIInsightPanel({ title = "AI Insights", subtitle, endpoi
   };
 
   React.useEffect(() => {
-    if (autoLoad && !loaded && !busy) generate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoLoad]);
+    if (autoLoad && !loaded && !busy) generateRef.current?.();
+  }, [autoLoad, loaded, busy]);
 
   return (
     <SectionCard
       eyebrow={title}
       title={subtitle}
       actions={
-        <Button variant="outlinePill" size="pillSm" onClick={generate} disabled={busy} data-testid="ai-generate">
+        <Button variant="outlinePill" size="pillSm" onClick={() => generateRef.current?.()} disabled={busy} data-testid="ai-generate">
           {busy ? <Loader2 className="h-3 w-3 animate-spin"/> : <RefreshCw className="h-3 w-3"/>}
           {data ? "Regenerate" : "Generate"}
         </Button>

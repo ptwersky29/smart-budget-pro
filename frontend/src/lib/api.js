@@ -1,6 +1,6 @@
 import axios from "axios";
 import { cacheGet, cacheSet, cacheInvalidate, dedupe } from "./cache";
-import { getToken, setToken } from "./storage";
+import { getToken, setToken, clearTokens } from "./storage";
 
 const fallbackBackend = typeof window !== "undefined" && (
   window.location.hostname !== "localhost" &&
@@ -87,10 +87,7 @@ api.interceptors.response.use(
       } catch (refreshError) {
         const status = refreshError?.response?.status;
         console.warn("[auth] refresh failed", status, refreshError?.response?.data);
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-        sessionStorage.removeItem("access_token");
-        sessionStorage.removeItem("refresh_token");
+        clearTokens();
         // Redirect to login so the user isn't stuck in a zombie authenticated state
         if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
           window.location.assign("/login?expired=1");

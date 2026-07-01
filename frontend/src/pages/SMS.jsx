@@ -34,7 +34,7 @@ export default function SMS({ embedded }) {
   const loadInbox = useCallback(async () => {
     try {
       const { data } = await api.get("/sms/inbox");
-      setInbox(data.messages);
+      setInbox(data.messages || data.inbox || []);
     } catch { toast.error("Could not load SMS inbox"); }
   }, []);
   const loadTw = useCallback(async () => {

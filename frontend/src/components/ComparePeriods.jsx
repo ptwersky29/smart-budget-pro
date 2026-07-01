@@ -37,6 +37,27 @@ function lastOfPrevMonth() {
   return d.toISOString().slice(0, 10);
 }
 
+function ChangeBadge({ pct }) {
+  if (pct == null || isNaN(pct))
+    return <Minus className="h-4 w-4 text-muted-foreground" />;
+  const isGood = pct < 0;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-xs font-medium ${isGood ? "text-emerald" : pct > 0 ? "text-ruby" : "text-muted-foreground"}`}
+    >
+      {pct > 0 ? (
+        <TrendingUp className="h-3 w-3" />
+      ) : pct < 0 ? (
+        <TrendingDown className="h-3 w-3" />
+      ) : (
+        <Minus className="h-3 w-3" />
+      )}
+      {isGood ? "" : "+"}
+      {pct.toFixed(1)}%
+    </span>
+  );
+}
+
 export default function ComparePeriods({ open, onClose }) {
   const [aFrom, setAFrom] = useState(firstOfPrevMonth());
   const [aTo, setATo] = useState(lastOfPrevMonth());
@@ -65,27 +86,6 @@ export default function ComparePeriods({ open, onClose }) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const ChangeBadge = ({ pct }) => {
-    if (pct == null || isNaN(pct))
-      return <Minus className="h-4 w-4 text-muted-foreground" />;
-    const isGood = pct < 0;
-    return (
-      <span
-        className={`inline-flex items-center gap-1 text-xs font-medium ${isGood ? "text-emerald" : pct > 0 ? "text-ruby" : "text-muted-foreground"}`}
-      >
-        {pct > 0 ? (
-          <TrendingUp className="h-3 w-3" />
-        ) : pct < 0 ? (
-          <TrendingDown className="h-3 w-3" />
-        ) : (
-          <Minus className="h-3 w-3" />
-        )}
-        {isGood ? "" : "+"}
-        {pct.toFixed(1)}%
-      </span>
-    );
   };
 
   if (!open) return null;

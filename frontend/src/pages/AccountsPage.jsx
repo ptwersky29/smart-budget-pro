@@ -29,9 +29,7 @@ const ACCOUNT_TYPE_META = {
 
 function AccountLogo({ account, size = "md" }) {
   const sizes = { sm: "h-8 w-8 text-xs", md: "h-10 w-10 text-sm", lg: "h-14 w-14 text-lg" };
-  const imgSizes = { sm: "h-6 w-6", md: "h-8 w-8", lg: "h-10 w-10" };
   const sizeClass = sizes[size] || sizes.md;
-  const imgSize = imgSizes[size] || imgSizes.md;
   const displayName = getDisplayName(account);
   const initials = displayName
     .split(" ")
@@ -41,21 +39,22 @@ function AccountLogo({ account, size = "md" }) {
     .slice(0, 2);
   const brandInstitution = pickBankInstitution(account?.provider, account?.name);
   const bankLogoUrl = !account?.image && brandInstitution ? getBankLogoOrFallback(brandInstitution) : null;
+  const [imgError, setImgError] = useState(false);
 
-  if (account.image) {
+  if (account.image && !imgError) {
     return (
       <div className={`shrink-0 rounded-full overflow-hidden ${sizeClass} ring-2 ring-white dark:ring-gray-800 shadow-sm`}>
-        <img src={account.image} alt={account.name} className={`${imgSize} object-cover`}
-          onError={(e) => { e.target.onerror = null; e.target.style.display = "none"; e.target.parentElement.className = `shrink-0 rounded-full ${sizeClass} flex items-center justify-center font-bold text-white`; e.target.parentElement.style.background = account.color || "#059669"; e.target.parentElement.innerText = initials; }} />
+        <img src={account.image} alt={account.name} className="h-full w-full object-cover"
+          onError={() => setImgError(true)} />
       </div>
     );
   }
 
-  if (bankLogoUrl) {
+  if (bankLogoUrl && !imgError) {
     return (
       <div className={`shrink-0 rounded-full overflow-hidden ${sizeClass} ring-2 ring-white dark:ring-gray-800 shadow-sm bg-white dark:bg-secondary/40 flex items-center justify-center`}>
-        <img src={bankLogoUrl} alt={displayName} className={`${imgSize} object-contain`}
-          onError={(e) => { e.target.onerror = null; e.target.style.display = "none"; e.target.parentElement.className = `shrink-0 rounded-full ${sizeClass} flex items-center justify-center font-bold text-white`; e.target.parentElement.style.background = account.color || "#059669"; e.target.parentElement.innerText = initials; }} />
+        <img src={bankLogoUrl} alt={displayName} className="h-full w-full object-contain p-1"
+          onError={() => setImgError(true)} />
       </div>
     );
   }
