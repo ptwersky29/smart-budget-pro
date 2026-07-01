@@ -121,6 +121,7 @@ export default function AppLayout() {
               <span className="block font-semibold tracking-tight leading-none">{APP_NAME}</span>
               <span className="block text-[11px] text-muted-foreground mt-1">{APP_TAGLINE}</span>
             </div>
+            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-topaz/10 text-topaz border border-topaz/20 leading-none shrink-0 mt-2 self-start">Beta</span>
           </Link>
           <button className="lg:hidden h-11 w-11 rounded-full grid place-items-center hover:bg-secondary" onClick={() => setOpen(false)} data-testid="sidebar-close" aria-label="Close navigation menu">
             <X className="h-5 w-5" />
