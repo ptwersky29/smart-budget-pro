@@ -162,7 +162,9 @@ export default function AdminDashboard() {
     try {
       const res = await api.get("/admin/login-history", { params: { limit: 50 } });
       setLoginHistory(res.data.logins || []);
-    } catch { /* login history non-critical */ }
+    } catch (e) {
+      toast.error("Login history: " + formatApiError(e.response?.data?.detail) || e.message);
+    }
   }, []);
 
   useEffect(() => { loadStats(); loadUsers(); loadFlags(); loadLoginHistory(); }, [loadStats, loadUsers, loadFlags, loadLoginHistory]);

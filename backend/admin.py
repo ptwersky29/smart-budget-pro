@@ -310,6 +310,8 @@ def build_router() -> APIRouter:
                              limit: int = Query(50, ge=1, le=200)):
         sm = request.app.state.db
         async with sm() as session:
+            total = (await session.execute(select(func.count()).select_from(AuditLog))).scalar() or 0
+            actions_raw = (await session.execute(select(AuditLog.action).distinct())).scalars().all()
             result = await session.execute(
                 select(AuditLog, User.email, User.name).select_from(
                     AuditLog
@@ -318,7 +320,7 @@ def build_router() -> APIRouter:
                 ).order_by(AuditLog.created_at.desc()).limit(limit)
             )
             rows = result.all()
-            return {"logins": [
+            return {"total_audit_rows": total, "distinct_actions": list(actions_raw), "logins": [
                 {"user_id": l.user_id, "email": email, "name": name,
                  "action": l.action, "success": l.success,
                  "ip_address": l.ip_address, "user_agent": l.user_agent,
