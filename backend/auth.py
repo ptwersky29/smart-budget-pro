@@ -116,10 +116,10 @@ def _resolve_role(user_obj: User) -> str:
 
 
 def _effective_tier(user_obj: User) -> str:
-    """All users have premium access. Admin flag retained for admin-only features."""
+    """Admins are always premium; other users use their stored tier."""
     if user_obj.is_admin or user_obj.role == "admin":
         return "premium"
-    return "premium"
+    return user_obj.tier
 
 
 # ── Pydantic schemas ──────────────────────────────────────────────────────
@@ -260,7 +260,9 @@ async def get_current_user(request: Request) -> dict:
 
 
 async def require_premium(user: dict = Depends(get_current_user)) -> dict:
-    """All authenticated users have premium access."""
+    """Require the user's tier to be 'premium'."""
+    if user.get("tier") != "premium":
+        raise HTTPException(status_code=403, detail="Premium subscription required")
     return user
 
 

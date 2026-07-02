@@ -680,7 +680,7 @@ class User(Base, TimestampMixin):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     google_sub: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     role: Mapped[str] = mapped_column(String(32), default="user")
-    tier: Mapped[str] = mapped_column(String(32), default="free")
+    tier: Mapped[str] = mapped_column(String(32), default="premium")
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     stripe_customer_id: Mapped[Optional[str]] = mapped_column(
         String(255), nullable=True
