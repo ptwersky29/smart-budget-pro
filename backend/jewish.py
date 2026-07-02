@@ -296,17 +296,16 @@ def build_router() -> APIRouter:
                      date_from: str = Query(None), date_to: str = Query(None)):
         sm = request.app.state.db
         async with sm() as session:
+            ledger_ids = set()
             q = select(MaaserLedger).where(MaaserLedger.user_id == user["user_id"])
-            if status == "pending":
-                q = q.where(MaaserLedger.maaser_paid == 0)
-            elif status == "given":
-                q = q.where(MaaserLedger.maaser_paid > 0)
             if date_from:
                 q = q.where(MaaserLedger.date >= date_from)
             if date_to:
                 q = q.where(MaaserLedger.date <= date_to + "T23:59:59")
-            result = await session.execute(q.order_by(MaaserLedger.date.desc()).offset(offset).limit(limit))
-            rows = result.scalars().all()
+            all_rows = (await session.execute(q.order_by(MaaserLedger.date.desc()))).scalars().all()
+            for r in all_rows:
+                ledger_ids.add(r.id)
+            rows = all_rows[:limit]
             total = sum(r.maaser_paid or r.income_amount or 0 for r in rows)
             total_pending = sum(r.maaser_due or 0 for r in rows if r.maaser_paid == 0)
             entries = []
@@ -330,8 +329,49 @@ def build_router() -> APIRouter:
                     d["income_date"] = None
                     d["income_category"] = None
                 entries.append(d)
+
+            ledger_tx_ids = {r.transaction_id for r in all_rows if r.transaction_id}
+            tx_q = select(Transaction).where(
+                Transaction.user_id == user["user_id"],
+                Transaction.category == "tzedakah",
+            )
+            if date_from:
+                tx_q = tx_q.where(Transaction.date >= date_from)
+            if date_to:
+                tx_q = tx_q.where(Transaction.date <= date_to + "T23:59:59")
+            tzedakot = (await session.execute(tx_q.order_by(Transaction.date.desc()))).scalars().all()
+            for t in tzedakot:
+                if t.transaction_id in ledger_tx_ids:
+                    continue
+                amount = abs(float(t.amount or 0))
+                total += amount
+                entries.append({
+                    "entry_id": f"tx_{t.transaction_id}",
+                    "user_id": user["user_id"],
+                    "transaction_id": t.transaction_id,
+                    "amount": amount,
+                    "income_amount": None,
+                    "maaser_due": 0,
+                    "maaser_paid": amount,
+                    "paid_to": t.merchant_name or t.description or "Tzedakah",
+                    "note": t.notes or t.description or "",
+                    "date": t.date.isoformat() if t.date else None,
+                    "created_at": t.date.isoformat() if t.date else None,
+                    "status": "given",
+                    "income_description": t.description,
+                    "income_date": t.date.isoformat() if t.date else None,
+                    "income_category": t.category,
+                })
+
+            entries.sort(key=lambda e: e.get("date") or "", reverse=True)
+
+            if status == "pending":
+                entries = [e for e in entries if e.get("status") == "pending"]
+            elif status == "given":
+                entries = [e for e in entries if e.get("status") == "given"]
+
             return {
-                "entries": entries,
+                "entries": entries[:limit] if limit else entries,
                 "total_given": round(total, 2),
                 "total_pending": round(total_pending, 2),
             }
