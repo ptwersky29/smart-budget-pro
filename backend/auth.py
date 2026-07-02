@@ -733,7 +733,10 @@ def build_router() -> APIRouter:
                 )
                 session.add(user)
                 await session.commit()
+                await log_action(user.user_id, "login", "auth", request=request, success=True)
             elif user.disabled:
+                await log_action(user.user_id, "login_failed", "auth",
+                                 detail={"reason": "account_disabled"}, request=request, success=False)
                 raise HTTPException(403, "Account disabled")
             else:
                 if picture and (not user.picture or user.picture != picture):
@@ -741,6 +744,7 @@ def build_router() -> APIRouter:
                 if google_sub and not user.google_sub:
                     user.google_sub = google_sub
                 await session.commit()
+                await log_action(user.user_id, "login", "auth", request=request, success=True)
             access = create_access_token(user.user_id, email)
             refresh = create_refresh_token(user.user_id)
             frontend_url = os.environ.get("FRONTEND_URL", "").rstrip("/")
