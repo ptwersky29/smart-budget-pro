@@ -1,12 +1,19 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "../lib/api";
-import { CheckCircle2, RefreshCw, Star, X } from "lucide-react";
+import { CheckCircle2, RefreshCw, Star, Pencil, Trash2, X, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { SectionCard } from "./ui/layout";
 import Skeleton from "./ui/Skeleton";
 import ConfirmModal from "./ui/ConfirmModal";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "./ui/dropdown-menu";
 
 const EMPTY_SUM = {
   percent: 10, total_income: 0, obligation: 0, given_total: 0,
@@ -26,17 +33,27 @@ export default function MaaserPanel({ refreshKey = 0, onChange }) {
   const [giveRecipient, setGiveRecipient] = useState("");
   const [loading, setLoading] = useState(true);
 
+  const [ledger, setLedger] = useState([]);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [editEntry, setEditEntry] = useState(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editPaidTo, setEditPaidTo] = useState("");
+  const [editNote, setEditNote] = useState("");
+
   const load = useCallback(async () => {
     setLoading(true);
+    setLedgerLoading(true);
     try {
-      const [s, sum] = await Promise.all([
+      const [s, sum, lg] = await Promise.all([
         api.get("/jewish/maaser/settings"),
         api.get("/jewish/maaser/summary"),
+        api.get("/jewish/maaser/ledger?include_tx=true&limit=500"),
       ]);
       setCfg(s.data || { enabled: false, percent: 10 });
       setSum({ ...EMPTY_SUM, ...(sum.data || {}), enabled: s.data?.enabled });
+      setLedger(lg.data?.entries || []);
     } catch {}
-    finally { setLoading(false); }
+    finally { setLoading(false); setLedgerLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load, refreshKey]);
@@ -115,6 +132,55 @@ export default function MaaserPanel({ refreshKey = 0, onChange }) {
       onChange?.();
     } catch (e) {
       toast.error(formatApiError(e?.response?.data?.detail) || "Could not record");
+    }
+  };
+
+  const handleEdit = (entry) => {
+    setEditEntry(entry);
+    setEditAmount(String(entry.maaser_paid || entry.maaser_due || 0));
+    setEditPaidTo(entry.paid_to || "");
+    setEditNote(entry.note || "");
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editEntry) return;
+    const num = parseFloat(editAmount);
+    if (isNaN(num) || num < 0) {
+      toast.error("Enter a valid amount");
+      return;
+    }
+    try {
+      await api.put(`/jewish/maaser/ledger/${editEntry.entry_id}`, {
+        amount: num, recipient: editPaidTo || "Tzedakah", note: editNote || null,
+      });
+      toast.success("Entry updated");
+      setEditEntry(null);
+      await load();
+      onChange?.();
+    } catch (e) {
+      toast.error(formatApiError(e?.response?.data?.detail) || "Could not update");
+    }
+  };
+
+  const handlePay = async (entryId) => {
+    try {
+      await api.post(`/jewish/maaser/pay/${entryId}`);
+      toast.success("Marked as paid");
+      await load();
+      onChange?.();
+    } catch (e) {
+      toast.error(formatApiError(e?.response?.data?.detail) || "Could not mark paid");
+    }
+  };
+
+  const handleDelete = async (entryId) => {
+    try {
+      await api.delete(`/jewish/maaser/ledger/${entryId}`);
+      toast.success("Entry deleted");
+      await load();
+      onChange?.();
+    } catch (e) {
+      toast.error(formatApiError(e?.response?.data?.detail) || "Could not delete");
     }
   };
 
@@ -213,6 +279,87 @@ export default function MaaserPanel({ refreshKey = 0, onChange }) {
               Reset audit
             </button>
           </div>
+
+          <div className="mt-6 border-t border-border pt-5">
+            <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+              <Star className="h-4 w-4 text-topaz" />
+              All Maaser Transactions
+              {ledger.length > 0 && <span className="text-xs text-muted-foreground font-normal">({ledger.length})</span>}
+            </h4>
+
+            {ledgerLoading ? (
+              <div className="space-y-2">
+                {[1,2,3].map(i => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}
+              </div>
+            ) : ledger.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                No Maaser entries yet. Income transactions with auto-maaser or manual ledger entries will appear here.
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                {ledger.map((e) => (
+                  <div
+                    key={e.entry_id}
+                    className="flex items-center gap-3 rounded-xl border border-border bg-background/40 px-4 py-3 text-sm hover:bg-secondary/20 transition-colors"
+                  >
+                    <div className="min-w-0 flex-1 grid grid-cols-1 sm:grid-cols-[auto_1fr_auto_auto] gap-x-4 gap-y-1 items-center">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {e.date || e.income_date ? new Date(e.date || e.income_date).toLocaleDateString("en-GB") : "-"}
+                      </span>
+                      <div className="min-w-0">
+                        {e.income_description ? (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="truncate max-w-[200px]">{e.income_description}</span>
+                            {e.income_category && <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-secondary capitalize">{e.income_category}</span>}
+                            <span className="text-xs font-medium">{fmt(e.income_amount)}</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Manual entry</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 whitespace-nowrap">
+                        <span className="text-xs">
+                          <span className="text-muted-foreground">Due: </span><span className="font-medium">{fmt(e.maaser_due)}</span>
+                        </span>
+                        <span className="text-xs">
+                          <span className="text-muted-foreground">Paid: </span>
+                          {e.status === "pending" ? (
+                            <span className="text-amber-500 font-medium">Pending</span>
+                          ) : (
+                            <span className="font-medium">{fmt(e.maaser_paid)}</span>
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${e.status === "given" ? "bg-emerald/10 text-emerald" : "bg-amber/10 text-amber-500"}`}>
+                          {e.status === "given" ? "Given" : "Pending"}
+                        </span>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className="p-1 rounded-lg hover:bg-secondary text-muted-foreground">
+                            <MoreHorizontal className="h-3.5 w-3.5" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEdit(e)}>
+                              <Pencil className="h-3.5 w-3.5 mr-2" /> Edit
+                            </DropdownMenuItem>
+                            {e.status === "pending" && (
+                              <DropdownMenuItem onClick={() => handlePay(e.entry_id)}>
+                                <CheckCircle2 className="h-3.5 w-3.5 mr-2" /> Mark Paid
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleDelete(e.entry_id)} className="text-ruby">
+                              <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </>
       )}
 
@@ -232,18 +379,52 @@ export default function MaaserPanel({ refreshKey = 0, onChange }) {
             <div className="space-y-4">
               <div>
                 <label className="label-overline">Amount (£)</label>
-            <Input type="number" step="0.01" value={giveAmount} onChange={(e) => setGiveAmount(e.target.value)}
-              className="mt-1 w-full" />
+                <Input type="number" step="0.01" value={giveAmount} onChange={(e) => setGiveAmount(e.target.value)}
+                  className="mt-1 w-full" />
               </div>
               <div>
                 <label className="label-overline">Recipient</label>
-            <Input value={giveRecipient} onChange={(e) => setGiveRecipient(e.target.value)}
-              placeholder="e.g. local shul, JNF, charity"
-              className="mt-1 w-full" />
+                <Input value={giveRecipient} onChange={(e) => setGiveRecipient(e.target.value)}
+                  placeholder="e.g. local shul, JNF, charity"
+                  className="mt-1 w-full" />
               </div>
               <div className="flex gap-3 justify-end pt-2">
                 <Button variant="outlinePill" size="pill" onClick={() => setShowGiveForm(false)}>Cancel</Button>
                 <Button variant="primary" size="pill" onClick={submitGive}>Give</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editEntry && (
+        <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={() => setEditEntry(null)}>
+          <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl tracking-tight font-medium">Edit Maaser Entry</h3>
+              <button onClick={() => setEditEntry(null)} className="p-3 rounded-lg hover:bg-secondary text-muted-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="label-overline">Amount (£)</label>
+                <Input type="number" step="0.01" value={editAmount}
+                  onChange={(e) => setEditAmount(e.target.value)} className="mt-1 w-full" />
+              </div>
+              <div>
+                <label className="label-overline">Recipient / Paid To</label>
+                <Input value={editPaidTo}
+                  onChange={(e) => setEditPaidTo(e.target.value)} className="mt-1 w-full" />
+              </div>
+              <div>
+                <label className="label-overline">Note</label>
+                <Input value={editNote}
+                  onChange={(e) => setEditNote(e.target.value)} className="mt-1 w-full" />
+              </div>
+              <div className="flex gap-3 justify-end pt-2">
+                <Button variant="outlinePill" size="pill" onClick={() => setEditEntry(null)}>Cancel</Button>
+                <Button variant="primary" size="pill" onClick={handleSaveEdit}>Save</Button>
               </div>
             </div>
           </div>
