@@ -39,7 +39,7 @@ import { useKeyboardShortcut } from "../hooks/useKeyboardShortcut";
 import CategoryCombobox from "../components/CategoryCombobox";
 
 const SOURCE_LABELS = { manual: "Manual", csv: "CSV", pdf: "PDF", statement: "Statement", sms: "SMS" };
-const emptyForm = { description: "", amount: "", category: "", is_income: false, budget_type: "", occasion: "", merchant: "", account_id: "" };
+const emptyForm = { description: "", amount: "", category: "", is_income: false, budget_type: "", occasion: "", merchant: "", account_id: "", exclude_from_maaser: false };
 
 function today() {
   const d = new Date();
@@ -284,6 +284,19 @@ const Transactions = React.memo(function Transactions() {
     }
   };
 
+  const handleMaaserExclude = async (transactionId) => {
+    if (!transactionId) { toast.error("No linked transaction"); return; }
+    setMaaserBusy(true);
+    try {
+      await api.patch(`/transactions/${transactionId}`, { exclude_from_maaser: true });
+      toast.success("Income excluded from Maaser");
+      await refreshMaaser();
+    } catch (e) {
+      toast.error(formatApiError(e?.response?.data?.detail) || "Could not exclude");
+    }
+    finally { setMaaserBusy(false); }
+  };
+
   const showConfirm = useCallback((title, message, cb) => {
     setConfirmTitle(title);
     setConfirmMessage(message);
@@ -465,7 +478,7 @@ const Transactions = React.memo(function Transactions() {
   const openAdd = useCallback(() => { setEditingId(null); setForm(emptyForm); setOpen(true); }, []);
   const openEdit = useCallback((t) => {
     setEditingId(t.transaction_id);
-    setForm({ description: t.description || "", amount: String(Math.abs(t.amount)), category: t.category || "", account_id: t.account_id || "", is_income: t.amount > 0, is_transfer: t.is_transfer || false, budget_type: "", occasion: "", merchant: "" });
+    setForm({ description: t.description || "", amount: String(Math.abs(t.amount)), category: t.category || "", account_id: t.account_id || "", is_income: t.amount > 0, is_transfer: t.is_transfer || false, exclude_from_maaser: t.exclude_from_maaser || false, budget_type: "", occasion: "", merchant: "" });
     setOpen(true);
   }, []);
   const closeForm = useCallback(() => { setOpen(false); setEditingId(null); setForm(emptyForm); setClassification(null); setSaveAsRecurring(false); }, []);
@@ -492,7 +505,7 @@ const Transactions = React.memo(function Transactions() {
     const amt = parseFloat(form.amount);
     const signed = form.is_income ? Math.abs(amt) : -Math.abs(amt);
     if (editingId) {
-      const payload = { description: form.description, amount: signed, category: form.category || undefined, is_income: form.is_income, is_transfer: form.is_transfer || undefined, account_id: form.account_id || undefined };
+      const payload = { description: form.description, amount: signed, category: form.category || undefined, is_income: form.is_income, is_transfer: form.is_transfer || undefined, exclude_from_maaser: form.exclude_from_maaser || undefined, account_id: form.account_id || undefined };
       const old = txsRef.current.find(t => t.transaction_id === editingId);
       setTxs(prev => prev.map(t => t.transaction_id === editingId ? { ...t, ...payload } : t));
       setOpen(false); setEditingId(null);
@@ -533,7 +546,7 @@ const Transactions = React.memo(function Transactions() {
       }
     } else {
       if (!form.account_id) { toast.error("Select an account first"); return; }
-      const payload = { description: form.description, amount: signed, category: form.category || undefined, account_id: form.account_id, is_income: form.is_income, is_transfer: form.is_transfer || undefined };
+      const payload = { description: form.description, amount: signed, category: form.category || undefined, account_id: form.account_id, is_income: form.is_income, is_transfer: form.is_transfer || undefined, exclude_from_maaser: form.exclude_from_maaser || undefined };
       setOpen(false); setEditingId(null);
       const optimisticTx = { transaction_id: `optimistic-${Date.now()}`, ...payload, date: new Date().toISOString(), source: "manual" };
       setTxs(prev => [optimisticTx, ...prev]);
@@ -1226,20 +1239,25 @@ const Transactions = React.memo(function Transactions() {
                         <DropdownMenuTrigger className="p-1 rounded-lg hover:bg-secondary text-muted-foreground">
                           <MoreHorizontal className="h-3.5 w-3.5" />
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleMaaserEdit(e)}>
-                            <Pencil className="h-3.5 w-3.5 mr-2" /> Edit
-                          </DropdownMenuItem>
-                          {e.status === "pending" && (
-                            <DropdownMenuItem onClick={() => handleMaaserPay(e.entry_id)}>
-                              <CheckCircle2 className="h-3.5 w-3.5 mr-2" /> Mark Paid
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleMaaserEdit(e)}>
+                              <Pencil className="h-3.5 w-3.5 mr-2" /> Edit
                             </DropdownMenuItem>
-                          )}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleMaaserDelete(e.entry_id)} className="text-ruby">
-                            <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
+                            {e.status === "pending" && (
+                              <DropdownMenuItem onClick={() => handleMaaserPay(e.entry_id)}>
+                                <CheckCircle2 className="h-3.5 w-3.5 mr-2" /> Mark Paid
+                              </DropdownMenuItem>
+                            )}
+                            {e.status === "pending" && e.transaction_id && (
+                              <DropdownMenuItem onClick={() => handleMaaserExclude(e.transaction_id)}>
+                                <X className="h-3.5 w-3.5 mr-2" /> Exclude from Maaser
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleMaaserDelete(e.entry_id)} className="text-ruby">
+                              <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
                   </div>

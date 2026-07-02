@@ -20,6 +20,7 @@ const emptyForm = {
   account_id: "",
   is_income: false,
   is_transfer: false,
+  exclude_from_maaser: false,
   budget_type: "",
   occasion: "",
   merchant: "",
@@ -221,6 +222,22 @@ export default function TransactionForm({
           </label>
           <span className="text-xs text-muted-foreground ml-6 -mt-2 block">
             Won't count as income or affect Maaser plan
+          </span>
+
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.exclude_from_maaser}
+              onChange={(e) =>
+                setForm({ ...form, exclude_from_maaser: e.target.checked })
+              }
+              disabled={form.is_transfer}
+              className="accent-topaz h-4 w-4"
+            />{" "}
+            <span>Exclude from Maaser calculation</span>
+          </label>
+          <span className="text-xs text-muted-foreground ml-6 -mt-2 block">
+            {form.is_transfer ? "Transfers are already excluded" : "This income won't be tithed"}
           </span>
 
           {/* Classify button */}
