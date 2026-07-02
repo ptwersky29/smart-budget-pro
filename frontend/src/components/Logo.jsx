@@ -18,64 +18,36 @@ export default function Logo({ size = "md", className = "" }) {
       aria-hidden="true"
     >
       <defs>
-        <linearGradient id="logo-bg-grad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="#10B981" />
-          <stop offset="60%" stop-color="#059669" />
-          <stop offset="100%" stop-color="#047857" />
+        <linearGradient id="logo-classic-green" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#0F4C3A" />
+          <stop offset="100%" stop-color="#062E22" />
         </linearGradient>
-        
-        <linearGradient id="logo-coin-grad" x1="0.2" y1="0" x2="0.8" y2="1">
-          <stop offset="0%" stop-color="#FCD34D" />
-          <stop offset="50%" stop-color="#F59E0B" />
+        <linearGradient id="logo-warm-gold" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#F59E0B" />
           <stop offset="100%" stop-color="#D97706" />
         </linearGradient>
-
-        <linearGradient id="logo-stem-grad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="#FFFFFF" />
-          <stop offset="100%" stop-color="#E0F2FE" />
-        </linearGradient>
-
-        <filter id="logo-premium-shadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#022C22" flood-opacity="0.3" />
-          <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#022C22" flood-opacity="0.15" />
-        </filter>
       </defs>
 
-      <rect width="120" height="120" rx="36" fill="url(#logo-bg-grad)" />
-      <rect x="1.5" y="1.5" width="117" height="117" rx="34.5" stroke="#FFFFFF" stroke-opacity="0.15" stroke-width="2" />
-      <rect x="6" y="6" width="108" height="108" rx="30" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1.2" />
+      <circle cx="60" cy="60" r="54" fill="url(#logo-classic-green)" />
+      
+      <circle cx="60" cy="60" r="48" stroke="url(#logo-warm-gold)" stroke-width="1.5" />
+      <circle cx="60" cy="60" r="45" stroke="#FFFFFF" stroke-opacity="0.1" stroke-width="1" />
 
-      <g filter="url(#logo-premium-shadow)">
-        <rect x="36" y="32" width="14" height="56" rx="7" fill="url(#logo-stem-grad)" />
-        <rect x="36" y="32" width="14" height="24" rx="7" fill="#FFFFFF" fill-opacity="0.3" />
+      <path d="M42 74 C36 68 36 52 46 42" stroke="url(#logo-warm-gold)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M42 74 C38 72 38 68 42 68 C44 70 44 72 42 74 Z" fill="url(#logo-warm-gold)" />
+      <path d="M39 65 C35 63 36 59 40 59 C41 61 41 63 39 65 Z" fill="url(#logo-warm-gold)" />
+      <path d="M38 55 C35 52 36 48 40 49 C40 51 40 53 38 55 Z" fill="url(#logo-warm-gold)" />
+      <path d="M41 46 C39 43 41 39 45 40 C45 42 44 44 41 46 Z" fill="url(#logo-warm-gold)" />
 
-        <path d="M43 32
-                 H68
-                 C82.36 32 94 43.64 94 58
-                 C94 72.36 82.36 84 68 84
-                 H43
-                 V70
-                 H68
-                 C74.63 70 80 64.63 80 58
-                 C80 51.37 74.63 46 68 46
-                 H43
-                 V32Z" 
-              fill="url(#logo-stem-grad)" />
+      <path d="M78 74 C84 68 84 52 74 42" stroke="url(#logo-warm-gold)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M78 74 C82 72 82 68 78 68 C76 70 76 72 78 74 Z" fill="url(#logo-warm-gold)" />
+      <path d="M81 65 C85 63 84 59 80 59 C79 61 79 63 81 65 Z" fill="url(#logo-warm-gold)" />
+      <path d="M82 55 C85 52 84 48 80 49 C80 51 80 53 82 55 Z" fill="url(#logo-warm-gold)" />
+      <path d="M79 46 C81 43 79 39 75 40 C75 42 76 44 79 46 Z" fill="url(#logo-warm-gold)" />
 
-        <circle cx="68" cy="58" r="14" fill="url(#logo-coin-grad)" />
-        <circle cx="68" cy="58" r="14" stroke="#FFFFFF" stroke-opacity="0.25" stroke-width="1" />
-        
-        <path d="M68 50
-                 L69.8 54.7
-                 L74.5 56.5
-                 L69.8 58.3
-                 L68 63
-                 L66.2 58.3
-                 L61.5 56.5
-                 L66.2 54.7
-                 Z" 
-              fill="#FFFFFF" />
-      </g>
+      <text x="60" y="74" font-family="Georgia, 'Times New Roman', serif" font-size="44" font-weight="bold" fill="#FFFFFF" text-anchor="middle">P</text>
+      
+      <path d="M60 32 L61.5 35 L64.5 35 L62 36.5 L63 39.5 L60 38 L57 39.5 L58 36.5 L55.5 35 L58.5 35 Z" fill="url(#logo-warm-gold)" />
     </svg>
   );
 }

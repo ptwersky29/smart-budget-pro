@@ -292,7 +292,8 @@ def build_router() -> APIRouter:
     @router.get("/maaser/ledger")
     async def ledger(request: Request, user: dict = Depends(get_current_user),
                      status: str = Query(None), limit: int = Query(200, ge=1, le=1000),
-                     offset: int = Query(0, ge=0), include_tx: bool = Query(False)):
+                     offset: int = Query(0, ge=0), include_tx: bool = Query(False),
+                     date_from: str = Query(None), date_to: str = Query(None)):
         sm = request.app.state.db
         async with sm() as session:
             q = select(MaaserLedger).where(MaaserLedger.user_id == user["user_id"])
@@ -300,6 +301,10 @@ def build_router() -> APIRouter:
                 q = q.where(MaaserLedger.maaser_paid == 0)
             elif status == "given":
                 q = q.where(MaaserLedger.maaser_paid > 0)
+            if date_from:
+                q = q.where(MaaserLedger.date >= date_from)
+            if date_to:
+                q = q.where(MaaserLedger.date <= date_to + "T23:59:59")
             result = await session.execute(q.order_by(MaaserLedger.date.desc()).offset(offset).limit(limit))
             rows = result.scalars().all()
             total = sum(r.maaser_paid or r.income_amount or 0 for r in rows)

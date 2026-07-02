@@ -129,7 +129,7 @@ const Transactions = React.memo(function Transactions() {
   const [maaserEditPaidTo, setMaaserEditPaidTo] = useState("");
   const [maaserEditNote, setMaaserEditNote] = useState("");
 
-  const refreshMaaser = useCallback(async () => {
+  const refreshMaaser = useCallback(async (dateFrom, dateTo) => {
     try {
       const [s, sum] = await Promise.all([
         api.get("/jewish/maaser/settings"),
@@ -139,7 +139,10 @@ const Transactions = React.memo(function Transactions() {
       setMaaserSum(sum.data || null);
     } catch {}
     try {
-      const { data } = await api.get("/jewish/maaser/ledger?include_tx=true&limit=500");
+      let url = "/jewish/maaser/ledger?include_tx=true&limit=500";
+      if (dateFrom) url += `&date_from=${dateFrom}`;
+      if (dateTo) url += `&date_to=${dateTo}`;
+      const { data } = await api.get(url);
       setMaaserLedger(data?.entries || []);
     } catch {}
   }, []);
@@ -157,10 +160,13 @@ const Transactions = React.memo(function Transactions() {
     finally { setMaaserLoading(false); }
   }, []);
 
-  const loadMaaserLedger = useCallback(async () => {
+  const loadMaaserLedger = useCallback(async (dateFrom, dateTo) => {
     setMaaserLedgerLoading(true);
     try {
-      const { data } = await api.get("/jewish/maaser/ledger?include_tx=true&limit=500");
+      let url = "/jewish/maaser/ledger?include_tx=true&limit=500";
+      if (dateFrom) url += `&date_from=${dateFrom}`;
+      if (dateTo) url += `&date_to=${dateTo}`;
+      const { data } = await api.get(url);
       setMaaserLedger(data?.entries || []);
     } catch {}
     finally { setMaaserLedgerLoading(false); }
@@ -169,9 +175,9 @@ const Transactions = React.memo(function Transactions() {
   useEffect(() => {
     if (activeTab === "maaser") {
       loadMaaserSummary();
-      loadMaaserLedger();
+      loadMaaserLedger(filters.date_from, filters.date_to);
     }
-  }, [activeTab, loadMaaserSummary, loadMaaserLedger]);
+  }, [activeTab, loadMaaserSummary, loadMaaserLedger, filters.date_from, filters.date_to]);
 
   const handleMaaserSaveCfg = async (next) => {
     setMaaserBusy(true);
@@ -179,7 +185,7 @@ const Transactions = React.memo(function Transactions() {
       await api.put("/jewish/maaser/settings", next);
       setMaaserCfg(next);
       toast.success(`Auto-Maaser ${next.enabled ? "enabled" : "disabled"}`);
-      await refreshMaaser();
+      await refreshMaaser(filters.date_from, filters.date_to);
     } catch (e) {
       toast.error(formatApiError(e?.response?.data?.detail) || "Could not save");
     }
@@ -195,7 +201,7 @@ const Transactions = React.memo(function Transactions() {
       } else {
         toast.success(`Accrued maaser for ${data.created} income tx · ${fmt(data.total_amount)}`);
       }
-      await refreshMaaser();
+      await refreshMaaser(filters.date_from, filters.date_to);
     } catch (e) {
       toast.error(formatApiError(e?.response?.data?.detail) || "Recalculate failed");
     }
@@ -210,7 +216,7 @@ const Transactions = React.memo(function Transactions() {
     try {
       await api.post("/jewish/maaser/reset");
       toast.success("Maaser audit log reset");
-      await refreshMaaser();
+      await refreshMaaser(filters.date_from, filters.date_to);
     } catch (e) {
       toast.error(formatApiError(e?.response?.data?.detail) || "Reset failed");
     }
@@ -238,7 +244,7 @@ const Transactions = React.memo(function Transactions() {
       await api.post("/jewish/tzedakah", { amount: num, recipient, note: "Maaser given against balance" });
       toast.success("Maaser given");
       setMaaserShowGive(false);
-      await refreshMaaser();
+      await refreshMaaser(filters.date_from, filters.date_to);
     } catch (e) {
       toast.error(formatApiError(e?.response?.data?.detail) || "Could not record");
     }
@@ -265,7 +271,7 @@ const Transactions = React.memo(function Transactions() {
       });
       toast.success("Entry updated");
       setMaaserEditEntry(null);
-      await refreshMaaser();
+      await refreshMaaser(filters.date_from, filters.date_to);
     } catch (e) {
       toast.error(formatApiError(e?.response?.data?.detail) || "Could not update");
     }
@@ -276,7 +282,7 @@ const Transactions = React.memo(function Transactions() {
       try {
         await api.delete(`/jewish/maaser/ledger/${entryId}`);
         toast.success("Entry deleted");
-        await refreshMaaser();
+        await refreshMaaser(filters.date_from, filters.date_to);
       } catch (e) {
         toast.error(formatApiError(e?.response?.data?.detail) || "Could not delete");
       }
@@ -287,7 +293,7 @@ const Transactions = React.memo(function Transactions() {
     try {
       await api.post(`/jewish/maaser/pay/${entryId}`);
       toast.success("Entry marked as paid");
-      await refreshMaaser();
+      await refreshMaaser(filters.date_from, filters.date_to);
     } catch (e) {
       toast.error(formatApiError(e?.response?.data?.detail) || "Could not mark paid");
     }
