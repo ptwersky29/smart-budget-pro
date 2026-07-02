@@ -19,9 +19,8 @@ import httpx
 import urllib.parse
 from starlette.responses import RedirectResponse
 
-from db import User, UserSession, PasswordResetToken, TokenBlacklist, TrueLayerState
+from db import User, UserSession, PasswordResetToken, TokenBlacklist, TrueLayerState, AuditLog
 from security import validate_password, _require_jwt_secret, generate_csrf_token, verify_csrf_token
-from audit import log_action
 
 logger = logging.getLogger(__name__)
 
@@ -342,14 +341,19 @@ def build_router() -> APIRouter:
             result = await session.execute(select(User).where(User.email == email))
             user = result.scalar_one_or_none()
 
+            ip = request.client.host if request.client else None
+            ua = request.headers.get("user-agent", "")[:512] if request else ""
+
             # Account lockout check
             if user and user.locked_until:
                 if user.locked_until.tzinfo is None:
                     user.locked_until = user.locked_until.replace(tzinfo=timezone.utc)
                 if user.locked_until > datetime.now(timezone.utc):
                     remaining = int((user.locked_until - datetime.now(timezone.utc)).total_seconds())
-                    await log_action(user.user_id, "login_locked", "auth", detail={"reason": "account_locked"},
-                                     request=request, success=False)
+                    session.add(AuditLog(user_id=user.user_id, action="login_locked", resource="auth",
+                                         detail={"reason": "account_locked"}, ip_address=ip, user_agent=ua,
+                                         success=False))
+                    await session.commit()
                     raise HTTPException(429, f"Account locked. Try again in {remaining} seconds.")
                 user.locked_until = None
                 user.login_attempts = 0
@@ -359,18 +363,24 @@ def build_router() -> APIRouter:
                     user.login_attempts = (user.login_attempts or 0) + 1
                     if user.login_attempts >= 5:
                         user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
+                    session.add(AuditLog(user_id=user.user_id, action="login_failed", resource="auth",
+                                         detail={"reason": "invalid_password", "attempts": user.login_attempts},
+                                         ip_address=ip, user_agent=ua, success=False))
                     await session.commit()
-                    await log_action(user.user_id, "login_failed", "auth", detail={"reason": "invalid_password",
-                                     "attempts": user.login_attempts}, request=request, success=False)
                 raise HTTPException(401, "Invalid email or password")
             if user.disabled:
-                await log_action(user.user_id, "login_failed", "auth", detail={"reason": "account_disabled"},
-                                 request=request, success=False)
+                session.add(AuditLog(user_id=user.user_id, action="login_failed", resource="auth",
+                                     detail={"reason": "account_disabled"}, ip_address=ip, user_agent=ua,
+                                     success=False))
+                await session.commit()
                 raise HTTPException(403, "Account disabled")
 
             # Reset lockout counters
             user.login_attempts = 0
             user.locked_until = None
+
+            session.add(AuditLog(user_id=user.user_id, action="login", resource="auth",
+                                 ip_address=ip, user_agent=ua, success=True))
             await session.commit()
 
             request.state.user_id = user.user_id
@@ -380,8 +390,6 @@ def build_router() -> APIRouter:
             ud = _user_to_dict(user)
             ud["access_token"] = access
             ud["refresh_token"] = refresh
-
-            await log_action(user.user_id, "login", "auth", request=request, success=True)
             return ud
 
     @router.post("/logout")
@@ -719,6 +727,8 @@ def build_router() -> APIRouter:
         async with sm() as session:
             result = await session.execute(select(User).where(User.email == email))
             user = result.scalar_one_or_none()
+            ip = request.client.host if request.client else None
+            ua = request.headers.get("user-agent", "")[:512] if request else ""
             if user is None:
                 user_id = f"user_{uuid.uuid4().hex[:12]}"
                 free_trial_end = datetime.now(timezone.utc) + timedelta(days=FREE_TRIAL_DAYS)
@@ -734,19 +744,23 @@ def build_router() -> APIRouter:
                     email_verified=True,
                 )
                 session.add(user)
+                session.add(AuditLog(user_id=user_id, action="login", resource="auth",
+                                     ip_address=ip, user_agent=ua, success=True))
                 await session.commit()
-                await log_action(user.user_id, "login", "auth", request=request, success=True)
             elif user.disabled:
-                await log_action(user.user_id, "login_failed", "auth",
-                                 detail={"reason": "account_disabled"}, request=request, success=False)
+                session.add(AuditLog(user_id=user.user_id, action="login_failed", resource="auth",
+                                     detail={"reason": "account_disabled"}, ip_address=ip, user_agent=ua,
+                                     success=False))
+                await session.commit()
                 raise HTTPException(403, "Account disabled")
             else:
                 if picture and (not user.picture or user.picture != picture):
                     user.picture = picture
                 if google_sub and not user.google_sub:
                     user.google_sub = google_sub
+                session.add(AuditLog(user_id=user.user_id, action="login", resource="auth",
+                                     ip_address=ip, user_agent=ua, success=True))
                 await session.commit()
-                await log_action(user.user_id, "login", "auth", request=request, success=True)
             access = create_access_token(user.user_id, email)
             refresh = create_refresh_token(user.user_id)
             frontend_url = os.environ.get("FRONTEND_URL", "").rstrip("/")
