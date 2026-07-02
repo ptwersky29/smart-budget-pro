@@ -88,7 +88,7 @@ const Transactions = React.memo(function Transactions() {
   const [showPie, setShowPie] = useState(false);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const defaultFilters = useMemo(() => ({ search: "", category: "", source: "", tx_type: "", date_from: firstOfMonth(), date_to: today(), amount_min: "", amount_max: "", sort: "date", order: "desc", account_id: "" }), []);
+  const defaultFilters = useMemo(() => ({ search: "", category: "", source: "", tx_type: "", date_from: "", date_to: "", amount_min: "", amount_max: "", sort: "date", order: "desc", account_id: "" }), []);
   const [filters, setFilters] = useState(() => {
     const fromUrl = {};
     for (const k of Object.keys(defaultFilters)) {
@@ -423,14 +423,12 @@ const Transactions = React.memo(function Transactions() {
 
   const isCurrentHebrewMonth = selectedHebrewMonth?.is_current ?? false;
 
-  const monthLabel = filters.date_from ? new Date(filters.date_from).toLocaleDateString("en-GB", { month: "long", year: "numeric" }) : "";
   const hebrewMonthLabel = selectedHebrewMonth ? (
     <span>
-      {monthLabel && <span className="text-xs font-normal text-muted-foreground mr-1">{monthLabel} ·</span>}
       <span dir="rtl" lang="he" className="inline-block">{YIDDISH[selectedHebrewMonth.month_name] || selectedHebrewMonth.month_name}</span>
       {" "}{selectedHebrewMonth.hebrew_year}
     </span>
-  ) : (monthLabel ? <span>{monthLabel}</span> : null);
+  ) : null;
 
   // Load Hebrew months and select current month (only if no date params in URL)
   useEffect(() => {
@@ -467,10 +465,14 @@ const Transactions = React.memo(function Transactions() {
 
   const clearAllFilters = useCallback(() => {
     setSearchInput("");
-    setSelectedHebrewMonth(null);
-    setFilters(prev => ({ ...prev, search: "", tx_type: "", source: "", category: "", amount_min: "", amount_max: "", date_from: firstOfMonth(), date_to: today(), account_id: "" }));
     setOffset(0);
-  }, []);
+    const current = hebrewMonths.find(m => m.is_current);
+    if (current) {
+      applyHebrewMonth(current);
+    } else {
+      setFilters(prev => ({ ...prev, search: "", tx_type: "", source: "", category: "", amount_min: "", amount_max: "", date_from: "", date_to: "", account_id: "" }));
+    }
+  }, [hebrewMonths, applyHebrewMonth]);
 
   const totalPages = Math.ceil(total / limit);
   const currentPage = Math.floor(offset / limit) + 1;
@@ -986,7 +988,7 @@ const Transactions = React.memo(function Transactions() {
           <button onClick={() => setShowPie(!showPie)} className="flex items-center justify-between w-full text-left">
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
               <span className="grid h-6 w-6 place-items-center rounded-md bg-muted/70"><PieChartIcon className="h-3 w-3 text-muted-foreground/80" /></span>
-              Spend breakdown
+              Spend breakdown{selectedHebrewMonth ? <span className="text-xs font-normal text-muted-foreground">· <span dir="rtl" lang="he">{YIDDISH[selectedHebrewMonth.month_name] || selectedHebrewMonth.month_name}</span> {selectedHebrewMonth.hebrew_year}</span> : ""}
             </h3>
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">{categorySpend.length} categories</span>
@@ -1195,118 +1197,70 @@ const Transactions = React.memo(function Transactions() {
 
         {/* Ledger Table */}
         <div className="rounded-xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden">
+          <div className="px-4 py-3 flex items-center justify-between border-b border-border/60">
+            <h4 className="text-sm font-medium">All Maaser Transactions</h4>
+            {!maaserLedgerLoading && maaserLedger.length > 0 && (
+              <span className="text-xs text-muted-foreground">{maaserLedger.length} entries</span>
+            )}
+          </div>
           {maaserLedgerLoading ? (
             <SkeletonTable rows={6} className="p-3" />
           ) : maaserLedger.length === 0 ? (
             <EmptyState icon={Star} title="No maaser entries"
               description="Income transactions with auto-maaser or manual ledger entries will appear here." />
           ) : (
-            <>
-              {/* Mobile card view */}
-              <div className="block sm:hidden divide-y divide-border">
-                {maaserLedger.map(e => (
-                  <div key={e.entry_id} className="px-4 py-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">{e.date || e.income_date ? new Date(e.date || e.income_date).toLocaleDateString("en-GB") : "-"}</span>
+            <div className="divide-y divide-border/60">
+              {maaserLedger.map(e => (
+                <div key={e.entry_id} className="px-4 py-3 flex items-center gap-3 text-sm hover:bg-secondary/20 transition-colors">
+                  <div className="min-w-0 flex-1 grid grid-cols-1 sm:grid-cols-[auto_1fr_auto_auto] gap-x-4 gap-y-1 items-center">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {e.date || e.income_date ? new Date(e.date || e.income_date).toLocaleDateString("en-GB") : "-"}
+                    </span>
+                    <div className="min-w-0">
+                      {e.income_description ? (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="truncate max-w-[200px]">{e.income_description}</span>
+                          {e.income_category && <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-secondary capitalize">{e.income_category}</span>}
+                          <span className="text-xs font-medium">{fmt(e.income_amount)}</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Manual entry</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 whitespace-nowrap">
+                      <span className="text-xs"><span className="text-muted-foreground">Due: </span><span className="font-medium">{fmt(e.maaser_due)}</span></span>
+                      <span className="text-xs"><span className="text-muted-foreground">Paid: </span>
+                        {e.status === "pending" ? <span className="text-amber-500 font-medium">Pending</span> : <span className="font-medium">{fmt(e.maaser_paid)}</span>}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${e.status === "given" ? "bg-emerald/10 text-emerald" : "bg-amber/10 text-amber-500"}`}>
                         {e.status === "given" ? "Given" : "Pending"}
                       </span>
-                    </div>
-                    {e.income_description && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
-                        <span className="truncate max-w-[160px]">{e.income_description}</span>
-                        {e.income_category && <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-secondary text-[10px] capitalize">{e.income_category}</span>}
-                        <span className="font-medium">{fmt(e.income_amount)}</span>
-                      </p>
-                    )}
-                    <div className="grid grid-cols-2 gap-1 text-xs">
-                      <div><span className="text-muted-foreground">Due: </span><span className="font-medium">{fmt(e.maaser_due)}</span></div>
-                      <div><span className="text-muted-foreground">Paid: </span>
-                        {e.status === "pending" ? <span className="text-amber-500 font-medium">Pending</span> : <span className="font-medium">{fmt(e.maaser_paid)}</span>}
-                      </div>
-                      <div className="col-span-2"><span className="text-muted-foreground">To: </span>{e.paid_to || "-"}</div>
-                      {e.note && <div className="col-span-2"><span className="text-muted-foreground">Note: </span><span className="truncate">{e.note}</span></div>}
-                    </div>
-                    <div className="flex justify-end gap-1 pt-1">
-                      <button onClick={() => handleMaaserEdit(e)} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
-                      {e.status === "pending" && <button onClick={() => handleMaaserPay(e.entry_id)} className="p-1.5 rounded-lg hover:bg-secondary text-emerald"><CheckCircle2 className="h-3.5 w-3.5" /></button>}
-                      <button onClick={() => handleMaaserDelete(e.entry_id)} className="p-1.5 rounded-lg hover:bg-secondary text-ruby"><Trash2 className="h-3.5 w-3.5" /></button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger className="p-1 rounded-lg hover:bg-secondary text-muted-foreground">
+                          <MoreHorizontal className="h-3.5 w-3.5" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleMaaserEdit(e)}>
+                            <Pencil className="h-3.5 w-3.5 mr-2" /> Edit
+                          </DropdownMenuItem>
+                          {e.status === "pending" && (
+                            <DropdownMenuItem onClick={() => handleMaaserPay(e.entry_id)}>
+                              <CheckCircle2 className="h-3.5 w-3.5 mr-2" /> Mark Paid
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleMaaserDelete(e.entry_id)} className="text-ruby">
+                            <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
-                ))}
-              </div>
-              {/* Desktop table */}
-              <div className="hidden sm:block overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-[11px] text-muted-foreground border-b border-border">
-                      <th className="px-4 py-2.5">Date</th>
-                      <th className="px-4 py-2.5">Income</th>
-                      <th className="px-4 py-2.5 text-right">Maaser Due</th>
-                      <th className="px-4 py-2.5 text-right">Paid</th>
-                      <th className="px-4 py-2.5">Paid To</th>
-                      <th className="px-4 py-2.5">Note</th>
-                      <th className="px-4 py-2.5">Status</th>
-                      <th className="px-4 py-2.5 w-10"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {maaserLedger.map(e => (
-                      <tr key={e.entry_id} className="border-b border-border last:border-0 hover:bg-secondary/30 transition-colors">
-                        <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                          {e.date || e.income_date ? new Date(e.date || e.income_date).toLocaleDateString("en-GB") : "-"}
-                        </td>
-                        <td className="px-4 py-3">
-                          {e.income_description ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs truncate max-w-[140px]">{e.income_description}</span>
-                              {e.income_category && <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-secondary capitalize">{e.income_category}</span>}
-                              <span className="text-xs font-medium">{fmt(e.income_amount)}</span>
-                            </div>
-                          ) : <span className="text-xs text-muted-foreground">-</span>}
-                        </td>
-                        <td className="px-4 py-3 text-right font-medium text-xs">{fmt(e.maaser_due)}</td>
-                        <td className="px-4 py-3 text-right text-xs">
-                          {e.status === "pending" ? (
-                            <span className="text-amber-500 font-medium">Pending</span>
-                          ) : (
-                            <span className="font-medium">{fmt(e.maaser_paid)}</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-xs">{e.paid_to || "-"}</td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground truncate max-w-[160px]">{e.note || "-"}</td>
-                        <td className="px-4 py-3">
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${e.status === "given" ? "bg-emerald/10 text-emerald" : "bg-amber/10 text-amber-500"}`}>
-                            {e.status === "given" ? "Given" : "Pending"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleMaaserEdit(e)}>
-                                <Pencil className="h-4 w-4 mr-2" /> Edit
-                              </DropdownMenuItem>
-                              {e.status === "pending" && (
-                                <DropdownMenuItem onClick={() => handleMaaserPay(e.entry_id)}>
-                                  <CheckCircle2 className="h-4 w-4 mr-2" /> Mark Paid
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleMaaserDelete(e.entry_id)} className="text-ruby">
-                                <Trash2 className="h-4 w-4 mr-2" /> Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
