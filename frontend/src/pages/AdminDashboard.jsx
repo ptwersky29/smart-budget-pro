@@ -3,15 +3,15 @@ import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
 import {
   Users, Shield, Flag, Search, X, ChevronDown, ChevronRight,
-  Loader2, ChevronLeft, ChevronRight as ChevronRightIcon, Activity,
-  UserCheck, UserX,
+  Loader2, ChevronLeft, ChevronRight as ChevronRightIcon, Activity, LogIn,
+  UserCheck, UserX, Trash2,
 } from "lucide-react";
 import { PageHeader, SectionCard, MetricCard } from "../components/ui/layout";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
 
-function UserRow({ u, busy, onToggleDisable, onSetRole, onSetTier }) {
+function UserRow({ u, busy, onToggleDisable, onSetRole, onSetTier, onDeleteUser }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -75,6 +75,19 @@ function UserRow({ u, busy, onToggleDisable, onSetRole, onSetTier }) {
               )}
               {u.disabled ? "Enable" : "Disable"}
             </Button>
+            <Button
+              variant="danger"
+              size="pillSm"
+              onClick={() => onDeleteUser(u.user_id)}
+              disabled={busy[`delete-${u.user_id}`]}
+            >
+              {busy[`delete-${u.user_id}`] ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Trash2 className="h-3 w-3" />
+              )}
+              Delete
+            </Button>
           </div>
         </td>
       </tr>
@@ -114,6 +127,7 @@ export default function AdminDashboard() {
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [flags, setFlags] = useState([]);
+  const [loginHistory, setLoginHistory] = useState([]);
   const [busy, setBusy] = useState({});
   const [newFlag, setNewFlag] = useState({ flag: "", description: "" });
 
@@ -144,7 +158,14 @@ export default function AdminDashboard() {
     } catch { /* flags non-critical */ }
   }, []);
 
-  useEffect(() => { loadStats(); loadUsers(); loadFlags(); }, [loadStats, loadUsers, loadFlags]);
+  const loadLoginHistory = useCallback(async () => {
+    try {
+      const res = await api.get("/admin/login-history", { params: { limit: 50 } });
+      setLoginHistory(res.data.logins || []);
+    } catch { /* login history non-critical */ }
+  }, []);
+
+  useEffect(() => { loadStats(); loadUsers(); loadFlags(); loadLoginHistory(); }, [loadStats, loadUsers, loadFlags, loadLoginHistory]);
 
   const toggleDisable = async (userId) => {
     setBusy((p) => ({ ...p, [`disable-${userId}`]: true }));
@@ -161,7 +182,7 @@ export default function AdminDashboard() {
   const setRole = async (userId, role) => {
     setBusy((p) => ({ ...p, [`role-${userId}`]: true }));
     try {
-      await api.put(`/admin/users/${userId}/role`, { params: { role } });
+      await api.put(`/admin/users/${userId}/role?role=${role}`);
       setUsers((prev) => prev.map((u) => u.user_id === userId ? { ...u, role } : u));
       toast.success(`Role set to ${role}`);
     } catch (e) {
@@ -172,12 +193,24 @@ export default function AdminDashboard() {
   const setTier = async (userId, tier) => {
     setBusy((p) => ({ ...p, [`tier-${userId}`]: true }));
     try {
-      await api.put(`/admin/users/${userId}/tier`, { params: { tier } });
+      await api.put(`/admin/users/${userId}/tier?tier=${tier}`);
       setUsers((prev) => prev.map((u) => u.user_id === userId ? { ...u, tier } : u));
       toast.success(`Tier set to ${tier}`);
     } catch (e) {
       toast.error(formatApiError(e.response?.data?.detail) || "Failed");
     } finally { setBusy((p) => ({ ...p, [`tier-${userId}`]: false })); }
+  };
+
+  const deleteUser = async (userId) => {
+    if (!window.confirm(`Are you sure you want to permanently delete user ${userId}? This cannot be undone.`)) return;
+    setBusy((p) => ({ ...p, [`delete-${userId}`]: true }));
+    try {
+      await api.delete(`/admin/users/${userId}`);
+      setUsers((prev) => prev.filter((u) => u.user_id !== userId));
+      toast.success("User deleted");
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Failed to delete user");
+    } finally { setBusy((p) => ({ ...p, [`delete-${userId}`]: false })); }
   };
 
   const toggleFlag = async (flagId, currentEnabled) => {
@@ -317,6 +350,7 @@ export default function AdminDashboard() {
                     onToggleDisable={toggleDisable}
                     onSetRole={setRole}
                     onSetTier={setTier}
+                    onDeleteUser={deleteUser}
                   />
                 ))
               )}
@@ -370,6 +404,57 @@ export default function AdminDashboard() {
           </div>
         </SectionCard>
       )}
+
+      <SectionCard eyebrow="Security" title="Login History" description="Recent login attempts across all users.">
+        <div className="-mx-6 -mb-4">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-border text-muted-foreground">
+                <th className="text-left font-medium px-4 py-2">User</th>
+                <th className="text-left font-medium px-4 py-2">Action</th>
+                <th className="text-left font-medium px-4 py-2">Result</th>
+                <th className="text-left font-medium px-4 py-2">IP</th>
+                <th className="text-left font-medium px-4 py-2 hidden md:table-cell">User Agent</th>
+                <th className="text-right font-medium px-4 py-2">Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loginHistory.map((l, i) => (
+                <tr key={i} className="border-b border-border last:border-0 hover:bg-muted/30">
+                  <td className="px-4 py-2.5">
+                    <div className="flex flex-col">
+                      <span className="font-medium text-xs">{l.name || "Unknown"}</span>
+                      <span className="text-muted-foreground">{l.email || l.user_id?.slice(0, 16)}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <span className="capitalize">{l.action?.replace(/_/g, " ")}</span>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {l.success ? (
+                      <Badge variant="secondary" className="text-emerald border-emerald/30">Success</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-destructive border-destructive/30">Failed</Badge>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 font-mono">{l.ip_address || "—"}</td>
+                  <td className="px-4 py-2.5 hidden md:table-cell text-muted-foreground truncate max-w-[160px]">
+                    {l.user_agent || "—"}
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-muted-foreground">
+                    {l.created_at?.slice(0, 16).replace("T", " ")}
+                  </td>
+                </tr>
+              ))}
+              {loginHistory.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="text-center py-6 text-muted-foreground">No login history yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </SectionCard>
 
       <SectionCard eyebrow="Configuration" title="Feature Flags" description="Toggle features on/off globally or per-user.">
         <form onSubmit={createFlag} className="flex items-end gap-3 mb-6 pb-6 border-b border-border">

@@ -10,6 +10,12 @@ from sqlalchemy import select, func
 
 from db import User, Transaction, AuditLog, FeatureFlag, SupportTicket
 from db import SmsMessage, SmsSender
+from db import (PasswordResetToken, TrueLayerState, SyncLog,
+    SplitTransaction, AccountNickname, Budget, RecurringTransaction,
+    Category, Subscription, PendingUpdate, MaaserLedger, AiMessage,
+    AiUsage, AiProvider, CategoryRule, PaymentTransaction, BillingRecord,
+    Statement, ConsentRecord, InvestmentHolding, HolidayBudget,
+    ChasunaPlan, Integration, BudgetOccasion, AISuggestion)
 from auth import require_admin
 from audit import log_action
 
@@ -159,6 +165,32 @@ def build_router() -> APIRouter:
                          detail={"new_role": role}, request=request)
         return {"status": "ok", "user_id": user_id, "role": role}
 
+    @router.delete("/users/{user_id}")
+    async def delete_user(user_id: str, request: Request, user: dict = Depends(require_admin)):
+        sm = request.app.state.db
+        async with sm() as session:
+            u = (await session.execute(select(User).where(User.user_id == user_id))).scalar_one_or_none()
+            if not u:
+                raise HTTPException(404, "User not found")
+
+            # delete related records before removing the user
+            cleanup = [PasswordResetToken, TrueLayerState, SyncLog, SplitTransaction,
+                       AccountNickname, Budget, RecurringTransaction, Category,
+                       Subscription, PendingUpdate, MaaserLedger, AiMessage, AiUsage,
+                       AiProvider, CategoryRule, PaymentTransaction, BillingRecord,
+                       SmsMessage, SmsSender, Statement, AuditLog, ConsentRecord,
+                       InvestmentHolding, HolidayBudget, ChasunaPlan, Integration,
+                       BudgetOccasion, AISuggestion, Transaction]
+            for model in cleanup:
+                await session.execute(delete(model).where(model.user_id == user_id))
+
+            await session.delete(u)
+            await session.commit()
+
+        await log_action(user["user_id"], "user_delete", "user", user_id,
+                         request=request)
+        return {"status": "deleted", "user_id": user_id}
+
     @router.put("/users/{user_id}/toggle-disable")
     async def toggle_disable_user(user_id: str, request: Request, user: dict = Depends(require_admin)):
         sm = request.app.state.db
@@ -272,6 +304,27 @@ def build_router() -> APIRouter:
             await session.delete(ff)
             await session.commit()
             return {"status": "deleted"}
+
+    @router.get("/login-history")
+    async def login_history(request: Request, user: dict = Depends(require_admin),
+                             limit: int = Query(50, ge=1, le=200)):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(AuditLog, User.email, User.name).select_from(
+                    AuditLog
+                ).outerjoin(User, AuditLog.user_id == User.user_id).where(
+                    AuditLog.action.in_(["login", "login_failed", "login_locked"])
+                ).order_by(AuditLog.created_at.desc()).limit(limit)
+            )
+            rows = result.all()
+            return {"logins": [
+                {"user_id": l.user_id, "email": email, "name": name,
+                 "action": l.action, "success": l.success,
+                 "ip_address": l.ip_address, "user_agent": l.user_agent,
+                 "created_at": l.created_at.isoformat() if l.created_at else None}
+                for l, email, name in rows
+            ]}
 
     @router.get("/health")
     async def admin_health():

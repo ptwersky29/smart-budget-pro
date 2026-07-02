@@ -21,6 +21,7 @@ from starlette.responses import RedirectResponse
 
 from db import User, UserSession, PasswordResetToken, TokenBlacklist, TrueLayerState
 from security import validate_password, _require_jwt_secret, generate_csrf_token, verify_csrf_token
+from audit import log_action
 
 logger = logging.getLogger(__name__)
 
@@ -345,6 +346,8 @@ def build_router() -> APIRouter:
                     user.locked_until = user.locked_until.replace(tzinfo=timezone.utc)
                 if user.locked_until > datetime.now(timezone.utc):
                     remaining = int((user.locked_until - datetime.now(timezone.utc)).total_seconds())
+                    await log_action(user.user_id, "login_locked", "auth", detail={"reason": "account_locked"},
+                                     request=request, success=False)
                     raise HTTPException(429, f"Account locked. Try again in {remaining} seconds.")
                 user.locked_until = None
                 user.login_attempts = 0
@@ -355,8 +358,12 @@ def build_router() -> APIRouter:
                     if user.login_attempts >= 5:
                         user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
                     await session.commit()
+                    await log_action(user.user_id, "login_failed", "auth", detail={"reason": "invalid_password",
+                                     "attempts": user.login_attempts}, request=request, success=False)
                 raise HTTPException(401, "Invalid email or password")
             if user.disabled:
+                await log_action(user.user_id, "login_failed", "auth", detail={"reason": "account_disabled"},
+                                 request=request, success=False)
                 raise HTTPException(403, "Account disabled")
 
             # Reset lockout counters
@@ -371,6 +378,8 @@ def build_router() -> APIRouter:
             ud = _user_to_dict(user)
             ud["access_token"] = access
             ud["refresh_token"] = refresh
+
+            await log_action(user.user_id, "login", "auth", request=request, success=True)
             return ud
 
     @router.post("/logout")
