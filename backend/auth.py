@@ -14,14 +14,13 @@ import bcrypt
 import jwt as pyjwt
 from fastapi import APIRouter, HTTPException, Request, Response, Depends
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import select, update, delete
+import json
+from sqlalchemy import select, update, delete, text
 import httpx
 import urllib.parse
 from starlette.responses import RedirectResponse
 
-import json
-from sqlalchemy import text
-from db import User, UserSession, PasswordResetToken, TokenBlacklist, TrueLayerState
+from db import User, UserSession, PasswordResetToken, TokenBlacklist, TrueLayerState, AuditLog
 from security import validate_password, _require_jwt_secret, generate_csrf_token, verify_csrf_token
 
 logger = logging.getLogger(__name__)
@@ -346,13 +345,11 @@ def build_router() -> APIRouter:
             ip = request.client.host if request.client else None
             ua = (request.headers.get("user-agent", "") or "")[:512]
 
-            def _write_audit(uid, act, success, extra=None):
-                session.execute(
+            async def _write_audit(uid, act, success, extra=None):
+                await session.execute(
                     text("INSERT INTO audit_logs (user_id, action, resource, ip_address, user_agent, success, created_at) VALUES (:uid, :act, 'auth', :ip, :ua, :s, NOW())"),
                     {"uid": uid, "act": act, "ip": ip, "ua": ua, "s": success}
                 )
-                if uid and act == "login":
-                    print(f"[AUDIT] wrote login event for {uid}", flush=True)
 
             # Account lockout check
             if user and user.locked_until:
@@ -360,7 +357,7 @@ def build_router() -> APIRouter:
                     user.locked_until = user.locked_until.replace(tzinfo=timezone.utc)
                 if user.locked_until > datetime.now(timezone.utc):
                     remaining = int((user.locked_until - datetime.now(timezone.utc)).total_seconds())
-                    _write_audit(user.user_id, "login_locked", False, {"reason": "account_locked"})
+                    await _write_audit(user.user_id, "login_locked", False, {"reason": "account_locked"})
                     await session.commit()
                     raise HTTPException(429, f"Account locked. Try again in {remaining} seconds.")
                 user.locked_until = None
@@ -371,11 +368,11 @@ def build_router() -> APIRouter:
                     user.login_attempts = (user.login_attempts or 0) + 1
                     if user.login_attempts >= 5:
                         user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
-                    _write_audit(user.user_id, "login_failed", False, {"reason": "invalid_password", "attempts": user.login_attempts})
+                    await _write_audit(user.user_id, "login_failed", False, {"reason": "invalid_password", "attempts": user.login_attempts})
                     await session.commit()
                 raise HTTPException(401, "Invalid email or password")
             if user.disabled:
-                _write_audit(user.user_id, "login_failed", False, {"reason": "account_disabled"})
+                await _write_audit(user.user_id, "login_failed", False, {"reason": "account_disabled"})
                 await session.commit()
                 raise HTTPException(403, "Account disabled")
 
@@ -383,7 +380,7 @@ def build_router() -> APIRouter:
             user.login_attempts = 0
             user.locked_until = None
 
-            _write_audit(user.user_id, "login", True)
+            await _write_audit(user.user_id, "login", True)
             await session.commit()
 
             request.state.user_id = user.user_id
