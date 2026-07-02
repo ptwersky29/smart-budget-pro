@@ -21,15 +21,15 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
         /* ─── App Design System Variants ─── */
         primary:
-          "rounded-full gradient-emerald text-white shadow-lg shadow-emerald/15 active:scale-[0.97]",
+          "rounded-lg gradient-emerald text-white shadow-sm shadow-emerald/15 active:scale-[0.98]",
         warning:
-          "rounded-full gradient-topaz text-white active:scale-[0.97]",
+          "rounded-lg gradient-topaz text-white active:scale-[0.98]",
         danger:
-          "rounded-full border border-ruby text-ruby hover:bg-ruby/5 active:scale-[0.97]",
+          "rounded-lg border border-ruby text-ruby hover:bg-ruby/5 active:scale-[0.98]",
         outlinePill:
-          "rounded-full border border-border bg-card/80 hover:bg-secondary/60 text-muted-foreground hover:text-foreground active:scale-[0.97]",
+          "rounded-lg border border-border bg-card/90 hover:bg-secondary/60 text-muted-foreground hover:text-foreground active:scale-[0.98]",
         chip:
-          "rounded-full border border-border bg-card/80 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary/60 hover:text-foreground active:scale-[0.96]",
+          "rounded-lg border border-border bg-card/90 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary/60 hover:text-foreground active:scale-[0.98]",
       },
       size: {
         default: "h-9 px-4 py-2",

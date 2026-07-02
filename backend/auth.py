@@ -15,7 +15,7 @@ import jwt as pyjwt
 from fastapi import APIRouter, HTTPException, Request, Response, Depends
 from pydantic import BaseModel, EmailStr, Field
 import json
-from sqlalchemy import select, update, delete, text
+from sqlalchemy import select, update, delete
 import httpx
 import urllib.parse
 from starlette.responses import RedirectResponse
@@ -58,23 +58,27 @@ async def verify_password_async(plain: str, hashed: str) -> bool:
 
 
 def create_access_token(user_id: str, email: str, jti: str = None) -> str:
+    now = datetime.now(timezone.utc)
     payload = {
         "sub": user_id,
         "email": email,
         "type": "access",
         "jti": jti or _jti(),
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_MINUTES),
+        "iat": int(now.timestamp()),
+        "exp": now + timedelta(minutes=ACCESS_TOKEN_MINUTES),
     }
     return pyjwt.encode(payload, _require_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
 def create_refresh_token(user_id: str, remember_me: bool = False, jti: str = None) -> str:
+    now = datetime.now(timezone.utc)
     days = REMEMBER_ME_DAYS if remember_me else REFRESH_TOKEN_DAYS
     payload = {
         "sub": user_id,
         "type": "refresh",
         "jti": jti or _jti(),
-        "exp": datetime.now(timezone.utc) + timedelta(days=days),
+        "iat": int(now.timestamp()),
+        "exp": now + timedelta(days=days),
     }
     return pyjwt.encode(payload, _require_jwt_secret(), algorithm=JWT_ALGORITHM)
 
@@ -203,6 +207,22 @@ def _user_to_dict(u: User) -> dict:
 
 # ── Dependencies ──────────────────────────────────────────────────────────
 
+def _token_issued_before_password_change(payload: dict, user_obj: User) -> bool:
+    changed_at = user_obj.password_changed_at
+    if not changed_at:
+        return False
+    if changed_at.tzinfo is None:
+        changed_at = changed_at.replace(tzinfo=timezone.utc)
+    issued_at = payload.get("iat")
+    if issued_at is None:
+        return True
+    try:
+        issued_dt = datetime.fromtimestamp(float(issued_at), tz=timezone.utc)
+    except (TypeError, ValueError, OSError):
+        return True
+    return issued_dt < changed_at - timedelta(seconds=1)
+
+
 async def get_current_user(request: Request) -> dict:
     sm = request.app.state.db
     async with sm() as session:
@@ -227,6 +247,8 @@ async def get_current_user(request: Request) -> dict:
                     )
                     user = result.scalar_one_or_none()
                     if user:
+                        if _token_issued_before_password_change(payload, user):
+                            raise HTTPException(401, "Token expired by password change")
                         if user.disabled:
                             raise HTTPException(403, "Account disabled")
                         request.state.user_id = user.user_id
@@ -346,9 +368,16 @@ def build_router() -> APIRouter:
             ua = (request.headers.get("user-agent", "") or "")[:512]
 
             async def _write_audit(uid, act, success, extra=None):
-                await session.execute(
-                    text("INSERT INTO audit_logs (user_id, action, resource, ip_address, user_agent, success, created_at) VALUES (:uid, :act, 'auth', :ip, :ua, :s, NOW())"),
-                    {"uid": uid, "act": act, "ip": ip, "ua": ua, "s": success}
+                session.add(
+                    AuditLog(
+                        user_id=uid,
+                        action=act,
+                        resource="auth",
+                        detail=extra,
+                        ip_address=ip,
+                        user_agent=ua,
+                        success=success,
+                    )
                 )
 
             # Account lockout check
@@ -479,6 +508,8 @@ def build_router() -> APIRouter:
                     raise HTTPException(404, "User not found")
                 if user.disabled:
                     raise HTTPException(403, "Account disabled")
+                if _token_issued_before_password_change(token_data, user):
+                    raise HTTPException(401, "Token expired by password change")
 
                 if payload.refresh_token:
                     set_auth_cookies(response, payload.access_token, payload.refresh_token)
@@ -526,6 +557,10 @@ def build_router() -> APIRouter:
                 user = result.scalar_one_or_none()
                 if not user:
                     raise HTTPException(401, "User not found")
+                if user.disabled:
+                    raise HTTPException(403, "Account disabled")
+                if _token_issued_before_password_change(payload, user):
+                    raise HTTPException(401, "Refresh token expired by password change")
                 # Rotate: blacklist old refresh token, issue new pair
                 exp = datetime.fromtimestamp(payload["exp"], tz=timezone.utc) if payload.get("exp") else datetime.now(timezone.utc) + timedelta(days=7)
                 session.add(TokenBlacklist(jti=payload["jti"], expires_at=exp))
@@ -849,10 +884,6 @@ def build_router() -> APIRouter:
             # Invalidate all existing sessions after password reset
             await session.execute(
                 delete(UserSession).where(UserSession.user_id == rec.user_id)
-            )
-            # Invalidate all tokens
-            await session.execute(
-                delete(TokenBlacklist).where(TokenBlacklist.jti.isnot(None))
             )
             await session.delete(rec)
             await session.commit()

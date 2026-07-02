@@ -13,10 +13,8 @@ export default function AuthCallback() {
   useEffect(() => {
     (async () => {
       const hash = window.location.hash;
-      
-      // If no hash, check if we already have stored tokens
+
       if (!hash || hash === "#") {
-        console.log("[AuthCallback] No hash fragment found, checking stored tokens");
         const stored = getToken("access_token");
         if (stored) {
           try {
@@ -24,11 +22,10 @@ export default function AuthCallback() {
             setUser(me);
             navigate("/dashboard", { replace: true });
             return;
-          } catch (e) {
-            console.error("[AuthCallback] Stored token invalid:", e);
+          } catch {
+            // Stored auth was stale; continue to the normal failure path.
           }
         }
-        // No valid stored token, redirect to login
         toast.error("Authentication failed. Please try again.");
         navigate("/login?error=no_callback_data", { replace: true });
         return;
@@ -53,30 +50,26 @@ export default function AuthCallback() {
         return;
       }
 
-      // Save tokens from hash fragment immediately (Google OAuth or direct login)
       if (accessToken) {
         setToken("access_token", accessToken, true);
         if (refreshToken) setToken("refresh_token", refreshToken, true);
         window.location.hash = "";
-        
+
         try {
           const { data: me } = await api.get("/auth/me");
           setUser(me);
           toast.success("Welcome back!");
           navigate("/dashboard", { replace: true });
-        } catch (e) {
-          console.error("[AuthCallback] Token validation failed:", e?.response?.status, e?.response?.data?.detail);
+        } catch {
           toast.error("Login failed. Please try again.");
           navigate("/login?error=token_validation_failed", { replace: true });
         }
       } else {
-        // Hash exists but no access token - something went wrong
-        console.error("[AuthCallback] Hash exists but no access_token found:", hash);
         toast.error("Authentication incomplete. Please try again.");
         navigate("/login?error=missing_token", { replace: true });
       }
     })();
   }, [navigate, setUser]);
 
-  return <AppSplash text="Completing sign in…" />;
+  return <AppSplash text="Completing sign in..." />;
 }

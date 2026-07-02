@@ -221,8 +221,8 @@ export default function AccountsPage() {
   const loadConns = useCallback(async () => {
     try {
       const { data } = await api.get("/truelayer/connections");
-      setConns(data.connections);
-      setTotalTx(data.total_transactions);
+      setConns(Array.isArray(data.connections) ? data.connections : []);
+      setTotalTx(Number(data.total_transactions || 0));
     } catch (err) {
       if (err.response?.status === 500 && err.response?.data?.detail?.includes("configured")) {
         setNeedsSetup(true);
