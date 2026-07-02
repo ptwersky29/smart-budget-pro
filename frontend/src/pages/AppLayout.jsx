@@ -8,6 +8,7 @@ import KeyboardShortcutsHelp from "../components/KeyboardShortcutsHelp";
 import CommandPalette from "../components/CommandPalette";
 import NotificationCenter from "../components/NotificationCenter";
 import QuickAddWidget from "../components/QuickAddWidget";
+import Logo from "../components/Logo";
 import { BOTTOM_NAV, NAV_SECTIONS, ROUTE_META, getRouteMeta, KEYBOARD_GOTO } from "../data/navigation";
 import { APP_NAME, APP_TAGLINE } from "../data/constants";
 import { Button } from "../components/ui/button";
@@ -117,10 +118,7 @@ export default function AppLayout() {
       <aside className={`${open ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:sticky top-0 left-0 z-40 h-screen w-[19rem] border-r border-border bg-card/85 backdrop-blur-xl transition-transform duration-300`}>
         <div className="flex items-center justify-between px-6 h-16 border-b border-border/70">
           <Link to="/dashboard" className="flex items-center gap-3" data-testid="sidebar-logo">
-            <div className="relative w-10 h-10 rounded-full gradient-emerald grid place-items-center text-white font-bold text-lg shadow-lg shadow-emerald/20 overflow-hidden ring-1 ring-white/15">
-              <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent rounded-full pointer-events-none" />
-              <span className="relative z-10">P</span>
-            </div>
+            <Logo size="md" />
             <div>
               <span className="block font-semibold tracking-tight leading-none">{APP_NAME}</span>
               <span className="block text-[11px] text-muted-foreground mt-0.5">{APP_TAGLINE}</span>

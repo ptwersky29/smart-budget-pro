@@ -7,6 +7,7 @@ import { Loader2, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import AuthVisual from "../components/AuthVisual";
+import Logo from "../components/Logo";
 
 export default function Login() {
   const { login } = useAuth();
@@ -66,7 +67,7 @@ export default function Login() {
       <div className="flex items-center justify-center p-8">
         <div className="w-full max-w-sm">
           <Link to="/" className="flex items-center gap-2.5 mb-10">
-            <div className="w-10 h-10 rounded-full gradient-emerald grid place-items-center text-white font-bold text-lg shadow-md shadow-emerald/20 ring-1 ring-white/15">&pound;</div>
+            <Logo size="md" />
             <span className="font-semibold tracking-tight text-lg">Penni</span>
           </Link>
 

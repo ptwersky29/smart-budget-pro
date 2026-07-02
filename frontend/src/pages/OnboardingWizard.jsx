@@ -6,6 +6,7 @@ import { Check, ArrowRight, Banknote, Receipt, Target, Zap, Loader2, Upload, Pen
 import Skeleton from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import Logo from "../components/Logo";
 
 const STEPS = [
   {
@@ -372,7 +373,7 @@ export default function OnboardingWizard() {
           {/* Header */}
           <div className="flex items-center justify-between mb-10">
             <Link to="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full gradient-emerald grid place-items-center text-white font-bold text-sm shadow-md shadow-emerald/20 ring-1 ring-white/15">£</div>
+              <Logo size="sm" />
               <span className="font-semibold tracking-tight">Penni</span>
             </Link>
             <button onClick={skipAll} className="text-sm text-muted-foreground hover:text-foreground">

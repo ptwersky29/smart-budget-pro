@@ -1,16 +1,79 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" fill="none">
   <defs>
-    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#4ade80"/>
-      <stop offset="100%" stop-color="#059669"/>
+    <!-- Rich premium emerald-teal gradient for background -->
+    <linearGradient id="bg-grad-apple" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="60%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#047857" />
     </linearGradient>
-    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#fff" stop-opacity="0.2"/>
-      <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+    
+    <!-- Gold/accent gradient for the coin graphic -->
+    <linearGradient id="coin-grad-apple" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0%" stop-color="#FCD34D" />
+      <stop offset="50%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#D97706" />
     </linearGradient>
+
+    <!-- Metallic/shine gradient for logo stem -->
+    <linearGradient id="stem-grad-apple" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#E0F2FE" />
+    </linearGradient>
+
+    <!-- Inner glow & shadows -->
+    <filter id="premium-shadow-apple" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#022C22" flood-opacity="0.3" />
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#022C22" flood-opacity="0.15" />
+    </filter>
   </defs>
-  <rect width="192" height="192" rx="36" fill="url(#brand)"/>
-  <rect width="192" height="192" rx="36" fill="url(#shine)"/>
-  <rect x="12" y="12" width="168" height="168" rx="30" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="2"/>
-  <text x="96" y="124" font-family="system-ui,-apple-system,sans-serif" font-size="88" font-weight="700" fill="#fff" text-anchor="middle" letter-spacing="-4">P</text>
+
+  <!-- Background base: smooth rounded squircle -->
+  <rect width="192" height="192" rx="54" fill="url(#bg-grad-apple)" />
+  
+  <!-- Subtle inner border light reflection -->
+  <rect x="2" y="2" width="188" height="188" rx="52" stroke="#FFFFFF" stroke-opacity="0.15" stroke-width="3" />
+  
+  <!-- Outer light ring -->
+  <rect x="10" y="10" width="172" height="172" rx="44" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1.5" />
+
+  <!-- Logo Graphics Group with drop shadow -->
+  <g filter="url(#premium-shadow-apple)" transform="translate(16, 16)">
+    <!-- Vertical stem of the "P" -> Sleek finance bar chart column -->
+    <rect x="48" y="42" width="18" height="76" rx="9" fill="url(#stem-grad-apple)" />
+    
+    <!-- Glowing Accent element of the stem -->
+    <rect x="48" y="42" width="18" height="32" rx="9" fill="#FFFFFF" fill-opacity="0.3" />
+
+    <!-- The loop of the "P" -> Dynamic crescent/chart curve representing growth -->
+    <path d="M57 42
+             H92
+             C111.44 42 127 57.56 127 77
+             C127 96.44 111.44 112 92 112
+             H57
+             V93
+             H92
+             C100.84 93 108 85.84 108 77
+             C108 68.16 100.84 61 92 61
+             H57
+             V42Z" 
+          fill="url(#stem-grad-apple)" />
+
+    <!-- The "Penni" - a golden coin nested inside the P loop, symbolizing budgeting & wealth -->
+    <circle cx="92" cy="77" r="19" fill="url(#coin-grad-apple)" />
+    
+    <!-- Coin border ring for separation -->
+    <circle cx="92" cy="77" r="19" stroke="#FFFFFF" stroke-opacity="0.25" stroke-width="1.2" />
+    
+    <!-- Sparkling star inside the coin (representing AI intelligence / premium nature) -->
+    <path d="M92 66
+             L94.4 72.5
+             L101 74.9
+             L94.4 77.3
+             L92 83.8
+             L89.6 77.3
+             L83 74.9
+             L89.6 72.5
+             Z" 
+          fill="#FFFFFF" />
+  </g>
 </svg>

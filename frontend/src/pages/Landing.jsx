@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Sparkles, Building2, MessagesSquare, TrendingUp, ShieldCheck, Star, Check, ArrowRight, Landmark, Menu, X, Sun, MoonStar } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "../components/ui/button";
+import Logo from "../components/Logo";
 
 const HERO_IMG = "https://static.prod-images.emergentagent.com/jobs/a8ffc4f3-0824-40c4-a74c-b4e5c8fbcb66/images/9ec1a41a2ae49b3da963b26e9d76ff276824ad745a2dc7b71aee9227d794347c.png";
 
@@ -26,10 +27,7 @@ export default function Landing() {
       <header className="sticky top-0 z-40 backdrop-blur-xl bg-background/70 border-b border-border">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2" data-testid="landing-logo">
-            <div className="relative w-8 h-8 rounded-full gradient-emerald grid place-items-center text-white font-bold overflow-hidden shadow-md shadow-emerald/20 ring-1 ring-white/15">
-              <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent rounded-full pointer-events-none" />
-              <span className="relative z-10">£</span>
-            </div>
+            <Logo size="sm" />
             <span className="font-semibold tracking-tight text-lg">Penni</span>
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">

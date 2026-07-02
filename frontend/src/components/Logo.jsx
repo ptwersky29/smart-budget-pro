@@ -1,0 +1,81 @@
+import React from "react";
+
+export default function Logo({ size = "md", className = "" }) {
+  const sizeClasses = {
+    sm: "w-8 h-8",
+    md: "w-10 h-10",
+    lg: "w-16 h-16",
+  };
+
+  const currentSizeClass = sizeClasses[size] || size;
+
+  return (
+    <svg 
+      className={`${currentSizeClass} ${className} shrink-0 select-none`}
+      viewBox="0 0 120 120" 
+      fill="none" 
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="logo-bg-grad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#10B981" />
+          <stop offset="60%" stop-color="#059669" />
+          <stop offset="100%" stop-color="#047857" />
+        </linearGradient>
+        
+        <linearGradient id="logo-coin-grad" x1="0.2" y1="0" x2="0.8" y2="1">
+          <stop offset="0%" stop-color="#FCD34D" />
+          <stop offset="50%" stop-color="#F59E0B" />
+          <stop offset="100%" stop-color="#D97706" />
+        </linearGradient>
+
+        <linearGradient id="logo-stem-grad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#FFFFFF" />
+          <stop offset="100%" stop-color="#E0F2FE" />
+        </linearGradient>
+
+        <filter id="logo-premium-shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#022C22" flood-opacity="0.3" />
+          <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#022C22" flood-opacity="0.15" />
+        </filter>
+      </defs>
+
+      <rect width="120" height="120" rx="36" fill="url(#logo-bg-grad)" />
+      <rect x="1.5" y="1.5" width="117" height="117" rx="34.5" stroke="#FFFFFF" stroke-opacity="0.15" stroke-width="2" />
+      <rect x="6" y="6" width="108" height="108" rx="30" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1.2" />
+
+      <g filter="url(#logo-premium-shadow)">
+        <rect x="36" y="32" width="14" height="56" rx="7" fill="url(#logo-stem-grad)" />
+        <rect x="36" y="32" width="14" height="24" rx="7" fill="#FFFFFF" fill-opacity="0.3" />
+
+        <path d="M43 32
+                 H68
+                 C82.36 32 94 43.64 94 58
+                 C94 72.36 82.36 84 68 84
+                 H43
+                 V70
+                 H68
+                 C74.63 70 80 64.63 80 58
+                 C80 51.37 74.63 46 68 46
+                 H43
+                 V32Z" 
+              fill="url(#logo-stem-grad)" />
+
+        <circle cx="68" cy="58" r="14" fill="url(#logo-coin-grad)" />
+        <circle cx="68" cy="58" r="14" stroke="#FFFFFF" stroke-opacity="0.25" stroke-width="1" />
+        
+        <path d="M68 50
+                 L69.8 54.7
+                 L74.5 56.5
+                 L69.8 58.3
+                 L68 63
+                 L66.2 58.3
+                 L61.5 56.5
+                 L66.2 54.7
+                 Z" 
+              fill="#FFFFFF" />
+      </g>
+    </svg>
+  );
+}
