@@ -56,8 +56,8 @@ export default function ConsentBanner() {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-background border-t border-border shadow-2xl">
-      <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-start sm:items-center gap-4">
+    <div className="fixed bottom-3 left-3 right-3 lg:left-auto lg:right-5 lg:bottom-5 lg:max-w-xl z-50 rounded-lg border border-border bg-background/95 p-4 shadow-2xl backdrop-blur-xl">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
         <div className="flex-1 text-sm">
           <p className="font-medium">We value your privacy</p>
           <p className="text-muted-foreground mt-1">

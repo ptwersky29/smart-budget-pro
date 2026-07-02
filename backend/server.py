@@ -13,6 +13,8 @@ import logging
 import logging.config
 from datetime import datetime, timezone
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends
+from fastapi.exceptions import RequestValidationError
+from pydantic import BaseModel, Field
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse, Response
 from starlette.requests import Request as StarletteRequest
@@ -117,6 +119,10 @@ app.add_middleware(RateLimitMiddleware, limiter=RateLimiter(limit=120, window=60
 api = APIRouter(prefix="/api")
 
 
+class HmrcEstimateIn(BaseModel):
+    annual_income: float = Field(ge=0, le=10_000_000)
+
+
 @api.get("/")
 async def root():
     return {"app": "FinanceAI", "status": "online"}
@@ -210,9 +216,8 @@ api.include_router(bank_accounts.build_router())
 # ── Frontend‑compatibility aliases ───────────────────────────────────────────
 
 @api.post("/uk/hmrc-estimate")
-async def hmrc_estimate(request: Request, user: dict = Depends(get_current_user)):
-    body = await request.json()
-    income = body.get("annual_income", 0)
+async def hmrc_estimate(payload: HmrcEstimateIn, user: dict = Depends(get_current_user)):
+    income = payload.annual_income
     from uk_tools import _calc_income_tax, PERSONAL_ALLOWANCE, PA_TAPER_THRESHOLD
     pa = PERSONAL_ALLOWANCE
     if income > PA_TAPER_THRESHOLD:
@@ -295,21 +300,48 @@ def _cors_headers(request: StarletteRequest):
         }
     return {}
 
+
+def _error_payload(request: StarletteRequest, detail, code: str = None, **extra):
+    payload = {"detail": detail}
+    if code:
+        payload["code"] = code
+    request_id = getattr(request.state, "request_id", None) or request.headers.get("x-request-id")
+    if request_id:
+        payload["request_id"] = request_id
+    payload.update({k: v for k, v in extra.items() if v is not None})
+    return payload
+
+
 # HTTPException handler adds CORS headers (preserves status code)
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: StarletteRequest, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
-        content={"detail": exc.detail},
+        content=_error_payload(request, exc.detail, f"http_{exc.status_code}"),
         headers=_cors_headers(request),
     )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: StarletteRequest, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content=_error_payload(
+            request,
+            "Please check the highlighted fields and try again.",
+            "validation_error",
+            errors=exc.errors(),
+        ),
+        headers=_cors_headers(request),
+    )
+
 
 # FinanceAIError handler
 @app.exception_handler(FinanceAIError)
 async def financeai_exception_handler(request: StarletteRequest, exc: FinanceAIError):
     return JSONResponse(
         status_code=exc.status_code,
-        content={"detail": exc.message},
+        content=_error_payload(request, exc.message, "financeai_error"),
         headers=_cors_headers(request),
     )
 
@@ -319,7 +351,11 @@ async def global_exception_handler(request: StarletteRequest, exc: Exception):
     logger.exception("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
     return JSONResponse(
         status_code=500,
-        content={"detail": "An internal server error occurred. Please try again later."},
+        content=_error_payload(
+            request,
+            "An internal server error occurred. Please try again later.",
+            "internal_error",
+        ),
         headers=_cors_headers(request),
     )
 

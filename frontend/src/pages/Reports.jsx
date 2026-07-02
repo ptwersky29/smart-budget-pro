@@ -58,7 +58,7 @@ export default function Reports() {
         const { data } = await api.get("/dashboard/overview", {
           params: { date_from: dateFrom, date_to: dateTo },
         });
-        setData(data);
+        setData({ balance: 0, savings_rate: 0, category_spend: [], ...data });
       } catch {
         setLoadError(true);
         toast.error("Could not load report data");

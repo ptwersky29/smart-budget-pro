@@ -19,7 +19,7 @@ import {
   DropdownMenuItem,
 } from "../components/ui/dropdown-menu";
 
-import { LogOut, Menu, X, MoonStar, Sun } from "lucide-react";
+import { LogOut, Menu, X, MoonStar, Sun, Search } from "lucide-react";
 import pkg from "../../package.json";
 
 export default function AppLayout() {
@@ -110,12 +110,7 @@ export default function AppLayout() {
 
   return (
     <div className="app-shell min-h-screen flex text-foreground relative">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-24 top-12 h-72 w-72 rounded-full bg-emerald/10 blur-3xl" />
-        <div className="absolute right-0 top-40 h-80 w-80 rounded-full bg-topaz/10 blur-3xl" />
-      </div>
-
-      <aside className={`${open ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:sticky top-0 left-0 z-40 h-screen w-[19rem] border-r border-border bg-card/85 backdrop-blur-xl transition-transform duration-300`}>
+      <aside className={`${open ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:sticky top-0 left-0 z-40 h-screen w-[18rem] border-r border-border bg-card/95 backdrop-blur-xl transition-transform duration-300`}>
         <div className="flex items-center justify-between px-6 h-16 border-b border-border/70">
           <Link to="/dashboard" className="flex items-center gap-3 min-w-0" data-testid="sidebar-logo">
             <Logo size="md" />
@@ -128,7 +123,7 @@ export default function AppLayout() {
               <span className="block text-[11px] text-muted-foreground mt-0.5 truncate">{APP_TAGLINE}</span>
             </div>
           </Link>
-          <button className="lg:hidden h-11 w-11 rounded-full grid place-items-center hover:bg-secondary" onClick={() => setOpen(false)} data-testid="sidebar-close" aria-label="Close navigation menu">
+          <button className="lg:hidden h-10 w-10 rounded-lg grid place-items-center hover:bg-secondary" onClick={() => setOpen(false)} data-testid="sidebar-close" aria-label="Close navigation menu">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -136,7 +131,7 @@ export default function AppLayout() {
         <div className="p-4 space-y-5 overflow-y-auto h-[calc(100vh-4rem)] no-scrollbar">
           {NAV_SECTIONS.filter((section) => !section.adminOnly || user?.role === "admin").map((section) => (
             <div key={section.label} className="space-y-2">
-              <p className="px-3 text-[11px] uppercase tracking-[0.24em] text-muted-foreground">{section.label}</p>
+              <p className="px-3 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{section.label}</p>
               <div className="space-y-1">
                 {section.items.map(({ to, label, icon: Icon }) => {
                   const active = location.pathname.startsWith(to);
@@ -147,13 +142,13 @@ export default function AppLayout() {
                       onClick={() => setOpen(false)}
                       data-testid={`nav-${label.toLowerCase().replace(/\s+/g, "-")}`}
                       aria-current={active ? "page" : undefined}
-              className={`group flex items-center gap-3 rounded-2xl px-3 py-3 transition-all ${
+              className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all ${
                         active
-                          ? "bg-emerald/10 text-foreground border border-emerald/20 shadow-sm"
+                          ? "bg-emerald/10 text-foreground border border-emerald/20"
                           : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
                       }`}
                     >
-                      <span className={`grid h-10 w-10 place-items-center rounded-xl border transition-colors ${
+                      <span className={`grid h-9 w-9 place-items-center rounded-lg border transition-colors ${
                         active ? "border-emerald/20 bg-emerald/15 text-emerald" : "border-transparent bg-secondary/60"
                       }`}>
                         <Icon className="h-4 w-4" />
@@ -170,8 +165,8 @@ export default function AppLayout() {
         </div>
 
         <div className="absolute bottom-0 left-0 right-0 border-t border-border/70 bg-card/90 backdrop-blur-xl p-4">
-          <div className="flex items-center gap-3 rounded-[1.25rem] border border-border/70 bg-background/70 px-3 py-3">
-            <div className="w-10 h-10 rounded-full bg-secondary grid place-items-center text-sm font-semibold">
+          <div className="flex items-center gap-3 rounded-lg border border-border/70 bg-background/80 px-3 py-3">
+            <div className="w-10 h-10 rounded-lg bg-secondary grid place-items-center text-sm font-semibold">
               {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
@@ -189,7 +184,7 @@ export default function AppLayout() {
       {open && <div className="fixed inset-0 z-30 bg-black/40 lg:hidden backdrop-blur-[2px]" onClick={() => setOpen(false)} />}
 
       <div className="relative flex-1 min-w-0">
-        <header className="sticky top-0 z-20 border-b border-border/70 bg-background/80 backdrop-blur-xl">
+        <header className="sticky top-0 z-20 border-b border-border/70 bg-background/95 backdrop-blur-xl">
           {/* Route loading progress bar */}
           {routeLoading && (
             <div className="absolute top-0 left-0 right-0 h-0.5 z-50 overflow-hidden">
@@ -200,11 +195,11 @@ export default function AppLayout() {
           <h1 className="sr-only">{routeMeta.title} — {APP_NAME}</h1>
           <div className="flex items-center justify-between gap-4 px-4 lg:px-8 h-16">
             <div className="flex items-center gap-3 min-w-0">
-              <button className="lg:hidden h-11 w-11 rounded-full grid place-items-center border border-border bg-card/80" onClick={() => setOpen(true)} data-testid="sidebar-open" aria-label="Open navigation menu">
+              <button className="lg:hidden h-10 w-10 rounded-lg grid place-items-center border border-border bg-card/90" onClick={() => setOpen(true)} data-testid="sidebar-open" aria-label="Open navigation menu">
                 <Menu className="h-5 w-5" />
               </button>
               <div className="min-w-0">
-                <p className="text-sm font-medium truncate">{routeMeta.title}</p>
+                <p className="text-sm font-semibold truncate">{routeMeta.title}</p>
               </div>
             </div>
 
@@ -220,13 +215,19 @@ export default function AppLayout() {
                 </Button>
               )}
               <NotificationCenter />
-              <button onClick={toggleTheme} data-testid="theme-toggle" className="h-11 w-11 grid place-items-center rounded-full border border-border bg-card/80 hover:bg-secondary transition-colors" aria-label="Toggle theme" title="Toggle theme">
+              <button onClick={() => setCommandOpen(true)} data-testid="command-open" className="h-10 w-10 grid place-items-center rounded-lg border border-border bg-card/90 hover:bg-secondary transition-colors" aria-label="Open command palette" title="Open command palette">
+                <Search className="h-4 w-4" />
+              </button>
+              <button onClick={toggleTheme} data-testid="theme-toggle" className="h-10 w-10 grid place-items-center rounded-lg border border-border bg-card/90 hover:bg-secondary transition-colors" aria-label="Toggle theme" title="Toggle theme">
                 {dark ? <Sun className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
               </button>
             </div>
 
             <div className="flex items-center gap-2 lg:hidden">
-              <button onClick={toggleTheme} data-testid="theme-toggle-mobile" className="h-11 w-11 grid place-items-center rounded-full border border-border bg-card/80 hover:bg-secondary transition-colors" aria-label="Toggle theme">
+              <button onClick={() => setCommandOpen(true)} data-testid="command-open-mobile" className="h-10 w-10 grid place-items-center rounded-lg border border-border bg-card/90 hover:bg-secondary transition-colors" aria-label="Open command palette">
+                <Search className="h-4 w-4" />
+              </button>
+              <button onClick={toggleTheme} data-testid="theme-toggle-mobile" className="h-10 w-10 grid place-items-center rounded-lg border border-border bg-card/90 hover:bg-secondary transition-colors" aria-label="Toggle theme">
                 {dark ? <Sun className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
               </button>
               {routeMeta.primary && (
@@ -238,7 +239,7 @@ export default function AppLayout() {
           </div>
         </header>
 
-        <main className="p-4 sm:p-5 lg:p-8 pb-24 lg:pb-8 max-w-[1680px] mx-auto">
+        <main className="p-4 sm:p-5 lg:p-8 pb-24 lg:pb-8 max-w-[1560px] mx-auto">
           <div className="space-y-8">
             <div key={location.pathname} className={noAnim ? "" : "animate-[slideInRight_0.3s_ease-out]"}>
               <Outlet />

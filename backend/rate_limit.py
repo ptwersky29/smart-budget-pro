@@ -1,8 +1,10 @@
 """In-memory rate limiter using a sliding window per user/IP + CSRF middleware."""
 import time
 import logging
+import uuid
 from collections import defaultdict, deque
-from fastapi import HTTPException, Request
+from fastapi import Request
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger("rate_limit")
@@ -15,6 +17,21 @@ CSRF_SAFE_PATH_PREFIXES = ("/api/auth/",)
 # Stricter limits for sensitive endpoints
 AUTH_LIMIT = 20
 AUTH_WINDOW = 300  # 5 minutes
+
+
+def _request_id(request: Request) -> str:
+    rid = getattr(request.state, "request_id", None) or request.headers.get("X-Request-Id")
+    if not rid:
+        rid = uuid.uuid4().hex[:16]
+        request.state.request_id = rid
+    return rid
+
+
+def _error(detail: str, status_code: int, code: str, request: Request) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code,
+        content={"detail": detail, "code": code, "request_id": _request_id(request)},
+    )
 
 
 class RateLimiter:
@@ -63,7 +80,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         limiter = self.auth_limiter if request.url.path in auth_paths else self.limiter
         if not limiter.check(request):
             logger.warning("Rate limit exceeded for %s", limiter._key(request))
-            raise HTTPException(429, "Too many requests. Please slow down.")
+            return _error("Too many requests. Please slow down.", 429, "rate_limited", request)
         return await call_next(request)
 
 
@@ -89,10 +106,8 @@ class CsrfProtectionMiddleware(BaseHTTPMiddleware):
         csrf_header = request.headers.get("X-CSRF-Token", "")
         csrf_cookie = request.cookies.get("csrf_token", "")
         if not csrf_header or not csrf_cookie:
-            from fastapi.responses import JSONResponse
-            return JSONResponse(status_code=403, content={"detail": "CSRF token missing"})
+            return _error("CSRF token missing", 403, "csrf_missing", request)
         from security import verify_csrf_token as _verify
         if not _verify(csrf_header, csrf_cookie):
-            from fastapi.responses import JSONResponse
-            return JSONResponse(status_code=403, content={"detail": "CSRF token mismatch"})
+            return _error("CSRF token mismatch", 403, "csrf_mismatch", request)
         return await call_next(request)
