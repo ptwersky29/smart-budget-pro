@@ -23,7 +23,6 @@ SYSTEM_PROMPT = (
     "Use British English. Never give regulated financial advice without disclaimer."
 )
 
-FREE_TIER_DAILY_LIMIT = 5
 
 
 class ChatIn(BaseModel):
@@ -71,18 +70,8 @@ async def _build_financial_context(session, user_id: str) -> str:
 
 
 async def _enforce_rate_limit(session, user: dict) -> None:
-    if user.get("tier") == "premium" or user.get("role") == "admin":
-        return
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    result = await session.execute(
-        select(func.count()).select_from(AiMessage).where(
-            AiMessage.user_id == user["user_id"], AiMessage.created_at >= today_start,
-            AiMessage.role == "user",
-        )
-    )
-    count = result.scalar() or 0
-    if count >= FREE_TIER_DAILY_LIMIT:
-        raise HTTPException(429, f"Free tier: {FREE_TIER_DAILY_LIMIT} AI messages/day. Upgrade to Premium for unlimited.")
+    """All users have unlimited AI access."""
+    return
 
 
 def _pick_model(user: dict) -> tuple[str, str, str]:

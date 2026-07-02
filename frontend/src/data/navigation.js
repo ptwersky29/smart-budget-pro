@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Wallet, Receipt, PiggyBank, Building2, TrendingUp, Star,
-  Landmark, FileText, Settings, RefreshCcw, MoreHorizontal
+  Landmark, FileText, Settings, RefreshCcw, MoreHorizontal, Shield,
 } from "lucide-react";
 
 export const BOTTOM_NAV = [
@@ -40,6 +40,13 @@ export const NAV_SECTIONS = [
       { to: "/jewish", label: "Jewish Tools", icon: Star },
       { to: "/uk-tools", label: "UK Benefits", icon: Landmark },
       { to: "/settings", label: "Settings", icon: Settings },
+    ],
+  },
+  {
+    label: "Admin",
+    adminOnly: true,
+    items: [
+      { to: "/admin", label: "Admin Panel", icon: Shield },
     ],
   },
 ];
@@ -123,6 +130,12 @@ export const ROUTE_META = [
     description: "Manage your account, subscription, AI providers, integrations, and SMS settings.",
     primary: { label: "Pricing", to: "/pricing" },
     secondary: { label: "Accounts & Import", to: "/accounts" },
+  },
+  {
+    paths: ["/admin"],
+    eyebrow: "Admin",
+    title: "Admin Panel",
+    description: "Manage users, feature flags, and system settings.",
   },
 ];
 

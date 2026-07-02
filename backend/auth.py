@@ -115,19 +115,10 @@ def _resolve_role(user_obj: User) -> str:
 
 
 def _effective_tier(user_obj: User) -> str:
-    """Return effective tier considering trial period."""
+    """All users have premium access. Admin flag retained for admin-only features."""
     if user_obj.is_admin or user_obj.role == "admin":
         return "premium"
-    if user_obj.tier == "premium":
-        return "premium"
-    if user_obj.free_trial_end:
-        now = datetime.now(timezone.utc)
-        trial_end = user_obj.free_trial_end
-        if trial_end.tzinfo is None:
-            trial_end = trial_end.replace(tzinfo=timezone.utc)
-        if trial_end > now:
-            return "premium"
-    return "free"
+    return "premium"
 
 
 # ── Pydantic schemas ──────────────────────────────────────────────────────
@@ -268,9 +259,7 @@ async def get_current_user(request: Request) -> dict:
 
 
 async def require_premium(user: dict = Depends(get_current_user)) -> dict:
-    role = user.get("role", "free_user")
-    if ROLE_HIERARCHY.get(role, 0) < ROLE_HIERARCHY["premium_user"]:
-        raise HTTPException(status_code=403, detail="Premium subscription required. Visit /pricing to upgrade.")
+    """All authenticated users have premium access."""
     return user
 
 

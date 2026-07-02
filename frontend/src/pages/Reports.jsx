@@ -1,11 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
-import { useAuth } from "../contexts/AuthContext";
 import {
   ShieldCheck,
   Download,
   Loader2,
-  Lock,
   AlertCircle,
   Sparkles,
   ChevronDown,
@@ -40,7 +38,6 @@ export default function Reports() {
   useEffect(() => {
     document.title = "Reports | Penni";
   }, []);
-  const { user } = useAuth();
   const { version: categoriesVersion } = useCategories();
   const [data, setData] = useState(null);
   const [loadError, setLoadError] = useState(false);
@@ -70,8 +67,6 @@ export default function Reports() {
   }, [dateFrom, dateTo]);
   useEffect(loadReport, [loadReport, categoriesVersion]);
 
-  const isPremium = user?.tier === "premium" || user?.role === "admin";
-
   const downloadBlob = async (url, params, filename) => {
     const res = await api.get(url, { params, responseType: "blob" });
     const cd = res.headers["content-disposition"] || "";
@@ -88,10 +83,6 @@ export default function Reports() {
   };
 
   const download = async (kind) => {
-    if (!isPremium) {
-      toast.error("Premium feature — upgrade to download PDF reports.");
-      return;
-    }
     setBusy(kind);
     try {
       await downloadBlob(`/reports/${kind}`, {}, `Penni-${kind}.pdf`);
@@ -105,10 +96,6 @@ export default function Reports() {
   };
 
   const downloadCsv = async () => {
-    if (!isPremium) {
-      toast.error("Premium feature — upgrade to download CSV reports.");
-      return;
-    }
     setBusy("csv-monthly");
     try {
       await downloadBlob(
@@ -166,7 +153,7 @@ export default function Reports() {
       <PageHeader
         eyebrow="Reports"
         title="Your financial health, explained."
-        description="A cleaner monthly readout with health score, insights, and premium PDF reports."
+        description="A cleaner monthly readout with health score, insights, and PDF reports."
         actions={
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
@@ -192,7 +179,7 @@ export default function Reports() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
-                  variant={isPremium ? "primary" : "outlinePill"}
+                  variant="primary"
                   size="pill"
                 >
                   {busy ? (
@@ -222,35 +209,17 @@ export default function Reports() {
                 >
                   Full snapshot PDF
                 </DropdownMenuItem>
-                {isPremium && (
-                  <DropdownMenuItem
-                    onClick={() => downloadCsv()}
-                    disabled={busy === "csv-monthly"}
-                  >
-                    CSV export
-                  </DropdownMenuItem>
-                )}
+                <DropdownMenuItem
+                  onClick={() => downloadCsv()}
+                  disabled={busy === "csv-monthly"}
+                >
+                  CSV export
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         }
       />
-
-      {!isPremium && (
-        <div
-          className="rounded-2xl border border-dashed border-emerald/40 bg-emerald/5 p-4 flex items-center gap-3"
-          data-testid="reports-paywall"
-        >
-          <Lock className="h-4 w-4 text-emerald" />
-          <p className="text-sm">
-            PDF reports are a Premium feature.{" "}
-            <a href="/pricing" className="text-emerald hover:underline">
-              Upgrade for £5/mo
-            </a>{" "}
-            to download monthly, yearly, and full snapshots.
-          </p>
-        </div>
-      )}
 
       <div className="rounded-2xl border border-border bg-card p-6">
         <div className="flex items-center gap-2 sm:gap-3">

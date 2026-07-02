@@ -3,8 +3,7 @@ import { api } from "../../lib/api";
 import { useAuth } from "../../contexts/AuthContext";
 import { toast } from "sonner";
 import {
-  User, Shield, CreditCard, ExternalLink, XCircle, Crown,
-  Plug, Lock, Building2, Save, Trash2, Key,
+  CreditCard, ExternalLink, XCircle, Save, Trash2,
 } from "lucide-react";
 import { SectionCard } from "../ui/layout";
 import { Button } from "../ui/button";
@@ -147,11 +146,6 @@ export default React.memo(function AccountSettings() {
               )}
             </div>
 
-            {subscription.free_trial_end && !subscription.is_premium && (
-              <div className="rounded-xl border border-topaz/30 bg-topaz/5 px-4 py-3 text-sm text-topaz">
-                Free trial ends {new Date(subscription.free_trial_end).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}.
-              </div>
-            )}
             {subscription.cancel_at_period_end && (
               <div className="rounded-xl border border-ruby/30 bg-ruby/5 px-4 py-3 text-sm text-ruby">
                 Cancellation scheduled — you keep access until period end.
@@ -170,11 +164,6 @@ export default React.memo(function AccountSettings() {
                 <Button variant="danger" size="pill" onClick={() => setConfirmOpen(true)} disabled={cancelBusy}>
                   <XCircle className="h-4 w-4" />
                   {cancelBusy ? "…" : "Cancel subscription"}
-                </Button>
-              )}
-              {!subscription.is_premium && !subscription.on_trial && (
-                <Button asChild variant="primary" size="pill">
-                  <a href="/pricing"><Crown className="h-4 w-4" /> Upgrade to Premium — £5/mo</a>
                 </Button>
               )}
             </div>

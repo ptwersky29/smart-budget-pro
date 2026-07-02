@@ -16,7 +16,6 @@ import maaser as maaser_mod
 logger = logging.getLogger("statements")
 
 MAX_BYTES = 5 * 1024 * 1024
-PARSE_LIMIT_FREE = 1
 MAX_CHARS_TO_AI = 40000
 
 # ── Expanded category hierarchy ─────────────────────────────────────────
@@ -468,18 +467,6 @@ def build_router() -> APIRouter:
                      user: dict = Depends(get_current_user)):
         sm = request.app.state.db
         async with sm() as session:
-            if user.get("tier") != "premium" and user.get("role") != "admin":
-                today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-                result = await session.execute(
-                    select(func.count()).select_from(Statement).where(
-                        Statement.user_id == user["user_id"],
-                        Statement.created_at >= today,
-                    )
-                )
-                count = result.scalar() or 0
-                if count >= PARSE_LIMIT_FREE:
-                    raise HTTPException(429, "Free tier: 1 statement upload/day. Upgrade for unlimited.")
-
             content = await file.read()
             if len(content) > MAX_BYTES:
                 raise HTTPException(413, "File too large (max 5 MB)")

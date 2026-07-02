@@ -111,7 +111,6 @@ export default function SMS({ embedded }) {
           eyebrow="Accounts"
           title="Paste any bank SMS. AI does the rest."
           description="Drop in a bank SMS and Penni will extract the transaction, category, and useful metadata."
-          meta={user?.tier !== "premium" && user?.role !== "admin" ? [<span key="limit" className="rounded-full border border-border bg-card/80 px-3 py-1.5 text-xs font-medium text-muted-foreground">Free tier · 3 parses/day</span>] : null}
         />
       )}
 

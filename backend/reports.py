@@ -1,4 +1,4 @@
-"""Phase 9 — PDF report generation via reportlab. Premium-gated."""
+"""Phase 9 — PDF report generation via reportlab."""
 import io
 import logging
 from datetime import datetime, timezone, timedelta
@@ -18,7 +18,7 @@ from reportlab.platypus import (
 )
 
 from db import Transaction, Budget, MaaserLedger
-from auth import require_premium
+from auth import get_current_user
 
 logger = logging.getLogger("reports")
 
@@ -234,7 +234,7 @@ def build_router() -> APIRouter:
 
     @router.get("/monthly")
     async def monthly(request: Request, month: str = Query(None, description="YYYY-MM"),
-                      user: dict = Depends(require_premium)):
+                      user: dict = Depends(get_current_user)):
         if not month:
             month = datetime.now(timezone.utc).strftime("%Y-%m")
         try:
@@ -248,7 +248,7 @@ def build_router() -> APIRouter:
 
     @router.get("/yearly")
     async def yearly(request: Request, year: int = Query(None),
-                     user: dict = Depends(require_premium)):
+                     user: dict = Depends(get_current_user)):
         if not year:
             year = datetime.now(timezone.utc).year
         try:
@@ -261,7 +261,7 @@ def build_router() -> APIRouter:
             raise HTTPException(500, "Report generation failed. Please try again.")
 
     @router.get("/full")
-    async def full(request: Request, user: dict = Depends(require_premium)):
+    async def full(request: Request, user: dict = Depends(get_current_user)):
         try:
             sm = request.app.state.db
             async with sm() as session:

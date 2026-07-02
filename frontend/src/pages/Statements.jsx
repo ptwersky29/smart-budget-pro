@@ -1,16 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { api, formatApiError } from "../lib/api";
-import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import { Upload, FileText, Loader2, Sparkles, CheckCircle2, Trash2, ArrowDownRight, ArrowUpRight, Save } from "lucide-react";
 import { PageHeader, SectionCard } from "../components/ui/layout";
 import Skeleton from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
 
 export default function Statements() {
   useEffect(() => { document.title = "Statements | Penni"; }, []);
-  const { user } = useAuth();
   const fileRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [current, setCurrent] = useState(null); // freshly parsed result
@@ -74,7 +71,6 @@ export default function Statements() {
         eyebrow="Money"
         title="Drop a statement. AI reads it."
         description="Upload a CSV or PDF bank statement — the system extracts each transaction so you can review and save it in one click."
-          meta={user?.tier !== "premium" && user?.role !== "admin" ? [<span key="limit" className="rounded-full border border-border bg-card/80 px-3 py-1.5 text-xs font-medium text-muted-foreground">Free tier · 1 upload/day</span>] : null}
       />
 
       <div

@@ -28,8 +28,6 @@ _ALL_CATEGORY_SECTIONS_STR = "\n".join(
 
 logger = logging.getLogger("budget_system")
 
-FREE_TIER_DAILY_LIMIT = 5
-
 DEFAULT_DAY_TO_DAY_CATEGORIES = [
     "fruit_veg", "grocery", "bakery", "fish", "meat", "paper_goods",
     "takeaway", "wine", "house_supplies", "chemist",
@@ -67,19 +65,8 @@ def _month_start_end(month_str: str) -> tuple:
 
 
 async def _enforce_free_limit(session, user: dict):
-    """Check daily AI insight limit for free-tier users."""
-    if user.get("tier") in ("premium", "enterprise") or user.get("role") == "admin":
-        return
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    count_result = await session.execute(
-        select(func.count()).select_from(AISuggestion).where(
-            AISuggestion.user_id == user["user_id"],
-            AISuggestion.created_at >= today_start,
-        )
-    )
-    count = count_result.scalar() or 0
-    if count >= FREE_TIER_DAILY_LIMIT:
-        raise HTTPException(429, f"Free tier limit ({FREE_TIER_DAILY_LIMIT} AI suggestions/day). Upgrade for unlimited.")
+    """All users have unlimited AI suggestions."""
+    return
 
 
 async def _track_usage(session, user_id: str, provider: str, model: str, pt: int, ct: int, cost: float):

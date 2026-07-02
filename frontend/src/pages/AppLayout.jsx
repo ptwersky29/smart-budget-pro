@@ -19,7 +19,7 @@ import {
   DropdownMenuItem,
 } from "../components/ui/dropdown-menu";
 
-import { LogOut, Menu, X, MoonStar, Sun, Crown, ArrowRight } from "lucide-react";
+import { LogOut, Menu, X, MoonStar, Sun } from "lucide-react";
 import pkg from "../../package.json";
 
 export default function AppLayout() {
@@ -134,7 +134,7 @@ export default function AppLayout() {
         </div>
 
         <div className="p-4 space-y-5 overflow-y-auto h-[calc(100vh-4rem)] no-scrollbar">
-          {NAV_SECTIONS.map((section) => (
+          {NAV_SECTIONS.filter((section) => !section.adminOnly || user?.role === "admin").map((section) => (
             <div key={section.label} className="space-y-2">
               <p className="px-3 text-[11px] uppercase tracking-[0.24em] text-muted-foreground">{section.label}</p>
               <div className="space-y-1">
@@ -167,18 +167,6 @@ export default function AppLayout() {
             </div>
           ))}
 
-          {user?.tier !== "premium" && user?.role !== "admin" && (
-            <div className="rounded-[1.5rem] border border-emerald/20 bg-emerald/5 p-4 shadow-sm">
-              <div className="flex items-center gap-2 mb-2">
-                <Crown className="h-4 w-4 text-emerald" />
-                <span className="text-sm font-semibold text-emerald">Upgrade to Premium</span>
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">Unlock bank sync, AI tools, and premium reports.</p>
-              <Link to="/pricing" onClick={() => setOpen(false)} data-testid="sidebar-upgrade" className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-emerald">
-                £5 / mo <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-          )}
         </div>
 
         <div className="absolute bottom-0 left-0 right-0 border-t border-border/70 bg-card/90 backdrop-blur-xl p-4">
@@ -230,12 +218,6 @@ export default function AppLayout() {
                 <Button asChild variant="primary" size="pill">
                   <Link to={routeMeta.primary.to}>{routeMeta.primary.label}</Link>
                 </Button>
-              )}
-              {user?.tier !== "premium" && user?.role !== "admin" && (
-                <Link to="/pricing" data-testid="topbar-upgrade" className="hidden xl:inline-flex items-center gap-2 px-4 h-10 rounded-full border border-emerald/20 bg-emerald/10 text-emerald text-sm font-medium hover:bg-emerald/15 transition-colors">
-                  <Crown className="h-4 w-4" />
-                  Upgrade
-                </Link>
               )}
               <NotificationCenter />
               <button onClick={toggleTheme} data-testid="theme-toggle" className="h-11 w-11 grid place-items-center rounded-full border border-border bg-card/80 hover:bg-secondary transition-colors" aria-label="Toggle theme" title="Toggle theme">

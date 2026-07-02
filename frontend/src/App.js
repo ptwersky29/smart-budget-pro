@@ -7,6 +7,7 @@ import { CategoriesProvider } from "./contexts/CategoriesContext";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "next-themes";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AdminRoute from "./components/AdminRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ConsentBanner from "./components/ConsentBanner";
 import PageLoader from "./components/PageLoader";
@@ -26,6 +27,7 @@ const UKTools = lazy(() => import("./pages/UKTools"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Settings = lazy(() => import("./pages/Settings"));
 const CategoryManager = lazy(() => import("./pages/CategoryManager"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const Subscriptions = lazy(() => import("./pages/Subscriptions"));
 const Connections = lazy(() => import("./pages/Connections"));
 const Integrations = lazy(() => import("./pages/Integrations"));
@@ -98,6 +100,7 @@ function AppRouter() {
         <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/settings/categories" element={<CategoryManager />} />
+        <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

@@ -30,13 +30,12 @@ export const PAGINATION = {
 };
 
 export const AI = {
-  FREE_DAILY_LIMIT: 5,
-  PREMIUM_DAILY_LIMIT: Infinity,
+  DAILY_LIMIT: Infinity,
   PROVIDERS: ["openai", "anthropic", "google", "openrouter"],
 };
 
 export const FEATURE_FLAGS = {
-  BANK_SYNC: "premium",
+  BANK_SYNC: "free",
   AI_INSIGHTS: "free",
-  PREMIUM_REPORTS: "premium",
+  PREMIUM_REPORTS: "free",
 };

@@ -23,22 +23,9 @@ SYSTEM_PROMPT = (
     "general-disclaimer caveat where appropriate."
 )
 
-FREE_TIER_DAILY_LIMIT = 5
-
-
 async def _enforce_free_limit_if_needed(session, user: dict) -> None:
-    if user.get("tier") == "premium" or user.get("role") == "admin":
-        return
-    start_of_day = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    result = await session.execute(
-        select(func.count()).select_from(AiUsage).where(
-            AiUsage.user_id == user["user_id"], AiUsage.date >= start_of_day, AiUsage.endpoint == "insight",
-        )
-    )
-    count = result.scalar() or 0
-    if count >= FREE_TIER_DAILY_LIMIT:
-        raise HTTPException(429, f"Free tier limit reached ({FREE_TIER_DAILY_LIMIT} AI insights / day). "
-                                 "Upgrade to Premium for unlimited.")
+    """All users have unlimited AI insights."""
+    return
 
 
 async def _track_usage(session, user_id: str, provider: str, model: str,

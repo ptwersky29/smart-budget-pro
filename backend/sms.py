@@ -1,4 +1,4 @@
-"""Phase 4 — SMS Automation: Twilio webhook, sender-based ID, AI parsing, premium features, dedup."""
+"""Phase 4 — SMS Automation: Twilio webhook, sender-based ID, AI parsing, dedup."""
 import uuid
 import hashlib
 import hmac
@@ -618,17 +618,6 @@ def build_router() -> APIRouter:
     async def parse_sms(payload: ParseIn, request: Request, user: dict = Depends(get_current_user)):
         sm = request.app.state.db
         async with sm() as session:
-            if user.get("tier") != "premium" and user.get("role") != "admin":
-                today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-                result = await session.execute(
-                    select(func.count()).select_from(SmsMessage).where(
-                        SmsMessage.user_id == user["user_id"], SmsMessage.created_at >= today_start,
-                    )
-                )
-                count_today = result.scalar() or 0
-                if count_today >= 3:
-                    raise HTTPException(429, "Free tier: 3 SMS parses/day. Upgrade for unlimited.")
-
             clean_text = sanitize_input(payload.text, max_len=2000)
             try:
                 text, provider, model, pt, ct, cost = await call_llm("You are a precise SMS parser. Always output valid JSON.",
@@ -757,8 +746,6 @@ def build_router() -> APIRouter:
 
     @router.post("/sms/send-report")
     async def send_report(request: Request, user: dict = Depends(get_current_user)):
-        if user.get("tier") != "premium" and user.get("role") != "admin":
-            raise HTTPException(403, "Premium feature. Upgrade to send SMS reports.")
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
@@ -814,8 +801,6 @@ def build_router() -> APIRouter:
 
     @router.post("/sms/send-insights")
     async def send_insights(request: Request, user: dict = Depends(get_current_user)):
-        if user.get("tier") != "premium" and user.get("role") != "admin":
-            raise HTTPException(403, "Premium feature. Upgrade for AI insights via SMS.")
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
@@ -876,8 +861,6 @@ Return JSON:
 
     @router.get("/sms/maaser-summary")
     async def maaser_summary(request: Request, user: dict = Depends(get_current_user)):
-        if user.get("tier") != "premium" and user.get("role") != "admin":
-            raise HTTPException(403, "Premium feature. Upgrade for Maaser summaries.")
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
