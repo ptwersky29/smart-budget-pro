@@ -117,15 +117,15 @@ export default function AppLayout() {
 
       <aside className={`${open ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:sticky top-0 left-0 z-40 h-screen w-[19rem] border-r border-border bg-card/85 backdrop-blur-xl transition-transform duration-300`}>
         <div className="flex items-center justify-between px-6 h-16 border-b border-border/70">
-          <Link to="/dashboard" className="flex items-center gap-3" data-testid="sidebar-logo">
+          <Link to="/dashboard" className="flex items-center gap-3 min-w-0" data-testid="sidebar-logo">
             <Logo size="md" />
-            <div>
-              <span className="block font-semibold tracking-tight leading-none">{APP_NAME}</span>
-              <span className="block text-[11px] text-muted-foreground mt-0.5">{APP_TAGLINE}</span>
-            </div>
-            <div className="flex gap-2 mt-2 self-start shrink-0">
-              <span className="text-[10px] font-bold uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-topaz/15 text-topaz border border-topaz/30 leading-none shadow-sm">BETA</span>
-              <span className="text-[10px] font-bold uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-emerald/15 text-emerald border border-emerald/30 leading-none shadow-sm">v{pkg.version}</span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="font-semibold tracking-tight leading-none truncate">{APP_NAME}</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-topaz/15 text-topaz border border-topaz/30 leading-none shadow-sm shrink-0">BETA</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.15em] px-2 py-1 rounded-lg bg-emerald/15 text-emerald border border-emerald/30 leading-none shadow-sm shrink-0">v{pkg.version}</span>
+              </div>
+              <span className="block text-[11px] text-muted-foreground mt-0.5 truncate">{APP_TAGLINE}</span>
             </div>
           </Link>
           <button className="lg:hidden h-11 w-11 rounded-full grid place-items-center hover:bg-secondary" onClick={() => setOpen(false)} data-testid="sidebar-close" aria-label="Close navigation menu">
