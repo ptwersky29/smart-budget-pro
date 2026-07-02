@@ -3,7 +3,7 @@ import uuid
 import logging
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, delete
 
 from db import User, MaaserLedger, Transaction
 
@@ -26,6 +26,14 @@ def _is_income_tx(tx: dict) -> bool:
 
 async def maybe_accrue(session, user_id: str, tx: dict) -> dict | None:
     if not _is_income_tx(tx):
+        if tx.get("transaction_id"):
+            await session.execute(
+                delete(MaaserLedger).where(
+                    MaaserLedger.user_id == user_id,
+                    MaaserLedger.transaction_id == tx["transaction_id"],
+                )
+            )
+            await session.commit()
         return None
 
     result = await session.execute(select(User).where(User.user_id == user_id))
@@ -35,6 +43,11 @@ async def maybe_accrue(session, user_id: str, tx: dict) -> dict | None:
     if not settings.get("enabled"):
         return None
 
+    percent = float(settings.get("percent", 10))
+    amount = round(abs(float(tx.get("amount", 0))) * percent / 100, 2)
+    if amount <= 0:
+        return None
+
     if tx.get("transaction_id"):
         existing = await session.execute(
             select(MaaserLedger).where(
@@ -42,13 +55,20 @@ async def maybe_accrue(session, user_id: str, tx: dict) -> dict | None:
                 MaaserLedger.transaction_id == tx["transaction_id"],
             )
         )
-        if existing.scalar_one_or_none():
-            return None
-
-    percent = float(settings.get("percent", 10))
-    amount = round(abs(float(tx.get("amount", 0))) * percent / 100, 2)
-    if amount <= 0:
-        return None
+        entry = existing.scalar_one_or_none()
+        if entry:
+            entry.income_amount = abs(float(tx.get("amount", 0)))
+            entry.maaser_due = amount
+            entry.note = f"Auto-Maaser {percent:.1f}% of {tx.get('description', 'income')}"
+            await session.commit()
+            await session.refresh(entry)
+            return {
+                "entry_id": f"tz_{entry.id}",
+                "user_id": user_id,
+                "amount": amount,
+                "recipient": entry.paid_to or "Maaser (pending allocation)",
+                "status": "given" if (entry.maaser_paid or 0) > 0 else "pending",
+            }
 
     now = datetime.now(timezone.utc)
     entry = MaaserLedger(
