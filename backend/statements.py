@@ -635,6 +635,33 @@ def build_router() -> APIRouter:
                     account_id=t.get("account_id") or rec.account_id,
                     date=datetime.fromisoformat(t["date"]) if t.get("date") else now,
                     source="statement",
+                    approval_status="unapproved",
+                    category_approval_status="unapproved",
+                    ai_selected_category=t.get("category", "uncategorized"),
+                    ai_confidence=0.7 if t.get("category") != "uncategorized" else 0,
+                    ai_reason="Suggested during statement import review.",
+                    ai_suggested_categories={
+                        "suggestions": [
+                            {
+                                "category": t.get("category", "uncategorized"),
+                                "confidence": 0.7 if t.get("category") != "uncategorized" else 0,
+                                "reason": "Suggested during statement import review.",
+                                "source": "ai",
+                            },
+                            {
+                                "category": "miscellaneous",
+                                "confidence": 0.2,
+                                "reason": "Fallback option.",
+                                "source": "fallback",
+                            },
+                            {
+                                "category": "uncategorized",
+                                "confidence": 0,
+                                "reason": "Review manually.",
+                                "source": "fallback",
+                            },
+                        ]
+                    },
                 )
                 session.add(tx)
                 docs.append({
@@ -644,6 +671,7 @@ def build_router() -> APIRouter:
                     "category": t.get("category", "uncategorized"),
                     "description": t["description"],
                     "is_income": float(t["amount"]) > 0,
+                    "approval_status": "unapproved",
                 })
             rec.status = "final"
             await session.commit()

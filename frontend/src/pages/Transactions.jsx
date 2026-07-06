@@ -39,7 +39,7 @@ import { useKeyboardShortcut } from "../hooks/useKeyboardShortcut";
 import CategoryCombobox from "../components/CategoryCombobox";
 
 const SOURCE_LABELS = { manual: "Manual", csv: "CSV", pdf: "PDF", statement: "Statement", sms: "SMS" };
-const emptyForm = { description: "", amount: "", category: "", is_income: false, budget_type: "", occasion: "", merchant: "", account_id: "", exclude_from_maaser: false };
+const emptyForm = { description: "", date: today(), amount: "", category: "", is_income: false, is_transfer: false, budget_type: "", occasion: "", merchant: "", notes: "", account_id: "", exclude_from_maaser: false };
 
 function today() {
   const d = new Date();
@@ -474,14 +474,22 @@ const Transactions = React.memo(function Transactions() {
 
   const totalPages = Math.ceil(total / limit);
   const currentPage = Math.floor(offset / limit) + 1;
+  const defaultAccountId = useMemo(() => {
+    const manual = accounts.find((a) => a.is_offline || a.provider === "manual");
+    return manual?.account_id || accounts[0]?.account_id || "";
+  }, [accounts]);
 
-  const openAdd = useCallback(() => { setEditingId(null); setForm(emptyForm); setOpen(true); }, []);
+  const openAdd = useCallback(() => {
+    setEditingId(null);
+    setForm({ ...emptyForm, date: today(), account_id: filters.account_id || defaultAccountId });
+    setOpen(true);
+  }, [defaultAccountId, filters.account_id]);
   const openEdit = useCallback((t) => {
     setEditingId(t.transaction_id);
-    setForm({ description: t.description || "", amount: String(Math.abs(t.amount)), category: t.category || "", account_id: t.account_id || "", is_income: t.amount > 0, is_transfer: t.is_transfer || false, exclude_from_maaser: t.exclude_from_maaser || false, budget_type: "", occasion: "", merchant: "" });
+    setForm({ description: t.description || "", date: t.date?.slice(0, 10) || today(), amount: String(Math.abs(t.amount)), category: t.category || "", account_id: t.account_id || "", is_income: t.amount > 0, is_transfer: t.is_transfer || false, exclude_from_maaser: t.exclude_from_maaser || false, budget_type: "", occasion: "", merchant: t.merchant || "", notes: t.notes || "" });
     setOpen(true);
   }, []);
-  const closeForm = useCallback(() => { setOpen(false); setEditingId(null); setForm(emptyForm); setClassification(null); setSaveAsRecurring(false); }, []);
+  const closeForm = useCallback(() => { setOpen(false); setEditingId(null); setForm({ ...emptyForm, date: today() }); setClassification(null); setSaveAsRecurring(false); }, []);
 
   const handleClassify = useCallback(async ({ description, amount }) => {
     if (!description.trim() || !amount) return;
@@ -505,7 +513,7 @@ const Transactions = React.memo(function Transactions() {
     const amt = parseFloat(form.amount);
     const signed = form.is_income ? Math.abs(amt) : -Math.abs(amt);
     if (editingId) {
-      const payload = { description: form.description, amount: signed, category: form.category || undefined, is_income: form.is_income, is_transfer: form.is_transfer || undefined, exclude_from_maaser: form.exclude_from_maaser || undefined, account_id: form.account_id || undefined };
+      const payload = { description: form.description, amount: signed, category: form.category || undefined, date: form.date || today(), merchant: form.merchant || undefined, notes: form.notes || undefined, is_income: form.is_income, is_transfer: form.is_transfer || undefined, exclude_from_maaser: form.exclude_from_maaser || undefined, account_id: form.account_id || undefined };
       const old = txsRef.current.find(t => t.transaction_id === editingId);
       setTxs(prev => prev.map(t => t.transaction_id === editingId ? { ...t, ...payload } : t));
       setOpen(false); setEditingId(null);
@@ -524,7 +532,7 @@ const Transactions = React.memo(function Transactions() {
       const suggestions = classification?.suggestions || [];
       const chosenIdx = suggestions.findIndex(s => s.category === form.category);
       setOpen(false); setEditingId(null);
-      const optimisticTx = { transaction_id: `optimistic-${Date.now()}`, description: form.description, amount: signed, category: form.category, date: new Date().toISOString(), source: "manual" };
+      const optimisticTx = { transaction_id: `optimistic-${Date.now()}`, description: form.description, amount: signed, category: form.category, date: form.date || today(), source: "manual", approval_status: "approved", category_approval_status: "approved", notes: form.notes, account_id: form.account_id };
       setTxs(prev => [optimisticTx, ...prev]);
       try {
         await api.post("/budget-system/approve", {
@@ -546,10 +554,15 @@ const Transactions = React.memo(function Transactions() {
       }
     } else {
       if (!form.account_id) { toast.error("Select an account first"); return; }
-      const payload = { description: form.description, amount: signed, category: form.category || undefined, account_id: form.account_id, is_income: form.is_income, is_transfer: form.is_transfer || undefined, exclude_from_maaser: form.exclude_from_maaser || undefined };
+      const payload = { description: form.description, amount: signed, category: form.category || undefined, date: form.date || today(), merchant: form.merchant || undefined, notes: form.notes || undefined, account_id: form.account_id, is_income: form.is_income, is_transfer: form.is_transfer || undefined, exclude_from_maaser: form.exclude_from_maaser || undefined };
       setOpen(false); setEditingId(null);
-      const optimisticTx = { transaction_id: `optimistic-${Date.now()}`, ...payload, date: new Date().toISOString(), source: "manual" };
+      const optimisticTx = { transaction_id: `optimistic-${Date.now()}`, ...payload, date: payload.date, source: "manual", approval_status: "approved", category_approval_status: "approved" };
       setTxs(prev => [optimisticTx, ...prev]);
+      if (!payload.is_transfer) {
+        setTotal(prev => prev + 1);
+        if (signed > 0) setIncomeTotal(prev => Number(prev || 0) + signed);
+        else setExpenseTotal(prev => Number(prev || 0) + Math.abs(signed));
+      }
       withUndo({
         action: async () => {
           const { data } = await api.post("/transactions", payload);
@@ -558,7 +571,14 @@ const Transactions = React.memo(function Transactions() {
         undo: async () => {
           await load();
         },
-        onError: () => setTxs(prev => prev.filter(t => t.transaction_id !== optimisticTx.transaction_id)),
+        onError: () => {
+          setTxs(prev => prev.filter(t => t.transaction_id !== optimisticTx.transaction_id));
+          if (!payload.is_transfer) {
+            setTotal(prev => Math.max(0, prev - 1));
+            if (signed > 0) setIncomeTotal(prev => Math.max(0, Number(prev || 0) - signed));
+            else setExpenseTotal(prev => Math.max(0, Number(prev || 0) - Math.abs(signed)));
+          }
+        },
         successMsg: "Transaction added",
         errorMsg: "Could not add",
       });
@@ -708,6 +728,101 @@ const Transactions = React.memo(function Transactions() {
     });
   }, []);
 
+  const approveTx = useCallback(async (t) => {
+    try {
+      const { data } = await api.patch(`/transactions/${t.transaction_id}/approve-category`, {
+        category: t.ai_selected_category || t.category || "uncategorized",
+        approve_transaction: true,
+      });
+      setTxs(prev => prev.map(row => row.transaction_id === t.transaction_id ? data : row));
+      toast.success("Transaction approved");
+    } catch (e) {
+      toast.error(formatApiError(e?.response?.data?.detail) || "Could not approve");
+    }
+  }, []);
+
+  const classifySavedTx = useCallback(async (t) => {
+    try {
+      const { data } = await api.post(`/transactions/${t.transaction_id}/classify`);
+      setTxs(prev => prev.map(row => row.transaction_id === t.transaction_id ? data.transaction : row));
+      toast.success("AI suggestions added");
+    } catch (e) {
+      toast.error(formatApiError(e?.response?.data?.detail) || "AI classification failed");
+    }
+  }, []);
+
+  const bulkApprove = useCallback(async (highConfidenceOnly = false) => {
+    try {
+      const ids = selectedIds.size ? Array.from(selectedIds) : allDisplayed.map(t => t.transaction_id);
+      const { data } = await api.post("/transactions/bulk-approve", {
+        transaction_ids: ids,
+        high_confidence_only: highConfidenceOnly,
+      });
+      toast.success(`Approved ${data.approved}`);
+      setSelectedIds(new Set());
+      await load();
+    } catch (e) {
+      toast.error(formatApiError(e?.response?.data?.detail) || "Could not approve transactions");
+    }
+  }, [selectedIds, allDisplayed, load]);
+
+  const splitTx = useCallback(async (t) => {
+    const raw = window.prompt(
+      "Enter split lines as category:amount, separated by commas",
+      `${t.category || "uncategorized"}:${Math.abs(Number(t.amount || 0)).toFixed(2)}`
+    );
+    if (!raw) return;
+    const splits = raw.split(",").map((part) => {
+      const [category, amount] = part.split(":").map(v => v?.trim());
+      return { category, amount: Number(amount), description: t.description };
+    }).filter(s => s.category && Number.isFinite(s.amount) && s.amount > 0);
+    if (splits.length < 2) {
+      toast.error("Add at least two valid split lines");
+      return;
+    }
+    try {
+      const { data } = await api.put(`/transactions/${t.transaction_id}/splits`, { splits });
+      setTxs(prev => prev.map(row => row.transaction_id === t.transaction_id ? { ...row, is_split: true, split_count: data.splits.length } : row));
+      toast.success("Transaction split");
+    } catch (e) {
+      toast.error(formatApiError(e?.response?.data?.detail) || "Could not split transaction");
+    }
+  }, []);
+
+  const pairTransfer = useCallback(async (t) => {
+    const otherId = Array.from(selectedIds).find(id => id !== t.transaction_id) || window.prompt("Paste the matching transaction ID");
+    if (!otherId) return;
+    const other = allDisplayed.find(row => row.transaction_id === otherId);
+    const outgoing = Number(t.amount) < 0 ? t.transaction_id : otherId;
+    const incoming = Number(t.amount) > 0 ? t.transaction_id : otherId;
+    if (other && Number(t.amount) * Number(other.amount) >= 0) {
+      toast.error("Choose one outgoing expense and one incoming income");
+      return;
+    }
+    try {
+      const { data } = await api.post("/transactions/transfer-pairs", {
+        outgoing_transaction_id: outgoing,
+        incoming_transaction_id: incoming,
+      });
+      setTxs(prev => prev.map(row => [outgoing, incoming].includes(row.transaction_id) ? { ...row, is_transfer: true, tx_type: "transfer", transfer_pair_id: data.transfer_pair_id } : row));
+      setSelectedIds(new Set());
+      toast.success("Transfer paired");
+    } catch (e) {
+      toast.error(formatApiError(e?.response?.data?.detail) || "Could not pair transfer");
+    }
+  }, [selectedIds, allDisplayed]);
+
+  const unpairTransfer = useCallback(async (t) => {
+    if (!t.transfer_pair_id) return;
+    try {
+      await api.delete(`/transactions/transfer-pairs/${t.transfer_pair_id}`);
+      setTxs(prev => prev.map(row => row.transfer_pair_id === t.transfer_pair_id ? { ...row, is_transfer: false, tx_type: null, transfer_pair_id: null } : row));
+      toast.success("Transfer unpaired");
+    } catch (e) {
+      toast.error(formatApiError(e?.response?.data?.detail) || "Could not unpair transfer");
+    }
+  }, []);
+
   const runAiSearch = useCallback(async () => {
     if (!aiQuery.trim()) return;
     setAiLoading(true); setAiResults(null);
@@ -808,6 +923,13 @@ const Transactions = React.memo(function Transactions() {
                             </DropdownMenuItem>
                           </DropdownMenuSubContent>
                         </DropdownMenuSub>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => bulkApprove(false)}>
+                          <CheckCircle2 className="h-4 w-4 mr-2" /> Approve selected
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => bulkApprove(true)}>
+                          <Star className="h-4 w-4 mr-2" /> Approve high confidence
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={bulkDelete} className="text-ruby">
                           <Trash2 className="h-4 w-4 mr-2" /> Delete {selectedIds.size}
@@ -1078,6 +1200,11 @@ const Transactions = React.memo(function Transactions() {
                     onToggleSelect={toggleSelect}
                     onEdit={openEdit}
                     onDelete={del}
+                    onApprove={approveTx}
+                    onClassify={classifySavedTx}
+                    onSplit={splitTx}
+                    onPairTransfer={pairTransfer}
+                    onUnpairTransfer={unpairTransfer}
                   />
                 ))}
               </div>
@@ -1097,6 +1224,11 @@ const Transactions = React.memo(function Transactions() {
                         isSelected={selectedIds.has(t.transaction_id)}
                         isFocused={focusedIndex === idx}
                         onToggleSelect={toggleSelect} onEdit={openEdit} onDelete={del}
+                        onApprove={approveTx}
+                        onClassify={classifySavedTx}
+                        onSplit={splitTx}
+                        onPairTransfer={pairTransfer}
+                        onUnpairTransfer={unpairTransfer}
                         onSetFocus={() => setFocusedIndex(idx)} />
                     ))}
                   </tbody>
@@ -1372,7 +1504,7 @@ const Transactions = React.memo(function Transactions() {
   );
 });
 
-function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, onEdit, onDelete }) {
+function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, onEdit, onDelete, onApprove, onClassify, onSplit, onPairTransfer, onUnpairTransfer }) {
   const handlers = useSwipe(
     () => setSwipedId(t.transaction_id),
     () => setSwipedId(null),
@@ -1409,6 +1541,27 @@ function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, o
                 <DropdownMenuItem onClick={() => onEdit(t)}>
                   <Pencil className="h-4 w-4 mr-2" /> Edit
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onClassify?.(t)}>
+                  <Sparkles className="h-4 w-4 mr-2" /> AI classify
+                </DropdownMenuItem>
+                {(t.approval_status === "unapproved" || t.category_approval_status === "unapproved") && (
+                  <DropdownMenuItem onClick={() => onApprove?.(t)}>
+                    <CheckCircle2 className="h-4 w-4 mr-2" /> Approve
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={() => onSplit?.(t)}>
+                  <PieChartIcon className="h-4 w-4 mr-2" /> Split transaction
+                </DropdownMenuItem>
+                {!t.transfer_pair_id ? (
+                  <DropdownMenuItem onClick={() => onPairTransfer?.(t)}>
+                    <RefreshCw className="h-4 w-4 mr-2" /> Pair transfer
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onClick={() => onUnpairTransfer?.(t)}>
+                    <X className="h-4 w-4 mr-2" /> Unpair transfer
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => onDelete(t.transaction_id)} className="text-ruby">
                   <Trash2 className="h-4 w-4 mr-2" /> Delete
                 </DropdownMenuItem>
@@ -1416,7 +1569,12 @@ function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, o
             </DropdownMenu>
           </div>
           <div className="flex items-center justify-between pl-11">
-            <span className="text-xs px-2.5 py-1 rounded-full bg-secondary capitalize">{t.category || "uncategorized"}</span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs px-2.5 py-1 rounded-full bg-secondary capitalize">{t.category || "uncategorized"}</span>
+              {t.is_split && <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet/10 text-violet">Split</span>}
+              {t.is_transfer && <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky/10 text-sky">Transfer</span>}
+              {(t.approval_status === "unapproved" || t.category_approval_status === "unapproved") && <span className="text-[10px] px-2 py-0.5 rounded-full bg-topaz/10 text-topaz">Unapproved</span>}
+            </div>
             <span className={`font-semibold tabular-nums text-sm ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}>
               {t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}
             </span>

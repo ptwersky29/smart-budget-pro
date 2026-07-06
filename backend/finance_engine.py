@@ -28,6 +28,7 @@ from db import (
     SplitTransaction,
     Subscription,
     Transaction,
+    TransactionTransferPair,
     User,
     get_session_maker,
 )
@@ -385,6 +386,7 @@ class TransactionIn(BaseModel):
     tags: Optional[dict] = None
     source: Optional[str] = "manual"
     balance_type: Optional[str] = "available"
+    approval_status: Optional[str] = None
 
 
 class TransactionUpdate(BaseModel):
@@ -401,6 +403,8 @@ class TransactionUpdate(BaseModel):
     tags: Optional[dict] = None
     pending: Optional[bool] = None
     exclude_from_maaser: Optional[bool] = None
+    approval_status: Optional[str] = None
+    category_approval_status: Optional[str] = None
 
 
 class BulkUpdateIn(BaseModel):
@@ -408,10 +412,33 @@ class BulkUpdateIn(BaseModel):
     category: Optional[str] = None
     exclude_from_maaser: Optional[bool] = None
     pending: Optional[bool] = None
+    approval_status: Optional[str] = None
 
 
 class SplitIn(BaseModel):
     splits: list[dict]  # [{amount: float, category: str, description: str}]
+
+
+class ApproveCategoryIn(BaseModel):
+    category: Optional[str] = None
+    suggestion_index: Optional[int] = None
+    approve_transaction: bool = True
+
+
+class TransferPairIn(BaseModel):
+    outgoing_transaction_id: str
+    incoming_transaction_id: str
+    notes: Optional[str] = None
+
+
+class BulkApproveIn(BaseModel):
+    transaction_ids: Optional[list[str]] = None
+    high_confidence_only: bool = False
+    visible_only: bool = False
+    source: Optional[str] = None
+    category: Optional[str] = None
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
 
 
 class NicknameIn(BaseModel):
@@ -742,12 +769,264 @@ def _tx_to_dict(
         "tx_type": t.tx_type,
         "source": t.source,
         "source_label": source_label,
+        "approval_status": getattr(t, "approval_status", None) or "approved",
+        "category_approval_status": getattr(t, "category_approval_status", None)
+        or "approved",
+        "ai_suggested_categories": getattr(t, "ai_suggested_categories", None),
+        "ai_selected_category": getattr(t, "ai_selected_category", None),
+        "ai_confidence": getattr(t, "ai_confidence", None),
+        "ai_reason": getattr(t, "ai_reason", None),
+        "approved_at": t.approved_at.isoformat()
+        if getattr(t, "approved_at", None)
+        else None,
+        "transfer_pair_id": getattr(t, "transfer_pair_id", None),
+        "failed_reason": getattr(t, "failed_reason", None),
+        "is_split": False,
+        "split_count": 0,
         "parent_id": t.parent_id,
         "recurring_id": t.recurring_id,
         "subscription_name": t.subscription_name,
         "exclude_from_maaser": t.exclude_from_maaser,
         "created_at": t.created_at.isoformat() if t.created_at else None,
     }
+
+
+def _is_approved_for_reporting(t: Transaction) -> bool:
+    return (getattr(t, "approval_status", None) or "approved") == "approved"
+
+
+def _is_transfer_tx(t: Transaction) -> bool:
+    return t.tx_type == "transfer" or bool(getattr(t, "transfer_pair_id", None))
+
+
+def _invalidate_finance_caches(user_id: str) -> None:
+    _query_cache.delete(f"dash:{user_id}")
+    _query_cache.delete_by_prefix(f"trends:{user_id}:")
+    _query_cache.delete_by_prefix(f"budgets:{user_id}:")
+
+
+async def _adjust_account_balance(session, user_id: str, account_id: str, delta: float) -> None:
+    if not account_id or not delta:
+        return
+    result = await session.execute(
+        select(BankAccount).where(
+            BankAccount.account_id == account_id,
+            BankAccount.user_id == user_id,
+        )
+    )
+    acct = result.scalar_one_or_none()
+    if acct:
+        acct.balance = round(float(acct.balance or 0) + float(delta), 2)
+        acct.balance_updated_at = datetime.now(timezone.utc)
+
+
+def _normalise_approval_status(source: str, requested: Optional[str]) -> str:
+    if requested in {"approved", "unapproved", "failed"}:
+        return requested
+    if source in {"truelayer", "statement", "csv", "pdf"}:
+        return "unapproved"
+    return "approved"
+
+
+def _normalise_suggestions(raw) -> list[dict]:
+    if isinstance(raw, dict):
+        raw = raw.get("suggestions", [])
+    if not isinstance(raw, list):
+        return []
+    out = []
+    for item in raw[:3]:
+        if not isinstance(item, dict):
+            continue
+        cat = str(item.get("category") or "uncategorized").lower().strip()
+        out.append(
+            {
+                "category": cat,
+                "confidence": float(item.get("confidence") or 0),
+                "reason": item.get("reason") or item.get("rationale") or "",
+                "source": item.get("source") or "ai",
+                "merchant": item.get("merchant"),
+                "budget_type": item.get("budget_type"),
+                "occasion": item.get("occasion"),
+            }
+        )
+    return out
+
+
+async def _suggest_categories_for_tx(
+    session, user_id: str, description: str, merchant: str | None, amount: float
+) -> list[dict]:
+    desc = sanitize_input((description or merchant or "").strip(), max_len=200)
+    suggestions = []
+    try:
+        merchant_key = normalize_merchant(merchant or desc).lower()
+        if merchant_key:
+            rules = (
+                await session.execute(
+                    select(CategoryRule)
+                    .where(
+                        CategoryRule.user_id == user_id,
+                        CategoryRule.merchant.ilike(f"%{merchant_key}%"),
+                    )
+                    .order_by(CategoryRule.match_count.desc())
+                    .limit(3)
+                )
+            ).scalars().all()
+            for rule in rules:
+                suggestions.append(
+                    {
+                        "category": rule.category,
+                        "confidence": min(0.95, 0.6 + (rule.match_count or 0) * 0.05),
+                        "reason": "Matched a category you used before.",
+                        "source": "historical",
+                        "merchant": merchant_key,
+                    }
+                )
+    except Exception:
+        pass
+
+    fast = smart_categorize(f"{desc} {merchant or ''}")
+    if fast and fast != "uncategorized":
+        suggestions.append(
+            {
+                "category": fast,
+                "confidence": 0.72,
+                "reason": "Matched the transaction wording.",
+                "source": "rules",
+                "merchant": merchant,
+            }
+        )
+
+    if len({s["category"] for s in suggestions}) < 3:
+        try:
+            system_prompt = (
+                "You classify UK personal finance transactions. Output JSON only."
+            )
+            user_prompt = (
+                f"Suggest exactly 3 category options for this transaction.\n"
+                f"Description: {desc}\nMerchant: {merchant or ''}\nAmount: {amount}\n"
+                f"Categories: {', '.join(sorted(ALL_CATEGORIES))}\n"
+                f'Return {{"suggestions":[{{"category":"slug","confidence":0.0,"reason":"short reason"}}]}}'
+            )
+            raw, provider, model, pt, ct, cost = await call_llm(
+                system_prompt,
+                user_prompt,
+                json_mode=True,
+                temperature=0.1,
+                max_tokens=700,
+            )
+            await track_ai_usage(
+                session,
+                user_id,
+                provider,
+                model,
+                pt,
+                ct,
+                cost,
+                endpoint="transaction_classify",
+            )
+            suggestions.extend(_normalise_suggestions(parse_json(raw)))
+        except Exception as e:
+            logger.warning("transaction classification failed: %s", e)
+
+    seen = set()
+    merged = []
+    from statements import resolve_category as _rc
+
+    for s in suggestions:
+        cat = _rc(s.get("category") or "uncategorized")
+        if cat in seen:
+            continue
+        seen.add(cat)
+        s["category"] = cat
+        merged.append(s)
+        if len(merged) == 3:
+            break
+    while len(merged) < 3:
+        fallback = "uncategorized" if not merged else "miscellaneous"
+        if fallback not in seen:
+            merged.append(
+                {
+                    "category": fallback,
+                    "confidence": 0,
+                    "reason": "No confident match found.",
+                    "source": "fallback",
+                }
+            )
+            seen.add(fallback)
+        else:
+            break
+    return merged[:3]
+
+
+async def _effective_transaction_lines(
+    session,
+    user_id: str,
+    *,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    category: str | None = None,
+    include_unapproved: bool = False,
+) -> list[dict]:
+    stmt = select(Transaction).where(Transaction.user_id == user_id)
+    if not include_unapproved:
+        stmt = stmt.where(Transaction.approval_status == "approved")
+    if date_from:
+        stmt = stmt.where(Transaction.date >= date_from)
+    if date_to:
+        stmt = stmt.where(Transaction.date < date_to)
+    result = await session.execute(stmt)
+    txs = [t for t in result.scalars().all() if not _is_transfer_tx(t)]
+    parent_ids = [t.transaction_id for t in txs]
+    split_map: dict[str, list[SplitTransaction]] = defaultdict(list)
+    if parent_ids:
+        split_result = await session.execute(
+            select(SplitTransaction).where(
+                SplitTransaction.user_id == user_id,
+                SplitTransaction.parent_transaction_id.in_(parent_ids),
+            )
+        )
+        for split in split_result.scalars().all():
+            split_map[split.parent_transaction_id].append(split)
+
+    lines = []
+    for t in txs:
+        splits = split_map.get(t.transaction_id) or []
+        if splits:
+            sign = 1 if float(t.amount or 0) >= 0 else -1
+            for s in splits:
+                amount = round(abs(float(s.amount or 0)) * sign, 2)
+                cat = s.category or t.category or "uncategorized"
+                if category and cat != category:
+                    continue
+                lines.append(
+                    {
+                        "transaction_id": t.transaction_id,
+                        "split_id": s.split_id,
+                        "amount": amount,
+                        "category": cat,
+                        "date": t.date,
+                        "description": s.description or t.description,
+                        "source": t.source,
+                        "approval_status": t.approval_status or "approved",
+                    }
+                )
+        else:
+            cat = t.category or "uncategorized"
+            if category and cat != category:
+                continue
+            lines.append(
+                {
+                    "transaction_id": t.transaction_id,
+                    "split_id": None,
+                    "amount": float(t.amount or 0),
+                    "category": cat,
+                    "date": t.date,
+                    "description": t.description,
+                    "source": t.source,
+                    "approval_status": t.approval_status or "approved",
+                }
+            )
+    return lines
 
 
 def _budget_to_dict(b: Budget) -> dict:
@@ -811,6 +1090,7 @@ def build_router() -> APIRouter:
         amount_min: float = Query(None),
         amount_max: float = Query(None),
         search: str = Query(None),
+        approval_status: str = Query(None),
         sort: str = Query("date"),
         order: str = Query("desc"),
         offset: int = Query(0, ge=0),
@@ -827,6 +1107,8 @@ def build_router() -> APIRouter:
                 stmt = stmt.where(Transaction.category == category)
             if source:
                 stmt = stmt.where(Transaction.source == source)
+            if approval_status:
+                stmt = stmt.where(Transaction.approval_status == approval_status)
             if merchant:
                 stmt = stmt.where(Transaction.merchant_name.ilike(f"%{merchant}%"))
             if pending == "true":
@@ -867,6 +1149,23 @@ def build_router() -> APIRouter:
             result = await session.execute(stmt)
             rows = result.scalars().all()
 
+            split_counts = {}
+            if rows:
+                split_count_result = await session.execute(
+                    select(
+                        SplitTransaction.parent_transaction_id,
+                        func.count().label("split_count"),
+                    )
+                    .where(
+                        SplitTransaction.user_id == user["user_id"],
+                        SplitTransaction.parent_transaction_id.in_(
+                            [t.transaction_id for t in rows]
+                        ),
+                    )
+                    .group_by(SplitTransaction.parent_transaction_id)
+                )
+                split_counts = {r.parent_transaction_id: r.split_count for r in split_count_result}
+
             conn_ids = list({t.connection_id for t in rows if t.connection_id})
             institution_map = {}
             label_map = {}
@@ -906,6 +1205,8 @@ def build_router() -> APIRouter:
                 count_stmt = count_stmt.where(Transaction.category == category)
             if source:
                 count_stmt = count_stmt.where(Transaction.source == source)
+            if approval_status:
+                count_stmt = count_stmt.where(Transaction.approval_status == approval_status)
             if pending == "true":
                 count_stmt = count_stmt.where(Transaction.pending == True)
             elif pending == "false":
@@ -946,6 +1247,13 @@ def build_router() -> APIRouter:
                 agg_stmt = agg_stmt.where(Transaction.category == category)
             if source:
                 agg_stmt = agg_stmt.where(Transaction.source == source)
+            if approval_status:
+                agg_stmt = agg_stmt.where(Transaction.approval_status == approval_status)
+            else:
+                agg_stmt = agg_stmt.where(Transaction.approval_status == "approved")
+            agg_stmt = agg_stmt.where(
+                or_(Transaction.tx_type.is_(None), Transaction.tx_type != "transfer")
+            )
             if pending == "true":
                 agg_stmt = agg_stmt.where(Transaction.pending == True)
             elif pending == "false":
@@ -985,7 +1293,12 @@ def build_router() -> APIRouter:
 
             return {
                 "transactions": [
-                    _tx_to_dict(t, institution_map, label_map) for t in rows
+                    {
+                        **_tx_to_dict(t, institution_map, label_map),
+                        "is_split": split_counts.get(t.transaction_id, 0) > 0,
+                        "split_count": int(split_counts.get(t.transaction_id, 0)),
+                    }
+                    for t in rows
                 ],
                 "total": total,
                 "income_total": income_total,
@@ -1722,53 +2035,12 @@ Output ONLY valid JSON, no markdown, no explanation:
                     raise HTTPException(400, f"Account '{payload.account_id}' not found or does not belong to you")
 
             tx_id = f"tx_{uuid.uuid4().hex[:12]}"
-            desc = payload.description or ""
-            merch = payload.merchant or ""
+            desc = sanitize_input(payload.description or "", max_len=500)
+            merch = sanitize_input(payload.merchant or "", max_len=255)
             category = payload.category or smart_categorize(f"{desc} {merch}")
             from statements import resolve_category as _rc
 
             category = _rc(category)
-            if category == "uncategorized":
-                # Fast path: keyword match
-                from statements import _keyword_categorise as kw_cat
-
-                fast = kw_cat(desc, merch, payload.amount)
-                if fast:
-                    category = fast
-                else:
-                    from llm import call_llm
-                    from llm import parse_json as llm_parse
-                    from llm import track_ai_usage as track_usage
-
-                    try:
-                        raw, provider, model, pt, ct, cost = await call_llm(
-                            "You categorise UK transactions. Output valid JSON only.",
-                            CATEGORISE_PROMPT_FE.format(
-                                description=desc[:100],
-                                merchant=merch or "unknown",
-                                amount=payload.amount,
-                            ),
-                            json_mode=False,
-                        )
-                        await track_usage(
-                            session,
-                            user["user_id"],
-                            provider,
-                            model,
-                            pt,
-                            ct,
-                            cost,
-                            endpoint="manual_categorize",
-                        )
-                        ai_cat = (
-                            str(llm_parse(raw).get("category", "uncategorized"))
-                            .lower()
-                            .strip()
-                        )
-                        if ai_cat in ALL_CATEGORIES and ai_cat != "uncategorized":
-                            category = ai_cat
-                    except Exception:
-                        pass
             normalized = normalize_merchant(merch or desc)
             signed_amount = round(
                 abs(payload.amount) if payload.is_income else -abs(payload.amount), 2
@@ -1795,26 +2067,37 @@ Output ONLY valid JSON, no markdown, no explanation:
                 tags=payload.tags,
                 source=payload.source or "manual",
                 tx_type="transfer" if payload.is_transfer else None,
-                exclude_from_maaser=payload.is_transfer,
+                exclude_from_maaser=payload.is_transfer or False,
+                approval_status=_normalise_approval_status(
+                    payload.source or "manual", payload.approval_status
+                ),
+                category_approval_status=(
+                    "approved"
+                    if (payload.source or "manual") == "manual"
+                    else "unapproved"
+                ),
+                approved_at=datetime.now(timezone.utc)
+                if _normalise_approval_status(
+                    payload.source or "manual", payload.approval_status
+                )
+                == "approved"
+                else None,
             )
             session.add(tx)
 
-            # Update account balance
-            acct = acct_result.scalar_one_or_none()
-            if acct is not None:
-                current_balance = float(acct.balance or 0)
-                acct.balance = round(current_balance + signed_amount, 2)
-                acct.balance_updated_at = datetime.now(timezone.utc)
+            await _adjust_account_balance(
+                session, user["user_id"], payload.account_id, signed_amount
+            )
 
             await session.commit()
             await session.refresh(tx)
             doc = _tx_to_dict(tx)
-            accrued = await maaser.maybe_accrue(session, user["user_id"], doc)
+            accrued = None
+            if doc["approval_status"] == "approved":
+                accrued = await maaser.maybe_accrue(session, user["user_id"], doc)
             if accrued:
                 doc["maaser_accrued"] = accrued
-            _query_cache.delete(f"dash:{user['user_id']}")
-            _query_cache.delete_by_prefix(f"trends:{user['user_id']}:")
-            _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
+            _invalidate_finance_caches(user["user_id"])
             return doc
 
     @router.patch("/transactions/{tx_id}")
@@ -1836,6 +2119,9 @@ Output ONLY valid JSON, no markdown, no explanation:
             if not tx:
                 raise HTTPException(404, "Not found")
 
+            old_amount = float(tx.amount or 0)
+            old_account_id = tx.account_id
+
             # Validate account_id if changing
             if payload.account_id is not None and payload.account_id != tx.account_id:
                 acct_result = await session.execute(
@@ -1849,11 +2135,26 @@ Output ONLY valid JSON, no markdown, no explanation:
                 tx.account_id = payload.account_id
 
             if payload.amount is not None:
-                tx.amount = payload.amount
+                if payload.is_income is None:
+                    tx.amount = round(float(payload.amount), 2)
+                else:
+                    tx.amount = round(
+                        abs(payload.amount)
+                        if payload.is_income
+                        else -abs(payload.amount),
+                        2,
+                    )
+            elif payload.is_income is not None:
+                tx.amount = round(
+                    abs(float(tx.amount or 0))
+                    if payload.is_income
+                    else -abs(float(tx.amount or 0)),
+                    2,
+                )
             if payload.description is not None:
-                tx.description = payload.description
+                tx.description = sanitize_input(payload.description, max_len=500)
             if payload.merchant is not None:
-                tx.merchant_name = payload.merchant
+                tx.merchant_name = sanitize_input(payload.merchant, max_len=255)
                 tx.normalized_merchant = normalize_merchant(payload.merchant)
             category_changed = False
             old_category = tx.category
@@ -1878,15 +2179,49 @@ Output ONLY valid JSON, no markdown, no explanation:
             if payload.is_transfer is not None:
                 tx.tx_type = "transfer" if payload.is_transfer else None
                 tx.exclude_from_maaser = payload.is_transfer
+                if not payload.is_transfer:
+                    tx.transfer_pair_id = None
+            if payload.approval_status is not None:
+                if payload.approval_status not in {"approved", "unapproved", "failed"}:
+                    raise HTTPException(400, "Invalid approval status")
+                tx.approval_status = payload.approval_status
+                tx.approved_at = (
+                    datetime.now(timezone.utc)
+                    if payload.approval_status == "approved"
+                    else None
+                )
+            if payload.category_approval_status is not None:
+                if payload.category_approval_status not in {
+                    "approved",
+                    "unapproved",
+                    "rejected",
+                }:
+                    raise HTTPException(400, "Invalid category approval status")
+                tx.category_approval_status = payload.category_approval_status
             if category_changed:
                 await _learn_category_rule(session, user["user_id"], tx, tx.category)
+                tx.category_approval_status = "approved"
+                tx.approved_at = tx.approved_at or datetime.now(timezone.utc)
+
+            new_amount = float(tx.amount or 0)
+            new_account_id = tx.account_id
+            if old_account_id == new_account_id:
+                await _adjust_account_balance(
+                    session, user["user_id"], new_account_id, new_amount - old_amount
+                )
+            else:
+                await _adjust_account_balance(
+                    session, user["user_id"], old_account_id, -old_amount
+                )
+                await _adjust_account_balance(
+                    session, user["user_id"], new_account_id, new_amount
+                )
+
             await session.commit()
             await session.refresh(tx)
             doc = _tx_to_dict(tx)
             await maaser.maybe_accrue(session, user["user_id"], doc)
-            _query_cache.delete(f"dash:{user['user_id']}")
-            _query_cache.delete_by_prefix(f"trends:{user['user_id']}:")
-            _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
+            _invalidate_finance_caches(user["user_id"])
             return doc
 
     @router.delete("/transactions/{tx_id}")
@@ -1917,12 +2252,233 @@ Output ONLY valid JSON, no markdown, no explanation:
                     MaaserLedger.user_id == user["user_id"],
                 )
             )
+            await session.execute(
+                delete(TransactionTransferPair).where(
+                    TransactionTransferPair.user_id == user["user_id"],
+                    or_(
+                        TransactionTransferPair.outgoing_transaction_id == tx_id,
+                        TransactionTransferPair.incoming_transaction_id == tx_id,
+                    ),
+                )
+            )
+            await _adjust_account_balance(
+                session, user["user_id"], tx.account_id, -float(tx.amount or 0)
+            )
             await session.delete(tx)
             await session.commit()
-            _query_cache.delete(f"dash:{user['user_id']}")
-            _query_cache.delete_by_prefix(f"trends:{user['user_id']}:")
-            _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
+            _invalidate_finance_caches(user["user_id"])
             return {"ok": True}
+
+    @router.post("/transactions/{tx_id}/classify")
+    async def classify_saved_transaction(
+        tx_id: str, request: Request, user: dict = Depends(get_current_user)
+    ):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(Transaction).where(
+                    Transaction.transaction_id == tx_id,
+                    Transaction.user_id == user["user_id"],
+                )
+            )
+            tx = result.scalar_one_or_none()
+            if not tx:
+                raise HTTPException(404, "Not found")
+            suggestions = await _suggest_categories_for_tx(
+                session,
+                user["user_id"],
+                tx.description or "",
+                tx.merchant_name,
+                float(tx.amount or 0),
+            )
+            top = suggestions[0] if suggestions else None
+            tx.ai_suggested_categories = {"suggestions": suggestions}
+            tx.ai_selected_category = top.get("category") if top else None
+            tx.ai_confidence = top.get("confidence") if top else None
+            tx.ai_reason = top.get("reason") if top else None
+            tx.category_approval_status = "unapproved"
+            if top and (not tx.category or tx.category == "uncategorized"):
+                tx.category = top["category"]
+            await session.commit()
+            await session.refresh(tx)
+            return {
+                "transaction": _tx_to_dict(tx),
+                "suggestions": suggestions,
+            }
+
+    @router.patch("/transactions/{tx_id}/approve-category")
+    async def approve_transaction_category(
+        tx_id: str,
+        payload: ApproveCategoryIn,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(Transaction).where(
+                    Transaction.transaction_id == tx_id,
+                    Transaction.user_id == user["user_id"],
+                )
+            )
+            tx = result.scalar_one_or_none()
+            if not tx:
+                raise HTTPException(404, "Not found")
+
+            chosen_category = payload.category
+            suggestions = _normalise_suggestions(tx.ai_suggested_categories)
+            if chosen_category is None and payload.suggestion_index is not None:
+                if 0 <= payload.suggestion_index < len(suggestions):
+                    chosen_category = suggestions[payload.suggestion_index].get("category")
+                else:
+                    raise HTTPException(400, "Invalid suggestion index")
+            if chosen_category:
+                from statements import resolve_category as _rc
+
+                tx.category = _rc(chosen_category)
+                tx.ai_selected_category = tx.category
+                match = next(
+                    (s for s in suggestions if s.get("category") == tx.category),
+                    None,
+                )
+                if match:
+                    tx.ai_confidence = match.get("confidence")
+                    tx.ai_reason = match.get("reason")
+                await _learn_category_rule(session, user["user_id"], tx, tx.category)
+            tx.category_approval_status = "approved"
+            if payload.approve_transaction:
+                tx.approval_status = "approved"
+                tx.approved_at = datetime.now(timezone.utc)
+            await session.commit()
+            await session.refresh(tx)
+            doc = _tx_to_dict(tx)
+            await maaser.maybe_accrue(session, user["user_id"], doc)
+            _invalidate_finance_caches(user["user_id"])
+            return doc
+
+    @router.post("/transactions/bulk-approve")
+    async def bulk_approve_transactions(
+        payload: BulkApproveIn,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
+        sm = request.app.state.db
+        async with sm() as session:
+            stmt = select(Transaction).where(Transaction.user_id == user["user_id"])
+            if payload.transaction_ids:
+                stmt = stmt.where(Transaction.transaction_id.in_(payload.transaction_ids))
+            else:
+                stmt = stmt.where(Transaction.approval_status != "approved")
+                if payload.source:
+                    stmt = stmt.where(Transaction.source == payload.source)
+                if payload.category:
+                    stmt = stmt.where(Transaction.category == payload.category)
+                if payload.date_from:
+                    stmt = stmt.where(Transaction.date >= datetime.fromisoformat(payload.date_from))
+                if payload.date_to:
+                    stmt = stmt.where(
+                        Transaction.date
+                        <= datetime.fromisoformat(payload.date_to) + timedelta(days=1)
+                    )
+            if payload.high_confidence_only:
+                stmt = stmt.where(Transaction.ai_confidence >= 0.85)
+            rows = (await session.execute(stmt)).scalars().all()
+            now = datetime.now(timezone.utc)
+            for tx in rows:
+                tx.approval_status = "approved"
+                tx.category_approval_status = "approved"
+                tx.approved_at = now
+            await session.commit()
+            for tx in rows:
+                await maaser.maybe_accrue(session, user["user_id"], _tx_to_dict(tx))
+            _invalidate_finance_caches(user["user_id"])
+            return {"ok": True, "approved": len(rows)}
+
+    @router.post("/transactions/transfer-pairs")
+    async def create_transfer_pair(
+        payload: TransferPairIn,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
+        sm = request.app.state.db
+        async with sm() as session:
+            ids = [payload.outgoing_transaction_id, payload.incoming_transaction_id]
+            if ids[0] == ids[1]:
+                raise HTTPException(400, "Choose two different transactions")
+            rows = (
+                await session.execute(
+                    select(Transaction).where(
+                        Transaction.transaction_id.in_(ids),
+                        Transaction.user_id == user["user_id"],
+                    )
+                )
+            ).scalars().all()
+            by_id = {t.transaction_id: t for t in rows}
+            outgoing = by_id.get(payload.outgoing_transaction_id)
+            incoming = by_id.get(payload.incoming_transaction_id)
+            if not outgoing or not incoming:
+                raise HTTPException(404, "Transaction not found")
+            if float(outgoing.amount or 0) >= 0 or float(incoming.amount or 0) <= 0:
+                raise HTTPException(
+                    400,
+                    "A transfer pair needs one outgoing expense and one incoming income",
+                )
+            if outgoing.transfer_pair_id or incoming.transfer_pair_id:
+                raise HTTPException(400, "One of these transactions is already paired")
+            pair_id = f"trp_{uuid.uuid4().hex[:12]}"
+            pair = TransactionTransferPair(
+                transfer_pair_id=pair_id,
+                user_id=user["user_id"],
+                outgoing_transaction_id=outgoing.transaction_id,
+                incoming_transaction_id=incoming.transaction_id,
+                notes=payload.notes,
+            )
+            session.add(pair)
+            for tx in (outgoing, incoming):
+                tx.transfer_pair_id = pair_id
+                tx.tx_type = "transfer"
+                tx.exclude_from_maaser = True
+                tx.category_approval_status = "approved"
+            await session.commit()
+            for tx in (outgoing, incoming):
+                await maaser.maybe_accrue(session, user["user_id"], _tx_to_dict(tx))
+            _invalidate_finance_caches(user["user_id"])
+            return {"ok": True, "transfer_pair_id": pair_id}
+
+    @router.delete("/transactions/transfer-pairs/{pair_id}")
+    async def delete_transfer_pair(
+        pair_id: str, request: Request, user: dict = Depends(get_current_user)
+    ):
+        sm = request.app.state.db
+        async with sm() as session:
+            pair = (
+                await session.execute(
+                    select(TransactionTransferPair).where(
+                        TransactionTransferPair.transfer_pair_id == pair_id,
+                        TransactionTransferPair.user_id == user["user_id"],
+                    )
+                )
+            ).scalar_one_or_none()
+            if not pair:
+                raise HTTPException(404, "Transfer pair not found")
+            rows = (
+                await session.execute(
+                    select(Transaction).where(
+                        Transaction.transfer_pair_id == pair_id,
+                        Transaction.user_id == user["user_id"],
+                    )
+                )
+            ).scalars().all()
+            await session.delete(pair)
+            for tx in rows:
+                tx.transfer_pair_id = None
+                tx.tx_type = None
+                tx.exclude_from_maaser = False
+            await session.commit()
+            for tx in rows:
+                await maaser.maybe_accrue(session, user["user_id"], _tx_to_dict(tx))
+            _invalidate_finance_caches(user["user_id"])
+            return {"ok": True, "unpaired": len(rows)}
 
     class BulkDeleteByQueryIn(BaseModel):
         source: Optional[str] = None
@@ -1958,9 +2514,15 @@ Output ONLY valid JSON, no markdown, no explanation:
                     "pending": r.pending,
                     "notes": r.notes,
                     "merchant_name": r.merchant_name,
+                    "account_id": r.account_id,
+                    "approval_status": getattr(r, "approval_status", "approved"),
                 }
                 for r in records
             ]
+            for r in records:
+                await _adjust_account_balance(
+                    session, user["user_id"], r.account_id, -float(r.amount or 0)
+                )
             await session.execute(
                 delete(SplitTransaction).where(
                     SplitTransaction.parent_transaction_id.in_(payload.transaction_ids),
@@ -1975,6 +2537,19 @@ Output ONLY valid JSON, no markdown, no explanation:
                     MaaserLedger.user_id == user["user_id"],
                 )
             )
+            await session.execute(
+                delete(TransactionTransferPair).where(
+                    TransactionTransferPair.user_id == user["user_id"],
+                    or_(
+                        TransactionTransferPair.outgoing_transaction_id.in_(
+                            payload.transaction_ids
+                        ),
+                        TransactionTransferPair.incoming_transaction_id.in_(
+                            payload.transaction_ids
+                        ),
+                    ),
+                )
+            )
             result = await session.execute(
                 delete(Transaction)
                 .where(
@@ -1985,9 +2560,7 @@ Output ONLY valid JSON, no markdown, no explanation:
             )
             deleted = len(result.fetchall())
             await session.commit()
-            _query_cache.delete(f"dash:{user['user_id']}")
-            _query_cache.delete_by_prefix(f"trends:{user['user_id']}:")
-            _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
+            _invalidate_finance_caches(user["user_id"])
             return {"ok": True, "deleted": deleted, "backup": backup}
 
     @router.post("/transactions/undo-bulk-delete")
@@ -2061,6 +2634,16 @@ Output ONLY valid JSON, no markdown, no explanation:
             )
             ids = [row[0] for row in ids_result.fetchall()]
             if ids:
+                tx_result = await session.execute(
+                    select(Transaction).where(
+                        Transaction.transaction_id.in_(ids),
+                        Transaction.user_id == user["user_id"],
+                    )
+                )
+                for tx in tx_result.scalars().all():
+                    await _adjust_account_balance(
+                        session, user["user_id"], tx.account_id, -float(tx.amount or 0)
+                    )
                 await session.execute(
                     delete(SplitTransaction).where(
                         SplitTransaction.parent_transaction_id.in_(ids),
@@ -2075,15 +2658,22 @@ Output ONLY valid JSON, no markdown, no explanation:
                         MaaserLedger.user_id == user["user_id"],
                     )
                 )
+                await session.execute(
+                    delete(TransactionTransferPair).where(
+                        TransactionTransferPair.user_id == user["user_id"],
+                        or_(
+                            TransactionTransferPair.outgoing_transaction_id.in_(ids),
+                            TransactionTransferPair.incoming_transaction_id.in_(ids),
+                        ),
+                    )
+                )
                 result = await session.execute(
                     delete(Transaction).where(Transaction.transaction_id.in_(ids))
                 )
             else:
                 result = None
             await session.commit()
-            _query_cache.delete(f"dash:{user['user_id']}")
-            _query_cache.delete_by_prefix(f"trends:{user['user_id']}:")
-            _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
+            _invalidate_finance_caches(user["user_id"])
             deleted = result.rowcount if result else 0
             return {"ok": True, "deleted": deleted}
 
@@ -2100,6 +2690,15 @@ Output ONLY valid JSON, no markdown, no explanation:
                 values["exclude_from_maaser"] = payload.exclude_from_maaser
             if payload.pending is not None:
                 values["pending"] = payload.pending
+            if payload.approval_status is not None:
+                if payload.approval_status not in {"approved", "unapproved", "failed"}:
+                    raise HTTPException(400, "Invalid approval status")
+                values["approval_status"] = payload.approval_status
+                values["approved_at"] = (
+                    datetime.now(timezone.utc)
+                    if payload.approval_status == "approved"
+                    else None
+                )
             if values:
                 await session.execute(
                     update(Transaction)
@@ -2110,9 +2709,7 @@ Output ONLY valid JSON, no markdown, no explanation:
                     .values(**values)
                 )
                 await session.commit()
-            _query_cache.delete(f"dash:{user['user_id']}")
-            _query_cache.delete_by_prefix(f"trends:{user['user_id']}:")
-            _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
+            _invalidate_finance_caches(user["user_id"])
             return {"ok": True, "updated": len(payload.transaction_ids)}
 
     @router.post("/transactions/seed-demo")
@@ -2191,6 +2788,7 @@ Output ONLY valid JSON, no markdown, no explanation:
     # ── Split transactions ───────────────────────────────────────────
 
     @router.post("/transactions/{tx_id}/split")
+    @router.put("/transactions/{tx_id}/splits")
     async def split_transaction(
         tx_id: str,
         payload: SplitIn,
@@ -2208,29 +2806,56 @@ Output ONLY valid JSON, no markdown, no explanation:
             tx = result.scalar_one_or_none()
             if not tx:
                 raise HTTPException(404, "Not found")
-            total_split = sum(s["amount"] for s in payload.splits)
+            if not payload.splits or len(payload.splits) < 2:
+                raise HTTPException(400, "Add at least two split lines")
+            total_split = 0.0
+            for s in payload.splits:
+                try:
+                    amount = abs(float(s.get("amount", 0)))
+                except (TypeError, ValueError):
+                    raise HTTPException(400, "Split amounts must be valid numbers")
+                if amount <= 0:
+                    raise HTTPException(400, "Each split amount must be above zero")
+                total_split += amount
             if abs(total_split - abs(tx.amount)) > 0.01:
                 raise HTTPException(
                     400,
-                    f"Split amounts (${total_split:.2f}) must equal original amount (${abs(tx.amount):.2f})",
+                    f"Split amounts (£{total_split:.2f}) must equal original amount (£{abs(tx.amount):.2f})",
                 )
             await session.execute(
                 delete(SplitTransaction).where(
-                    SplitTransaction.parent_transaction_id == tx_id
+                    SplitTransaction.parent_transaction_id == tx_id,
+                    SplitTransaction.user_id == user["user_id"],
                 )
             )
+            saved = []
             for s in payload.splits:
                 st = SplitTransaction(
                     split_id=f"spl_{uuid.uuid4().hex[:12]}",
                     parent_transaction_id=tx_id,
                     user_id=user["user_id"],
-                    amount=s["amount"],
+                    amount=round(abs(float(s["amount"])), 2),
                     category=s.get("category"),
                     description=s.get("description"),
+                    notes=s.get("notes"),
                 )
                 session.add(st)
+                saved.append(st)
             await session.commit()
-            return {"ok": True, "splits": payload.splits}
+            _invalidate_finance_caches(user["user_id"])
+            return {
+                "ok": True,
+                "splits": [
+                    {
+                        "split_id": s.split_id,
+                        "amount": s.amount,
+                        "category": s.category,
+                        "description": s.description,
+                        "notes": s.notes,
+                    }
+                    for s in saved
+                ],
+            }
 
     @router.get("/transactions/{tx_id}/splits")
     async def get_splits(
@@ -2259,6 +2884,32 @@ Output ONLY valid JSON, no markdown, no explanation:
             }
 
     # ── Recurring detection ──────────────────────────────────────────
+
+    @router.delete("/transactions/{tx_id}/splits")
+    async def delete_splits(
+        tx_id: str, request: Request, user: dict = Depends(get_current_user)
+    ):
+        sm = request.app.state.db
+        async with sm() as session:
+            tx = (
+                await session.execute(
+                    select(Transaction).where(
+                        Transaction.transaction_id == tx_id,
+                        Transaction.user_id == user["user_id"],
+                    )
+                )
+            ).scalar_one_or_none()
+            if not tx:
+                raise HTTPException(404, "Not found")
+            result = await session.execute(
+                delete(SplitTransaction).where(
+                    SplitTransaction.parent_transaction_id == tx_id,
+                    SplitTransaction.user_id == user["user_id"],
+                )
+            )
+            await session.commit()
+            _invalidate_finance_caches(user["user_id"])
+            return {"ok": True, "deleted": int(result.rowcount or 0)}
 
     @router.post("/transactions/detect-recurring")
     async def detect_recurring(
@@ -2887,24 +3538,21 @@ Output ONLY valid JSON, no markdown, no explanation:
     ):
         sm = request.app.state.db
         async with sm() as session:
-            stmt = select(Transaction).where(
-                Transaction.user_id == user["user_id"],
-                Transaction.amount < 0,
+            lines = await _effective_transaction_lines(
+                session,
+                user["user_id"],
+                date_from=datetime.fromisoformat(date_from) if date_from else None,
+                date_to=(datetime.fromisoformat(date_to) + timedelta(days=1))
+                if date_to
+                else None,
             )
-            if date_from:
-                stmt = stmt.where(Transaction.date >= datetime.fromisoformat(date_from))
-            if date_to:
-                stmt = stmt.where(
-                    Transaction.date
-                    <= datetime.fromisoformat(date_to) + timedelta(days=1)
-                )
-            result = await session.execute(stmt)
-            txs = result.scalars().all()
             cats = defaultdict(float)
             total = 0.0
-            for t in txs:
-                cat = t.category or "uncategorized"
-                amt = abs(t.amount)
+            for line in lines:
+                if line["amount"] >= 0:
+                    continue
+                cat = line["category"] or "uncategorized"
+                amt = abs(line["amount"])
                 cats[cat] += amt
                 total += amt
             sorted_cats = sorted(
@@ -2930,21 +3578,16 @@ Output ONLY valid JSON, no markdown, no explanation:
             return cached
         sm = request.app.state.db
         async with sm() as session:
-            result = await session.execute(
-                select(Transaction)
-                .where(Transaction.user_id == user["user_id"])
-                .order_by(Transaction.date.desc())
-                .limit(2000)
-            )
-            txs = result.scalars().all()
+            lines = await _effective_transaction_lines(session, user["user_id"])
             monthly = defaultdict(lambda: {"income": 0.0, "spend": 0.0, "net": 0.0})
-            for t in txs:
-                if not t.date:
+            for line in lines:
+                if not line["date"]:
                     continue
-                key = t.date.strftime("%Y-%m")
-                monthly[key]["income"] += t.amount if t.amount > 0 else 0
-                monthly[key]["spend"] += abs(t.amount) if t.amount < 0 else 0
-                monthly[key]["net"] += t.amount
+                key = line["date"].strftime("%Y-%m")
+                amount = float(line["amount"] or 0)
+                monthly[key]["income"] += amount if amount > 0 else 0
+                monthly[key]["spend"] += abs(amount) if amount < 0 else 0
+                monthly[key]["net"] += amount
             trends = sorted(
                 [{"month": k, **v} for k, v in monthly.items()],
                 key=lambda x: x["month"],
@@ -2963,21 +3606,17 @@ Output ONLY valid JSON, no markdown, no explanation:
                 select(Budget).where(Budget.user_id == user["user_id"])
             )
             budgets = budget_result.scalars().all()
-            tx_result = await session.execute(
-                select(Transaction).where(Transaction.user_id == user["user_id"])
-            )
-            txs = tx_result.scalars().all()
             now = datetime.now(timezone.utc)
             month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            lines = await _effective_transaction_lines(
+                session, user["user_id"], date_from=month_start
+            )
             comparisons = []
             for b in budgets:
                 spent = sum(
-                    abs(t.amount)
-                    for t in txs
-                    if t.amount < 0
-                    and t.category == b.category
-                    and t.date
-                    and t.date >= month_start
+                    abs(line["amount"])
+                    for line in lines
+                    if line["amount"] < 0 and line["category"] == b.category
                 )
                 comparisons.append(
                     {
@@ -3158,26 +3797,29 @@ Output ONLY valid JSON, no markdown, no explanation:
                 .limit(2000)
             )
             txs = result.scalars().all()
-            balance = sum(t.amount for t in txs)
 
             now = datetime.now(timezone.utc)
             month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            month_txs = [t for t in txs if t.date and t.date >= month_start]
-            income = sum(t.amount for t in month_txs if t.amount > 0)
-            spend = sum(-t.amount for t in month_txs if t.amount < 0)
+            lines = await _effective_transaction_lines(session, uid)
+            balance = sum(float(line["amount"] or 0) for line in lines)
+            month_lines = [
+                line for line in lines if line["date"] and line["date"] >= month_start
+            ]
+            income = sum(line["amount"] for line in month_lines if line["amount"] > 0)
+            spend = sum(-line["amount"] for line in month_lines if line["amount"] < 0)
 
             cats = defaultdict(float)
-            for t in month_txs:
-                if t.amount < 0:
-                    cats[t.category or "uncategorized"] += -t.amount
+            for line in month_lines:
+                if line["amount"] < 0:
+                    cats[line["category"] or "uncategorized"] += -line["amount"]
             monthly = defaultdict(lambda: {"income": 0, "spend": 0})
-            for t in txs:
-                if t.date:
-                    d = t.date.strftime("%Y-%m")
-                    if t.amount > 0:
-                        monthly[d]["income"] += t.amount
+            for line in lines:
+                if line["date"]:
+                    d = line["date"].strftime("%Y-%m")
+                    if line["amount"] > 0:
+                        monthly[d]["income"] += line["amount"]
                     else:
-                        monthly[d]["spend"] += -t.amount
+                        monthly[d]["spend"] += -line["amount"]
             flow = sorted(
                 [{"month": k, **v} for k, v in monthly.items()],
                 key=lambda x: x["month"],
@@ -3188,6 +3830,13 @@ Output ONLY valid JSON, no markdown, no explanation:
             sources = defaultdict(int)
             for t in txs:
                 sources[t.source or "manual"] += 1
+            needs_review = sum(
+                1
+                for t in txs
+                if (getattr(t, "approval_status", None) or "approved") != "approved"
+                or (getattr(t, "category_approval_status", None) or "approved")
+                != "approved"
+            )
 
             # Real bank balances from BankAccounts
             acct_result = await session.execute(
@@ -3260,6 +3909,7 @@ Output ONLY valid JSON, no markdown, no explanation:
                 ],
                 "monthly_flow": flow,
                 "recent": [_tx_to_dict(t, institution_map, label_map) for t in txs[:8]],
+                "needs_review_count": needs_review,
                 "source_breakdown": [
                     {"source": k, "count": v}
                     for k, v in sorted(sources.items(), key=lambda x: -x[1])
@@ -3368,21 +4018,16 @@ Output ONLY valid JSON, no markdown, no explanation:
                 result = await session.execute(q)
                 budgets = result.scalars().all()
 
-                # Fast spent lookup via SQL aggregation
-                spent_rows = await session.execute(
-                    select(
-                        Transaction.category,
-                        func.sum(-Transaction.amount).label("spent"),
-                    )
-                    .where(
-                        Transaction.user_id == user["user_id"],
-                        Transaction.date >= tx_start,
-                        Transaction.date < tx_end,
-                        Transaction.amount < 0,
-                    )
-                    .group_by(Transaction.category)
+                lines = await _effective_transaction_lines(
+                    session,
+                    user["user_id"],
+                    date_from=tx_start,
+                    date_to=tx_end,
                 )
-                spent_map = {row.category: float(row.spent) for row in spent_rows}
+                spent_map = defaultdict(float)
+                for line in lines:
+                    if line["amount"] < 0:
+                        spent_map[line["category"]] += abs(float(line["amount"]))
 
                 result_list = []
                 total_budgeted = 0.0
@@ -3808,6 +4453,12 @@ Output ONLY valid JSON, no markdown, no explanation:
                         Transaction.date >= first_month_start,
                         Transaction.date < month_ranges[-1][1],
                         Transaction.category.in_(cats_to_fetch),
+                        Transaction.approval_status == "approved",
+                        Transaction.transfer_pair_id.is_(None),
+                        or_(
+                            Transaction.tx_type.is_(None),
+                            Transaction.tx_type != "transfer",
+                        ),
                     )
                     .group_by(
                         Transaction.category,
@@ -3849,6 +4500,12 @@ Output ONLY valid JSON, no markdown, no explanation:
                         Transaction.amount < 0,
                         Transaction.date >= first_month_start,
                         Transaction.date < month_ranges[-1][1],
+                        Transaction.approval_status == "approved",
+                        Transaction.transfer_pair_id.is_(None),
+                        or_(
+                            Transaction.tx_type.is_(None),
+                            Transaction.tx_type != "transfer",
+                        ),
                     )
                     .group_by(
                         func.date_trunc("month", Transaction.date),

@@ -17,7 +17,7 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak,
 )
 
-from db import Transaction, Budget, MaaserLedger
+from db import Transaction, Budget, MaaserLedger, SplitTransaction
 from auth import get_current_user
 
 logger = logging.getLogger("reports")
@@ -161,26 +161,63 @@ async def _gather(session, user_id: str, month: Optional[str] = None, year: Opti
         base_q = base_q.where(Transaction.date >= start, Transaction.date < end)
 
     result = await session.execute(base_q.order_by(Transaction.date.desc()).limit(5000))
-    txs_raw = result.scalars().all()
+    txs_raw = [
+        t
+        for t in result.scalars().all()
+        if getattr(t, "approval_status", "approved") == "approved"
+        and t.tx_type != "transfer"
+        and not getattr(t, "transfer_pair_id", None)
+    ]
+    split_map = defaultdict(list)
+    if txs_raw:
+        split_result = await session.execute(
+            select(SplitTransaction).where(
+                SplitTransaction.user_id == user_id,
+                SplitTransaction.parent_transaction_id.in_(
+                    [t.transaction_id for t in txs_raw]
+                ),
+            )
+        )
+        for split in split_result.scalars().all():
+            split_map[split.parent_transaction_id].append(split)
 
     txs = []
     income = 0.0
     spend = 0.0
     for t in txs_raw:
-        d = {
-            "transaction_id": t.transaction_id,
-            "amount": t.amount,
-            "currency": t.currency,
-            "description": t.description,
-            "merchant": t.merchant_name,
-            "category": t.category,
-            "date": t.date.isoformat() if t.date else "",
-        }
-        txs.append(d)
-        if t.amount > 0:
-            income += t.amount
+        splits = split_map.get(t.transaction_id) or []
+        if splits:
+            sign = 1 if float(t.amount or 0) >= 0 else -1
+            entries = [
+                {
+                    "transaction_id": t.transaction_id,
+                    "amount": abs(float(s.amount or 0)) * sign,
+                    "currency": t.currency,
+                    "description": s.description or t.description,
+                    "merchant": t.merchant_name,
+                    "category": s.category or t.category,
+                    "date": t.date.isoformat() if t.date else "",
+                }
+                for s in splits
+            ]
         else:
-            spend += -t.amount
+            entries = [
+                {
+                    "transaction_id": t.transaction_id,
+                    "amount": t.amount,
+                    "currency": t.currency,
+                    "description": t.description,
+                    "merchant": t.merchant_name,
+                    "category": t.category,
+                    "date": t.date.isoformat() if t.date else "",
+                }
+            ]
+        for d in entries:
+            txs.append(d)
+            if d["amount"] > 0:
+                income += d["amount"]
+            else:
+                spend += -d["amount"]
 
     balance = income - spend
     savings_rate = ((income - spend) / income * 100) if income > 0 else 0

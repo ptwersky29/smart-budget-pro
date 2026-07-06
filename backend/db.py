@@ -626,12 +626,82 @@ async def create_tables():
             )
             await conn.execute(
                 text(
+                    "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS approval_status VARCHAR(16) DEFAULT 'approved'"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS category_approval_status VARCHAR(16) DEFAULT 'approved'"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS ai_suggested_categories JSON"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS ai_selected_category VARCHAR(128)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS ai_confidence NUMERIC(5,4)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS ai_reason TEXT"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS transfer_pair_id VARCHAR(64)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS failed_reason TEXT"
+                )
+            )
+            await conn.execute(
+                text(
+                    "UPDATE transactions SET approval_status = 'approved' WHERE approval_status IS NULL"
+                )
+            )
+            await conn.execute(
+                text(
+                    "UPDATE transactions SET category_approval_status = 'approved' WHERE category_approval_status IS NULL"
+                )
+            )
+            await conn.execute(
+                text(
+                    "UPDATE transactions SET exclude_from_maaser = TRUE WHERE tx_type = 'transfer'"
+                )
+            )
+            await conn.execute(
+                text(
                     "CREATE INDEX IF NOT EXISTS idx_transactions_account ON transactions(user_id, account_id)"
                 )
             )
             await conn.execute(
                 text(
                     "CREATE INDEX IF NOT EXISTS idx_transactions_balance_type ON transactions(user_id, balance_type)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS idx_transactions_approval ON transactions(user_id, approval_status)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS idx_transactions_transfer_pair ON transactions(user_id, transfer_pair_id)"
                 )
             )
             await conn.execute(
@@ -995,6 +1065,27 @@ class Transaction(Base, TimestampMixin):
     )  # available, savings
     exclude_from_maaser: Mapped[bool] = mapped_column(Boolean, default=False)
     source: Mapped[str] = mapped_column(String(32), default="manual")
+    approval_status: Mapped[str] = mapped_column(String(16), default="approved")
+    category_approval_status: Mapped[str] = mapped_column(
+        String(16), default="approved"
+    )
+    ai_suggested_categories: Mapped[Optional[dict]] = mapped_column(
+        JSON, nullable=True
+    )
+    ai_selected_category: Mapped[Optional[str]] = mapped_column(
+        String(128), nullable=True
+    )
+    ai_confidence: Mapped[Optional[float]] = mapped_column(
+        Numeric(5, 4, asdecimal=False), nullable=True
+    )
+    ai_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    approved_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    transfer_pair_id: Mapped[Optional[str]] = mapped_column(
+        String(64), nullable=True, index=True
+    )
+    failed_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     parent_id: Mapped[Optional[str]] = mapped_column(
         String(64), nullable=True, index=True
     )
@@ -1008,6 +1099,37 @@ class Transaction(Base, TimestampMixin):
         Index("idx_transactions_user_merchant", "user_id", "merchant_name"),
         Index("idx_transactions_account", "user_id", "account_id"),
         Index("idx_transactions_balance_type", "user_id", "balance_type"),
+        Index("idx_transactions_approval", "user_id", "approval_status"),
+        Index("idx_transactions_transfer_pair", "user_id", "transfer_pair_id"),
+    )
+
+
+class TransactionTransferPair(Base, TimestampMixin):
+    __tablename__ = "transaction_transfer_pairs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    transfer_pair_id: Mapped[str] = mapped_column(
+        String(64), unique=True, nullable=False, index=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("users.user_id"), nullable=False, index=True
+    )
+    outgoing_transaction_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    incoming_transaction_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "outgoing_transaction_id",
+            name="uq_transfer_pair_outgoing",
+        ),
+        UniqueConstraint(
+            "user_id",
+            "incoming_transaction_id",
+            name="uq_transfer_pair_incoming",
+        ),
+        Index("idx_transfer_pairs_user", "user_id"),
     )
 
 

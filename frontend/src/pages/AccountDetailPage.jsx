@@ -26,6 +26,10 @@ const ACCOUNT_TYPE_META = {
   credit: { icon: CreditCard, label: "Credit Card", color: "text-ruby", bg: "bg-ruby/10" },
 };
 
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export default function AccountDetailPage() {
   const { accountId } = useParams();
   const navigate = useNavigate();
@@ -42,7 +46,7 @@ export default function AccountDetailPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [txFormOpen, setTxFormOpen] = useState(false);
   const [editingTxId, setEditingTxId] = useState(null);
-  const [txForm, setTxForm] = useState({ description: "", amount: "", category: "", is_income: false, is_transfer: false, budget_type: "", occasion: "", merchant: "", account_id: accountId });
+  const [txForm, setTxForm] = useState({ description: "", date: today(), amount: "", category: "", is_income: false, is_transfer: false, budget_type: "", occasion: "", merchant: "", notes: "", account_id: accountId });
   const [allAccounts, setAllAccounts] = useState([]);
   const [allAccountsLoading, setAllAccountsLoading] = useState(false);
   const { categories: selectedCats, version: categoriesVersion } = useCategories();
@@ -98,7 +102,7 @@ export default function AccountDetailPage() {
     } catch (err) {
       setError(formatApiError(err.response?.data?.detail) || "Could not load account");
     } finally { setLoading(false); }
-  }, [accountId]);
+  }, [account?.account_id, accountId]);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -134,14 +138,14 @@ export default function AccountDetailPage() {
 
   const openEditTx = useCallback((t) => {
     setEditingTxId(t.transaction_id);
-    setTxForm({ description: t.description || "", amount: String(Math.abs(t.amount)), category: t.category || "", account_id: t.account_id || "", is_income: t.amount > 0, is_transfer: t.is_transfer || false, budget_type: "", occasion: "", merchant: "" });
+    setTxForm({ description: t.description || "", date: t.date?.slice(0, 10) || today(), amount: String(Math.abs(t.amount)), category: t.category || "", account_id: t.account_id || "", is_income: t.amount > 0, is_transfer: t.is_transfer || false, budget_type: "", occasion: "", merchant: t.merchant || "", notes: t.notes || "" });
     setTxFormOpen(true);
   }, []);
 
   const closeTxForm = useCallback(() => {
     setTxFormOpen(false);
     setEditingTxId(null);
-    setTxForm({ description: "", amount: "", category: "", is_income: false, is_transfer: false, budget_type: "", occasion: "", merchant: "", account_id: accountId });
+    setTxForm({ description: "", date: today(), amount: "", category: "", is_income: false, is_transfer: false, budget_type: "", occasion: "", merchant: "", notes: "", account_id: account?.account_id || accountId });
   }, [accountId]);
 
   const txsRef = useRef(txs);
@@ -169,7 +173,7 @@ export default function AccountDetailPage() {
     const amt = parseFloat(txForm.amount);
     if (!amt) { toast.error("Enter an amount"); return; }
     const signed = txForm.is_income ? Math.abs(amt) : -Math.abs(amt);
-    const payload = { description: txForm.description, amount: signed, category: txForm.category || undefined, account_id: txForm.account_id, is_income: txForm.is_income, is_transfer: txForm.is_transfer || undefined };
+    const payload = { description: txForm.description, amount: signed, category: txForm.category || undefined, date: txForm.date || today(), merchant: txForm.merchant || undefined, notes: txForm.notes || undefined, account_id: txForm.account_id, is_income: txForm.is_income, is_transfer: txForm.is_transfer || undefined };
     if (editingTxId) {
       const old = txs.find(t => t.transaction_id === editingTxId);
       setTxs(prev => prev.map(t => t.transaction_id === editingTxId ? { ...t, ...payload } : t));

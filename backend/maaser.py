@@ -13,7 +13,11 @@ INCOME_CATEGORIES = {"salary", "income"}
 
 
 def _is_income_tx(tx: dict) -> bool:
+    if tx.get("approval_status") and tx.get("approval_status") != "approved":
+        return False
     if tx.get("exclude_from_maaser") or tx.get("is_transfer"):
+        return False
+    if tx.get("transfer_pair_id"):
         return False
     if tx.get("is_income"):
         return True
@@ -117,6 +121,8 @@ async def backfill_for_user(session, user_id: str) -> dict:
             "is_income": t.amount > 0,
             "exclude_from_maaser": t.exclude_from_maaser,
             "is_transfer": t.tx_type == "transfer",
+            "transfer_pair_id": getattr(t, "transfer_pair_id", None),
+            "approval_status": getattr(t, "approval_status", "approved"),
         }
         existing = await session.execute(
             select(MaaserLedger).where(

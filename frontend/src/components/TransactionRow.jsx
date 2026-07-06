@@ -4,8 +4,12 @@ import {
   Pencil,
   Trash2,
   Copy,
-  ExternalLink,
-  Check,
+  CheckCircle2,
+  Sparkles,
+  Scissors,
+  Link2,
+  Link2Off,
+  AlertTriangle,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -38,6 +42,11 @@ const TransactionRow = React.memo(
     onEdit,
     onDelete,
     onSetFocus,
+    onApprove,
+    onClassify,
+    onSplit,
+    onPairTransfer,
+    onUnpairTransfer,
   }) => {
     const brandInstitution = pickBankInstitution(t.institution, t.source_label);
 
@@ -94,6 +103,21 @@ const TransactionRow = React.memo(
                     Transfer
                   </span>
                 )}
+                {t.is_split && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet/10 text-violet text-[10px] font-medium">
+                    Split {t.split_count ? `(${t.split_count})` : ""}
+                  </span>
+                )}
+                {(t.approval_status === "unapproved" || t.category_approval_status === "unapproved") && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-topaz/10 text-topaz text-[10px] font-medium">
+                    Unapproved
+                  </span>
+                )}
+                {t.approval_status === "failed" && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-ruby/10 text-ruby text-[10px] font-medium">
+                    Failed
+                  </span>
+                )}
                 <CategoryBadge
                   category={t.category || "uncategorized"}
                   size="sm"
@@ -134,6 +158,40 @@ const TransactionRow = React.memo(
                   <DropdownMenuItem onClick={() => onEdit(t)}>
                     <Pencil className="h-4 w-4 mr-2" /> Edit
                   </DropdownMenuItem>
+                  {onClassify && (
+                    <DropdownMenuItem onClick={() => onClassify(t)}>
+                      <Sparkles className="h-4 w-4 mr-2" /> AI classify
+                    </DropdownMenuItem>
+                  )}
+                  {onApprove && (t.approval_status === "unapproved" || t.category_approval_status === "unapproved") && (
+                    <DropdownMenuItem onClick={() => onApprove(t)}>
+                      <CheckCircle2 className="h-4 w-4 mr-2" /> Approve
+                    </DropdownMenuItem>
+                  )}
+                  {onSplit && (
+                    <DropdownMenuItem onClick={() => onSplit(t)}>
+                      <Scissors className="h-4 w-4 mr-2" /> Split transaction
+                    </DropdownMenuItem>
+                  )}
+                  {onPairTransfer && !t.transfer_pair_id && (
+                    <DropdownMenuItem onClick={() => onPairTransfer(t)}>
+                      <Link2 className="h-4 w-4 mr-2" /> Pair transfer
+                    </DropdownMenuItem>
+                  )}
+                  {onUnpairTransfer && t.transfer_pair_id && (
+                    <DropdownMenuItem onClick={() => onUnpairTransfer(t)}>
+                      <Link2Off className="h-4 w-4 mr-2" /> Unpair transfer
+                    </DropdownMenuItem>
+                  )}
+                  {t.failed_reason && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem disabled>
+                        <AlertTriangle className="h-4 w-4 mr-2" /> {t.failed_reason}
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => onDelete(t.transaction_id)}
                     className="text-ruby"
@@ -164,7 +222,16 @@ const TransactionRow = React.memo(
       </ContextMenu>
     );
   },
-  (prev, next) => prev.t.transaction_id === next.t.transaction_id && prev.t.amount === next.t.amount
+  (prev, next) =>
+    prev.t.transaction_id === next.t.transaction_id &&
+    prev.t.amount === next.t.amount &&
+    prev.t.category === next.t.category &&
+    prev.t.approval_status === next.t.approval_status &&
+    prev.t.category_approval_status === next.t.category_approval_status &&
+    prev.t.is_split === next.t.is_split &&
+    prev.t.transfer_pair_id === next.t.transfer_pair_id &&
+    prev.isSelected === next.isSelected &&
+    prev.isFocused === next.isFocused
 );
 
 export default TransactionRow;

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import {
@@ -15,6 +16,7 @@ import CategoryBadge from "./CategoryBadge";
 
 const emptyForm = {
   description: "",
+  date: "",
   amount: "",
   category: "",
   account_id: "",
@@ -24,6 +26,7 @@ const emptyForm = {
   budget_type: "",
   occasion: "",
   merchant: "",
+  notes: "",
 };
 const BUDGET_TYPES = ["day_to_day", "yom_tov", "holiday", "simcha", "other"];
 
@@ -111,6 +114,41 @@ export default function TransactionForm({
             )}
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="tx-date" className="label-overline text-muted-foreground mb-1.5 block">
+                Date
+              </label>
+              <Input
+                id="tx-date"
+                type="date"
+                value={form.date || new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setForm({ ...form, date: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="label-overline text-muted-foreground mb-1.5 block">
+                Type
+              </label>
+              <div className="grid grid-cols-2 rounded-xl border border-border bg-secondary/20 p-1 h-11">
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, is_income: false, is_transfer: false })}
+                  className={`rounded-lg text-sm font-medium transition-colors ${!form.is_income && !form.is_transfer ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  Expense
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, is_income: true, is_transfer: false })}
+                  className={`rounded-lg text-sm font-medium transition-colors ${form.is_income && !form.is_transfer ? "bg-card shadow-sm text-emerald" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  Income
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div>
             <label htmlFor="tx-desc" className="sr-only">
               Description
@@ -195,23 +233,6 @@ export default function TransactionForm({
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input
               type="checkbox"
-              checked={form.is_income}
-              onChange={(e) =>
-                setForm({ ...form, is_income: e.target.checked, is_transfer: false })
-              }
-              disabled={form.is_transfer}
-              className="accent-emerald h-4 w-4"
-              aria-describedby={form.is_income ? "income-hint" : undefined}
-            />{" "}
-            <span>This is income</span>
-          </label>
-          <span id="income-hint" className="sr-only">
-            Check if this transaction represents money coming in
-          </span>
-
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input
-              type="checkbox"
               checked={form.is_transfer}
               onChange={(e) =>
                 setForm({ ...form, is_transfer: e.target.checked, is_income: false })
@@ -240,6 +261,19 @@ export default function TransactionForm({
             {form.is_transfer ? "Transfers are already excluded" : "This income won't be tithed"}
           </span>
 
+          <div>
+            <label htmlFor="tx-notes" className="sr-only">
+              Notes
+            </label>
+            <textarea
+              id="tx-notes"
+              placeholder="Optional notes"
+              value={form.notes || ""}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              className="flex min-h-[72px] w-full rounded-xl bg-secondary/30 border border-border px-4 py-3 text-sm transition-colors placeholder:text-muted-foreground focus:border-emerald/50 focus:ring-2 focus:ring-emerald/20 focus:outline-none"
+            />
+          </div>
+
           {/* Classify button */}
           {!editingId && (
             <div className="flex gap-2">
@@ -247,6 +281,7 @@ export default function TransactionForm({
                 variant="outlinePill"
                 size="pillSm"
                 className="border-emerald text-emerald flex-1"
+                type="button"
                 onClick={() => {
                   const parsed = parseFloat(form.amount);
                   if (isNaN(parsed)) { toast.error("Invalid amount"); return; }
@@ -447,12 +482,13 @@ export default function TransactionForm({
           )}
 
           <div className="flex gap-2 pt-2">
-            <Button variant="outlinePill" className="flex-1" onClick={onClose}>
+            <Button variant="outlinePill" className="flex-1" type="button" onClick={onClose}>
               Cancel
             </Button>
             <Button
               variant="primary"
               className="flex-1"
+              type="submit"
               data-testid="tx-submit"
             >
               {editingId ? "Save changes" : "Add"}

@@ -68,7 +68,12 @@ async def annual_maaser_summary(
         months = {}
 
         for t in txs:
-            if t.exclude_from_maaser or t.tx_type == "transfer":
+            if (
+                t.exclude_from_maaser
+                or t.tx_type == "transfer"
+                or getattr(t, "transfer_pair_id", None)
+                or getattr(t, "approval_status", "approved") != "approved"
+            ):
                 continue
             amt = float(t.amount or 0)
             cat = (t.category or "").lower()
