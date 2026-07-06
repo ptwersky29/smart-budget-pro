@@ -118,18 +118,26 @@ async def backfill_for_user(session, user_id: str) -> dict:
             "exclude_from_maaser": t.exclude_from_maaser,
             "is_transfer": t.tx_type == "transfer",
         }
-        if not _is_income_tx(tx_dict):
-            continue
         existing = await session.execute(
             select(MaaserLedger).where(
                 MaaserLedger.user_id == user_id,
                 MaaserLedger.transaction_id == t.transaction_id,
             )
         )
-        if existing.scalar_one_or_none():
-            skipped += 1
+        entry = existing.scalar_one_or_none()
+        if not _is_income_tx(tx_dict):
+            if entry:
+                await session.delete(entry)
+                await session.flush()
             continue
         amt = round(abs(float(t.amount)) * percent / 100, 2)
+        if entry:
+            entry.income_amount = abs(float(t.amount))
+            entry.maaser_due = amt
+            entry.note = f"Auto-Maaser {percent:.1f}% of {t.description} (backfill)"
+            skipped += 1
+            await session.flush()
+            continue
         if amt <= 0:
             continue
         entry = MaaserLedger(

@@ -68,6 +68,8 @@ async def annual_maaser_summary(
         months = {}
 
         for t in txs:
+            if t.exclude_from_maaser or t.tx_type == "transfer":
+                continue
             amt = float(t.amount or 0)
             cat = (t.category or "").lower()
             month = str(t.date)[:7] if t.date else ""

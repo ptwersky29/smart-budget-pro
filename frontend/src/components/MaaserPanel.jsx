@@ -184,6 +184,20 @@ export default function MaaserPanel({ refreshKey = 0, onChange }) {
     }
   };
 
+  const handleExclude = async (transactionId) => {
+    if (!transactionId) { toast.error("No linked transaction"); return; }
+    setBusy(true);
+    try {
+      await api.patch(`/transactions/${transactionId}`, { exclude_from_maaser: true });
+      toast.success("Income excluded from Maaser");
+      await load();
+      onChange?.();
+    } catch (e) {
+      toast.error(formatApiError(e?.response?.data?.detail) || "Could not exclude");
+    }
+    finally { setBusy(false); }
+  };
+
   const overGiven = sum.credit > 0;
   const balanceValue = overGiven ? sum.credit : sum.balance_owed;
   const balanceAccent = sum.balance_owed > 0 ? "ruby" : "emerald";
@@ -345,6 +359,11 @@ export default function MaaserPanel({ refreshKey = 0, onChange }) {
                             {e.status === "pending" && (
                               <DropdownMenuItem onClick={() => handlePay(e.entry_id)}>
                                 <CheckCircle2 className="h-3.5 w-3.5 mr-2" /> Mark Paid
+                              </DropdownMenuItem>
+                            )}
+                            {e.status === "pending" && e.transaction_id && (
+                              <DropdownMenuItem onClick={() => handleExclude(e.transaction_id)}>
+                                <X className="h-3.5 w-3.5 mr-2" /> Exclude from Maaser
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuSeparator />

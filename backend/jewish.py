@@ -243,6 +243,8 @@ def build_router() -> APIRouter:
             txs = tx_result.scalars().all()
             total_income = 0.0
             for t in txs:
+                if t.exclude_from_maaser or t.tx_type == "transfer":
+                    continue
                 amt = float(t.amount or 0)
                 cat = (t.category or "").lower()
                 if amt > 0 or cat in INCOME_CATEGORIES:
@@ -263,6 +265,8 @@ def build_router() -> APIRouter:
             # (to avoid double-counting with manual_given)
             tx_given = 0.0
             for t in txs:
+                if t.exclude_from_maaser or t.tx_type == "transfer":
+                    continue
                 amt = float(t.amount or 0)
                 cat = (t.category or "").lower()
                 if amt < 0 and cat == "tzedakah" and t.transaction_id not in ledger_tx_ids:
@@ -334,6 +338,8 @@ def build_router() -> APIRouter:
             tx_q = select(Transaction).where(
                 Transaction.user_id == user["user_id"],
                 Transaction.category == "tzedakah",
+                Transaction.exclude_from_maaser == False,
+                Transaction.tx_type != "transfer",
             )
             if date_from:
                 tx_q = tx_q.where(Transaction.date >= date_from)
@@ -836,6 +842,8 @@ def build_router() -> APIRouter:
             tx_given = 0.0
             income_by_month = {}
             for t in txs:
+                if t.exclude_from_maaser or t.tx_type == "transfer":
+                    continue
                 amt = float(t.amount or 0)
                 cat = (t.category or "").lower()
                 if amt > 0 or cat in INCOME_CATEGORIES:
