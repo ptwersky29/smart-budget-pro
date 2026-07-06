@@ -58,7 +58,7 @@ test.describe("100k-user route and flow readiness", () => {
     await page.addInitScript(({ token }) => window.localStorage.setItem("access_token", token), { token: validJwt() });
     await installApiMocks(page, { forceError: true });
     await page.goto("/dashboard");
-    await expect(page.getByText(/could not load dashboard|try again/i)).toBeVisible();
+    await expect(page.getByTestId("dashboard-error")).toContainText(/could not load dashboard|try again/i);
   });
 
   test("mobile user can use bottom navigation on a slow network", async ({ page }) => {

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { api } from "../lib/api";
+import { api, formatApiError } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useSettings } from "../contexts/SettingsContext";
 import { useCategories } from "../contexts/CategoriesContext";
@@ -56,6 +56,7 @@ const Dashboard = React.memo(function Dashboard() {
   const [upcoming, setUpcoming] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   const dashboardPrefs = settings.preferences?.dashboard || {};
   const activeWidgets = dashboardPrefs.widgets && dashboardPrefs.widgets.length > 0
@@ -78,8 +79,15 @@ const Dashboard = React.memo(function Dashboard() {
         api.get("/budget-system/alerts"),
         api.get("/budget-system/upcoming"),
       ]);
-      if (ov.status === "fulfilled") setOverview(ov.value.data);
-      else toast.error("Could not load dashboard data");
+      if (ov.status === "fulfilled") {
+        setOverview(ov.value.data);
+        setLoadError("");
+      } else {
+        const message = formatApiError(ov.reason);
+        setOverview(null);
+        setLoadError(message);
+        if (silent) toast.error(message || "Could not refresh dashboard");
+      }
       if (bd.status === "fulfilled") setBudgets(bd.value.data.budgets || []);
       if (al.status === "fulfilled")
         setAlerts(al.value.data.alerts || al.value.data || []);
@@ -172,10 +180,16 @@ const Dashboard = React.memo(function Dashboard() {
 
   if (!overview)
     return (
-      <div className="grid place-items-center min-h-[60vh] text-center p-8">
-        <div>
-          <p className="text-lg font-medium text-muted-foreground">
-            Could not load dashboard
+      <div className="grid place-items-center min-h-[60vh] p-4 sm:p-8">
+        <div
+          role="alert"
+          data-testid="dashboard-error"
+          className="w-full max-w-md rounded-lg border border-border bg-card/95 p-6 text-center shadow-card"
+        >
+          <AlertTriangle className="mx-auto h-8 w-8 text-topaz" />
+          <p className="mt-4 text-lg font-medium">Could not load dashboard</p>
+          <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+            {loadError || "Something went wrong. Please try again."}
           </p>
           <Button
             onClick={() => loadAll()}
