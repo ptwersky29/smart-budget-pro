@@ -178,34 +178,53 @@ const Transactions = React.memo(function Transactions() {
   const [maaserEditAmount, setMaaserEditAmount] = useState("");
   const [maaserEditPaidTo, setMaaserEditPaidTo] = useState("");
   const [maaserEditNote, setMaaserEditNote] = useState("");
+  const [maaserIncomeTxs, setMaaserIncomeTxs] = useState([]);
+  const [maaserIncomeTxsLoading, setMaaserIncomeTxsLoading] = useState(false);
+  const [maaserTzedakahTxs, setMaaserTzedakahTxs] = useState([]);
+  const [maaserTzedakahTxsLoading, setMaaserTzedakahTxsLoading] = useState(false);
 
   const refreshMaaser = useCallback(async () => {
     try {
-      const [s, sum, lg] = await Promise.all([
+      const [s, sum, lg, incRes, tzdRes] = await Promise.all([
         api.get("/jewish/maaser/settings"),
         api.get("/jewish/maaser/summary"),
         api.get("/jewish/maaser/ledger?include_tx=true&limit=500"),
+        api.get("/transactions", { params: { tx_type: "income", limit: 200 } }),
+        api.get("/transactions", { params: { category: "tzedakah", limit: 200 } }),
       ]);
       setMaaserCfg(s.data || { enabled: false, percent: 10 });
       setMaaserSum(sum.data || null);
       setMaaserLedger(lg.data?.entries || []);
+      setMaaserIncomeTxs((incRes.data?.transactions || []).filter(t => !t.is_transfer && !t.exclude_from_maaser));
+      setMaaserTzedakahTxs(tzdRes.data?.transactions || []);
     } catch {}
   }, []);
 
   const loadMaaserSummary = useCallback(async () => {
     setMaaserLoading(true);
     setMaaserLedgerLoading(true);
+    setMaaserIncomeTxsLoading(true);
+    setMaaserTzedakahTxsLoading(true);
     try {
-      const [s, sum, lg] = await Promise.all([
+      const [s, sum, lg, incRes, tzdRes] = await Promise.all([
         api.get("/jewish/maaser/settings"),
         api.get("/jewish/maaser/summary"),
         api.get("/jewish/maaser/ledger?include_tx=true&limit=500"),
+        api.get("/transactions", { params: { tx_type: "income", limit: 200 } }),
+        api.get("/transactions", { params: { category: "tzedakah", limit: 200 } }),
       ]);
       setMaaserCfg(s.data || { enabled: false, percent: 10 });
       setMaaserSum(sum.data || null);
       setMaaserLedger(lg.data?.entries || []);
+      setMaaserIncomeTxs((incRes.data?.transactions || []).filter(t => !t.is_transfer && !t.exclude_from_maaser));
+      setMaaserTzedakahTxs(tzdRes.data?.transactions || []);
     } catch {}
-    finally { setMaaserLoading(false); setMaaserLedgerLoading(false); }
+    finally {
+      setMaaserLoading(false);
+      setMaaserLedgerLoading(false);
+      setMaaserIncomeTxsLoading(false);
+      setMaaserTzedakahTxsLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -1549,6 +1568,82 @@ const Transactions = React.memo(function Transactions() {
                     </div>
                   </div>
                 </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Income Generating Maaser */}
+        <div className="rounded-xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden mt-4">
+          <div className="px-4 py-3 flex items-center justify-between border-b border-border/60">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <RefreshCw className="h-3.5 w-3.5 text-emerald" />
+              Income Generating Maaser
+            </h4>
+            {!maaserIncomeTxsLoading && maaserIncomeTxs.length > 0 && (
+              <span className="text-xs text-muted-foreground">{maaserIncomeTxs.length} transactions</span>
+            )}
+          </div>
+          {maaserIncomeTxsLoading ? (
+            <SkeletonTable rows={4} className="p-3" />
+          ) : maaserIncomeTxs.length === 0 ? (
+            <EmptyState icon={RefreshCw} title="No income transactions"
+              description="Income transactions that aren't excluded from Maaser will appear here." />
+          ) : (
+            <div className="divide-y divide-border/60">
+              {maaserIncomeTxs.map(t => (
+                <button
+                  key={t.transaction_id}
+                  onClick={() => openEdit(t)}
+                  className="w-full text-left px-4 py-3 flex items-center gap-3 text-sm hover:bg-secondary/20 transition-colors"
+                >
+                  <span className="text-xs text-muted-foreground whitespace-nowrap w-20">
+                    {t.date ? new Date(t.date).toLocaleDateString("en-GB") : "-"}
+                  </span>
+                  <span className="flex-1 truncate min-w-0">{t.description || t.merchant || "—"}</span>
+                  {t.category && (
+                    <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-secondary capitalize">{t.category}</span>
+                  )}
+                  <span className="text-xs font-medium text-emerald shrink-0">+{fmt(t.amount)}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Maaser Given / Tzedakah */}
+        <div className="rounded-xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden mt-4">
+          <div className="px-4 py-3 flex items-center justify-between border-b border-border/60">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <Star className="h-3.5 w-3.5 text-topaz" />
+              Maaser Given / Tzedakah
+            </h4>
+            {!maaserTzedakahTxsLoading && maaserTzedakahTxs.length > 0 && (
+              <span className="text-xs text-muted-foreground">{maaserTzedakahTxs.length} transactions</span>
+            )}
+          </div>
+          {maaserTzedakahTxsLoading ? (
+            <SkeletonTable rows={4} className="p-3" />
+          ) : maaserTzedakahTxs.length === 0 ? (
+            <EmptyState icon={Star} title="No tzedakah transactions"
+              description="Use the 'Give' button above to record Maaser giving." />
+          ) : (
+            <div className="divide-y divide-border/60">
+              {maaserTzedakahTxs.map(t => (
+                <button
+                  key={t.transaction_id}
+                  onClick={() => openEdit(t)}
+                  className="w-full text-left px-4 py-3 flex items-center gap-3 text-sm hover:bg-secondary/20 transition-colors"
+                >
+                  <span className="text-xs text-muted-foreground whitespace-nowrap w-20">
+                    {t.date ? new Date(t.date).toLocaleDateString("en-GB") : "-"}
+                  </span>
+                  <span className="flex-1 truncate min-w-0">{t.description || t.merchant || "—"}</span>
+                  <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-secondary capitalize truncate max-w-[100px]">
+                    {t.merchant || "Tzedakah"}
+                  </span>
+                  <span className="text-xs font-medium text-rose-600 shrink-0">{fmt(Math.abs(t.amount))}</span>
+                </button>
               ))}
             </div>
           )}

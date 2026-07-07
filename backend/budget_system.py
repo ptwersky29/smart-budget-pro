@@ -1113,14 +1113,14 @@ def build_router() -> APIRouter:
                 acct = acct_obj.scalar_one_or_none()
                 if acct:
                     current_bal = float(acct.balance or 0)
-                    signed_amt = -abs(payload.amount) if payload.amount > 0 else payload.amount
-                    acct.balance = current_bal + signed_amt
+                    acct.balance = current_bal + payload.amount
                     acct.balance_updated_at = datetime.now(timezone.utc)
 
+            tx_type = "income" if payload.amount > 0 else "expense"
             tx = Transaction(
                 transaction_id=f"tx_{uuid.uuid4().hex[:12]}",
                 user_id=user["user_id"],
-                amount=-abs(payload.amount) if payload.amount > 0 else payload.amount,
+                amount=payload.amount,
                 description=payload.description.strip(),
                 category=payload.category.lower().strip(),
                 merchant_name=merchant_name,
@@ -1128,11 +1128,29 @@ def build_router() -> APIRouter:
                 date=datetime.fromisoformat(payload.date) if payload.date else datetime.now(timezone.utc),
                 account_id=acct_id or "",
                 source="manual",
-                tx_type="expense",
+                tx_type=tx_type,
             )
             session.add(tx)
             await session.commit()
             await session.refresh(tx)
+
+            # Accrue Maaser on income
+            import maaser as maaser_mod
+            tx_doc = {
+                "transaction_id": tx.transaction_id,
+                "user_id": user["user_id"],
+                "amount": tx.amount,
+                "category": tx.category,
+                "description": tx.description,
+                "is_income": tx.amount > 0,
+                "is_transfer": False,
+                "tx_type": tx_type,
+                "exclude_from_maaser": False,
+                "transfer_pair_id": None,
+                "approval_status": "approved",
+            }
+            await maaser_mod.maybe_accrue(session, user["user_id"], tx_doc)
+            await session.commit()
 
             # Mark suggestion as approved if provided
             chosen_suggestion = None

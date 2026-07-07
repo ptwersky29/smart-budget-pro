@@ -451,6 +451,9 @@ def build_router() -> APIRouter:
                     "category": parsed.get("category", "uncategorized"),
                     "description": parsed.get("description", ""),
                     "is_income": bool(parsed.get("is_income")),
+                    "is_transfer": False, "tx_type": "income" if parsed.get("is_income") else "expense",
+                    "exclude_from_maaser": False, "transfer_pair_id": None,
+                    "approval_status": "approved",
                 }
                 await maaser_mod.maybe_accrue(session, user.user_id, tx_doc)
 
@@ -550,6 +553,9 @@ def build_router() -> APIRouter:
                     "category": parsed.get("category", "uncategorized"),
                     "description": parsed.get("description", ""),
                     "is_income": bool(parsed.get("is_income")),
+                    "is_transfer": False, "tx_type": "income" if parsed.get("is_income") else "expense",
+                    "exclude_from_maaser": False, "transfer_pair_id": None,
+                    "approval_status": "approved",
                 }
                 await maaser_mod.maybe_accrue(session, user.user_id, tx_doc)
                 reply_text = await _build_transaction_reply(session, user.user_id, parsed)
@@ -557,7 +563,7 @@ def build_router() -> APIRouter:
             await session.commit()
 
             sent_ok = False
-            if reply_text and phone:
+            if reply_text:
                 sent_ok = await _send_twilio_sms(session, phone, reply_text[:600])
                 reply_log = SmsMessage(
                     user_id=user.user_id, to_number=phone, body=reply_text[:600],
@@ -655,6 +661,9 @@ def build_router() -> APIRouter:
                     "category": parsed.get("category", "uncategorized"),
                     "description": parsed.get("description", ""),
                     "is_income": bool(parsed.get("is_income")),
+                    "is_transfer": False, "tx_type": "income" if parsed.get("is_income") else "expense",
+                    "exclude_from_maaser": False, "transfer_pair_id": None,
+                    "approval_status": "approved",
                 }
                 await maaser_mod.maybe_accrue(session, user["user_id"], tx_doc)
 
@@ -739,6 +748,9 @@ def build_router() -> APIRouter:
                 "category": parsed.get("category", "uncategorized"),
                 "description": parsed.get("description", ""),
                 "is_income": bool(parsed.get("is_income")),
+                "is_transfer": False, "tx_type": "income" if parsed.get("is_income") else "expense",
+                "exclude_from_maaser": False, "transfer_pair_id": None,
+                "approval_status": "approved",
             }
             await maaser_mod.maybe_accrue(session, user["user_id"], tx_doc)
             await session.commit()

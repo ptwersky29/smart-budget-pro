@@ -15,7 +15,9 @@ INCOME_CATEGORIES = {"salary", "income"}
 def _is_income_tx(tx: dict) -> bool:
     if tx.get("approval_status") and tx.get("approval_status") != "approved":
         return False
-    if tx.get("exclude_from_maaser") or tx.get("is_transfer"):
+    if tx.get("exclude_from_maaser"):
+        return False
+    if tx.get("is_transfer") or tx.get("tx_type") == "transfer":
         return False
     if tx.get("transfer_pair_id"):
         return False

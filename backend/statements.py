@@ -671,6 +671,9 @@ def build_router() -> APIRouter:
                     "category": t.get("category", "uncategorized"),
                     "description": t["description"],
                     "is_income": float(t["amount"]) > 0,
+                    "is_transfer": t.get("tx_type") == "transfer" or t.get("is_transfer", False),
+                    "tx_type": t.get("tx_type") or ("transfer" if t.get("is_transfer") else "expense"),
+                    "exclude_from_maaser": False, "transfer_pair_id": None,
                     "approval_status": "unapproved",
                 })
             rec.status = "final"
