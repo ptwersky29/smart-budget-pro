@@ -26,14 +26,6 @@ import {
   SheetTitle,
   SheetDescription,
 } from "../components/ui/sheet";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "../components/ui/dialog";
 import ComparePeriods from "../components/ComparePeriods";
 import MonthPicker, { YIDDISH } from "../components/MonthPicker";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
@@ -71,6 +63,41 @@ function groupCatsBySection(cats) {
     groups[section].push(c);
   }
   return groups;
+}
+
+function TransactionActionPanel({ open, title, description, onClose, children, footer, className = "max-w-md" }) {
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+    >
+      <div
+        className={`rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full ${className}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div className="min-w-0">
+            <h3 className="text-xl tracking-tight font-medium">{title}</h3>
+            {description && <p className="text-sm text-muted-foreground mt-1">{description}</p>}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        {children}
+        {footer && <div className="flex flex-col-reverse sm:flex-row gap-3 justify-end pt-4">{footer}</div>}
+      </div>
+    </div>
+  );
 }
 
 const Transactions = React.memo(function Transactions() {
@@ -1583,21 +1610,28 @@ const Transactions = React.memo(function Transactions() {
         onCategoryCreated={loadCats}
         accounts={accounts} accountsLoading={accountsLoading} />
 
-      <Dialog open={reviewOpen} onOpenChange={(next) => {
-        setReviewOpen(next);
-        if (!next) {
+      <TransactionActionPanel
+        open={reviewOpen}
+        title="Review category"
+        description={reviewTx?.description || "Choose the best category before approving this transaction."}
+        className="max-w-xl"
+        onClose={() => {
+          setReviewOpen(false);
           setReviewTx(null);
           setReviewSuggestions([]);
           setReviewLoading(false);
+        }}
+        footer={
+          <>
+            <Button variant="outlinePill" size="pill" onClick={() => setReviewOpen(false)}>Close</Button>
+            {reviewTx && (
+              <Button variant="primary" size="pill" onClick={() => approveTx(reviewTx)}>
+                Approve current
+              </Button>
+            )}
+          </>
         }
-      }}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Review category</DialogTitle>
-            <DialogDescription>
-              {reviewTx?.description || "Choose the best category before approving this transaction."}
-            </DialogDescription>
-          </DialogHeader>
+      >
           <div className="space-y-4">
             {reviewTx && (
               <div className="rounded-xl border border-border bg-secondary/30 p-4">
@@ -1646,32 +1680,28 @@ const Transactions = React.memo(function Transactions() {
               </div>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outlinePill" size="pill" onClick={() => setReviewOpen(false)}>Close</Button>
-            {reviewTx && (
-              <Button variant="primary" size="pill" onClick={() => approveTx(reviewTx)}>
-                Approve current
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      </TransactionActionPanel>
 
-      <Dialog open={splitOpen} onOpenChange={(next) => {
-        setSplitOpen(next);
-        if (!next) {
+      <TransactionActionPanel
+        open={splitOpen}
+        title="Split transaction"
+        description={splitTxDraft?.description || "Assign this transaction across multiple categories."}
+        className="max-w-3xl"
+        onClose={() => {
+          setSplitOpen(false);
           setSplitTxDraft(null);
           setSplitLines([]);
           setSplitSaving(false);
+        }}
+        footer={
+          <>
+            <Button variant="outlinePill" size="pill" onClick={() => setSplitOpen(false)}>Cancel</Button>
+            <Button variant="primary" size="pill" onClick={saveSplit} disabled={splitSaving || Math.abs(splitDifference) > 0.01}>
+              {splitSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Save split
+            </Button>
+          </>
         }
-      }}>
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Split transaction</DialogTitle>
-            <DialogDescription>
-              {splitTxDraft?.description || "Assign this transaction across multiple categories."}
-            </DialogDescription>
-          </DialogHeader>
+      >
           <div className="space-y-4">
             <div className="grid gap-3 max-h-[50vh] overflow-y-auto pr-1">
               {splitLines.map((line, index) => (
@@ -1719,30 +1749,28 @@ const Transactions = React.memo(function Transactions() {
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outlinePill" size="pill" onClick={() => setSplitOpen(false)}>Cancel</Button>
-            <Button variant="primary" size="pill" onClick={saveSplit} disabled={splitSaving || Math.abs(splitDifference) > 0.01}>
-              {splitSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Save split
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      </TransactionActionPanel>
 
-      <Dialog open={transferOpen} onOpenChange={(next) => {
-        setTransferOpen(next);
-        if (!next) {
+      <TransactionActionPanel
+        open={transferOpen}
+        title="Pair transfer"
+        description="Match this transaction with the opposite side of the transfer."
+        className="max-w-xl"
+        onClose={() => {
+          setTransferOpen(false);
           setTransferTx(null);
           setTransferTargetId("");
           setTransferSaving(false);
+        }}
+        footer={
+          <>
+            <Button variant="outlinePill" size="pill" onClick={() => setTransferOpen(false)}>Cancel</Button>
+            <Button variant="primary" size="pill" onClick={saveTransferPair} disabled={transferSaving || !transferTargetId}>
+              {transferSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Pair transfer
+            </Button>
+          </>
         }
-      }}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Pair transfer</DialogTitle>
-            <DialogDescription>
-              Match this transaction with the opposite side of the transfer.
-            </DialogDescription>
-          </DialogHeader>
+      >
           <div className="space-y-4">
             {transferTx && (
               <div className="rounded-xl border border-border bg-secondary/30 p-4">
@@ -1779,14 +1807,7 @@ const Transactions = React.memo(function Transactions() {
               </div>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outlinePill" size="pill" onClick={() => setTransferOpen(false)}>Cancel</Button>
-            <Button variant="primary" size="pill" onClick={saveTransferPair} disabled={transferSaving || !transferTargetId}>
-              {transferSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Pair transfer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      </TransactionActionPanel>
 
       <ComparePeriods open={compareOpen} onClose={() => setCompareOpen(false)} />
 
