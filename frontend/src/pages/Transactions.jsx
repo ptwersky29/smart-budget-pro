@@ -466,20 +466,6 @@ const Transactions = React.memo(function Transactions() {
   }, []);
   useEffect(() => { loadAccounts(); }, [loadAccounts]);
 
-  useEffect(() => {
-    if (pendingSplitTransaction) {
-      splitTx(pendingSplitTransaction);
-      setPendingSplitTransaction(null);
-    }
-  }, [pendingSplitTransaction, splitTx]);
-
-  useEffect(() => {
-    if (pendingTransferTransaction) {
-      pairTransfer(pendingTransferTransaction);
-      setPendingTransferTransaction(null);
-    }
-  }, [pendingTransferTransaction, pairTransfer]);
-
   const applyHebrewMonth = useCallback((m) => {
     if (!m) return;
     setSelectedHebrewMonth(m);
@@ -956,6 +942,21 @@ const Transactions = React.memo(function Transactions() {
     setTransferTargetId(selectedOtherId || "");
     setTransferOpen(true);
   }, [selectedIds, allDisplayed]);
+
+  // These effects must live after splitTx and pairTransfer are declared
+  useEffect(() => {
+    if (pendingSplitTransaction) {
+      splitTx(pendingSplitTransaction);
+      setPendingSplitTransaction(null);
+    }
+  }, [pendingSplitTransaction, splitTx]);
+
+  useEffect(() => {
+    if (pendingTransferTransaction) {
+      pairTransfer(pendingTransferTransaction);
+      setPendingTransferTransaction(null);
+    }
+  }, [pendingTransferTransaction, pairTransfer]);
 
   const saveTransferPair = useCallback(async () => {
     if (!transferTx || !transferTargetId) {

@@ -1228,6 +1228,19 @@ def build_router() -> APIRouter:
                 count_stmt = count_stmt.where(abs(Transaction.amount) >= amount_min)
             if amount_max is not None:
                 count_stmt = count_stmt.where(abs(Transaction.amount) <= amount_max)
+            if merchant:
+                count_stmt = count_stmt.where(Transaction.merchant_name.ilike(f"%{merchant}%"))
+            if search:
+                term = f"%{search}%"
+                count_stmt = count_stmt.where(
+                    or_(
+                        Transaction.description.ilike(term),
+                        Transaction.merchant_name.ilike(term),
+                        Transaction.normalized_merchant.ilike(term),
+                        Transaction.notes.ilike(term),
+                        Transaction.category.ilike(term),
+                    )
+                )
             count_result = await session.execute(count_stmt)
             total = count_result.scalar() or 0
 
@@ -1275,6 +1288,8 @@ def build_router() -> APIRouter:
                 agg_stmt = agg_stmt.where(abs(Transaction.amount) >= amount_min)
             if amount_max is not None:
                 agg_stmt = agg_stmt.where(abs(Transaction.amount) <= amount_max)
+            if merchant:
+                agg_stmt = agg_stmt.where(Transaction.merchant_name.ilike(f"%{merchant}%"))
             if search:
                 term = f"%{search}%"
                 agg_stmt = agg_stmt.where(
