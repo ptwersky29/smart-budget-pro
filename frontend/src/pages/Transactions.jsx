@@ -28,8 +28,8 @@ import {
 } from "../components/ui/sheet";
 import ComparePeriods from "../components/ComparePeriods";
 import MonthPicker, { YIDDISH } from "../components/MonthPicker";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import TransactionRow from "../components/TransactionRow";
+const CategoryPieChart = React.lazy(() => import("../components/CategoryPieChart"));
 import TransactionForm from "../components/TransactionForm";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -1290,35 +1290,9 @@ const Transactions = React.memo(function Transactions() {
             </div>
           </button>
           {showPie && (
-            <div className="flex flex-col sm:flex-row items-center gap-6 mt-4">
-              <div className="relative shrink-0" style={{ width: 200, height: 200 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={categorySpend} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={82} paddingAngle={2} strokeWidth={0}>
-                      {categorySpend.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", fontSize: "13px" }}
-                      labelStyle={{ fontWeight: 600 }}
-                      formatter={(value) => [`£${Number(value).toLocaleString()}`, "Spent"]}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <p className="text-xl font-bold tabular-nums tracking-tight">£{categorySpend.reduce((s, c) => s + (c.value || 0), 0).toLocaleString()}</p>
-                  <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Total spent</p>
-                </div>
-              </div>
-              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 w-full">
-                {categorySpend.map((cat, i) => (
-                  <div key={cat.name} className="flex items-center gap-2 text-xs py-1 px-2 rounded-lg hover:bg-secondary/50 transition-colors">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                    <span className="flex-1 truncate capitalize text-muted-foreground">{cat.name}</span>
-                    <span className="font-semibold tabular-nums text-foreground">£{Number(cat.value).toLocaleString()}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <React.Suspense fallback={<div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">Loading chart…</div>}>
+              <CategoryPieChart data={categorySpend} />
+            </React.Suspense>
           )}
         </div>
       )}
