@@ -10,6 +10,9 @@ import {
   ChevronUp,
   Check,
   Brain,
+  Receipt,
+  Split,
+  ArrowLeftRight,
 } from "lucide-react";
 import CategoryCombobox from "./CategoryCombobox";
 import CategoryBadge from "./CategoryBadge";
@@ -20,6 +23,7 @@ const emptyForm = {
   amount: "",
   category: "",
   account_id: "",
+  entry_mode: "standard",
   is_income: false,
   is_transfer: false,
   exclude_from_maaser: false,
@@ -55,6 +59,23 @@ export default function TransactionForm({
   const canClassify =
     form.description.trim() && form.amount && !editingId && !classifying;
   const hasManualFields = form.budget_type || form.occasion || form.merchant;
+  const entryMode =
+    form.entry_mode || (form.is_transfer ? "transfer" : "standard");
+  const setEntryMode = (mode) => {
+    setForm({
+      ...form,
+      entry_mode: mode,
+      is_transfer: mode === "transfer",
+      is_income: mode === "transfer" ? false : form.is_income,
+      exclude_from_maaser:
+        mode === "transfer" ? true : form.exclude_from_maaser,
+    });
+  };
+  const transactionModes = [
+    { value: "standard", label: "Standard", helper: "Normal", Icon: Receipt },
+    { value: "split", label: "Split", helper: "Multiple", Icon: Split },
+    { value: "transfer", label: "Transfer", helper: "Between", Icon: ArrowLeftRight },
+  ];
 
   const suggestions = classification?.suggestions || [];
   const topSuggestion = suggestions[0];
@@ -133,14 +154,14 @@ export default function TransactionForm({
               <div className="grid grid-cols-2 rounded-xl border border-border bg-secondary/20 p-1 h-11">
                 <button
                   type="button"
-                  onClick={() => setForm({ ...form, is_income: false, is_transfer: false })}
+                  onClick={() => setForm({ ...form, is_income: false, is_transfer: false, entry_mode: entryMode === "transfer" ? "standard" : entryMode })}
                   className={`rounded-lg text-sm font-medium transition-colors ${!form.is_income && !form.is_transfer ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
                 >
                   Expense
                 </button>
                 <button
                   type="button"
-                  onClick={() => setForm({ ...form, is_income: true, is_transfer: false })}
+                  onClick={() => setForm({ ...form, is_income: true, is_transfer: false, entry_mode: entryMode === "transfer" ? "standard" : entryMode })}
                   className={`rounded-lg text-sm font-medium transition-colors ${form.is_income && !form.is_transfer ? "bg-card shadow-sm text-emerald" : "text-muted-foreground hover:text-foreground"}`}
                 >
                   Income
@@ -230,35 +251,52 @@ export default function TransactionForm({
             </div>
           )}
 
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input
-              type="checkbox"
-              checked={form.is_transfer}
-              onChange={(e) =>
-                setForm({ ...form, is_transfer: e.target.checked, is_income: false })
-              }
-              className="accent-sky h-4 w-4"
-            />{" "}
-            <span>Transfer to another account</span>
-          </label>
-          <span className="text-xs text-muted-foreground ml-6 -mt-2 block">
-            Won't count as income or affect Maaser plan
-          </span>
+          <div>
+            <label className="label-overline text-muted-foreground mb-1.5 block">
+              Transaction mode
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {transactionModes.map(({ value, label, helper, Icon }) => {
+                const active = entryMode === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setEntryMode(value)}
+                    aria-pressed={active}
+                    className={`min-h-[68px] rounded-xl border px-2.5 py-2 text-left transition-colors ${
+                      active
+                        ? "border-emerald/50 bg-emerald/10 text-foreground shadow-sm"
+                        : "border-border bg-secondary/20 text-muted-foreground hover:border-emerald/30 hover:text-foreground"
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5 text-sm font-medium leading-tight">
+                      <Icon className={`h-4 w-4 ${active ? "text-emerald" : ""}`} />
+                      {label}
+                    </span>
+                    <span className="mt-1 block text-[11px] leading-tight">
+                      {helper}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input
               type="checkbox"
-              checked={form.exclude_from_maaser}
+              checked={form.exclude_from_maaser || entryMode === "transfer"}
               onChange={(e) =>
                 setForm({ ...form, exclude_from_maaser: e.target.checked })
               }
-              disabled={form.is_transfer}
+              disabled={entryMode === "transfer"}
               className="accent-topaz h-4 w-4"
             />{" "}
             <span>Exclude from Maaser calculation</span>
           </label>
           <span className="text-xs text-muted-foreground ml-6 -mt-2 block">
-            {form.is_transfer ? "Transfers are already excluded" : "This income won't be tithed"}
+            {entryMode === "transfer" ? "Transfers are already excluded" : "This income won't be tithed"}
           </span>
 
           <div>

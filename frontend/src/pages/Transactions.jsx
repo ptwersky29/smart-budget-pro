@@ -40,7 +40,7 @@ import CategoryCombobox from "../components/CategoryCombobox";
 import CategoryBadge from "../components/CategoryBadge";
 
 const SOURCE_LABELS = { manual: "Manual", csv: "CSV", pdf: "PDF", statement: "Statement", sms: "SMS" };
-const emptyForm = { description: "", date: today(), amount: "", category: "", is_income: false, is_transfer: false, budget_type: "", occasion: "", merchant: "", notes: "", account_id: "", exclude_from_maaser: false };
+const emptyForm = { description: "", date: today(), amount: "", category: "", entry_mode: "standard", is_income: false, is_transfer: false, budget_type: "", occasion: "", merchant: "", notes: "", account_id: "", exclude_from_maaser: false };
 
 function today() {
   const d = new Date();
@@ -156,10 +156,12 @@ const Transactions = React.memo(function Transactions() {
   const [splitTxDraft, setSplitTxDraft] = useState(null);
   const [splitLines, setSplitLines] = useState([]);
   const [splitSaving, setSplitSaving] = useState(false);
+  const [pendingSplitTransaction, setPendingSplitTransaction] = useState(null);
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferTx, setTransferTx] = useState(null);
   const [transferTargetId, setTransferTargetId] = useState("");
   const [transferSaving, setTransferSaving] = useState(false);
+  const [pendingTransferTransaction, setPendingTransferTransaction] = useState(null);
 
   // ── Maaser ledger state ──
   const [maaserCfg, setMaaserCfg] = useState({ enabled: false, percent: 10 });
@@ -445,6 +447,20 @@ const Transactions = React.memo(function Transactions() {
   }, []);
   useEffect(() => { loadAccounts(); }, [loadAccounts]);
 
+  useEffect(() => {
+    if (pendingSplitTransaction) {
+      splitTx(pendingSplitTransaction);
+      setPendingSplitTransaction(null);
+    }
+  }, [pendingSplitTransaction, splitTx]);
+
+  useEffect(() => {
+    if (pendingTransferTransaction) {
+      pairTransfer(pendingTransferTransaction);
+      setPendingTransferTransaction(null);
+    }
+  }, [pendingTransferTransaction, pairTransfer]);
+
   const applyHebrewMonth = useCallback((m) => {
     if (!m) return;
     setSelectedHebrewMonth(m);
@@ -534,7 +550,7 @@ const Transactions = React.memo(function Transactions() {
   }, [defaultAccountId, filters.account_id]);
   const openEdit = useCallback((t) => {
     setEditingId(t.transaction_id);
-    setForm({ description: t.description || "", date: t.date?.slice(0, 10) || today(), amount: String(Math.abs(t.amount)), category: t.category || "", account_id: t.account_id || "", is_income: t.amount > 0, is_transfer: t.is_transfer || false, exclude_from_maaser: t.exclude_from_maaser || false, budget_type: "", occasion: "", merchant: t.merchant || "", notes: t.notes || "" });
+    setForm({ description: t.description || "", date: t.date?.slice(0, 10) || today(), amount: String(Math.abs(t.amount)), category: t.category || "", account_id: t.account_id || "", entry_mode: t.is_transfer ? "transfer" : t.is_split ? "split" : "standard", is_income: t.amount > 0, is_transfer: t.is_transfer || false, exclude_from_maaser: t.exclude_from_maaser || false, budget_type: "", occasion: "", merchant: t.merchant || "", notes: t.notes || "" });
     setOpen(true);
   }, []);
   const closeForm = useCallback(() => { setOpen(false); setEditingId(null); setForm({ ...emptyForm, date: today() }); setClassification(null); setSaveAsRecurring(false); }, []);
@@ -560,6 +576,8 @@ const Transactions = React.memo(function Transactions() {
     e.preventDefault();
     const amt = parseFloat(form.amount);
     const signed = form.is_income ? Math.abs(amt) : -Math.abs(amt);
+    const shouldOpenSplit = form.entry_mode === "split" && !editingId;
+    const shouldOpenTransferPair = form.entry_mode === "transfer" && !editingId;
     if (editingId) {
       const payload = { description: form.description, amount: signed, category: form.category || undefined, date: form.date || today(), merchant: form.merchant || undefined, notes: form.notes || undefined, is_income: form.is_income, is_transfer: form.is_transfer || undefined, exclude_from_maaser: form.exclude_from_maaser || undefined, account_id: form.account_id || undefined };
       const old = txsRef.current.find(t => t.transaction_id === editingId);
@@ -575,7 +593,7 @@ const Transactions = React.memo(function Transactions() {
         successMsg: "Transaction updated",
         errorMsg: "Could not update",
       });
-    } else if (classification || form.budget_type) {
+    } else if ((classification || form.budget_type) && !shouldOpenSplit && !shouldOpenTransferPair) {
       if (!form.account_id) { toast.error("Select an account first"); return; }
       const suggestions = classification?.suggestions || [];
       const chosenIdx = suggestions.findIndex(s => s.category === form.category);
@@ -615,6 +633,8 @@ const Transactions = React.memo(function Transactions() {
         action: async () => {
           const { data } = await api.post("/transactions", payload);
           setTxs(prev => prev.map(t => t.transaction_id === optimisticTx.transaction_id ? data : t));
+          if (shouldOpenSplit) setPendingSplitTransaction(data);
+          if (shouldOpenTransferPair) setPendingTransferTransaction(data);
         },
         undo: async () => {
           await load();
