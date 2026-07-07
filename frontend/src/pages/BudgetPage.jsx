@@ -248,6 +248,7 @@ const EventGroupCard = React.memo(({ group, setConfirmDelete, fetchData }) => {
 });
 
 export default React.memo(function BudgetPage() {
+  useEffect(() => { document.title = "Budgets | Penni"; }, []);
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     let id = setInterval(() => {
@@ -682,8 +683,8 @@ export default React.memo(function BudgetPage() {
     <div className="space-y-5">
 
       {/* Dashboard overview */}
-      <div className="sticky top-0 z-20 -mx-4 px-4 sm:-mx-8 sm:px-8 bg-background/70 backdrop-blur-xl border-b border-border/40 pb-4 pt-2 shadow-sm transition-all duration-300">
-        <PageHeader eyebrow="Budgets" title="Budgets" titleClassName="text-2xl" hideDivider>
+      <div className="sticky top-16 z-20 -mx-4 px-4 sm:-mx-8 sm:px-8 bg-background/70 backdrop-blur-xl border-b border-border/40 pb-4 pt-2 shadow-sm transition-all duration-300">
+        <PageHeader eyebrow="Budgets" title="Budgets" titleClassName="text-2xl" hideDivider sticky={false}>
           <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 mt-2 pt-2">
           {/* Large progress ring with subtle shadow */}
           <div className="relative shrink-0 drop-shadow-[0_0_8px_rgba(48,164,108,0.4)]">

@@ -3,13 +3,13 @@ import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { Button } from "./button";
 
-export const PageHeader = React.memo(function PageHeader({ eyebrow, title, description, actions, meta, children, className = "", hideDivider, ...props }) {
+export const PageHeader = React.memo(function PageHeader({ eyebrow, title, description, actions, meta, children, className = "", hideDivider, sticky = true, titleClassName = "", ...props }) {
   return (
-    <div {...props} className={`relative rounded-lg border border-border bg-card/95 backdrop-blur-xl p-5 sm:p-6 lg:p-7 shadow-card ${className}`}>
+    <div {...props} className={`${sticky ? "sticky top-20 z-20" : "relative"} rounded-lg border border-border bg-card/95 backdrop-blur-xl p-5 sm:p-6 lg:p-7 shadow-card ring-1 ring-white/40 dark:ring-white/5 ${className}`}>
       <div className="relative flex flex-col gap-4 lg:gap-6 lg:flex-row lg:items-end lg:justify-between z-10">
         <div className="max-w-3xl space-y-2 lg:space-y-3">
           {eyebrow && <p className="label-overline text-emerald">{eyebrow}</p>}
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-semibold leading-[1.08]">{title}</h1>
+          <h1 className={`text-2xl sm:text-3xl lg:text-4xl font-semibold leading-[1.08] ${titleClassName}`}>{title}</h1>
           {description && <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">{description}</p>}
           {meta && <div className="flex flex-wrap gap-2 pt-1">{meta}</div>}
         </div>
@@ -22,7 +22,7 @@ export const PageHeader = React.memo(function PageHeader({ eyebrow, title, descr
 
 export const SectionCard = React.memo(function SectionCard({ eyebrow, title, description, actions, children, className = "", contentClassName = "", ...props }) {
   return (
-    <section {...props} className={`rounded-lg border border-border bg-card/95 backdrop-blur-xl shadow-card ${className}`}>
+    <section {...props} className={`rounded-lg border border-border bg-card/95 backdrop-blur-xl shadow-card ring-1 ring-white/40 dark:ring-white/5 ${className}`}>
       {(eyebrow || title || description || actions) && (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between p-4 sm:p-6 border-b border-border/70">
           <div className="max-w-2xl space-y-1">
@@ -41,7 +41,7 @@ export const SectionCard = React.memo(function SectionCard({ eyebrow, title, des
 export const MetricCard = React.memo(function MetricCard({ label, value, icon: Icon, tone = "emerald", detail, testid, className = "", ...props }) {
   const toneClasses = tone === "ruby" ? "text-ruby bg-ruby/10" : tone === "topaz" ? "text-topaz bg-topaz/10" : "text-emerald bg-emerald/10";
   return (
-    <div {...props} data-testid={testid} className={`rounded-lg border border-border bg-card/95 backdrop-blur-xl p-4 sm:p-5 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${className}`}>
+    <div {...props} data-testid={testid} className={`rounded-lg border border-border bg-card/95 backdrop-blur-xl p-4 sm:p-5 shadow-card ring-1 ring-white/40 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg dark:ring-white/5 ${className}`}>
       <div className="flex items-center justify-between gap-2">
         <p className="label-overline">{label}</p>
         {Icon && <span className={`grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-lg ${toneClasses}`}><Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></span>}

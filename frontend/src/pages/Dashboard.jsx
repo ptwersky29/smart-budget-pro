@@ -164,15 +164,15 @@ const Dashboard = React.memo(function Dashboard() {
   if (loading)
     return (
       <div className="space-y-8" data-testid="dashboard-loading">
-        <Skeleton className="h-12 w-full rounded-2xl" />
-        <Skeleton className="h-44 w-full rounded-[1.75rem]" />
+        <Skeleton className="h-12 w-full rounded-lg" />
+        <Skeleton className="h-44 w-full rounded-lg" />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 space-y-4">
-            <Skeleton className="h-64 rounded-2xl" />
-            <Skeleton className="h-48 rounded-2xl" />
+            <Skeleton className="h-64 rounded-lg" />
+            <Skeleton className="h-48 rounded-lg" />
           </div>
           <div className="space-y-4">
-            <Skeleton className="h-full min-h-[500px] rounded-2xl" />
+            <Skeleton className="h-full min-h-[500px] rounded-lg" />
           </div>
         </div>
       </div>
@@ -315,7 +315,7 @@ const Dashboard = React.memo(function Dashboard() {
                     icon={AlertTriangle}
                     label="Alerts & Upcoming"
                   />
-                  <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden">
+                  <div className="rounded-lg border border-border bg-card/95 backdrop-blur-xl shadow-card overflow-hidden ring-1 ring-white/40 dark:ring-white/5">
                     {topAlerts.length > 0 && (
                       <div className="divide-y divide-border/60">
                         {topAlerts.map((a, i) => (

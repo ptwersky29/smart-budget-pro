@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useSettings } from "../contexts/SettingsContext";
@@ -19,8 +19,10 @@ import {
   DropdownMenuItem,
 } from "../components/ui/dropdown-menu";
 
-import { LogOut, Menu, X, MoonStar, Sun, Search } from "lucide-react";
+import { Compass, LogOut, Menu, X, MoonStar, Sun, Search } from "lucide-react";
 import pkg from "../../package.json";
+
+const ProductTour = lazy(() => import("../components/ProductTour"));
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
@@ -33,6 +35,7 @@ export default function AppLayout() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [routeLoading, setRouteLoading] = useState(false);
+  const [tourLoaded, setTourLoaded] = useState(false);
   const prevPath = useRef(location.pathname);
   const leaderBuffer = useRef([]);
   const dark = resolvedTheme === "dark";
@@ -103,6 +106,21 @@ export default function AppLayout() {
     setTheme(resolvedTheme === "dark" ? "light" : "dark");
   };
 
+  const startTour = () => {
+    localStorage.setItem("penni.productTour.v1", JSON.stringify({ started: true, index: 0, completed: false }));
+    setTourLoaded(true);
+    window.setTimeout(() => window.dispatchEvent(new CustomEvent("product-tour:start")), 80);
+  };
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("penni.productTour.v1") || "{}");
+      if (saved.started && !saved.completed) setTourLoaded(true);
+    } catch {
+      // Ignore damaged local state; the user can restart the tour from the header.
+    }
+  }, []);
+
   const doLogout = async () => {
     await logout();
     navigate("/", { replace: true });
@@ -110,7 +128,7 @@ export default function AppLayout() {
 
   return (
     <div className="app-shell min-h-screen flex text-foreground relative">
-      <aside className={`${open ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:sticky top-0 left-0 z-40 h-screen w-[18rem] border-r border-border bg-card/95 backdrop-blur-xl transition-transform duration-300`}>
+      <aside data-tour="sidebar" className={`${open ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:sticky top-0 left-0 z-40 h-screen w-[18rem] border-r border-border bg-card/95 backdrop-blur-xl transition-transform duration-300 shadow-[8px_0_30px_rgba(15,23,42,0.03)]`}>
         <div className="flex items-center justify-between px-6 h-16 border-b border-border/70">
           <Link to="/dashboard" className="flex items-center gap-3 min-w-0" data-testid="sidebar-logo">
             <Logo size="md" />
@@ -184,7 +202,7 @@ export default function AppLayout() {
       {open && <div className="fixed inset-0 z-30 bg-black/40 lg:hidden backdrop-blur-[2px]" onClick={() => setOpen(false)} />}
 
       <div className="relative flex-1 min-w-0">
-        <header className="sticky top-0 z-20 border-b border-border/70 bg-background/95 backdrop-blur-xl">
+        <header data-tour="route-header" className="sticky top-0 z-20 border-b border-border/70 bg-background/95 backdrop-blur-xl">
           {/* Route loading progress bar */}
           {routeLoading && (
             <div className="absolute top-0 left-0 right-0 h-0.5 z-50 overflow-hidden">
@@ -214,8 +232,11 @@ export default function AppLayout() {
                   <Link to={routeMeta.primary.to}>{routeMeta.primary.label}</Link>
                 </Button>
               )}
+              <button onClick={startTour} data-tour="tour-launch" className="h-10 w-10 grid place-items-center rounded-lg border border-border bg-card/90 hover:bg-secondary transition-colors" aria-label="Start app walk-through" title="Start app walk-through">
+                <Compass className="h-4 w-4" />
+              </button>
               <NotificationCenter />
-              <button onClick={() => setCommandOpen(true)} data-testid="command-open" className="h-10 w-10 grid place-items-center rounded-lg border border-border bg-card/90 hover:bg-secondary transition-colors" aria-label="Open command palette" title="Open command palette">
+              <button onClick={() => setCommandOpen(true)} data-tour="command-search" data-testid="command-open" className="h-10 w-10 grid place-items-center rounded-lg border border-border bg-card/90 hover:bg-secondary transition-colors" aria-label="Open command palette" title="Open command palette">
                 <Search className="h-4 w-4" />
               </button>
               <button onClick={toggleTheme} data-testid="theme-toggle" className="h-10 w-10 grid place-items-center rounded-lg border border-border bg-card/90 hover:bg-secondary transition-colors" aria-label="Toggle theme" title="Toggle theme">
@@ -224,7 +245,10 @@ export default function AppLayout() {
             </div>
 
             <div className="flex items-center gap-2 lg:hidden">
-              <button onClick={() => setCommandOpen(true)} data-testid="command-open-mobile" className="h-10 w-10 grid place-items-center rounded-lg border border-border bg-card/90 hover:bg-secondary transition-colors" aria-label="Open command palette">
+              <button onClick={startTour} data-tour="tour-launch" className="h-10 w-10 grid place-items-center rounded-lg border border-border bg-card/90 hover:bg-secondary transition-colors" aria-label="Start app walk-through">
+                <Compass className="h-4 w-4" />
+              </button>
+              <button onClick={() => setCommandOpen(true)} data-tour="command-search" data-testid="command-open-mobile" className="h-10 w-10 grid place-items-center rounded-lg border border-border bg-card/90 hover:bg-secondary transition-colors" aria-label="Open command palette">
                 <Search className="h-4 w-4" />
               </button>
               <button onClick={toggleTheme} data-testid="theme-toggle-mobile" className="h-10 w-10 grid place-items-center rounded-lg border border-border bg-card/90 hover:bg-secondary transition-colors" aria-label="Toggle theme">
@@ -239,7 +263,7 @@ export default function AppLayout() {
           </div>
         </header>
 
-        <main className="p-4 sm:p-5 lg:p-8 pb-16 lg:pb-8 max-w-[1560px] mx-auto">
+        <main data-tour="main-content" className="p-4 sm:p-5 lg:p-8 pb-20 lg:pb-8 max-w-[1560px] mx-auto">
           <div className="space-y-8">
             <div key={location.pathname} className={noAnim ? "" : "animate-[slideInRight_0.3s_ease-out]"}>
               <Outlet />
@@ -248,7 +272,7 @@ export default function AppLayout() {
         </main>
       </div>
       {/* ── Bottom Navigation (mobile) ── */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/90 backdrop-blur-xl safe-bottom-fixed tap-highlight-none" role="tablist" aria-label="Main navigation">
+      <nav data-tour="mobile-nav" className="lg:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/90 backdrop-blur-xl safe-bottom-fixed tap-highlight-none" role="tablist" aria-label="Main navigation">
         <div className="flex items-center justify-around h-16 px-2">
           {BOTTOM_NAV.map(({ to, label, icon: Icon, isMore }) => {
             const active = location.pathname.startsWith(to);
@@ -304,6 +328,11 @@ export default function AppLayout() {
       <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
       <KeyboardShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
       <QuickAddWidget />
+      {tourLoaded && (
+        <Suspense fallback={null}>
+          <ProductTour />
+        </Suspense>
+      )}
     </div>
   );
 }

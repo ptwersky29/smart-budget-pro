@@ -1039,8 +1039,8 @@ const Transactions = React.memo(function Transactions() {
     <div className="space-y-4" data-testid="transactions-root">
 
       {/* ─── Sticky Header ─── */}
-      <div className="sticky top-0 z-20 -mx-4 px-4 sm:-mx-8 sm:px-8 bg-background/70 backdrop-blur-xl border-b border-border/40 pb-4 pt-2 shadow-sm transition-all duration-300">
-        <PageHeader eyebrow="Transactions" title="Transactions" hideDivider>
+      <div className="sticky top-16 z-20 -mx-4 px-4 sm:-mx-8 sm:px-8 bg-background/70 backdrop-blur-xl border-b border-border/40 pb-4 pt-2 shadow-sm transition-all duration-300">
+        <PageHeader eyebrow="Transactions" title="Transactions" hideDivider sticky={false}>
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 mt-2 pt-2">
             {/* Wallet badge */}
             <div className="relative shrink-0 h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center drop-shadow-[0_0_8px_rgba(48,164,108,0.2)]">

@@ -40,10 +40,8 @@ export default React.memo(function LiveBalanceHero({ overview, truelayerBalance,
   const accountGroups = useMemo(() => hasAccounts ? groupAccounts(accounts) : [], [accounts]);
 
   return (
-    <div className="relative overflow-hidden rounded-[1.75rem] border border-border/60 bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-xl shadow-card">
-      <div className="absolute -top-20 -right-20 w-64 h-64 bg-emerald/8 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-20 -left-20 w-48 h-48 bg-topaz/5 rounded-full blur-3xl pointer-events-none" />
-
+    <div className="relative overflow-hidden rounded-lg border border-border/60 bg-card/95 backdrop-blur-xl shadow-card ring-1 ring-white/40 dark:ring-white/5">
+      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald via-topaz to-chart-3" />
       <div className="relative p-5 sm:p-6 lg:p-8">
         {/* Top row: Balance + Sync */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
