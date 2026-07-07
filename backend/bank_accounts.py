@@ -58,11 +58,18 @@ def build_router() -> APIRouter:
             for c in conn_result.scalars().all():
                 ba_res = await session.execute(
                     select(BankAccount).where(
-                        BankAccount.connection_id == c.connection_id,
-                        BankAccount.user_id == user["user_id"]
+                        BankAccount.user_id == user["user_id"],
+                        or_(
+                            BankAccount.connection_id == c.connection_id,
+                            BankAccount.account_id == c.account_id,
+                        ),
                     )
                 )
-                if not ba_res.scalars().first():
+                existing_ba = ba_res.scalars().first()
+                if existing_ba:
+                    if not existing_ba.connection_id:
+                        existing_ba.connection_id = c.connection_id
+                else:
                     acct_type = c.account_type.lower() if c.account_type else "current"
                     if acct_type not in ("current", "savings", "cash", "credit"):
                         acct_type = "current"
@@ -206,6 +213,7 @@ def build_router() -> APIRouter:
                 image=body.get("image") or None,
                 color=body.get("color") or None,
                 provider="manual",
+                connection_id=acct_id,
                 is_offline=True,
                 include_in_total=body.get("include_in_total", True),
                 sort_order=body.get("sort_order", 0),

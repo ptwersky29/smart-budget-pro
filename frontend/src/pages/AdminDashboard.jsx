@@ -10,6 +10,7 @@ import { PageHeader, SectionCard, MetricCard } from "../components/ui/layout";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
+import ConfirmModal from "../components/ui/ConfirmModal";
 
 function UserRow({ u, busy, onToggleDisable, onSetRole, onSetTier, onDeleteUser }) {
   const [expanded, setExpanded] = useState(false);
@@ -130,6 +131,7 @@ export default function AdminDashboard() {
   const [loginHistory, setLoginHistory] = useState([]);
   const [busy, setBusy] = useState({});
   const [newFlag, setNewFlag] = useState({ flag: "", description: "" });
+  const [deleteConfirmUserId, setDeleteConfirmUserId] = useState(null);
 
   const limit = 20;
 
@@ -203,8 +205,14 @@ export default function AdminDashboard() {
     } finally { setBusy((p) => ({ ...p, [`tier-${userId}`]: false })); }
   };
 
-  const deleteUser = async (userId) => {
-    if (!window.confirm(`Are you sure you want to permanently delete user ${userId}? This cannot be undone.`)) return;
+  const deleteUser = (userId) => {
+    setDeleteConfirmUserId(userId);
+  };
+
+  const confirmDeleteUser = async () => {
+    const userId = deleteConfirmUserId;
+    if (!userId) return;
+    setDeleteConfirmUserId(null);
     setBusy((p) => ({ ...p, [`delete-${userId}`]: true }));
     try {
       await api.delete(`/admin/users/${userId}`);
@@ -538,6 +546,13 @@ export default function AdminDashboard() {
           </div>
         )}
       </SectionCard>
+      <ConfirmModal
+        open={!!deleteConfirmUserId}
+        title="Delete user"
+        message={`Permanently delete user ${deleteConfirmUserId}? This cannot be undone.`}
+        onConfirm={confirmDeleteUser}
+        onCancel={() => setDeleteConfirmUserId(null)}
+      />
     </div>
   );
 }

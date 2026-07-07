@@ -26,6 +26,14 @@ import {
   SheetTitle,
   SheetDescription,
 } from "../components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
 import ComparePeriods from "../components/ComparePeriods";
 import MonthPicker, { YIDDISH } from "../components/MonthPicker";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
@@ -37,6 +45,7 @@ import { useSwipe } from "../hooks/useSwipe";
 import { useKeyboardShortcut } from "../hooks/useKeyboardShortcut";
 
 import CategoryCombobox from "../components/CategoryCombobox";
+import CategoryBadge from "../components/CategoryBadge";
 
 const SOURCE_LABELS = { manual: "Manual", csv: "CSV", pdf: "PDF", statement: "Statement", sms: "SMS" };
 const emptyForm = { description: "", date: today(), amount: "", category: "", is_income: false, is_transfer: false, budget_type: "", occasion: "", merchant: "", notes: "", account_id: "", exclude_from_maaser: false };
@@ -112,6 +121,18 @@ const Transactions = React.memo(function Transactions() {
   const confirmCb = useRef(null);
   const [newCategoryModal, setNewCategoryModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewTx, setReviewTx] = useState(null);
+  const [reviewSuggestions, setReviewSuggestions] = useState([]);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [splitOpen, setSplitOpen] = useState(false);
+  const [splitTxDraft, setSplitTxDraft] = useState(null);
+  const [splitLines, setSplitLines] = useState([]);
+  const [splitSaving, setSplitSaving] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferTx, setTransferTx] = useState(null);
+  const [transferTargetId, setTransferTargetId] = useState("");
+  const [transferSaving, setTransferSaving] = useState(false);
 
   // ── Maaser ledger state ──
   const [maaserCfg, setMaaserCfg] = useState({ enabled: false, percent: 10 });
@@ -589,6 +610,20 @@ const Transactions = React.memo(function Transactions() {
   const clearClassification = useCallback(() => { setClassification(null); setSaveAsRecurring(false); }, []);
 
   const allDisplayed = aiResults?.transactions || txs;
+  const transferCandidates = useMemo(() => {
+    if (!transferTx) return [];
+    const baseAmount = Number(transferTx.amount || 0);
+    return allDisplayed.filter((row) => {
+      if (row.transaction_id === transferTx.transaction_id || row.transfer_pair_id) return false;
+      return Number(row.amount || 0) * baseAmount < 0;
+    });
+  }, [allDisplayed, transferTx]);
+  const splitOriginalAmount = Math.abs(Number(splitTxDraft?.amount || 0));
+  const splitEnteredTotal = useMemo(
+    () => splitLines.reduce((sum, line) => sum + Math.abs(Number(line.amount || 0)), 0),
+    [splitLines]
+  );
+  const splitDifference = Number((splitOriginalAmount - splitEnteredTotal).toFixed(2));
   const someSelected = selectedIds.size > 0;
   const allDisplayedSelected = useMemo(
     () => allDisplayed.length > 0 && allDisplayed.every(t => selectedIds.has(t.transaction_id)),
@@ -728,13 +763,16 @@ const Transactions = React.memo(function Transactions() {
     });
   }, []);
 
-  const approveTx = useCallback(async (t) => {
+  const approveTx = useCallback(async (t, categoryOverride) => {
+    const category = categoryOverride || t.ai_selected_category || t.category || "uncategorized";
     try {
       const { data } = await api.patch(`/transactions/${t.transaction_id}/approve-category`, {
-        category: t.ai_selected_category || t.category || "uncategorized",
+        category,
         approve_transaction: true,
       });
       setTxs(prev => prev.map(row => row.transaction_id === t.transaction_id ? data : row));
+      setReviewTx(data);
+      setReviewOpen(false);
       toast.success("Transaction approved");
     } catch (e) {
       toast.error(formatApiError(e?.response?.data?.detail) || "Could not approve");
@@ -742,12 +780,22 @@ const Transactions = React.memo(function Transactions() {
   }, []);
 
   const classifySavedTx = useCallback(async (t) => {
+    setReviewTx(t);
+    setReviewSuggestions([]);
+    setReviewOpen(true);
+    setReviewLoading(true);
     try {
       const { data } = await api.post(`/transactions/${t.transaction_id}/classify`);
-      setTxs(prev => prev.map(row => row.transaction_id === t.transaction_id ? data.transaction : row));
+      const nextTx = data.transaction || t;
+      const suggestions = data.suggestions || nextTx.ai_suggested_categories?.suggestions || [];
+      setTxs(prev => prev.map(row => row.transaction_id === t.transaction_id ? nextTx : row));
+      setReviewTx(nextTx);
+      setReviewSuggestions(suggestions.slice(0, 3));
       toast.success("AI suggestions added");
     } catch (e) {
       toast.error(formatApiError(e?.response?.data?.detail) || "AI classification failed");
+    } finally {
+      setReviewLoading(false);
     }
   }, []);
 
@@ -767,38 +815,95 @@ const Transactions = React.memo(function Transactions() {
   }, [selectedIds, allDisplayed, load]);
 
   const splitTx = useCallback(async (t) => {
-    const raw = window.prompt(
-      "Enter split lines as category:amount, separated by commas",
-      `${t.category || "uncategorized"}:${Math.abs(Number(t.amount || 0)).toFixed(2)}`
-    );
-    if (!raw) return;
-    const splits = raw.split(",").map((part) => {
-      const [category, amount] = part.split(":").map(v => v?.trim());
-      return { category, amount: Number(amount), description: t.description };
-    }).filter(s => s.category && Number.isFinite(s.amount) && s.amount > 0);
+    const amount = Math.abs(Number(t.amount || 0));
+    const firstLine = Number((amount / 2).toFixed(2));
+    setSplitTxDraft(t);
+    setSplitOpen(true);
+    setSplitSaving(false);
+    setSplitLines([
+      { category: t.category || "uncategorized", amount: firstLine.toFixed(2), description: t.description || "" },
+      { category: "uncategorized", amount: Number((amount - firstLine).toFixed(2)).toFixed(2), description: "" },
+    ]);
+    if (!t.is_split) return;
+    try {
+      const { data } = await api.get(`/transactions/${t.transaction_id}/splits`);
+      const existing = data.splits || data || [];
+      if (existing.length) {
+        setSplitLines(existing.map((line) => ({
+          category: line.category || "uncategorized",
+          amount: Math.abs(Number(line.amount || 0)).toFixed(2),
+          description: line.description || line.note || "",
+        })));
+      }
+    } catch (e) {
+      toast.error(formatApiError(e?.response?.data?.detail) || "Could not load split lines");
+    }
+  }, []);
+
+  const updateSplitLine = useCallback((index, field, value) => {
+    setSplitLines(prev => prev.map((line, i) => i === index ? { ...line, [field]: value } : line));
+  }, []);
+
+  const addSplitLine = useCallback(() => {
+    setSplitLines(prev => [...prev, { category: "uncategorized", amount: "0.00", description: "" }]);
+  }, []);
+
+  const removeSplitLine = useCallback((index) => {
+    setSplitLines(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const saveSplit = useCallback(async () => {
+    if (!splitTxDraft) return;
+    const splits = splitLines.map((line) => ({
+      category: line.category,
+      amount: Math.abs(Number(line.amount || 0)),
+      description: line.description || splitTxDraft.description || "",
+    })).filter(line => line.category && Number.isFinite(line.amount) && line.amount > 0);
     if (splits.length < 2) {
       toast.error("Add at least two valid split lines");
       return;
     }
+    const nextTotal = splits.reduce((sum, line) => sum + line.amount, 0);
+    if (Math.abs(nextTotal - splitOriginalAmount) > 0.01) {
+      toast.error("Split total must match the transaction amount");
+      return;
+    }
+    setSplitSaving(true);
     try {
-      const { data } = await api.put(`/transactions/${t.transaction_id}/splits`, { splits });
-      setTxs(prev => prev.map(row => row.transaction_id === t.transaction_id ? { ...row, is_split: true, split_count: data.splits.length } : row));
+      const { data } = await api.put(`/transactions/${splitTxDraft.transaction_id}/splits`, { splits });
+      setTxs(prev => prev.map(row => row.transaction_id === splitTxDraft.transaction_id ? { ...row, is_split: true, split_count: data.splits.length } : row));
+      setSplitOpen(false);
       toast.success("Transaction split");
     } catch (e) {
       toast.error(formatApiError(e?.response?.data?.detail) || "Could not split transaction");
+    } finally {
+      setSplitSaving(false);
     }
-  }, []);
+  }, [splitTxDraft, splitLines, splitOriginalAmount]);
 
-  const pairTransfer = useCallback(async (t) => {
-    const otherId = Array.from(selectedIds).find(id => id !== t.transaction_id) || window.prompt("Paste the matching transaction ID");
-    if (!otherId) return;
-    const other = allDisplayed.find(row => row.transaction_id === otherId);
-    const outgoing = Number(t.amount) < 0 ? t.transaction_id : otherId;
-    const incoming = Number(t.amount) > 0 ? t.transaction_id : otherId;
-    if (other && Number(t.amount) * Number(other.amount) >= 0) {
+  const pairTransfer = useCallback((t) => {
+    const selectedOtherId = Array.from(selectedIds).find((id) => {
+      const other = allDisplayed.find(row => row.transaction_id === id);
+      return other && id !== t.transaction_id && !other.transfer_pair_id && Number(t.amount || 0) * Number(other.amount || 0) < 0;
+    });
+    setTransferTx(t);
+    setTransferTargetId(selectedOtherId || "");
+    setTransferOpen(true);
+  }, [selectedIds, allDisplayed]);
+
+  const saveTransferPair = useCallback(async () => {
+    if (!transferTx || !transferTargetId) {
+      toast.error("Choose a matching transfer transaction");
+      return;
+    }
+    const other = allDisplayed.find(row => row.transaction_id === transferTargetId);
+    if (!other || Number(transferTx.amount || 0) * Number(other.amount || 0) >= 0) {
       toast.error("Choose one outgoing expense and one incoming income");
       return;
     }
+    const outgoing = Number(transferTx.amount) < 0 ? transferTx.transaction_id : transferTargetId;
+    const incoming = Number(transferTx.amount) > 0 ? transferTx.transaction_id : transferTargetId;
+    setTransferSaving(true);
     try {
       const { data } = await api.post("/transactions/transfer-pairs", {
         outgoing_transaction_id: outgoing,
@@ -806,11 +911,14 @@ const Transactions = React.memo(function Transactions() {
       });
       setTxs(prev => prev.map(row => [outgoing, incoming].includes(row.transaction_id) ? { ...row, is_transfer: true, tx_type: "transfer", transfer_pair_id: data.transfer_pair_id } : row));
       setSelectedIds(new Set());
+      setTransferOpen(false);
       toast.success("Transfer paired");
     } catch (e) {
       toast.error(formatApiError(e?.response?.data?.detail) || "Could not pair transfer");
+    } finally {
+      setTransferSaving(false);
     }
-  }, [selectedIds, allDisplayed]);
+  }, [transferTx, transferTargetId, allDisplayed]);
 
   const unpairTransfer = useCallback(async (t) => {
     if (!t.transfer_pair_id) return;
@@ -1474,6 +1582,211 @@ const Transactions = React.memo(function Transactions() {
         saveAsRecurring={saveAsRecurring} setSaveAsRecurring={setSaveAsRecurring}
         onCategoryCreated={loadCats}
         accounts={accounts} accountsLoading={accountsLoading} />
+
+      <Dialog open={reviewOpen} onOpenChange={(next) => {
+        setReviewOpen(next);
+        if (!next) {
+          setReviewTx(null);
+          setReviewSuggestions([]);
+          setReviewLoading(false);
+        }
+      }}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Review category</DialogTitle>
+            <DialogDescription>
+              {reviewTx?.description || "Choose the best category before approving this transaction."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {reviewTx && (
+              <div className="rounded-xl border border-border bg-secondary/30 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium text-foreground">{reviewTx.description || reviewTx.merchant || "Transaction"}</div>
+                    <div className="text-xs text-muted-foreground">{reviewTx.date} - {reviewTx.account_name || "Account"}</div>
+                  </div>
+                  <div className={`text-sm font-semibold ${Number(reviewTx.amount || 0) >= 0 ? "text-emerald" : "text-rose-600"}`}>
+                    {fmt(reviewTx.amount)}
+                  </div>
+                </div>
+              </div>
+            )}
+            {reviewLoading ? (
+              <div className="flex items-center gap-2 rounded-xl border border-border p-4 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Getting suggestions...
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {(reviewSuggestions.length ? reviewSuggestions : (reviewTx?.ai_selected_category ? [{ category: reviewTx.ai_selected_category, confidence: reviewTx.ai_confidence, reason: reviewTx.ai_reason }] : [])).map((suggestion, index) => {
+                  const category = suggestion.category || suggestion.name || suggestion.value || suggestion;
+                  const confidence = suggestion.confidence ?? suggestion.score ?? null;
+                  return (
+                    <button
+                      key={`${category}-${index}`}
+                      type="button"
+                      onClick={() => approveTx(reviewTx, category)}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 text-left transition hover:border-emerald hover:bg-emerald/5"
+                    >
+                      <div className="min-w-0 space-y-2">
+                        <CategoryBadge category={category} size="sm" />
+                        {suggestion.reason && <div className="text-xs text-muted-foreground">{suggestion.reason}</div>}
+                      </div>
+                      <div className="shrink-0 text-xs font-medium text-muted-foreground">
+                        {confidence != null ? `${Math.round(Number(confidence) * 100)}%` : "Approve"}
+                      </div>
+                    </button>
+                  );
+                })}
+                {!reviewLoading && !reviewSuggestions.length && !reviewTx?.ai_selected_category && (
+                  <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+                    No suggestions yet. Run AI classify again or approve the current category.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outlinePill" size="pill" onClick={() => setReviewOpen(false)}>Close</Button>
+            {reviewTx && (
+              <Button variant="primary" size="pill" onClick={() => approveTx(reviewTx)}>
+                Approve current
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={splitOpen} onOpenChange={(next) => {
+        setSplitOpen(next);
+        if (!next) {
+          setSplitTxDraft(null);
+          setSplitLines([]);
+          setSplitSaving(false);
+        }
+      }}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Split transaction</DialogTitle>
+            <DialogDescription>
+              {splitTxDraft?.description || "Assign this transaction across multiple categories."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid gap-3 max-h-[50vh] overflow-y-auto pr-1">
+              {splitLines.map((line, index) => (
+                <div key={index} className="grid gap-3 rounded-xl border border-border bg-card p-3 sm:grid-cols-[minmax(0,1.2fr)_120px_minmax(0,1fr)_40px]">
+                  <CategoryCombobox
+                    value={line.category}
+                    onChange={(value) => updateSplitLine(index, "category", value)}
+                    categories={selectedCats.categories || selectedCats}
+                    placeholder="Category"
+                  />
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={line.amount}
+                    onChange={(e) => updateSplitLine(index, "amount", e.target.value)}
+                    aria-label="Split amount"
+                  />
+                  <Input
+                    value={line.description}
+                    onChange={(e) => updateSplitLine(index, "description", e.target.value)}
+                    placeholder="Note"
+                    aria-label="Split note"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeSplitLine(index)}
+                    disabled={splitLines.length <= 2}
+                    aria-label="Remove split line"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <Button type="button" variant="outlinePill" size="pill" onClick={addSplitLine}>
+                <Plus className="h-4 w-4" /> Add line
+              </Button>
+              <div className={`text-sm font-medium ${Math.abs(splitDifference) <= 0.01 ? "text-emerald" : "text-rose-600"}`}>
+                Split total {fmt(splitEnteredTotal)} of {fmt(splitOriginalAmount)}
+                {Math.abs(splitDifference) > 0.01 ? ` - ${fmt(Math.abs(splitDifference))} remaining` : ""}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outlinePill" size="pill" onClick={() => setSplitOpen(false)}>Cancel</Button>
+            <Button variant="primary" size="pill" onClick={saveSplit} disabled={splitSaving || Math.abs(splitDifference) > 0.01}>
+              {splitSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Save split
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={transferOpen} onOpenChange={(next) => {
+        setTransferOpen(next);
+        if (!next) {
+          setTransferTx(null);
+          setTransferTargetId("");
+          setTransferSaving(false);
+        }
+      }}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Pair transfer</DialogTitle>
+            <DialogDescription>
+              Match this transaction with the opposite side of the transfer.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {transferTx && (
+              <div className="rounded-xl border border-border bg-secondary/30 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium text-foreground">{transferTx.description || "Selected transaction"}</div>
+                    <div className="text-xs text-muted-foreground">{transferTx.date} - {transferTx.account_name || "Account"}</div>
+                  </div>
+                  <div className={`text-sm font-semibold ${Number(transferTx.amount || 0) >= 0 ? "text-emerald" : "text-rose-600"}`}>
+                    {fmt(transferTx.amount)}
+                  </div>
+                </div>
+              </div>
+            )}
+            {transferCandidates.length ? (
+              <div className="space-y-2">
+                <label className="label-overline">Matching transaction</label>
+                <select
+                  value={transferTargetId}
+                  onChange={(e) => setTransferTargetId(e.target.value)}
+                  className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-ring"
+                >
+                  <option value="">Choose a match</option>
+                  {transferCandidates.map((candidate) => (
+                    <option key={candidate.transaction_id} value={candidate.transaction_id}>
+                      {candidate.date} - {candidate.description || candidate.merchant || "Transaction"} - {fmt(candidate.amount)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+                No eligible opposite-side transactions are visible. Adjust filters or load more transactions, then try again.
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outlinePill" size="pill" onClick={() => setTransferOpen(false)}>Cancel</Button>
+            <Button variant="primary" size="pill" onClick={saveTransferPair} disabled={transferSaving || !transferTargetId}>
+              {transferSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Pair transfer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ComparePeriods open={compareOpen} onClose={() => setCompareOpen(false)} />
 

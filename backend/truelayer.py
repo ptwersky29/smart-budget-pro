@@ -680,7 +680,13 @@ def build_router() -> APIRouter:
         async with _sync_lock:
             sm = request.app.state.db
             async with sm() as session:
-                result = await session.execute(select(BankConnection).where(BankConnection.user_id == user["user_id"], BankConnection.status == "active"))
+                result = await session.execute(
+                    select(BankConnection).where(
+                        BankConnection.user_id == user["user_id"],
+                        BankConnection.status == "active",
+                        BankConnection.provider == "truelayer",
+                    )
+                )
                 conns = result.scalars().all()
                 if not conns:
                     raise HTTPException(400, "No active bank connections")
@@ -762,7 +768,12 @@ async def run_background_sync(db_maker) -> dict:
     async with _sync_lock:
         sm = db_maker
         async with sm() as session:
-            result = await session.execute(select(BankConnection).where(BankConnection.status == "active"))
+            result = await session.execute(
+                select(BankConnection).where(
+                    BankConnection.status == "active",
+                    BankConnection.provider == "truelayer",
+                )
+            )
             conns = result.scalars().all()
             total_new = 0
             total_dup = 0

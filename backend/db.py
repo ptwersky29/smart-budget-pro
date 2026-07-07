@@ -68,12 +68,63 @@ async def dispose_engine():
         _engine = None
 
 
+async def _sqlite_column_exists(conn, table_name: str, column_name: str) -> bool:
+    rows = await conn.execute(text(f"PRAGMA table_info({table_name})"))
+    return any(row[1] == column_name for row in rows.fetchall())
+
+
+async def _sqlite_add_column_if_missing(conn, table_name: str, column_name: str, definition: str):
+    if not await _sqlite_column_exists(conn, table_name, column_name):
+        await conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}"))
+
+
+async def _run_sqlite_migrations(conn):
+    """SQLite create_all does not alter existing tables, so keep additive upgrades here."""
+    transaction_columns = [
+        ("balance_type", "VARCHAR(16) DEFAULT 'available'"),
+        ("approval_status", "VARCHAR(16) DEFAULT 'approved'"),
+        ("category_approval_status", "VARCHAR(16) DEFAULT 'approved'"),
+        ("ai_suggested_categories", "JSON"),
+        ("ai_selected_category", "VARCHAR(128)"),
+        ("ai_confidence", "NUMERIC(5,4)"),
+        ("ai_reason", "TEXT"),
+        ("approved_at", "TIMESTAMP"),
+        ("transfer_pair_id", "VARCHAR(64)"),
+        ("failed_reason", "TEXT"),
+    ]
+    for column_name, definition in transaction_columns:
+        await _sqlite_add_column_if_missing(conn, "transactions", column_name, definition)
+
+    await conn.execute(
+        text("UPDATE transactions SET approval_status = 'approved' WHERE approval_status IS NULL")
+    )
+    await conn.execute(
+        text("UPDATE transactions SET category_approval_status = 'approved' WHERE category_approval_status IS NULL")
+    )
+    await conn.execute(
+        text("UPDATE transactions SET balance_type = 'available' WHERE balance_type IS NULL")
+    )
+    await conn.execute(
+        text("UPDATE transactions SET exclude_from_maaser = 1 WHERE tx_type = 'transfer'")
+    )
+    await conn.execute(
+        text("CREATE INDEX IF NOT EXISTS idx_transactions_approval ON transactions(user_id, approval_status)")
+    )
+    await conn.execute(
+        text("CREATE INDEX IF NOT EXISTS idx_transactions_transfer_pair ON transactions(user_id, transfer_pair_id)")
+    )
+
+    await _sqlite_add_column_if_missing(conn, "bank_accounts", "image", "TEXT")
+    await _sqlite_add_column_if_missing(conn, "bank_accounts", "color", "VARCHAR(7)")
+
+
 async def create_tables():
     """Create all tables via the async engine (safe to call on every startup)."""
     if _engine:
         async with _engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
             if _engine.url.drivername.startswith("sqlite"):
+                await _run_sqlite_migrations(conn)
                 return
             from sqlalchemy import text
 
