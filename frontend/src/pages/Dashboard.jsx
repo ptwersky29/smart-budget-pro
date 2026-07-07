@@ -163,7 +163,7 @@ const Dashboard = React.memo(function Dashboard() {
 
   if (loading)
     return (
-      <div className="space-y-8" data-testid="dashboard-root">
+      <div className="space-y-8" data-testid="dashboard-loading">
         <Skeleton className="h-12 w-full rounded-2xl" />
         <Skeleton className="h-44 w-full rounded-[1.75rem]" />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

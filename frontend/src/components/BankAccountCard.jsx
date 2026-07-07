@@ -53,10 +53,9 @@ function BankAccountCard({ account, connection, variant = "default" }) {
                 e.target.style.display = "none";
               }}
             />
-          ) : null}
-          {!logoUrl ? (
+          ) : (
             <Building2 className="h-5 w-5 text-muted-foreground" />
-          ) : null}
+          )}
         </div>
         <div>
           <p className="text-xs font-medium leading-tight group-hover:text-emerald transition-colors">
@@ -91,10 +90,9 @@ function BankAccountCard({ account, connection, variant = "default" }) {
                     e.target.style.display = "none";
                   }}
                 />
-              ) : null}
-              {!logoUrl ? (
+              ) : (
                 <Building2 className="h-7 w-7 text-muted-foreground" />
-              ) : null}
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
@@ -141,10 +139,9 @@ function BankAccountCard({ account, connection, variant = "default" }) {
               e.target.style.display = "none";
             }}
           />
-        ) : null}
-        {!logoUrl ? (
+        ) : (
           <Building2 className="h-6 w-6 text-muted-foreground" />
-        ) : null}
+        )}
       </div>
       <div>
         <p className="text-sm font-medium leading-tight group-hover:text-emerald transition-colors">

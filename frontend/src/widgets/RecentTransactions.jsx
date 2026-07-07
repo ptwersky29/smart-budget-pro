@@ -5,7 +5,8 @@ import CategoryBadge from "../components/CategoryBadge";
 
 function formatCurrency(n) {
   const abs = Math.abs(n).toFixed(2);
-  return n >= 0 ? `+£${abs}` : `-£${abs}`;
+  if (n === 0) return `£${abs}`;
+  return n > 0 ? `+£${abs}` : `-£${abs}`;
 }
 
 function groupByDate(transactions) {
@@ -43,7 +44,6 @@ export default React.memo(function RecentTransactions({ overview }) {
   const [sortDir, setSortDir] = useState("desc");
 
   const allTransactions = overview?.recent || [];
-  if (allTransactions.length === 0) return null;
 
   const filtered = useMemo(() => {
     const query = search.toLowerCase();
@@ -72,6 +72,8 @@ export default React.memo(function RecentTransactions({ overview }) {
       ),
     [grouped, sortDir],
   );
+
+  if (allTransactions.length === 0) return null;
 
   return (
     <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden lg:sticky lg:top-24">

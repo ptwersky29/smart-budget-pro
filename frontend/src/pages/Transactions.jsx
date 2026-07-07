@@ -1936,16 +1936,17 @@ function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, o
   const deleting = swipedId === t.transaction_id;
 
   return (
-    <div className="relative overflow-hidden tap-highlight-none" {...handlers} onClick={() => { if (deleting) setSwipedId(null); }}>
+    <div className="relative overflow-hidden tap-highlight-none" {...handlers} onClick={() => { if (deleting) setSwipedId(null); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSwipedId(t.transaction_id); } }} role="button" tabIndex={0}>
       <div
         className={`transition-transform duration-200 ease-out ${deleting ? "-translate-x-20" : "translate-x-0"} ${isSelected ? "bg-emerald/5" : ""} divide-y divide-border`}
       >
         <div className="px-4 py-4 space-y-1.5">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-3 min-w-0">
-              <label className="flex items-center justify-center" aria-label="Select transaction">
+              <label className="flex items-center justify-center">
                 <input type="checkbox" checked={isSelected}
                   onChange={() => onToggleSelect(t.transaction_id)}
+                  aria-label="Select transaction"
                   className="h-5 w-5 rounded border-border accent-emerald cursor-pointer shrink-0" />
               </label>
               <div className="min-w-0">

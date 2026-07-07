@@ -231,7 +231,7 @@ export default function MaaserPanel({ refreshKey = 0, onChange }) {
               onChange={(e) => saveCfg({ ...cfg, enabled: e.target.checked })}
               className="sr-only peer"
             />
-            <span className="w-11 h-6 bg-secondary rounded-full peer-checked:bg-emerald relative transition-colors">
+            <span className="w-11 h-6 bg-secondary rounded-full peer-checked:bg-emerald relative transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2">
               <span
                 className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform"
                 style={{ transform: cfg.enabled ? "translateX(20px)" : "translateX(0)" }}

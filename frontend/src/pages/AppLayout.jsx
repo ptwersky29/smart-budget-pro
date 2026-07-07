@@ -239,7 +239,7 @@ export default function AppLayout() {
           </div>
         </header>
 
-        <main className="p-4 sm:p-5 lg:p-8 pb-24 lg:pb-8 max-w-[1560px] mx-auto">
+        <main className="p-4 sm:p-5 lg:p-8 pb-16 lg:pb-8 max-w-[1560px] mx-auto">
           <div className="space-y-8">
             <div key={location.pathname} className={noAnim ? "" : "animate-[slideInRight_0.3s_ease-out]"}>
               <Outlet />
