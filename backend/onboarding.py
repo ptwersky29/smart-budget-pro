@@ -77,6 +77,7 @@ def build_router() -> APIRouter:
             prog.completed_steps = completed
             if prog.step == "complete" or all(s in completed for s in ONBOARDING_STEPS if s != "complete"):
                 u.onboarding_completed = True
+                u.onboarded = True
                 prog.finished_at = datetime.now(timezone.utc)
             await session.commit()
         await log_action(user["user_id"], "onboarding_step", "onboarding", payload.step, request=request)
@@ -89,6 +90,7 @@ def build_router() -> APIRouter:
             u = (await session.execute(select(User).where(User.user_id == user["user_id"]))).scalar_one_or_none()
             if u:
                 u.onboarding_completed = True
+                u.onboarded = True
             prog = (await session.execute(
                 select(OnboardingProgress).where(OnboardingProgress.user_id == user["user_id"])
             )).scalar_one_or_none()

@@ -20,7 +20,7 @@ export default function AuthCallback() {
           try {
             const { data: me } = await api.get("/auth/me");
             setUser(me);
-            navigate("/dashboard", { replace: true });
+            navigate(me.onboarded ? "/dashboard" : "/onboarding", { replace: true });
             return;
           } catch {
             // Stored auth was stale; continue to the normal failure path.
@@ -59,7 +59,7 @@ export default function AuthCallback() {
           const { data: me } = await api.get("/auth/me");
           setUser(me);
           toast.success("Welcome back!");
-          navigate("/dashboard", { replace: true });
+          navigate(me.onboarded ? "/dashboard" : "/onboarding", { replace: true });
         } catch {
           toast.error("Login failed. Please try again.");
           navigate("/login?error=token_validation_failed", { replace: true });
