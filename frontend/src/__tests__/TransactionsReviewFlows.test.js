@@ -5,6 +5,10 @@ const transactionsSource = fs.readFileSync(
   path.join(__dirname, "..", "pages", "Transactions.jsx"),
   "utf8"
 );
+const transactionFormSource = fs.readFileSync(
+  path.join(__dirname, "..", "components", "TransactionForm.jsx"),
+  "utf8"
+);
 
 function readSourceFiles(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -26,5 +30,12 @@ describe("Transactions review flows", () => {
     expect(transactionsSource).toContain("Split total");
     expect(transactionsSource).toContain("Matching transaction");
     expect(transactionsSource).toContain("Pair transfer");
+  });
+
+  test("new transaction form uses a mode selector for split and transfer", () => {
+    expect(transactionFormSource).toContain("Transaction mode");
+    expect(transactionFormSource).toContain('value: "split"');
+    expect(transactionFormSource).toContain('value: "transfer"');
+    expect(transactionFormSource).not.toContain("Transfer to another account");
   });
 });

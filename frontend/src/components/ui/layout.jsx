@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { Button } from "./button";
 
-export const PageHeader = React.memo(function PageHeader({ eyebrow, title, description, actions, meta, children, className = "", ...props }) {
+export const PageHeader = React.memo(function PageHeader({ eyebrow, title, description, actions, meta, children, className = "", hideDivider, ...props }) {
   return (
     <div {...props} className={`relative rounded-lg border border-border bg-card/95 backdrop-blur-xl p-5 sm:p-6 lg:p-7 shadow-card ${className}`}>
       <div className="relative flex flex-col gap-4 lg:gap-6 lg:flex-row lg:items-end lg:justify-between z-10">
