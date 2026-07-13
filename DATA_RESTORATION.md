@@ -25,7 +25,7 @@ The application was using **TWO DIFFERENT DATABASES**:
 
 1. **Neon PostgreSQL** (where all the data is stored):
    ```
-   postgresql+asyncpg://...@ep-silent-water-ab6f94vy-pooler.eu-west-2.aws.neon.tech/neondb
+   postgresql+asyncpg://...@your-neon-host/neondb
    ```
    - Contains all user transactions, budgets, accounts
    - Used during development
@@ -63,10 +63,10 @@ envVars:
       name: financeai-db
       property: connectionString
 
-# AFTER:
+# AFTER (set the secret in Render, never commit its value):
 envVars:
   - key: DATABASE_URL
-    value: postgresql+asyncpg://neondb_owner:npg_DEn4SXe1YkWV@ep-silent-water-ab6f94vy-pooler.eu-west-2.aws.neon.tech/neondb
+    sync: false
 ```
 
 ### Commit `c0012b1` - Remove Unused Database
@@ -162,7 +162,7 @@ All data is intact:
                ↓
 ┌─────────────────────────────────────────────┐
 │  Neon PostgreSQL (Primary Database)         │
-│  ep-silent-water-ab6f94vy-pooler.eu-west-2  │
+│  your-neon-host                              │
 │  neondb                                     │
 │                                             │
 │  📦 All user data stored here               │

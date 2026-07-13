@@ -57,6 +57,7 @@ from exceptions import FinanceAIError
 from rate_limit import RateLimiter, RateLimitMiddleware, CsrfProtectionMiddleware
 from middleware import ErrorMonitorMiddleware, RequestTimerMiddleware, RequestIdMiddleware, SecurityHeadersMiddleware
 from security import generate_csrf_token, _require_jwt_secret
+from runtime_config import LOCAL_DATABASE_URL, resolve_database_url
 
 # Optional Sentry integration
 class JsonFormatter(logging.Formatter):
@@ -90,9 +91,8 @@ if SENTRY_DSN:
 
 # ── Startup validation ──────────────────────────────────────────────────
 
-database_url = os.environ.get("DATABASE_URL")
-if not database_url:
-    database_url = "sqlite+aiosqlite:///financeai.db"
+database_url = resolve_database_url()
+if database_url == LOCAL_DATABASE_URL:
     logger.info("No DATABASE_URL set — using local SQLite: %s", database_url)
 
 # Validate JWT_SECRET early — will raise if missing/weak
@@ -387,24 +387,28 @@ async def startup():
     if not os.environ.get("TRUELAYER_CLIENT_ID") or not os.environ.get("TRUELAYER_CLIENT_SECRET"):
         logger.warning("TRUELAYER_CLIENT_ID/SECRET not set — Open Banking sync disabled")
 
-    # Start background sync loop for TrueLayer
-    try:
-        from truelayer import run_background_sync, SYNC_INTERVAL_SECONDS
+    # Run scheduled bank sync only in the dedicated worker. This avoids duplicate
+    # syncs when the web service has multiple Uvicorn workers.
+    if os.environ.get("RUN_BACKGROUND_SYNC", "false").lower() == "true":
+        try:
+            from truelayer import run_background_sync, SYNC_INTERVAL_SECONDS
 
-        async def _background_sync_loop():
-            logger.info("Background TrueLayer sync loop started (interval=%ss)", SYNC_INTERVAL_SECONDS)
-            while True:
-                await asyncio.sleep(SYNC_INTERVAL_SECONDS)
-                try:
-                    db_maker = get_session_maker()
-                    await run_background_sync(db_maker)
-                except Exception as e:
-                    logger.error("Background sync loop error: %s", e)
+            async def _background_sync_loop():
+                logger.info("Background TrueLayer sync loop started (interval=%ss)", SYNC_INTERVAL_SECONDS)
+                while True:
+                    await asyncio.sleep(SYNC_INTERVAL_SECONDS)
+                    try:
+                        db_maker = get_session_maker()
+                        await run_background_sync(db_maker)
+                    except Exception as e:
+                        logger.error("Background sync loop error: %s", e)
 
-        asyncio.create_task(_background_sync_loop())
-        logger.info("Background sync task created")
-    except Exception as e:
-        logger.warning("Could not start background sync: %s", e)
+            asyncio.create_task(_background_sync_loop())
+            logger.info("Background sync task created")
+        except Exception as e:
+            logger.warning("Could not start background sync: %s", e)
+    else:
+        logger.info("Background sync scheduler disabled for this process")
 
     logger.info("FinanceAI startup complete.")
 
