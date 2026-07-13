@@ -10,6 +10,7 @@ from db import User, MaaserLedger, Transaction
 logger = logging.getLogger("maaser")
 
 INCOME_CATEGORIES = {"salary", "income"}
+CHARITY_CATEGORIES = {"maaser_tzedakah", "charity", "other_charity"}
 
 
 def _is_income_tx(tx: dict) -> bool:
@@ -30,7 +31,86 @@ def _is_income_tx(tx: dict) -> bool:
     return False
 
 
+def _is_charity_tx(tx: dict) -> bool:
+    if tx.get("exclude_from_maaser"):
+        return False
+    if tx.get("is_transfer") or tx.get("tx_type") == "transfer":
+        return False
+    if tx.get("transfer_pair_id"):
+        return False
+    amt = float(tx.get("amount") or 0)
+    if amt >= 0:
+        return False
+    cat = (tx.get("category") or "").lower()
+    return cat in CHARITY_CATEGORIES
+
+
+async def _apply_giving_to_pending(session, user_id: str, amount: float, recipient: str | None = None, note: str | None = None, tx_id: str | None = None) -> dict | None:
+    """Apply a giving amount against pending MaaserLedger entries (FIFO by date).
+    
+    Returns the last affected entry's dict, or None if no change.
+    """
+    if amount <= 0:
+        return None
+    pending = await session.execute(
+        select(MaaserLedger).where(
+            MaaserLedger.user_id == user_id,
+            MaaserLedger.maaser_paid < MaaserLedger.maaser_due,
+        ).order_by(MaaserLedger.date.asc())
+    )
+    pending_entries = pending.scalars().all()
+    remaining = amount
+    last_entry = None
+    for entry in pending_entries:
+        if remaining <= 0:
+            break
+        owed = entry.maaser_due - (entry.maaser_paid or 0)
+        if owed <= 0:
+            continue
+        payment = min(remaining, owed)
+        entry.maaser_paid = (entry.maaser_paid or 0) + payment
+        if recipient:
+            entry.paid_to = recipient
+        if note:
+            entry.note = note
+        remaining -= payment
+        last_entry = entry
+
+    if remaining > 0:
+        entry = MaaserLedger(
+            user_id=user_id, maaser_paid=remaining,
+            paid_to=recipient or "Tzedakah",
+            note=note, transaction_id=tx_id,
+            date=datetime.now(timezone.utc),
+        )
+        session.add(entry)
+        await session.commit()
+        await session.refresh(entry)
+        out = {"entry_id": f"tz_{entry.id}", "user_id": user_id, "amount": remaining, "recipient": entry.paid_to, "status": "given"}
+        if tx_id:
+            out["transaction_id"] = tx_id
+        return out
+    elif last_entry:
+        await session.commit()
+        await session.refresh(last_entry)
+        out = {"entry_id": f"tz_{last_entry.id}", "user_id": user_id, "amount": amount, "recipient": last_entry.paid_to or recipient, "status": "given" if last_entry.maaser_paid >= last_entry.maaser_due else "partial"}
+        if tx_id:
+            out["transaction_id"] = tx_id
+        return out
+    return None
+
+
 async def maybe_accrue(session, user_id: str, tx: dict) -> dict | None:
+    # Charity expense → apply against pending obligation
+    if _is_charity_tx(tx):
+        amt = abs(float(tx.get("amount", 0)))
+        recipient = tx.get("merchant_name") or tx.get("description") or "Tzedakah"
+        return await _apply_giving_to_pending(
+            session, user_id, amt, recipient=recipient,
+            note=f"Charity: {tx.get('description', '')}",
+            tx_id=tx.get("transaction_id"),
+        )
+
     if not _is_income_tx(tx):
         if tx.get("transaction_id"):
             await session.execute(

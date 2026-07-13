@@ -279,7 +279,7 @@ def build_router() -> APIRouter:
                     continue
                 amt = float(t.amount or 0)
                 cat = (t.category or "").lower()
-                if amt < 0 and cat == "tzedakah" and t.transaction_id not in ledger_tx_ids:
+                if amt < 0 and cat in maaser_mod.CHARITY_CATEGORIES and t.transaction_id not in ledger_tx_ids:
                     tx_given += -amt
             
             # Count maaser_paid from ledger entries (these are the recordings)
@@ -347,7 +347,7 @@ def build_router() -> APIRouter:
             ledger_tx_ids = {r.transaction_id for r in all_rows if r.transaction_id}
             tx_q = select(Transaction).where(
                 Transaction.user_id == user["user_id"],
-                Transaction.category == "tzedakah",
+                Transaction.category.in_(list(maaser_mod.CHARITY_CATEGORIES)),
                 Transaction.exclude_from_maaser == False,
                 Transaction.tx_type != "transfer",
                 Transaction.approval_status == "approved",
@@ -546,8 +546,9 @@ def build_router() -> APIRouter:
             if amount <= 0:
                 raise HTTPException(400, "Amount must be positive")
 
-            # Record the giving as a transaction (excluded from auto-maaser to avoid double-count)
+            # Record the giving as a charity transaction (canonical category)
             desc = f"Tzedakah — {payload.recipient}" + (f" ({payload.note})" if payload.note else "")
+            cat = "maaser_tzedakah"
             tx = Transaction(
                 transaction_id=tx_id,
                 user_id=user["user_id"],
@@ -556,53 +557,22 @@ def build_router() -> APIRouter:
                 description=desc,
                 merchant_name=payload.recipient,
                 normalized_merchant=(payload.recipient or "").strip().upper() or None,
-                category="tzedakah",
+                category=cat,
                 date=entry_date,
                 source="tzedakah",
                 notes=payload.note,
-                exclude_from_maaser=True,
             )
             session.add(tx)
             await session.flush()
 
-            # Apply giving against pending (unpaid) auto-accrued entries first (FIFO)
-            pending = await session.execute(
-                select(MaaserLedger).where(
-                    MaaserLedger.user_id == user["user_id"],
-                    MaaserLedger.maaser_paid < MaaserLedger.maaser_due,
-                ).order_by(MaaserLedger.date.asc())
+            # Apply giving against pending entries via shared helper
+            result = await maaser_mod._apply_giving_to_pending(
+                session, user["user_id"], amount,
+                recipient=payload.recipient, note=payload.note, tx_id=tx_id,
             )
-            pending_entries = pending.scalars().all()
-            remaining = amount
-            last_entry = None
-            for entry in pending_entries:
-                if remaining <= 0:
-                    break
-                owed = entry.maaser_due - (entry.maaser_paid or 0)
-                if owed <= 0:
-                    continue
-                payment = min(remaining, owed)
-                entry.maaser_paid = (entry.maaser_paid or 0) + payment
-                if payload.recipient:
-                    entry.paid_to = payload.recipient
-                remaining -= payment
-                last_entry = entry
-
-            # Any leftover amount creates a new ledger entry
-            if remaining > 0:
-                entry = MaaserLedger(
-                    user_id=user["user_id"], maaser_paid=remaining, paid_to=payload.recipient,
-                    note=payload.note, transaction_id=tx_id,
-                    date=entry_date,
-                )
-                session.add(entry)
-                await session.commit()
-                await session.refresh(entry)
-                out = _tz_to_dict(entry)
-            else:
-                await session.commit()
-                await session.refresh(last_entry)
-                out = _tz_to_dict(last_entry) if last_entry else {"entry_id": ""}
+            out = _tz_to_dict(
+                await session.get(MaaserLedger, int(result["entry_id"].replace("tz_", "")))
+            ) if result else {"entry_id": ""}
             out["transaction_id"] = tx_id
             return out
 
@@ -903,7 +873,7 @@ def build_router() -> APIRouter:
                     total_income += abs(amt)
                     month_key = t.date.strftime("%Y-%m") if t.date else "unknown"
                     income_by_month[month_key] = income_by_month.get(month_key, 0) + abs(amt)
-                if amt < 0 and cat == "tzedakah":
+                if amt < 0 and cat in maaser_mod.CHARITY_CATEGORIES:
                     tx_given += -amt
 
             obligation = round(total_income * percent / 100, 2)
