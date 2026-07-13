@@ -282,10 +282,8 @@ def build_router() -> APIRouter:
                 if amt < 0 and cat in maaser_mod.CHARITY_CATEGORIES and t.transaction_id not in ledger_tx_ids:
                     tx_given += -amt
             
-            # Count maaser_paid from all entries, subtracting Give entries to avoid double-counting
-            total_give = sum((e.maaser_paid or 0) for e in ledger if not (e.income_amount or 0) and not (e.maaser_due or 0) and e.maaser_paid and e.maaser_paid > 0)
-            total_all = sum((e.maaser_paid or 0) for e in ledger if e.maaser_paid and e.maaser_paid > 0)
-            manual_given = total_all - total_give
+            # Count maaser_paid from Give entries only (income_amount == 0, maaser_due == 0)
+            manual_given = sum((e.maaser_paid or 0) for e in ledger if not (e.income_amount or 0) and not (e.maaser_due or 0) and e.maaser_paid and e.maaser_paid > 0)
             
             pending_result = await session.execute(
                 select(MaaserLedger).where(
@@ -487,12 +485,22 @@ def build_router() -> APIRouter:
             result = await session.execute(
                 select(MaaserLedger).where(
                     MaaserLedger.id == eid, MaaserLedger.user_id == user["user_id"],
-                    MaaserLedger.maaser_paid == 0,
+                    MaaserLedger.maaser_paid < MaaserLedger.maaser_due,
                 )
             )
             entry = result.scalar_one_or_none()
             if not entry:
-                raise HTTPException(404, "Pending entry not found")
+                raise HTTPException(404, "Pending entry not found or already fully paid")
+            # Create a Give entry for the remaining unpaid amount so it appears in manual_given
+            remaining = entry.maaser_due - (entry.maaser_paid or 0)
+            if remaining > 0:
+                give_entry = MaaserLedger(
+                    user_id=user["user_id"],
+                    maaser_paid=remaining,
+                    paid_to=recipient,
+                    note=f"Maaser payment for income entry #{eid}",
+                )
+                session.add(give_entry)
             entry.maaser_paid = entry.maaser_due
             entry.paid_to = recipient
             await session.commit()
@@ -887,9 +895,7 @@ def build_router() -> APIRouter:
                 )
             )
             ledger_entries = ledger_result.scalars().all()
-            total_give = sum((e.maaser_paid or 0) for e in ledger_entries if not (e.income_amount or 0) and not (e.maaser_due or 0) and e.maaser_paid and e.maaser_paid > 0)
-            total_all = sum((e.maaser_paid or 0) for e in ledger_entries if e.maaser_paid and e.maaser_paid > 0)
-            manual_given = total_all - total_give
+            manual_given = sum((e.maaser_paid or 0) for e in ledger_entries if not (e.income_amount or 0) and not (e.maaser_due or 0) and e.maaser_paid and e.maaser_paid > 0)
             pending_entries = [e for e in ledger_entries if e.maaser_paid == 0]
             accrued_pending = sum(r.maaser_due or 0 for r in pending_entries)
 
