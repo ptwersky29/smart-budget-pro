@@ -195,20 +195,23 @@ const Transactions = React.memo(function Transactions() {
   const [maaserTzedakahTxs, setMaaserTzedakahTxs] = useState([]);
   const [maaserTzedakahTxsLoading, setMaaserTzedakahTxsLoading] = useState(false);
 
+  const CHARITY_CATEGORIES = ["maaser_tzedakah", "charity", "other_charity"];
   const refreshMaaser = useCallback(async () => {
     try {
-      const [s, sum, lg, incRes, tzdRes] = await Promise.all([
+      const charityReqs = CHARITY_CATEGORIES.map(c => api.get("/transactions", { params: { category: c, limit: 200 } }));
+      const [s, sum, lg, incRes, ...tzdResArr] = await Promise.all([
         api.get("/jewish/maaser/settings"),
         api.get("/jewish/maaser/summary"),
         api.get("/jewish/maaser/ledger?include_tx=true&limit=500"),
         api.get("/transactions", { params: { tx_type: "income", limit: 200 } }),
-        api.get("/transactions", { params: { category: "tzedakah", limit: 200 } }),
+        ...charityReqs,
       ]);
       setMaaserCfg(s.data || { enabled: false, percent: 10 });
       setMaaserSum(sum.data || null);
       setMaaserLedger(lg.data?.entries || []);
       setMaaserIncomeTxs((incRes.data?.transactions || []).filter(t => !t.is_transfer && !t.exclude_from_maaser));
-      setMaaserTzedakahTxs(tzdRes.data?.transactions || []);
+      const allCharityTxs = tzdResArr.flatMap(r => r.data?.transactions || []);
+      setMaaserTzedakahTxs(allCharityTxs);
     } catch {}
   }, []);
 
@@ -218,18 +221,20 @@ const Transactions = React.memo(function Transactions() {
     setMaaserIncomeTxsLoading(true);
     setMaaserTzedakahTxsLoading(true);
     try {
-      const [s, sum, lg, incRes, tzdRes] = await Promise.all([
+      const charityReqs = CHARITY_CATEGORIES.map(c => api.get("/transactions", { params: { category: c, limit: 200 } }));
+      const [s, sum, lg, incRes, ...tzdResArr] = await Promise.all([
         api.get("/jewish/maaser/settings"),
         api.get("/jewish/maaser/summary"),
         api.get("/jewish/maaser/ledger?include_tx=true&limit=500"),
         api.get("/transactions", { params: { tx_type: "income", limit: 200 } }),
-        api.get("/transactions", { params: { category: "tzedakah", limit: 200 } }),
+        ...charityReqs,
       ]);
       setMaaserCfg(s.data || { enabled: false, percent: 10 });
       setMaaserSum(sum.data || null);
       setMaaserLedger(lg.data?.entries || []);
       setMaaserIncomeTxs((incRes.data?.transactions || []).filter(t => !t.is_transfer && !t.exclude_from_maaser));
-      setMaaserTzedakahTxs(tzdRes.data?.transactions || []);
+      const allCharityTxs = tzdResArr.flatMap(r => r.data?.transactions || []);
+      setMaaserTzedakahTxs(allCharityTxs);
     } catch {}
     finally {
       setMaaserLoading(false);
