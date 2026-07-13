@@ -50,10 +50,22 @@ def _is_charity_tx(tx: dict) -> bool:
 async def _apply_giving_to_pending(session, user_id: str, amount: float, recipient: str | None = None, note: str | None = None, tx_id: str | None = None) -> dict | None:
     """Apply a giving amount against pending MaaserLedger entries (FIFO by date).
     
-    Returns the last affected entry's dict, or None if no change.
+    Always creates a Give entry recording the full amount.
+    Returns the Give entry dict, or None if amount ≤ 0 or already applied.
     """
     if amount <= 0:
         return None
+    # Dedup: skip if a Give entry already exists for this transaction
+    if tx_id:
+        existing = await session.execute(
+            select(MaaserLedger).where(
+                MaaserLedger.user_id == user_id,
+                MaaserLedger.transaction_id == tx_id,
+            )
+        )
+        if existing.scalar_one_or_none():
+            return None
+
     pending = await session.execute(
         select(MaaserLedger).where(
             MaaserLedger.user_id == user_id,
@@ -62,7 +74,6 @@ async def _apply_giving_to_pending(session, user_id: str, amount: float, recipie
     )
     pending_entries = pending.scalars().all()
     remaining = amount
-    last_entry = None
     for entry in pending_entries:
         if remaining <= 0:
             break
@@ -76,30 +87,27 @@ async def _apply_giving_to_pending(session, user_id: str, amount: float, recipie
         if note:
             entry.note = note
         remaining -= payment
-        last_entry = entry
 
-    if remaining > 0:
-        entry = MaaserLedger(
-            user_id=user_id, maaser_paid=remaining,
-            paid_to=recipient or "Tzedakah",
-            note=note, transaction_id=tx_id,
-            date=datetime.now(timezone.utc),
-        )
-        session.add(entry)
-        await session.commit()
-        await session.refresh(entry)
-        out = {"entry_id": f"tz_{entry.id}", "user_id": user_id, "amount": remaining, "recipient": entry.paid_to, "status": "given"}
-        if tx_id:
-            out["transaction_id"] = tx_id
-        return out
-    elif last_entry:
-        await session.commit()
-        await session.refresh(last_entry)
-        out = {"entry_id": f"tz_{last_entry.id}", "user_id": user_id, "amount": amount, "recipient": last_entry.paid_to or recipient, "status": "given" if last_entry.maaser_paid >= last_entry.maaser_due else "partial"}
-        if tx_id:
-            out["transaction_id"] = tx_id
-        return out
-    return None
+    # Always create a Give entry for the full amount
+    give_entry = MaaserLedger(
+        user_id=user_id, maaser_paid=amount,
+        paid_to=recipient or "Tzedakah",
+        note=note, transaction_id=tx_id,
+        date=datetime.now(timezone.utc),
+    )
+    session.add(give_entry)
+    await session.commit()
+    await session.refresh(give_entry)
+    out = {
+        "entry_id": f"tz_{give_entry.id}",
+        "user_id": user_id,
+        "amount": amount,
+        "recipient": give_entry.paid_to,
+        "status": "given",
+    }
+    if tx_id:
+        out["transaction_id"] = tx_id
+    return out
 
 
 async def maybe_accrue(session, user_id: str, tx: dict) -> dict | None:
@@ -217,22 +225,30 @@ async def backfill_for_user(session, user_id: str) -> dict:
             )
         )
         entry = existing.scalar_one_or_none()
+        # Charity: apply against pending (dedup in _apply_giving_to_pending)
+        if _is_charity_tx(tx_dict):
+            if entry and (entry.income_amount or entry.maaser_due):
+                await session.delete(entry)
+                await session.flush()
+            if entry and not (entry.income_amount or entry.maaser_due):
+                charity_applied += 1
+                charity_amount += abs(float(t.amount))
+                continue
+            amt = abs(float(t.amount))
+            result = await _apply_giving_to_pending(
+                session, user_id, amt,
+                recipient=t.merchant_name or t.description or "Tzedakah",
+                note=f"Charity (backfill): {t.description}",
+                tx_id=t.transaction_id,
+            )
+            if result:
+                charity_applied += 1
+                charity_amount += amt
+            continue
         if not _is_income_tx(tx_dict):
             if entry:
                 await session.delete(entry)
                 await session.flush()
-            # Apply charity expenses against pending obligation
-            if _is_charity_tx(tx_dict):
-                amt = abs(float(t.amount))
-                result = await _apply_giving_to_pending(
-                    session, user_id, amt,
-                    recipient=t.merchant_name or t.description or "Tzedakah",
-                    note=f"Charity (backfill): {t.description}",
-                    tx_id=t.transaction_id,
-                )
-                if result:
-                    charity_applied += 1
-                    charity_amount += amt
             continue
         amt = round(abs(float(t.amount)) * percent / 100, 2)
         if entry:

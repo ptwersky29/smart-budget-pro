@@ -107,17 +107,17 @@ async def annual_maaser_summary(
 
         # Calculate obligation and given
         obligation = round(total_income * percent / 100, 2)
-        manual_given = sum((e.maaser_paid or 0) for e in ledger if e.maaser_paid and e.maaser_paid > 0)
+        manual_given = sum((e.maaser_paid or 0) for e in ledger if not (e.income_amount or 0) and not (e.maaser_due or 0) and e.maaser_paid and e.maaser_paid > 0)
         total_given = manual_given + tx_given
         balance_owed = round(max(0, obligation - total_given), 2)
         credit = round(max(0, total_given - obligation), 2)
 
-        # Organize ledger entries by month
+        # Organize ledger entries by month (Give entries only)
         for entry in ledger:
             month = str(entry.date)[:7] if entry.date else ""
             if month not in months:
                 months[month] = {"income": 0, "given": 0}
-            if entry.maaser_paid and entry.maaser_paid > 0:
+            if not (entry.income_amount or 0) and not (entry.maaser_due or 0) and entry.maaser_paid and entry.maaser_paid > 0:
                 months[month]["given"] += entry.maaser_paid
 
         return {
