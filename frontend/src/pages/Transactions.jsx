@@ -27,7 +27,7 @@ import {
   SheetDescription,
 } from "../components/ui/sheet";
 import ComparePeriods from "../components/ComparePeriods";
-import MonthPicker, { YIDDISH } from "../components/MonthPicker";
+import MonthPicker from "../components/MonthPicker";
 import TransactionRow from "../components/TransactionRow";
 const CategoryPieChart = React.lazy(() => import("../components/CategoryPieChart"));
 import TransactionForm from "../components/TransactionForm";
@@ -50,6 +50,14 @@ function today() {
 function firstOfMonth() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+function fmtMonth(y, m) { return `${y}-${String(m).padStart(2, "0")}`; }
+function addMonth(mm, delta) {
+  const [y, m] = mm.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return fmtMonth(d.getFullYear(), String(d.getMonth() + 1));
 }
 
 const fmt = (n) => `£${Number(n || 0).toFixed(2)}`;
@@ -118,8 +126,13 @@ const Transactions = React.memo(function Transactions() {
   const [saveAsRecurring, setSaveAsRecurring] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("ledger");
-  const [hebrewMonths, setHebrewMonths] = useState([]);
-  const [selectedHebrewMonth, setSelectedHebrewMonth] = useState(null);
+  const now = new Date();
+  const urlMonth = (() => {
+    const df = searchParams.get("date_from");
+    if (df && df.length >= 7) return df.slice(0, 7);
+    return null;
+  })();
+  const [month, setMonth] = useState(urlMonth || fmtMonth(now.getFullYear(), String(now.getMonth() + 1)));
   const [categorySpend, setCategorySpend] = useState([]);
   const [showPie, setShowPie] = useState(false);
 
@@ -253,11 +266,15 @@ const Transactions = React.memo(function Transactions() {
       if (data.enabled === false) {
         toast.error("Turn auto-Maaser on first");
       } else {
-        toast.success(`Accrued maaser for ${data.created} income tx · ${fmt(data.total_amount)}`);
+        const parts = [`Accrued maaser for ${data.created} income tx · ${fmt(data.total_amount)}`];
+        if (data.charity_applied > 0) {
+          parts.push(`\nApplied ${data.charity_applied} charity tx (${fmt(data.charity_amount)}) against obligation`);
+        }
+        toast.success(parts.join("\n"));
       }
       await refreshMaaser();
     } catch (e) {
-      toast.error(formatApiError(e?.response?.data?.detail) || "Recalculate failed");
+      toast.error(formatApiError(e?.response?.data?.detail) || "Could not recalculate");
     }
     finally { setMaaserBusy(false); }
   };
@@ -466,56 +483,31 @@ const Transactions = React.memo(function Transactions() {
   }, []);
   useEffect(() => { loadAccounts(); }, [loadAccounts]);
 
-  const applyHebrewMonth = useCallback((m) => {
-    if (!m) return;
-    setSelectedHebrewMonth(m);
+  const applyGregorianMonth = useCallback((mm) => {
     setOffset(0);
+    setMonth(mm);
+    const [y, m] = mm.split("-").map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
     setFilters((prev) => ({
       ...prev,
-      date_from: m.gregorian_start,
-      date_to: m.gregorian_end,
+      date_from: `${mm}-01`,
+      date_to: `${mm}-${String(lastDay).padStart(2, "0")}`,
     }));
   }, []);
 
-  const toggleHebrewMonth = useCallback((dir) => {
-    if (!selectedHebrewMonth || hebrewMonths.length === 0) return;
-    const idx = hebrewMonths.findIndex(
-      (m) => m.hebrew_month === selectedHebrewMonth.hebrew_month && m.hebrew_year === selectedHebrewMonth.hebrew_year
-    );
-    const next = dir === "next" ? idx + 1 : idx - 1;
-    if (next >= 0 && next < hebrewMonths.length) {
-      applyHebrewMonth(hebrewMonths[next]);
-    }
-  }, [selectedHebrewMonth, hebrewMonths, applyHebrewMonth]);
+  const monthLabel = (() => {
+    const [y, m] = month.split("-").map(Number);
+    return `${MONTH_NAMES[m - 1]} ${y}`;
+  })();
 
-  const isCurrentHebrewMonth = selectedHebrewMonth?.is_current ?? false;
+  const isCurrentMonth = month === fmtMonth(new Date().getFullYear(), String(new Date().getMonth() + 1));
 
-  const hebrewMonthLabel = selectedHebrewMonth ? (
-    <span>
-      <span dir="rtl" lang="he" className="inline-block">{YIDDISH[selectedHebrewMonth.month_name] || selectedHebrewMonth.month_name}</span>
-      {" "}{selectedHebrewMonth.hebrew_year}
-    </span>
-  ) : null;
-
-  // Load Hebrew months and select current month (only if no date params in URL)
+  // Set initial date filters to current month if no date params in URL
   useEffect(() => {
-    api.get("/jewish/hebcal/months")
-      .then(({ data }) => {
-        const ms = (data.months || []).sort((a, b) => a.gregorian_start.localeCompare(b.gregorian_start));
-        setHebrewMonths(ms);
-        const hasCustomDates = searchParams.get("date_from") || searchParams.get("date_to");
-        if (!hasCustomDates) {
-          const current = ms.find((m) => m.is_current);
-          if (current) applyHebrewMonth(current);
-        } else {
-          const firstOfMonth = ms.find((m) =>
-            filters.date_from === m.gregorian_start &&
-            filters.date_to === m.gregorian_end
-          );
-          if (firstOfMonth) setSelectedHebrewMonth(firstOfMonth);
-        }
-      })
-      .catch(() => { console.warn("[transactions] failed to load Hebrew months"); });
+    const hasCustomDates = searchParams.get("date_from") || searchParams.get("date_to");
+    if (!hasCustomDates) {
+      applyGregorianMonth(month);
+    }
   }, []);
 
   const activeFilters = useMemo(() => {
@@ -532,14 +524,9 @@ const Transactions = React.memo(function Transactions() {
 
   const clearAllFilters = useCallback(() => {
     setSearchInput("");
-    setOffset(0);
-    const current = hebrewMonths.find(m => m.is_current);
-    if (current) {
-      applyHebrewMonth(current);
-    } else {
-      setFilters(prev => ({ ...prev, search: "", tx_type: "", source: "", category: "", amount_min: "", amount_max: "", date_from: "", date_to: "", account_id: "" }));
-    }
-  }, [hebrewMonths, applyHebrewMonth]);
+    const mm = fmtMonth(new Date().getFullYear(), String(new Date().getMonth() + 1));
+    applyGregorianMonth(mm);
+  }, [applyGregorianMonth]);
 
   const totalPages = Math.ceil(total / limit);
   const currentPage = Math.floor(offset / limit) + 1;
@@ -1051,11 +1038,11 @@ const Transactions = React.memo(function Transactions() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <MonthPicker
-                  label={hebrewMonthLabel}
-                  onPrev={() => toggleHebrewMonth("prev")}
-                  onNext={() => toggleHebrewMonth("next")}
-                  onToday={() => { const c = hebrewMonths.find(m => m.is_current); if (c) applyHebrewMonth(c); }}
-                  isToday={isCurrentHebrewMonth}
+                  label={monthLabel}
+                  onPrev={() => applyGregorianMonth(addMonth(month, -1))}
+                  onNext={() => applyGregorianMonth(addMonth(month, 1))}
+                  onToday={() => applyGregorianMonth(fmtMonth(new Date().getFullYear(), String(new Date().getMonth() + 1)))}
+                  isToday={isCurrentMonth}
                 />
               </div>
               {(!someSelected) ? (
@@ -1184,8 +1171,8 @@ const Transactions = React.memo(function Transactions() {
                     <Input type="number" min="0" step="0.01" placeholder="Max £" value={filters.amount_max}
                       onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_max: e.target.value })); }}
                       className="text-sm h-10" />
-                    <Input type="date" value={filters.date_from} onChange={(e) => { if (!e.target.value) { setSelectedHebrewMonth(null); } setOffset(0); setFilters(p => ({ ...p, date_from: e.target.value })); }} className="text-sm h-10" />
-                    <Input type="date" value={filters.date_to} onChange={(e) => { if (!e.target.value) { setSelectedHebrewMonth(null); } setOffset(0); setFilters(p => ({ ...p, date_to: e.target.value })); }} className="text-sm h-10" />
+                    <Input type="date" value={filters.date_from} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_from: e.target.value })); }} className="text-sm h-10" />
+                    <Input type="date" value={filters.date_to} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_to: e.target.value })); }} className="text-sm h-10" />
                   </div>
 
                   <div className="border-t border-border pt-4 space-y-3">
@@ -1283,7 +1270,7 @@ const Transactions = React.memo(function Transactions() {
           <button onClick={() => setShowPie(!showPie)} className="flex items-center justify-between w-full text-left">
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
               <span className="grid h-6 w-6 place-items-center rounded-md bg-muted/70"><PieChartIcon className="h-3 w-3 text-muted-foreground/80" /></span>
-              Spend breakdown{selectedHebrewMonth ? <span className="text-xs font-normal text-muted-foreground">· <span dir="rtl" lang="he">{YIDDISH[selectedHebrewMonth.month_name] || selectedHebrewMonth.month_name}</span> {selectedHebrewMonth.hebrew_year}</span> : ""}
+              Spend breakdown <span className="text-xs font-normal text-muted-foreground">· {monthLabel}</span>
             </h3>
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">{categorySpend.length} categories</span>

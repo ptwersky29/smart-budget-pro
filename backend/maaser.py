@@ -32,6 +32,8 @@ def _is_income_tx(tx: dict) -> bool:
 
 
 def _is_charity_tx(tx: dict) -> bool:
+    if tx.get("approval_status") and tx.get("approval_status") != "approved":
+        return False
     if tx.get("exclude_from_maaser"):
         return False
     if tx.get("is_transfer") or tx.get("tx_type") == "transfer":
@@ -194,6 +196,8 @@ async def backfill_for_user(session, user_id: str) -> dict:
     created = 0
     skipped = 0
     total_amount = 0.0
+    charity_applied = 0
+    charity_amount = 0.0
     for t in txs:
         tx_dict = {
             "transaction_id": t.transaction_id,
@@ -217,6 +221,18 @@ async def backfill_for_user(session, user_id: str) -> dict:
             if entry:
                 await session.delete(entry)
                 await session.flush()
+            # Apply charity expenses against pending obligation
+            if _is_charity_tx(tx_dict):
+                amt = abs(float(t.amount))
+                result = await _apply_giving_to_pending(
+                    session, user_id, amt,
+                    recipient=t.merchant_name or t.description or "Tzedakah",
+                    note=f"Charity (backfill): {t.description}",
+                    tx_id=t.transaction_id,
+                )
+                if result:
+                    charity_applied += 1
+                    charity_amount += amt
             continue
         amt = round(abs(float(t.amount)) * percent / 100, 2)
         if entry:
@@ -241,4 +257,10 @@ async def backfill_for_user(session, user_id: str) -> dict:
         created += 1
         total_amount += amt
     await session.commit()
-    return {"created": created, "skipped": skipped, "total_amount": round(total_amount, 2), "enabled": True}
+    return {
+        "created": created, "skipped": skipped,
+        "total_amount": round(total_amount, 2),
+        "charity_applied": charity_applied,
+        "charity_amount": round(charity_amount, 2),
+        "enabled": True,
+    }
