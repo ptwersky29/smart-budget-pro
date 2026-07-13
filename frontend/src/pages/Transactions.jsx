@@ -125,6 +125,7 @@ const Transactions = React.memo(function Transactions() {
   const [classification, setClassification] = useState(null);
   const [saveAsRecurring, setSaveAsRecurring] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState("ledger");
   const now = new Date();
   const urlMonth = (() => {
@@ -135,8 +136,6 @@ const Transactions = React.memo(function Transactions() {
   const [month, setMonth] = useState(urlMonth || fmtMonth(now.getFullYear(), String(now.getMonth() + 1)));
   const [categorySpend, setCategorySpend] = useState([]);
   const [showPie, setShowPie] = useState(false);
-
-  const [searchParams, setSearchParams] = useSearchParams();
   const defaultFilters = useMemo(() => ({ search: "", category: "", source: "", tx_type: "", date_from: "", date_to: "", amount_min: "", amount_max: "", sort: "date", order: "desc", account_id: "" }), []);
   const [filters, setFilters] = useState(() => {
     const fromUrl = {};
