@@ -107,7 +107,9 @@ async def annual_maaser_summary(
 
         # Calculate obligation and given
         obligation = round(total_income * percent / 100, 2)
-        manual_given = sum((e.maaser_paid or 0) for e in ledger if not (e.income_amount or 0) and not (e.maaser_due or 0) and e.maaser_paid and e.maaser_paid > 0)
+        total_give = sum((e.maaser_paid or 0) for e in ledger if not (e.income_amount or 0) and not (e.maaser_due or 0) and e.maaser_paid and e.maaser_paid > 0)
+        total_all = sum((e.maaser_paid or 0) for e in ledger if e.maaser_paid and e.maaser_paid > 0)
+        manual_given = total_all - total_give
         total_given = manual_given + tx_given
         balance_owed = round(max(0, obligation - total_given), 2)
         credit = round(max(0, total_given - obligation), 2)

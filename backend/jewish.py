@@ -282,8 +282,10 @@ def build_router() -> APIRouter:
                 if amt < 0 and cat in maaser_mod.CHARITY_CATEGORIES and t.transaction_id not in ledger_tx_ids:
                     tx_given += -amt
             
-            # Count maaser_paid from Give entries only (income_amount == 0, maaser_due == 0)
-            manual_given = sum((e.maaser_paid or 0) for e in ledger if not (e.income_amount or 0) and not (e.maaser_due or 0) and e.maaser_paid and e.maaser_paid > 0)
+            # Count maaser_paid from all entries, subtracting Give entries to avoid double-counting
+            total_give = sum((e.maaser_paid or 0) for e in ledger if not (e.income_amount or 0) and not (e.maaser_due or 0) and e.maaser_paid and e.maaser_paid > 0)
+            total_all = sum((e.maaser_paid or 0) for e in ledger if e.maaser_paid and e.maaser_paid > 0)
+            manual_given = total_all - total_give
             
             pending_result = await session.execute(
                 select(MaaserLedger).where(
@@ -885,7 +887,9 @@ def build_router() -> APIRouter:
                 )
             )
             ledger_entries = ledger_result.scalars().all()
-            manual_given = sum((e.maaser_paid or 0) for e in ledger_entries if not (e.income_amount or 0) and not (e.maaser_due or 0) and e.maaser_paid and e.maaser_paid > 0)
+            total_give = sum((e.maaser_paid or 0) for e in ledger_entries if not (e.income_amount or 0) and not (e.maaser_due or 0) and e.maaser_paid and e.maaser_paid > 0)
+            total_all = sum((e.maaser_paid or 0) for e in ledger_entries if e.maaser_paid and e.maaser_paid > 0)
+            manual_given = total_all - total_give
             pending_entries = [e for e in ledger_entries if e.maaser_paid == 0]
             accrued_pending = sum(r.maaser_due or 0 for r in pending_entries)
 
