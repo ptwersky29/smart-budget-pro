@@ -38,14 +38,27 @@ test("setToken stores only in sessionStorage when not persistent", () => {
 });
 
 test("getToken prefers localStorage over sessionStorage", () => {
-  localStorage.setItem("access_token", "local-value");
-  sessionStorage.setItem("access_token", "session-value");
-  expect(getToken("access_token")).toBe("local-value");
+  const localValue = tokenExpiringIn(3600);
+  const sessionValue = tokenExpiringIn(7200);
+  localStorage.setItem("access_token", localValue);
+  sessionStorage.setItem("access_token", sessionValue);
+  expect(getToken("access_token")).toBe(localValue);
 });
 
 test("getToken falls back to sessionStorage when localStorage is empty", () => {
-  sessionStorage.setItem("access_token", "session-value");
-  expect(getToken("access_token")).toBe("session-value");
+  const sessionValue = tokenExpiringIn(3600);
+  sessionStorage.setItem("access_token", sessionValue);
+  expect(getToken("access_token")).toBe(sessionValue);
+});
+
+function tokenExpiringIn(seconds) {
+  const payload = btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + seconds }));
+  return `header.${payload}.sig`;
+}
+
+test("getToken never returns expired or malformed tokens", () => {
+  localStorage.setItem("access_token", "malformed");
+  expect(getToken("access_token")).toBeNull();
 });
 
 test("getToken returns null when no token exists", () => {

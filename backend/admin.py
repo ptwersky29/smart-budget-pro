@@ -6,7 +6,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request, Depends, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func
+from sqlalchemy import delete, select, func
 
 from db import User, Transaction, AuditLog, FeatureFlag, SupportTicket
 from db import SmsMessage, SmsSender

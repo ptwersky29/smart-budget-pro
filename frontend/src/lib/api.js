@@ -9,6 +9,23 @@ const DEFAULT_BACKEND = "https://budget-pro-4jlg.onrender.com";
 export const BACKEND_URL = (process.env.REACT_APP_BACKEND_URL || DEFAULT_BACKEND).replace(/\/+$/, "");
 export const API = `${BACKEND_URL}/api`;
 
+const PUBLIC_ROUTES = new Set([
+  "/",
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/pricing",
+  "/privacy",
+  "/callback",
+  "/billing/success",
+]);
+
+export function isPublicRoute(pathname = "") {
+  const normalized = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+  return PUBLIC_ROUTES.has(normalized);
+}
+
 export const api = axios.create({
   baseURL: API,
   withCredentials: true,
@@ -68,12 +85,15 @@ api.interceptors.response.use(
       !requestUrl.includes("/gdpr/")
     ) {
       originalRequest._retry = true;
+      const storedRt = getToken("refresh_token");
+      if (!storedRt) {
+        clearTokens();
+        return Promise.reject(error);
+      }
       try {
-        const storedRt = getToken("refresh_token");
-        const refreshHeaders = storedRt ? { Authorization: `Bearer ${storedRt}` } : {};
         const refreshResponse = await axios.post(`${API}/auth/refresh`, {}, {
           withCredentials: true,
-          headers: refreshHeaders,
+          headers: { Authorization: `Bearer ${storedRt}` },
         });
         if (refreshResponse?.data?.access_token) {
           setToken("access_token", refreshResponse.data.access_token, true);
@@ -86,8 +106,11 @@ api.interceptors.response.use(
         const status = refreshError?.response?.status;
         console.warn("[auth] refresh failed", status, refreshError?.response?.data);
         clearTokens();
-        // Redirect to login so the user isn't stuck in a zombie authenticated state
-        if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+        // Expired sessions should interrupt private pages, never public browsing.
+        if (
+          typeof window !== "undefined" &&
+          !isPublicRoute(window.location.pathname)
+        ) {
           window.location.assign("/login?expired=1");
         }
       }

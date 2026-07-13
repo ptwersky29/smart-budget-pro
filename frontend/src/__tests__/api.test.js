@@ -1,4 +1,18 @@
-import { formatApiError } from "../lib/api";
+import { formatApiError, isPublicRoute } from "../lib/api";
+
+describe("isPublicRoute", () => {
+  test.each([
+    "/", "/login", "/register", "/forgot-password", "/reset-password",
+    "/pricing", "/privacy", "/callback", "/billing/success",
+  ])("recognizes %s as public", (path) => {
+    expect(isPublicRoute(path)).toBe(true);
+  });
+
+  test.each(["/dashboard", "/settings", "/accounts/123"])(
+    "recognizes %s as private",
+    (path) => expect(isPublicRoute(path)).toBe(false)
+  );
+});
 
 describe("formatApiError", () => {
   test("explains request timeouts", () => {
