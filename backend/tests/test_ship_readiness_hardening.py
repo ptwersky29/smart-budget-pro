@@ -7,6 +7,7 @@ os.environ.setdefault("JWT_SECRET", "ship_readiness_test_secret_value_32_chars_m
 
 from rate_limit import RateLimiter, RateLimitMiddleware, CsrfProtectionMiddleware
 from auth import _token_issued_before_password_change
+from admin import delete as sqlalchemy_delete
 
 
 class _Client:
@@ -60,3 +61,8 @@ def test_tokens_before_password_change_are_rejected():
 
     assert _token_issued_before_password_change(old_payload, user)
     assert not _token_issued_before_password_change(fresh_payload, user)
+
+
+def test_admin_cleanup_uses_sqlalchemy_delete():
+    """Keep the destructive admin cleanup path from failing at runtime."""
+    assert callable(sqlalchemy_delete)

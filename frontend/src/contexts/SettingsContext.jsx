@@ -2,18 +2,28 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
+import { useAuth } from "./AuthContext";
 
 const LS_KEY = "financeai_settings";
 
-function loadFromStorage() {
+function storageKey(userId) {
+  return userId ? `${LS_KEY}:${userId}` : null;
+}
+
+function loadFromStorage(userId) {
   try {
-    const raw = localStorage.getItem(LS_KEY);
+    const key = storageKey(userId);
+    if (!key) return null;
+    const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : null;
   } catch { return null; }
 }
 
-function saveToStorage(data) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch {}
+function saveToStorage(userId, data) {
+  try {
+    const key = storageKey(userId);
+    if (key) localStorage.setItem(key, JSON.stringify(data));
+  } catch {}
 }
 
 const SettingsContext = createContext(null);
@@ -34,6 +44,11 @@ const DEFAULTS = {
     budget_reminders: true, weekly_report: true, spending_alerts: true,
   },
   accessibility: { high_contrast: false, font_scaling: 100, keyboard_navigation: true, reduce_motion: false, enhanced_focus: false },
+};
+
+const DEFAULT_SETTINGS = {
+  language: "en", theme: "system", currency: "GBP",
+  onboarding_completed: false, preferences: DEFAULTS,
 };
 
 function applyToDOM(preferences) {
@@ -63,11 +78,8 @@ function applyToDOM(preferences) {
 
 export function SettingsProvider({ children }) {
   const { setTheme } = useTheme();
-  const cached = useMemo(() => loadFromStorage(), []);
-  const [settings, setSettings] = useState(cached || {
-    language: "en", theme: "system", currency: "GBP",
-    onboarding_completed: false, preferences: DEFAULTS,
-  });
+  const { user, loading: authLoading } = useAuth();
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const settingsRef = useRef(settings);
@@ -75,14 +87,32 @@ export function SettingsProvider({ children }) {
   const debounceTimer = useRef(null);
 
   useEffect(() => {
+    // Earlier releases used one cache for every account on the device.
+    // Drop it rather than risk showing one user's preferences to another.
+    try { localStorage.removeItem(LS_KEY); } catch {}
     applyToDOM(DEFAULTS);
   }, []);
 
   const load = useCallback(async () => {
+    if (!user) {
+      setSettings(DEFAULT_SETTINGS);
+      setTheme("system");
+      applyToDOM(DEFAULTS);
+      setLoaded(true);
+      return;
+    }
+    const userId = user.user_id;
+    const cached = loadFromStorage(userId);
+    if (cached) {
+      setSettings(cached);
+      if (cached.theme) setTheme(cached.theme);
+      applyToDOM(cached.preferences || DEFAULTS);
+    }
+    setLoaded(false);
     try {
       const { data } = await api.get("/settings/app");
       setSettings(data);
-      saveToStorage(data);
+      saveToStorage(userId, data);
       if (data.theme) setTheme(data.theme);
       applyToDOM(data.preferences || DEFAULTS);
     } catch {
@@ -90,9 +120,11 @@ export function SettingsProvider({ children }) {
     } finally {
       setLoaded(true);
     }
-  }, [setTheme]);
+  }, [setTheme, user]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!authLoading) load();
+  }, [authLoading, load]);
 
   const updateSettings = useCallback(async (patch) => {
     const prev = settingsRef.current;
@@ -101,6 +133,10 @@ export function SettingsProvider({ children }) {
     if (patch.theme) setTheme(patch.theme);
     applyToDOM(merged.preferences || DEFAULTS);
 
+    if (!user) {
+      return merged;
+    }
+
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     return new Promise((resolve, reject) => {
       debounceTimer.current = setTimeout(async () => {
@@ -108,11 +144,11 @@ export function SettingsProvider({ children }) {
         try {
           const { data } = await api.put("/settings/app", merged);
           setSettings(data);
-          saveToStorage(data);
+          saveToStorage(user.user_id, data);
           resolve(data);
         } catch (err) {
           setSettings(prev);
-          saveToStorage(prev);
+          saveToStorage(user.user_id, prev);
           if (prev.theme) setTheme(prev.theme);
           applyToDOM(prev.preferences || DEFAULTS);
           toast.error("Failed to save settings");
@@ -122,7 +158,7 @@ export function SettingsProvider({ children }) {
         }
       }, 300);
     });
-  }, [setTheme]);
+  }, [setTheme, user]);
 
   const value = useMemo(() => ({
     settings, loaded, saving, updateSettings, reload: load,

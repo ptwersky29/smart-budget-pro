@@ -3,17 +3,24 @@ import { api } from "../lib/api";
 import { toast } from "sonner";
 import { X } from "lucide-react";
 import { Button } from "./ui/button";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function ConsentBanner() {
+  const { user, loading: authLoading } = useAuth();
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setVisible(false);
+      return;
+    }
     api.get("/gdpr/consent").then(({ data }) => {
       const hasChoice = data?.current?.privacy !== null && data?.current?.privacy !== undefined;
       setVisible(!hasChoice);
-    }).catch(() => setVisible(true));
-  }, []);
+    }).catch(() => setVisible(false));
+  }, [authLoading, user]);
 
   const acceptAll = async () => {
     setBusy(true);
@@ -56,13 +63,16 @@ export default function ConsentBanner() {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-3 left-3 right-3 lg:left-auto lg:right-5 lg:bottom-5 lg:max-w-xl z-50 rounded-lg border border-border bg-background/95 p-4 shadow-2xl backdrop-blur-xl">
+    <section
+      aria-label="Privacy choices"
+      className="fixed bottom-3 left-3 right-3 lg:left-auto lg:right-5 lg:bottom-5 lg:max-w-xl z-50 rounded-lg border border-border bg-background/95 p-4 shadow-2xl backdrop-blur-xl"
+    >
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
         <div className="flex-1 text-sm">
           <p className="font-medium">We value your privacy</p>
           <p className="text-muted-foreground mt-1">
-            We store your financial data securely and never share it with third parties.
-            By continuing, you agree to our{" "}
+            We process your financial data to provide Penni and use trusted service providers
+            for bank connections, payments, messaging, and optional AI features. Read our{" "}
             <a href="/privacy" className="text-emerald hover:underline" target="_blank" rel="noopener noreferrer">
               Privacy Policy
             </a>
@@ -85,6 +95,6 @@ export default function ConsentBanner() {
           </button>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

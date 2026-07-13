@@ -346,7 +346,7 @@ def build_router() -> APIRouter:
 
             await session.commit()
 
-            logger.info("User %s registered. Verification token: %s", user_id[:16], verify_token[:16])
+            logger.info("User %s registered", user_id[:16])
 
             access = create_access_token(user_id, email)
             refresh = create_refresh_token(user_id)
@@ -458,26 +458,6 @@ def build_router() -> APIRouter:
     @router.get("/me", response_model=UserOut)
     async def me(user: dict = Depends(get_current_user)):
         return user
-
-    @router.get("/debug-cookies")
-    async def debug_cookies(request: Request):
-        """Debug: show what cookies and auth headers are being received."""
-        auth_header = request.headers.get("Authorization", "")
-        cookies = dict(request.cookies)
-        origin = request.headers.get("Origin", "")
-        referer = request.headers.get("Referer", "")
-        return {
-            "origin": origin,
-            "referer": referer,
-            "has_auth_header": bool(auth_header),
-            "auth_header_prefix": auth_header[:20] + "..." if auth_header else "",
-            "cookie_names": list(cookies.keys()),
-            "has_access_token": "access_token" in cookies,
-            "has_refresh_token": "refresh_token" in cookies,
-            "has_csrf_token": "csrf_token" in cookies,
-            "access_token_len": len(cookies.get("access_token", "")),
-            "refresh_token_len": len(cookies.get("refresh_token", "")),
-        }
 
     @router.post("/emergent-session", response_model=UserOut)
     async def emergent_session(payload: EmergentSessionIn, request: Request, response: Response):
