@@ -1465,154 +1465,115 @@ const Transactions = React.memo(function Transactions() {
           </button>
         </div>
 
-        {/* Ledger Table */}
+        {/* Unified Maaser Activity */}
         <div className="rounded-xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden">
           <div className="px-4 py-3 flex items-center justify-between border-b border-border/60">
-            <h4 className="text-sm font-medium">All Maaser Transactions</h4>
-            {!maaserLedgerLoading && maaserLedger.length > 0 && (
-              <span className="text-xs text-muted-foreground">{maaserLedger.length} entries</span>
-            )}
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <Star className="h-3.5 w-3.5 text-topaz" />
+              Maaser Activity
+            </h4>
+            {!maaserLedgerLoading && (() => {
+              const txIds = new Set(maaserLedger.filter(e => e.transaction_id).map(e => e.transaction_id));
+              const extraIncome = maaserIncomeTxs.filter(t => !txIds.has(t.transaction_id));
+              const extraCharity = maaserTzedakahTxs.filter(t => !txIds.has(t.transaction_id));
+              const total = maaserLedger.length + extraIncome.length + extraCharity.length;
+              return total > 0 && <span className="text-xs text-muted-foreground">{total} entries</span>;
+            })()}
           </div>
           {maaserLedgerLoading ? (
             <SkeletonTable rows={6} className="p-3" />
-          ) : maaserLedger.length === 0 ? (
-            <EmptyState icon={Star} title="No maaser entries"
-              description="Income transactions with auto-maaser or manual ledger entries will appear here." />
-          ) : (
-            <div className="divide-y divide-border/60">
-              {maaserLedger.map(e => (
-                <div key={e.entry_id} className="px-4 py-3 flex items-center gap-3 text-sm hover:bg-secondary/20 transition-colors">
-                  <div className="min-w-0 flex-1 grid grid-cols-1 sm:grid-cols-[auto_1fr_auto_auto] gap-x-4 gap-y-1 items-center">
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      {e.date || e.income_date ? new Date(e.date || e.income_date).toLocaleDateString("en-GB") : "-"}
-                    </span>
-                    <div className="min-w-0">
-                      {e.income_description ? (
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="truncate max-w-[200px]">{e.income_description}</span>
-                          {e.income_category && <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-secondary capitalize">{e.income_category}</span>}
-                          <span className="text-xs font-medium">{fmt(e.income_amount)}</span>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Manual entry</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 whitespace-nowrap">
-                      <span className="text-xs"><span className="text-muted-foreground">Due: </span><span className="font-medium">{fmt(e.maaser_due)}</span></span>
-                      <span className="text-xs"><span className="text-muted-foreground">Paid: </span>
-                        {e.status === "pending" ? <span className="text-amber-500 font-medium">Pending</span> : <span className="font-medium">{fmt(e.maaser_paid)}</span>}
+          ) : (() => {
+            const txIds = new Set(maaserLedger.filter(e => e.transaction_id).map(e => e.transaction_id));
+            const extraIncome = maaserIncomeTxs.filter(t => !txIds.has(t.transaction_id));
+            const extraCharity = maaserTzedakahTxs.filter(t => !txIds.has(t.transaction_id));
+            const all = [
+              ...maaserLedger.map(e => ({ ...e, _type: "ledger" })),
+              ...extraIncome.map(t => ({ _type: "income", entry_id: `inc_${t.transaction_id}`, date: t.date, income_description: t.description || t.merchant || "—", income_category: t.category, income_amount: t.amount, maaser_due: 0, maaser_paid: 0, status: "income", transaction_id: t.transaction_id })),
+              ...extraCharity.map(t => ({ _type: "charity", entry_id: `tzd_${t.transaction_id}`, date: t.date, income_description: t.description || t.merchant || "—", income_category: t.category || t.merchant || "Tzedakah", income_amount: 0, maaser_due: 0, maaser_paid: Math.abs(t.amount), status: "given", transaction_id: t.transaction_id, paid_to: t.merchant || "Tzedakah" })),
+            ].sort((a, b) => {
+              const da = a.date || a.income_date || "";
+              const db = b.date || b.income_date || "";
+              return db.localeCompare(da);
+            });
+            if (all.length === 0) return (
+              <EmptyState icon={Star} title="No maaser activity" description="Income transactions, giving, and ledger entries will appear here." />
+            );
+            return (
+              <div className="divide-y divide-border/60">
+                {all.map(e => (
+                  <div key={e.entry_id} className="px-4 py-3 flex items-center gap-3 text-sm hover:bg-secondary/20 transition-colors">
+                    <div className="min-w-0 flex-1 grid grid-cols-1 sm:grid-cols-[auto_1fr_auto] gap-x-4 gap-y-1 items-center">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {e.date || e.income_date ? new Date(e.date || e.income_date).toLocaleDateString("en-GB") : "-"}
                       </span>
+                      <div className="min-w-0">
+                        {e.income_description ? (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="truncate max-w-[200px]">{e.income_description}</span>
+                            {e.income_category && <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-secondary capitalize">{e.income_category}</span>}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Manual entry</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 whitespace-nowrap">
+                        {e._type === "income" ? (
+                          <span className="text-xs font-medium text-emerald shrink-0">+{fmt(e.income_amount)}</span>
+                        ) : e._type === "charity" ? (
+                          <span className="text-xs font-medium text-rose-600 shrink-0">-{fmt(e.maaser_paid)}</span>
+                        ) : e.status === "given" ? (
+                          <span className="text-xs font-medium text-rose-600 shrink-0">-{fmt(e.maaser_paid)}</span>
+                        ) : (
+                          <span className="text-xs"><span className="text-muted-foreground">Due: </span><span className="font-medium">{fmt(e.maaser_due)}</span></span>
+                        )}
+                        {e._type === "ledger" && e.status !== "given" && (
+                          <span className="text-xs"><span className="text-muted-foreground">Paid: </span>
+                            {e.status === "pending" ? <span className="text-amber-500 font-medium">Pending</span> : <span className="font-medium">{fmt(e.maaser_paid)}</span>}
+                          </span>
+                        )}
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                          e._type === "income" ? "bg-emerald/10 text-emerald" :
+                          e._type === "charity" || (e._type === "ledger" && e.status === "given") ? "bg-rose-50 text-rose-600" :
+                          e.status === "given" ? "bg-emerald/10 text-emerald" :
+                          "bg-amber/10 text-amber-500"
+                        }`}>
+                          {e._type === "income" ? "Income" :
+                           e._type === "charity" ? "Given" :
+                           e.status === "given" ? "Given" : "Pending"}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${e.status === "given" ? "bg-emerald/10 text-emerald" : "bg-amber/10 text-amber-500"}`}>
-                        {e.status === "given" ? "Given" : "Pending"}
-                      </span>
+                    {e._type === "ledger" && (
                       <DropdownMenu>
                         <DropdownMenuTrigger className="p-1 rounded-lg hover:bg-secondary text-muted-foreground">
                           <MoreHorizontal className="h-3.5 w-3.5" />
                         </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleMaaserEdit(e)}>
-                              <Pencil className="h-3.5 w-3.5 mr-2" /> Edit
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleMaaserEdit(e)}>
+                            <Pencil className="h-3.5 w-3.5 mr-2" /> Edit
+                          </DropdownMenuItem>
+                          {e.status === "pending" && (
+                            <DropdownMenuItem onClick={() => handleMaaserPay(e.entry_id)}>
+                              <CheckCircle2 className="h-3.5 w-3.5 mr-2" /> Mark Paid
                             </DropdownMenuItem>
-                            {e.status === "pending" && (
-                              <DropdownMenuItem onClick={() => handleMaaserPay(e.entry_id)}>
-                                <CheckCircle2 className="h-3.5 w-3.5 mr-2" /> Mark Paid
-                              </DropdownMenuItem>
-                            )}
-                            {e.status === "pending" && e.transaction_id && (
-                              <DropdownMenuItem onClick={() => handleMaaserExclude(e.transaction_id)}>
-                                <X className="h-3.5 w-3.5 mr-2" /> Exclude from Maaser
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleMaaserDelete(e.entry_id)} className="text-ruby">
-                              <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                          )}
+                          {e.status === "pending" && e.transaction_id && (
+                            <DropdownMenuItem onClick={() => handleMaaserExclude(e.transaction_id)}>
+                              <X className="h-3.5 w-3.5 mr-2" /> Exclude from Maaser
                             </DropdownMenuItem>
-                          </DropdownMenuContent>
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleMaaserDelete(e.entry_id)} className="text-ruby">
+                            <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
                       </DropdownMenu>
-                    </div>
+                    )}
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Income Generating Maaser */}
-        <div className="rounded-xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden mt-4">
-          <div className="px-4 py-3 flex items-center justify-between border-b border-border/60">
-            <h4 className="text-sm font-medium flex items-center gap-2">
-              <RefreshCw className="h-3.5 w-3.5 text-emerald" />
-              Income Generating Maaser
-            </h4>
-            {!maaserIncomeTxsLoading && maaserIncomeTxs.length > 0 && (
-              <span className="text-xs text-muted-foreground">{maaserIncomeTxs.length} transactions</span>
-            )}
-          </div>
-          {maaserIncomeTxsLoading ? (
-            <SkeletonTable rows={4} className="p-3" />
-          ) : maaserIncomeTxs.length === 0 ? (
-            <EmptyState icon={RefreshCw} title="No income transactions"
-              description="Income transactions that aren't excluded from Maaser will appear here." />
-          ) : (
-            <div className="divide-y divide-border/60">
-              {maaserIncomeTxs.map(t => (
-                <button
-                  key={t.transaction_id}
-                  onClick={() => openEdit(t)}
-                  className="w-full text-left px-4 py-3 flex items-center gap-3 text-sm hover:bg-secondary/20 transition-colors"
-                >
-                  <span className="text-xs text-muted-foreground whitespace-nowrap w-20">
-                    {t.date ? new Date(t.date).toLocaleDateString("en-GB") : "-"}
-                  </span>
-                  <span className="flex-1 truncate min-w-0">{t.description || t.merchant || "—"}</span>
-                  {t.category && (
-                    <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-secondary capitalize">{t.category}</span>
-                  )}
-                  <span className="text-xs font-medium text-emerald shrink-0">+{fmt(t.amount)}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Maaser Given / Tzedakah */}
-        <div className="rounded-xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden mt-4">
-          <div className="px-4 py-3 flex items-center justify-between border-b border-border/60">
-            <h4 className="text-sm font-medium flex items-center gap-2">
-              <Star className="h-3.5 w-3.5 text-topaz" />
-              Maaser Given / Tzedakah
-            </h4>
-            {!maaserTzedakahTxsLoading && maaserTzedakahTxs.length > 0 && (
-              <span className="text-xs text-muted-foreground">{maaserTzedakahTxs.length} transactions</span>
-            )}
-          </div>
-          {maaserTzedakahTxsLoading ? (
-            <SkeletonTable rows={4} className="p-3" />
-          ) : maaserTzedakahTxs.length === 0 ? (
-            <EmptyState icon={Star} title="No tzedakah transactions"
-              description="Use the 'Give' button above to record Maaser giving." />
-          ) : (
-            <div className="divide-y divide-border/60">
-              {maaserTzedakahTxs.map(t => (
-                <button
-                  key={t.transaction_id}
-                  onClick={() => openEdit(t)}
-                  className="w-full text-left px-4 py-3 flex items-center gap-3 text-sm hover:bg-secondary/20 transition-colors"
-                >
-                  <span className="text-xs text-muted-foreground whitespace-nowrap w-20">
-                    {t.date ? new Date(t.date).toLocaleDateString("en-GB") : "-"}
-                  </span>
-                  <span className="flex-1 truncate min-w-0">{t.description || t.merchant || "—"}</span>
-                  <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-secondary capitalize truncate max-w-[100px]">
-                    {t.merchant || "Tzedakah"}
-                  </span>
-                  <span className="text-xs font-medium text-rose-600 shrink-0">{fmt(Math.abs(t.amount))}</span>
-                </button>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Edit Modal */}
