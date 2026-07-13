@@ -151,16 +151,22 @@ export default function AccountFormModal({ open, onClose, onCreated, editAccount
   const isSavings = accountType === "savings";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="account-form-title"
+    >
       <div className="w-full max-w-md rounded-2xl bg-card border border-border/60 shadow-xl p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <span className={`grid h-8 w-8 place-items-center rounded-xl ${isSavings ? "bg-violet/10 text-violet" : "bg-emerald/10 text-emerald"}`}>
               {isSavings ? <Lock className="h-4 w-4" /> : <Wallet className="h-4 w-4" />}
             </span>
-            <h2 className="text-lg font-semibold">{editAccount ? "Edit Account" : "New Account"}</h2>
+            <h2 id="account-form-title" className="text-lg font-semibold">{editAccount ? "Edit Account" : "New Account"}</h2>
           </div>
-          <button onClick={onClose} className="h-8 w-8 rounded-full grid place-items-center hover:bg-secondary/60 transition-colors">
+          <button onClick={onClose} className="h-8 w-8 rounded-full grid place-items-center hover:bg-secondary/60 transition-colors" aria-label="Close">
             <X className="h-4 w-4" />
           </button>
         </div>

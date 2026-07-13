@@ -3,7 +3,7 @@ import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
 import { withUndo } from "../lib/undo";
 import { Loader2, Plus, Trash2, Pencil, RefreshCcw, Sparkles, Bell, ChevronDown, RefreshCw } from "lucide-react";
-import { EmptyState, SectionCard } from "../components/ui/layout";
+import { EmptyState, PageHeader, SectionCard } from "../components/ui/layout";
 import {
   DropdownMenu,
   DropdownMenuTrigger,

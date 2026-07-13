@@ -542,11 +542,16 @@ def build_router() -> APIRouter:
         async with sm() as session:
             tx_id = payload.transaction_id or f"tz_{_uuid.uuid4().hex[:12]}"
             entry_date = _parse_date(payload.date) or datetime.now(timezone.utc)
+            amount = abs(float(payload.amount))
+            if amount <= 0:
+                raise HTTPException(400, "Amount must be positive")
+
+            # Record the giving as a transaction (excluded from auto-maaser to avoid double-count)
             desc = f"Tzedakah — {payload.recipient}" + (f" ({payload.note})" if payload.note else "")
             tx = Transaction(
                 transaction_id=tx_id,
                 user_id=user["user_id"],
-                amount=-abs(float(payload.amount)),
+                amount=-amount,
                 currency="GBP",
                 description=desc,
                 merchant_name=payload.recipient,
@@ -555,18 +560,49 @@ def build_router() -> APIRouter:
                 date=entry_date,
                 source="tzedakah",
                 notes=payload.note,
+                exclude_from_maaser=True,
             )
             session.add(tx)
             await session.flush()
-            entry = MaaserLedger(
-                user_id=user["user_id"], maaser_paid=payload.amount, paid_to=payload.recipient,
-                note=payload.note, transaction_id=tx_id,
-                date=entry_date,
+
+            # Apply giving against pending (unpaid) auto-accrued entries first (FIFO)
+            pending = await session.execute(
+                select(MaaserLedger).where(
+                    MaaserLedger.user_id == user["user_id"],
+                    MaaserLedger.maaser_paid < MaaserLedger.maaser_due,
+                ).order_by(MaaserLedger.date.asc())
             )
-            session.add(entry)
-            await session.commit()
-            await session.refresh(entry)
-            out = _tz_to_dict(entry)
+            pending_entries = pending.scalars().all()
+            remaining = amount
+            last_entry = None
+            for entry in pending_entries:
+                if remaining <= 0:
+                    break
+                owed = entry.maaser_due - (entry.maaser_paid or 0)
+                if owed <= 0:
+                    continue
+                payment = min(remaining, owed)
+                entry.maaser_paid = (entry.maaser_paid or 0) + payment
+                if payload.recipient:
+                    entry.paid_to = payload.recipient
+                remaining -= payment
+                last_entry = entry
+
+            # Any leftover amount creates a new ledger entry
+            if remaining > 0:
+                entry = MaaserLedger(
+                    user_id=user["user_id"], maaser_paid=remaining, paid_to=payload.recipient,
+                    note=payload.note, transaction_id=tx_id,
+                    date=entry_date,
+                )
+                session.add(entry)
+                await session.commit()
+                await session.refresh(entry)
+                out = _tz_to_dict(entry)
+            else:
+                await session.commit()
+                await session.refresh(last_entry)
+                out = _tz_to_dict(last_entry) if last_entry else {"entry_id": ""}
             out["transaction_id"] = tx_id
             return out
 
