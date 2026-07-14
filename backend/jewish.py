@@ -508,6 +508,33 @@ def build_router() -> APIRouter:
             await session.commit()
             return {"ok": True}
 
+    @router.post("/maaser/exclude/{entry_id}")
+    async def exclude_from_maaser(entry_id: str, request: Request, user: dict = Depends(get_current_user)):
+        sm = request.app.state.db
+        async with sm() as session:
+            eid = int(entry_id.replace("tz_", "")) if entry_id.startswith("tz_") else int(entry_id)
+            result = await session.execute(
+                select(MaaserLedger).where(
+                    MaaserLedger.id == eid, MaaserLedger.user_id == user["user_id"],
+                )
+            )
+            entry = result.scalar_one_or_none()
+            if not entry:
+                raise HTTPException(404, "Entry not found")
+            if entry.transaction_id:
+                tx_result = await session.execute(
+                    select(Transaction).where(
+                        Transaction.transaction_id == entry.transaction_id,
+                        Transaction.user_id == user["user_id"],
+                    )
+                )
+                tx = tx_result.scalar_one_or_none()
+                if tx:
+                    tx.exclude_from_maaser = True
+            await session.delete(entry)
+            await session.commit()
+            return {"ok": True}
+
     @router.post("/maaser/reset")
     async def reset_accrued(request: Request, user: dict = Depends(get_current_user)):
         sm = request.app.state.db

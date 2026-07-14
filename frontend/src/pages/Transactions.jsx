@@ -374,11 +374,15 @@ const Transactions = React.memo(function Transactions() {
     }
   };
 
-  const handleMaaserExclude = async (transactionId) => {
-    if (!transactionId) { toast.error("No linked transaction"); return; }
+  const handleMaaserExclude = async (entryId, transactionId) => {
+    if (!entryId) { toast.error("Missing entry"); return; }
     setMaaserBusy(true);
     try {
-      await api.patch(`/transactions/${transactionId}`, { exclude_from_maaser: true });
+      if (transactionId) {
+        await api.post(`/jewish/maaser/exclude/${entryId}`);
+      } else {
+        await api.delete(`/jewish/maaser/ledger/${entryId}`);
+      }
       toast.success("Income excluded from Maaser");
       await refreshMaaser();
     } catch (e) {
@@ -1521,6 +1525,22 @@ const Transactions = React.memo(function Transactions() {
                           <span className="text-xs font-medium text-emerald shrink-0">+{fmt(e.income_amount)}</span>
                         ) : e._type === "charity" ? (
                           <span className="text-xs font-medium text-rose-600 shrink-0">-{fmt(e.maaser_paid)}</span>
+                        ) : e._type === "ledger" && e.income_amount ? (
+                          <>
+                            <span className="text-xs text-muted-foreground shrink-0">
+                              Income: {fmt(e.income_amount)}
+                            </span>
+                            {e.status === "given" ? (
+                              <span className="text-xs font-medium text-rose-600 shrink-0">
+                                Given: {fmt(e.maaser_paid)}
+                              </span>
+                            ) : (
+                              <span className="text-xs shrink-0">
+                                <span className="text-muted-foreground">Due: </span>
+                                <span className="font-medium">{fmt(e.maaser_due)}</span>
+                              </span>
+                            )}
+                          </>
                         ) : e.status === "given" ? (
                           <span className="text-xs font-medium text-rose-600 shrink-0">-{fmt(e.maaser_paid)}</span>
                         ) : (
@@ -1557,8 +1577,8 @@ const Transactions = React.memo(function Transactions() {
                               <CheckCircle2 className="h-3.5 w-3.5 mr-2" /> Mark Paid
                             </DropdownMenuItem>
                           )}
-                          {e.status === "pending" && e.transaction_id && (
-                            <DropdownMenuItem onClick={() => handleMaaserExclude(e.transaction_id)}>
+                          {e.income_amount && (
+                            <DropdownMenuItem onClick={() => handleMaaserExclude(e.entry_id, e.transaction_id)}>
                               <X className="h-3.5 w-3.5 mr-2" /> Exclude from Maaser
                             </DropdownMenuItem>
                           )}
