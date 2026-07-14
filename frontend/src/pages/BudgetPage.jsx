@@ -325,6 +325,7 @@ export default React.memo(function BudgetPage() {
   }, [month, year, mNum]);
 
   const openTxEdit = useCallback((tx) => {
+    setBudgetTxOpen(false);
     setTxEditId(tx.transaction_id);
     setTxEditForm({
       description: tx.description || "",
@@ -346,6 +347,7 @@ export default React.memo(function BudgetPage() {
   const closeTxEdit = useCallback(() => {
     setTxEditId(null);
     setTxEditForm(null);
+    setBudgetTxOpen(true);
   }, []);
   const monthLabel = `${MONTH_NAMES[mNum - 1]} ${year}`;
   const isCurrentMonth = month === fmtMonth(now.getFullYear(), now.getMonth() + 1);
