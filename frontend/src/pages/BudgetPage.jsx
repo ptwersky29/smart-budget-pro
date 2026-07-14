@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { parseISO, isBefore, getDaysInMonth, getDate } from "date-fns";
+import { parseISO, isBefore, getDaysInMonth, getDate, format } from "date-fns";
 import {
   RefreshCw, Wallet, ShoppingCart, Calendar, Plus, Pencil, Trash2,
   Check, X, Target, TrendingDown, ChevronDown, ChevronUp,
   Sparkles, TrendingUp, Download, Search, Copy, MoreHorizontal,
-  Lock, PiggyBank, Home, AlertCircle,
+  Lock, PiggyBank, Home, AlertCircle, ExternalLink,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
@@ -21,6 +21,13 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "../components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "../components/ui/sheet";
+import TransactionForm from "../components/TransactionForm";
 
 function fmtMonth(y, m) { return `${y}-${String(m).padStart(2, "0")}`; }
 
@@ -61,7 +68,7 @@ function ProgressRing({ pct, size = 40, stroke = 3.5, color }) {
   );
 }
 
-const BudgetCard = React.memo(({ budget, isCurrentMonth, currentDay, monthElapsedPct, daysInMonth, editingId, form, setForm, cancelEdit, handleUpdate, startEdit, bulkSelected, setBulkSelected, setConfirmDelete }) => {
+const BudgetCard = React.memo(({ budget, isCurrentMonth, currentDay, monthElapsedPct, daysInMonth, editingId, form, setForm, cancelEdit, handleUpdate, startEdit, bulkSelected, setBulkSelected, setConfirmDelete, openBudgetTransactions }) => {
   const pct = budget.progress_pct || 0;
   const over = pct >= 100;
   const isEditing = editingId === budget.budget_id;
@@ -92,14 +99,18 @@ const BudgetCard = React.memo(({ budget, isCurrentMonth, currentDay, monthElapse
   }
   const isSelected = bulkSelected.has(budget.budget_id);
   const statusLabel = over ? "Over" : pct >= 80 ? "Nearing" : "On track";
+  const handleCardClick = (e) => {
+    if (e.target.closest("button, input, select, a")) return;
+    openBudgetTransactions(budget);
+  };
   return (
-    <div key={budget.budget_id} className={`rounded-xl border ${isSelected ? "border-emerald bg-emerald/[0.03] ring-1 ring-emerald/30" : "border-border/50 bg-background/40"} backdrop-blur-xl p-3 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-border transition-all duration-300 relative overflow-hidden border-l-[3px] ${over ? "border-l-ruby" : pct >= 80 ? "border-l-topaz" : "border-l-emerald"}`}>
+    <div key={budget.budget_id} onClick={handleCardClick} className={`rounded-xl border ${isSelected ? "border-emerald bg-emerald/[0.03] ring-1 ring-emerald/30" : "border-border/50 bg-background/40"} backdrop-blur-xl p-3 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-border transition-all duration-300 relative overflow-hidden border-l-[3px] cursor-pointer ${over ? "border-l-ruby" : pct >= 80 ? "border-l-topaz" : "border-l-emerald"}`}>
       <div className="flex items-start gap-2.5 mb-2">
         <input type="checkbox" checked={isSelected} onChange={() => {
           const next = new Set(bulkSelected);
           if (isSelected) next.delete(budget.budget_id); else next.add(budget.budget_id);
           setBulkSelected(next);
-        }} className="shrink-0 w-4 h-4 rounded border-border text-emerald focus:ring-emerald/30 mt-0.5" />
+        }} className="shrink-0 w-4 h-4 rounded border-border text-emerald focus:ring-emerald/30 mt-0.5" onClick={(e) => e.stopPropagation()} />
         <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${over ? "from-ruby to-ruby/70" : pct >= 80 ? "from-topaz to-topaz/70" : "from-emerald to-emerald/70"} flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-sm`}>
           {budget.category[0].toUpperCase()}
         </div>
@@ -108,7 +119,7 @@ const BudgetCard = React.memo(({ budget, isCurrentMonth, currentDay, monthElapse
           <span className={`w-1.5 h-1.5 rounded-full ${over ? "bg-ruby" : pct >= 80 ? "bg-topaz" : "bg-emerald"} shrink-0`} />
           <span className={`text-[10px] font-semibold ${over ? "text-ruby" : pct >= 80 ? "text-topaz" : "text-emerald"} hidden sm:inline`}>{statusLabel}</span>
         </div>
-        <div className="flex gap-0.5">
+        <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
           <button onClick={() => startEdit(budget)} className="p-1.5 rounded-lg bg-secondary/30 hover:bg-secondary text-muted-foreground hover:text-foreground transition-all" aria-label={`Edit ${budget.category}`}>
             <Pencil className="h-3.5 w-3.5" />
           </button>
@@ -287,6 +298,79 @@ export default React.memo(function BudgetPage() {
   const [sortOrder, setSortOrder] = useState("desc");
   const [categoryHierarchy, setCategoryHierarchy] = useState({});
   const [categorySpend, setCategorySpend] = useState([]);
+
+  // Transaction sheet state
+  const [budgetTxOpen, setBudgetTxOpen] = useState(false);
+  const [budgetTxCategory, setBudgetTxCategory] = useState("");
+  const [budgetTxList, setBudgetTxList] = useState([]);
+  const [budgetTxLoading, setBudgetTxLoading] = useState(false);
+  const [txEditForm, setTxEditForm] = useState(null);
+  const [txEditId, setTxEditId] = useState(null);
+
+  const openBudgetTransactions = useCallback(async (budget) => {
+    setBudgetTxCategory(budget.category);
+    setBudgetTxOpen(true);
+    setBudgetTxLoading(true);
+    try {
+      const lastDay = getDaysInMonth(new Date(budget.month ? parseInt(budget.month.slice(0, 4), 10) : year, budget.month ? parseInt(budget.month.slice(5, 7), 10) - 1 : mNum - 1));
+      const txMonth = budget.month || month;
+      const { data } = await api.get("/transactions", {
+        params: { category: budget.category, date_from: `${txMonth}-01`, date_to: `${txMonth}-${String(lastDay).padStart(2, "0")}` },
+      });
+      setBudgetTxList(data.transactions || []);
+    } catch { setBudgetTxList([]); }
+    finally { setBudgetTxLoading(false); }
+  }, [month, year, mNum]);
+
+  const openTxEdit = useCallback((tx) => {
+    setTxEditId(tx.transaction_id);
+    setTxEditForm({
+      description: tx.description || "",
+      date: tx.date?.slice(0, 10) || "",
+      amount: String(Math.abs(tx.amount)),
+      category: tx.category || "",
+      account_id: tx.account_id || "",
+      entry_mode: "standard",
+      is_income: tx.amount > 0,
+      is_transfer: false,
+      exclude_from_maaser: tx.exclude_from_maaser || false,
+      budget_type: "",
+      occasion: "",
+      merchant: tx.merchant || "",
+      notes: tx.notes || "",
+    });
+  }, []);
+
+  const closeTxEdit = useCallback(() => {
+    setTxEditId(null);
+    setTxEditForm(null);
+  }, []);
+
+  const handleTxEditSubmit = useCallback(async () => {
+    if (!txEditForm || !txEditId) return;
+    const payload = {
+      description: txEditForm.description,
+      amount: txEditForm.is_income ? Math.abs(parseFloat(txEditForm.amount)) : -Math.abs(parseFloat(txEditForm.amount)),
+      category: txEditForm.category,
+      date: txEditForm.date,
+      merchant: txEditForm.merchant || undefined,
+      notes: txEditForm.notes || undefined,
+      is_income: txEditForm.is_income,
+    };
+    try {
+      await api.patch(`/transactions/${txEditId}`, payload);
+      toast.success("Transaction updated");
+      closeTxEdit();
+      const lastDay = getDaysInMonth(new Date(year, mNum - 1));
+      const { data } = await api.get("/transactions", {
+        params: { category: budgetTxCategory, date_from: `${month}-01`, date_to: `${month}-${String(lastDay).padStart(2, "0")}` },
+      });
+      setBudgetTxList(data.transactions || []);
+      await fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Could not update");
+    }
+  }, [txEditForm, txEditId, budgetTxCategory, month, year, mNum, closeTxEdit, fetchData]);
 
   const { year, month: mNum } = parseMonth(month);
   const monthLabel = `${MONTH_NAMES[mNum - 1]} ${year}`;
@@ -827,7 +911,7 @@ export default React.memo(function BudgetPage() {
                   </span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {items.map((b) => <BudgetCard key={b.budget_id} budget={b} isCurrentMonth={isCurrentMonth} currentDay={currentDay} monthElapsedPct={monthElapsedPct} daysInMonth={daysInMonth} editingId={editingId} form={form} setForm={setForm} cancelEdit={cancelEdit} handleUpdate={handleUpdate} startEdit={startEdit} bulkSelected={bulkSelected} setBulkSelected={setBulkSelected} setConfirmDelete={setConfirmDelete} />)}
+                  {items.map((b) => <BudgetCard key={b.budget_id} budget={b} isCurrentMonth={isCurrentMonth} currentDay={currentDay} monthElapsedPct={monthElapsedPct} daysInMonth={daysInMonth} editingId={editingId} form={form} setForm={setForm} cancelEdit={cancelEdit} handleUpdate={handleUpdate} startEdit={startEdit} bulkSelected={bulkSelected} setBulkSelected={setBulkSelected} setConfirmDelete={setConfirmDelete} openBudgetTransactions={openBudgetTransactions} />)}
                   <button onClick={() => openAddBudget("everyday")}
                     className="rounded-xl border-2 border-dashed border-border/40 hover:border-emerald/40 hover:bg-emerald/5 hover:text-emerald hover:scale-[1.02] active:scale-[0.98] text-muted-foreground/50 transition-all duration-200 flex flex-col items-center justify-center p-3 w-full group/add">
                     <Plus className="h-5 w-5 mb-1.5 group-hover/add:rotate-90 transition-transform duration-300" />
@@ -1226,6 +1310,65 @@ export default React.memo(function BudgetPage() {
         }}
         onCancel={() => setConfirmBulkDelete(false)}
       />
+
+      {/* Budget Transactions Sheet */}
+      <Sheet open={budgetTxOpen} onOpenChange={setBudgetTxOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-lg p-0 flex flex-col">
+          <SheetHeader className="p-4 pb-0">
+            <SheetTitle className="flex items-center gap-2 text-base">
+              {budgetTxCategory && <><span className="w-2 h-2 rounded-full bg-emerald shrink-0" /><span className="capitalize">{budgetTxCategory}</span></>}
+            </SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto p-4 space-y-1">
+            {budgetTxLoading ? (
+              <div className="space-y-2 p-4">
+                {[...Array(5)].map((_, i) => <div key={i} className="h-12 rounded-lg bg-muted/40 animate-pulse" />)}
+              </div>
+            ) : budgetTxList.length === 0 ? (
+              <div className="text-center py-12 text-sm text-muted-foreground">No transactions for this budget</div>
+            ) : (
+              budgetTxList.map((tx) => (
+                <div key={tx.transaction_id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-secondary/30 transition-colors group">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${tx.amount > 0 ? "bg-emerald/10 text-emerald" : "bg-rose-50 text-rose-600"}`}>
+                    {tx.amount > 0 ? "+" : "-"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium truncate">{tx.description || tx.merchant || "—"}</span>
+                      {tx.category && <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-secondary capitalize">{tx.category}</span>}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {tx.date ? format(new Date(tx.date), "dd MMM yyyy") : "—"}
+                      {tx.merchant && <span> · {tx.merchant}</span>}
+                    </div>
+                  </div>
+                  <span className={`text-sm font-semibold tabular-nums shrink-0 ${tx.amount > 0 ? "text-emerald" : "text-rose-600"}`}>
+                    {tx.amount > 0 ? "+" : ""}£{Math.abs(tx.amount).toFixed(2)}
+                  </span>
+                  <button onClick={() => openTxEdit(tx)} className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground hover:bg-secondary transition-all" aria-label="Edit transaction">
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Transaction Edit Modal */}
+      {txEditForm && (
+        <TransactionForm
+          open={!!txEditForm}
+          editingId={txEditId}
+          form={txEditForm}
+          setForm={setTxEditForm}
+          onClose={closeTxEdit}
+          onSubmit={handleTxEditSubmit}
+          selectedCats={[]}
+          accounts={[]}
+          accountsLoading={false}
+        />
+      )}
     </div>
   );
 });
