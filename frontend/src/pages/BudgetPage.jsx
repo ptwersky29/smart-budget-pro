@@ -490,7 +490,8 @@ export default React.memo(function BudgetPage() {
     }
   }, [month]);
 
-  const handleTxEditSubmit = useCallback(async () => {
+  const handleTxEditSubmit = useCallback(async (e) => {
+    e.preventDefault();
     if (!txEditForm || !txEditId) return;
     const payload = {
       description: txEditForm.description,
@@ -500,6 +501,7 @@ export default React.memo(function BudgetPage() {
       merchant: txEditForm.merchant || undefined,
       notes: txEditForm.notes || undefined,
       is_income: txEditForm.is_income,
+      account_id: txEditForm.account_id || undefined,
     };
     try {
       await api.patch(`/transactions/${txEditId}`, payload);
