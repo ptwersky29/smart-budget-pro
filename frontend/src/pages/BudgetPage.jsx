@@ -5,6 +5,9 @@ import {
   Check, X, Target, TrendingDown, ChevronDown, ChevronUp,
   Sparkles, TrendingUp, Download, Search, Copy, MoreHorizontal,
   Lock, PiggyBank, Home, AlertCircle, ExternalLink,
+  Car, Utensils, Zap, Gift, Film, Heart, BookOpen,
+  Shirt, Gamepad2, Plane, Coffee, Briefcase, Smartphone,
+  ArrowUpRight,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
@@ -55,6 +58,24 @@ const SECTION_ICONS = {
   other: Home,
 };
 
+const CATEGORY_ICONS = {
+  food: ShoppingCart, groceries: ShoppingCart,
+  dining: Utensils, restaurant: Utensils, takeaway: Utensils,
+  transport: Car, fuel: Car, petrol: Car, parking: Car,
+  housing: Home, rent: Home, mortgage: Home,
+  utilities: Zap, electricity: Zap, gas: Zap, water: Zap,
+  entertainment: Film, leisure: Film,
+  shopping: ShoppingCart, clothing: Shirt, fashion: Shirt,
+  health: Heart, medical: Heart, pharmacy: Heart,
+  education: BookOpen,
+  subscriptions: Smartphone, phone: Smartphone,
+  travel: Plane, holiday: Plane, vacation: Plane,
+  gifts: Gift, charity: Gift, donation: Gift,
+  general: Briefcase, business: Briefcase,
+  coffee: Coffee, snacks: Coffee,
+  gaming: Gamepad2, games: Gamepad2,
+};
+
 function ProgressRing({ pct, size = 40, stroke = 3.5, color }) {
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
@@ -103,23 +124,24 @@ const BudgetCard = React.memo(({ budget, isCurrentMonth, currentDay, monthElapse
     if (e.target.closest("button, input, select, a")) return;
     openBudgetTransactions(budget);
   };
+  const CatIcon = CATEGORY_ICONS[budget.category.toLowerCase().trim()] || (pct >= 100 ? TrendingDown : Target);
   return (
-    <div key={budget.budget_id} onClick={handleCardClick} className={`rounded-xl border ${isSelected ? "border-emerald bg-emerald/[0.03] ring-1 ring-emerald/30" : "border-border/50 bg-background/40"} backdrop-blur-xl p-3 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-border transition-all duration-300 relative overflow-hidden border-l-[3px] cursor-pointer ${over ? "border-l-ruby" : pct >= 80 ? "border-l-topaz" : "border-l-emerald"}`}>
-      <div className="flex items-start gap-2.5 mb-2">
+    <div key={budget.budget_id} onClick={handleCardClick} className={`group rounded-xl border ${isSelected ? "border-emerald bg-emerald/[0.03] ring-1 ring-emerald/30" : "border-border/50 bg-background/40"} backdrop-blur-xl p-3 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-border transition-all duration-300 relative overflow-hidden border-l-[3px] cursor-pointer ${over ? "border-l-ruby" : pct >= 80 ? "border-l-topaz" : "border-l-emerald"}`}>
+      <div className="flex items-start gap-2 mb-2">
+        <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${over ? "from-ruby to-ruby/70" : pct >= 80 ? "from-topaz to-topaz/70" : "from-emerald to-emerald/70"} flex items-center justify-center text-white shrink-0 shadow-sm`}>
+          <CatIcon className="h-3.5 w-3.5" />
+        </div>
+        <h3 className="text-sm font-semibold capitalize truncate leading-tight tracking-tight flex-1 pt-0.5">{budget.category}</h3>
         <input type="checkbox" checked={isSelected} onChange={() => {
           const next = new Set(bulkSelected);
           if (isSelected) next.delete(budget.budget_id); else next.add(budget.budget_id);
           setBulkSelected(next);
-        }} className="shrink-0 w-4 h-4 rounded border-border text-emerald focus:ring-emerald/30 mt-0.5" onClick={(e) => e.stopPropagation()} />
-        <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${over ? "from-ruby to-ruby/70" : pct >= 80 ? "from-topaz to-topaz/70" : "from-emerald to-emerald/70"} flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-sm`}>
-          {budget.category[0].toUpperCase()}
-        </div>
-        <h3 className="text-sm font-semibold capitalize truncate leading-tight tracking-tight flex-1 pt-0.5">{budget.category}</h3>
+        }} className="shrink-0 w-3.5 h-3.5 rounded border-border text-emerald focus:ring-emerald/30 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity mt-1" onClick={(e) => e.stopPropagation()} />
         <div className="flex items-center gap-1 mt-1">
           <span className={`w-1.5 h-1.5 rounded-full ${over ? "bg-ruby" : pct >= 80 ? "bg-topaz" : "bg-emerald"} shrink-0`} />
           <span className={`text-[10px] font-semibold ${over ? "text-ruby" : pct >= 80 ? "text-topaz" : "text-emerald"} hidden sm:inline`}>{statusLabel}</span>
         </div>
-        <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
           <button onClick={() => startEdit(budget)} className="p-1.5 rounded-lg bg-secondary/30 hover:bg-secondary text-muted-foreground hover:text-foreground transition-all" aria-label={`Edit ${budget.category}`}>
             <Pencil className="h-3.5 w-3.5" />
           </button>
@@ -128,7 +150,7 @@ const BudgetCard = React.memo(({ budget, isCurrentMonth, currentDay, monthElapse
           </button>
         </div>
       </div>
-      <div className="pl-9 space-y-1.5">
+      <div className="space-y-1.5">
         <div className="flex items-baseline gap-1.5">
           <span className={`text-2xl font-bold tabular-nums tracking-tight ${over ? "text-ruby" : "text-foreground"}`}>
             £{budget.spent}
@@ -146,11 +168,16 @@ const BudgetCard = React.memo(({ budget, isCurrentMonth, currentDay, monthElapse
           )}
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex-1 h-2.5 rounded-full bg-secondary/50 overflow-hidden shadow-inner">
+          <div className="flex-1 h-2 rounded-full bg-secondary/50 overflow-hidden shadow-inner">
             <div className={`h-full rounded-full ${over ? "bg-ruby" : "bg-gradient-to-r from-emerald to-topaz"}`} style={{ width: `${Math.min(100, pct)}%`, transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)" }} />
           </div>
           <span className="text-[11px] font-bold tabular-nums text-muted-foreground">{Math.round(pct)}%</span>
         </div>
+      </div>
+      <div className="absolute inset-x-0 bottom-0 h-7 bg-gradient-to-t from-emerald/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-1">
+        <span className="text-[10px] font-medium text-emerald flex items-center gap-0.5">
+          View transactions <ArrowUpRight className="h-2.5 w-2.5" />
+        </span>
       </div>
     </div>
   );
@@ -758,24 +785,24 @@ export default React.memo(function BudgetPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <div className="relative w-full sm:w-36 lg:w-44 group/search">
+            <div className="relative w-full sm:w-40 lg:w-48 group/search order-last sm:order-none">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none transition-transform duration-200 group-focus-within/search:scale-110" />
-              <input type="search" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} aria-label="Search budgets"
+              <input type="search" placeholder="Search budgets..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} aria-label="Search budgets"
                 className="w-full h-8 pl-8 pr-3 rounded-full bg-secondary/40 border border-transparent text-xs placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring/30 focus:outline-none transition-all" />
             </div>
-            <div className="flex items-center gap-0.5">
-              <select value={sortOption} onChange={(e) => setSortOption(e.target.value)} aria-label="Sort budgets"
-                className="h-8 px-2 rounded-lg bg-secondary/50 border border-border/50 text-[11px] font-medium focus:outline-none focus:border-ring">
-                <option value="progress">Progress</option>
-                <option value="name">Name</option>
-                <option value="limit">Limit</option>
-                <option value="spent">Spent</option>
-                <option value="remaining">Remaining</option>
-              </select>
-              <button onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
-                className="h-8 w-7 grid place-items-center rounded-lg bg-secondary/50 border border-border/50 hover:bg-secondary/80 transition-colors" aria-label={`Sort ${sortOrder === "desc" ? "ascending" : "descending"}`}>
-                {sortOrder === "desc" ? <ChevronDown className="h-3 w-3 text-muted-foreground" aria-hidden="true" /> : <ChevronUp className="h-3 w-3 text-muted-foreground" aria-hidden="true" />}
-              </button>
+            <div className="flex flex-wrap gap-1.5">
+              {["progress", "name", "limit", "spent", "remaining"].map((opt) => (
+                <button key={opt} onClick={() => {
+                  if (sortOption === opt) setSortOrder(sortOrder === "desc" ? "asc" : "desc");
+                  else { setSortOption(opt); setSortOrder("desc"); }
+                }}
+                  className={`h-7 px-3 rounded-full text-[11px] font-medium border transition-all duration-200 ${sortOption === opt
+                    ? "bg-emerald/10 text-emerald border-emerald/20"
+                    : "bg-card/80 text-muted-foreground border-border/50 hover:bg-secondary/60 hover:text-foreground"}`}>
+                  {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                  {sortOption === opt && (sortOrder === "desc" ? " ↓" : " ↑")}
+                </button>
+              ))}
             </div>
             <Button variant="primary" size="sm" onClick={() => openAddBudget("everyday")}>
               <Plus className="h-3.5 w-3.5" /> Add
@@ -804,24 +831,24 @@ export default React.memo(function BudgetPage() {
       </div>
 
       {/* Quick stats row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 relative z-10">
-        <div className="rounded-2xl border border-border/50 bg-gradient-to-br from-background/80 to-emerald/[0.02] backdrop-blur-sm p-4 text-center hover:scale-[1.02] hover:shadow-md transition-all duration-300">
-          <div className="mx-auto mb-2 grid h-8 w-8 place-items-center rounded-full bg-emerald/10 text-emerald"><Wallet className="h-4 w-4" /></div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 relative z-10 fade-up">
+        <div className="rounded-xl border border-border bg-card/95 backdrop-blur-xl p-4 sm:p-5 shadow-card ring-1 ring-white/40 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300">
+          <div className="mx-auto mb-2 grid h-9 w-9 place-items-center rounded-xl bg-emerald/10 text-emerald"><Wallet className="h-4 w-4" /></div>
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Budgets</p>
-          <p className="text-2xl sm:text-3xl font-bold tracking-tight">{summary.count}</p>
+          <p className="text-2xl sm:text-3xl font-bold tracking-tight tabular-nums">{summary.count}</p>
         </div>
-        <div className="rounded-2xl border border-border/50 bg-gradient-to-br from-background/80 to-primary/[0.02] backdrop-blur-sm p-4 text-center hover:scale-[1.02] hover:shadow-md transition-all duration-300">
-          <div className="mx-auto mb-2 grid h-8 w-8 place-items-center rounded-full bg-primary/10 text-primary"><Target className="h-4 w-4" /></div>
+        <div className="rounded-xl border border-border bg-card/95 backdrop-blur-xl p-4 sm:p-5 shadow-card ring-1 ring-white/40 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300">
+          <div className="mx-auto mb-2 grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary"><Target className="h-4 w-4" /></div>
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Budgeted</p>
           <p className="text-2xl sm:text-3xl font-bold tracking-tight tabular-nums">£{summary.totalPlanned.toLocaleString()}</p>
         </div>
-        <div className="rounded-2xl border border-border/50 bg-gradient-to-br from-background/80 to-ruby/[0.02] backdrop-blur-sm p-4 text-center hover:scale-[1.02] hover:shadow-md transition-all duration-300">
-          <div className="mx-auto mb-2 grid h-8 w-8 place-items-center rounded-full bg-ruby/10 text-ruby"><TrendingDown className="h-4 w-4" /></div>
+        <div className="rounded-xl border border-border bg-card/95 backdrop-blur-xl p-4 sm:p-5 shadow-card ring-1 ring-white/40 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300">
+          <div className="mx-auto mb-2 grid h-9 w-9 place-items-center rounded-xl bg-ruby/10 text-ruby"><TrendingDown className="h-4 w-4" /></div>
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Spent</p>
           <p className={`text-2xl sm:text-3xl font-bold tracking-tight tabular-nums ${summary.overCount > 0 ? "text-ruby" : "text-emerald"}`}>£{summary.totalSpent.toLocaleString()}</p>
         </div>
-        <div className={`rounded-2xl border border-border/50 bg-gradient-to-br from-background/80 to-emerald/[0.02] backdrop-blur-sm p-4 text-center hover:scale-[1.02] hover:shadow-md transition-all duration-300 ${summary.totalRemaining < 0 ? "border-ruby/20" : ""}`}>
-          <div className={`mx-auto mb-2 grid h-8 w-8 place-items-center rounded-full ${summary.totalRemaining < 0 ? "bg-ruby/10 text-ruby" : "bg-emerald/10 text-emerald"}`}><PiggyBank className="h-4 w-4" /></div>
+        <div className={`rounded-xl border border-border bg-card/95 backdrop-blur-xl p-4 sm:p-5 shadow-card ring-1 ring-white/40 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300 ${summary.totalRemaining < 0 ? "border-ruby/30" : ""}`}>
+          <div className={`mx-auto mb-2 grid h-9 w-9 place-items-center rounded-xl ${summary.totalRemaining < 0 ? "bg-ruby/10 text-ruby" : "bg-emerald/10 text-emerald"}`}><PiggyBank className="h-4 w-4" /></div>
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Remaining</p>
           <p className={`text-2xl sm:text-3xl font-bold tracking-tight tabular-nums ${summary.totalRemaining < 0 ? "text-ruby" : "text-emerald"}`}>£{Math.abs(summary.totalRemaining).toLocaleString()}</p>
         </div>
@@ -830,7 +857,22 @@ export default React.memo(function BudgetPage() {
       {/* Loading */}
       {loading && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {[...Array(6)].map((_, i) => <div key={i} className="h-28 rounded-xl bg-muted/40 animate-pulse" />)}
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card/90 backdrop-blur-xl p-3 shadow-sm animate-pulse">
+              <div className="flex items-start gap-2 mb-3">
+                <div className="w-7 h-7 rounded-lg bg-muted/60" />
+                <div className="flex-1">
+                  <div className="h-3 w-24 bg-muted/60 rounded-full" />
+                </div>
+                <div className="h-3 w-14 bg-muted/40 rounded-full" />
+              </div>
+              <div className="space-y-2 pl-9">
+                <div className="h-6 w-20 bg-muted/60 rounded" />
+                <div className="h-3 w-32 bg-muted/40 rounded-full" />
+                <div className="h-2 bg-muted/40 rounded-full" />
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -850,9 +892,9 @@ export default React.memo(function BudgetPage() {
 
       {/* Bulk actions toolbar */}
       {!loading && bulkSelected.size > 0 && (
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald/5 border border-emerald/20">
-          <span className="text-sm text-muted-foreground">{bulkSelected.size} selected</span>
-          <button onClick={() => setBulkSelected(new Set())} className="text-xs text-muted-foreground hover:text-foreground">Clear</button>
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald/5 border border-emerald/20 animate-in slide-in-from-top-2 duration-200">
+          <span className="bg-emerald/10 text-emerald text-xs font-medium px-2 py-0.5 rounded-full tabular-nums">{bulkSelected.size} selected</span>
+          <button onClick={() => setBulkSelected(new Set())} className="text-xs text-muted-foreground hover:text-foreground transition-colors">Clear</button>
           <div className="ml-auto flex gap-2">
             <Button variant="outlinePill" size="pillSm" onClick={() => {
               if (budgets.length === 0) return;
@@ -891,8 +933,12 @@ export default React.memo(function BudgetPage() {
           {/* Budget Sections */}
           <section>
             {Object.entries(sectionsForDisplay).length === 0 && upcomingEventGroups.length === 0 && searchQuery.trim() && (
-              <div className="rounded-xl border border-dashed border-border bg-card/40 p-6 text-center">
-                <p className="text-sm text-muted-foreground">No budgets match "{searchQuery}"</p>
+              <div className="rounded-2xl border border-dashed border-border bg-card/60 backdrop-blur-xl p-10 text-center">
+                <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-muted/60 text-muted-foreground">
+                  <Search className="h-5 w-5" />
+                </div>
+                <p className="text-sm font-medium">No budgets match "<span className="text-foreground">{searchQuery}</span>"</p>
+                <button onClick={() => setSearchQuery("")} className="mt-3 text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors">Clear search</button>
               </div>
             )}
             {Object.entries(sectionsForDisplay).map(([section, items]) => {
@@ -900,7 +946,7 @@ export default React.memo(function BudgetPage() {
               const totalRemaining = items.reduce((s, b) => s + Number(b.remaining || 0), 0);
               return (
               <div key={section} className="mb-5">
-                <div className="sticky top-[115px] z-10 flex items-center justify-between mb-3 bg-gradient-to-r from-secondary/70 via-secondary/40 to-transparent backdrop-blur-md px-4 py-2 rounded-xl border border-border/50 shadow-sm">
+                <div className="flex items-center justify-between mb-3 px-1">
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                     <span className="grid h-5 w-5 place-items-center rounded-md bg-muted/70"><SecIcon className="h-3 w-3 text-muted-foreground/80" /></span>
                     {section}
@@ -913,7 +959,7 @@ export default React.memo(function BudgetPage() {
                   </span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {items.map((b) => <BudgetCard key={b.budget_id} budget={b} isCurrentMonth={isCurrentMonth} currentDay={currentDay} monthElapsedPct={monthElapsedPct} daysInMonth={daysInMonth} editingId={editingId} form={form} setForm={setForm} cancelEdit={cancelEdit} handleUpdate={handleUpdate} startEdit={startEdit} bulkSelected={bulkSelected} setBulkSelected={setBulkSelected} setConfirmDelete={setConfirmDelete} openBudgetTransactions={openBudgetTransactions} />)}
+                  {items.map((b, idx) => <div key={b.budget_id} className={`fade-up delay-${Math.min(idx, 5)}`}><BudgetCard budget={b} isCurrentMonth={isCurrentMonth} currentDay={currentDay} monthElapsedPct={monthElapsedPct} daysInMonth={daysInMonth} editingId={editingId} form={form} setForm={setForm} cancelEdit={cancelEdit} handleUpdate={handleUpdate} startEdit={startEdit} bulkSelected={bulkSelected} setBulkSelected={setBulkSelected} setConfirmDelete={setConfirmDelete} openBudgetTransactions={openBudgetTransactions} /></div>)}
                   <button onClick={() => openAddBudget("everyday")}
                     className="rounded-xl border-2 border-dashed border-border/40 hover:border-emerald/40 hover:bg-emerald/5 hover:text-emerald hover:scale-[1.02] active:scale-[0.98] text-muted-foreground/50 transition-all duration-200 flex flex-col items-center justify-center p-3 w-full group/add">
                     <Plus className="h-5 w-5 mb-1.5 group-hover/add:rotate-90 transition-transform duration-300" />
@@ -928,7 +974,7 @@ export default React.memo(function BudgetPage() {
           {/* Unbudgeted categories */}
           {unbudgetedCategories.length > 0 && (
             <section className="mb-5">
-              <div className="sticky top-[115px] z-10 flex items-center justify-between mb-3 bg-gradient-to-r from-topaz/10 via-topaz/5 to-transparent backdrop-blur-md px-4 py-2 rounded-xl border border-topaz/20 shadow-sm">
+              <div className="flex items-center justify-between mb-3 px-1">
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-topaz flex items-center gap-2">
                   <span className="grid h-5 w-5 place-items-center rounded-md bg-topaz/20"><AlertCircle className="h-3 w-3 text-topaz" /></span>
                   Unbudgeted
@@ -937,11 +983,13 @@ export default React.memo(function BudgetPage() {
                 <span className="text-[10px] text-topaz font-medium">Categories with spend, no budget</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {unbudgetedCategories.map((cat) => (
-                  <div key={cat.name} className="rounded-xl border border-dashed border-topaz/30 bg-background/40 backdrop-blur-xl p-3 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-topaz/50 transition-all duration-300 relative overflow-hidden border-l-[3px] border-l-topaz">
+                {unbudgetedCategories.map((cat, idx) => {
+                  const UnCatIcon = CATEGORY_ICONS[cat.name.toLowerCase().trim()] || AlertCircle;
+                  return (
+                  <div key={cat.name} className={`rounded-xl border border-dashed border-topaz/30 bg-background/40 backdrop-blur-xl p-3 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-topaz/50 transition-all duration-300 relative overflow-hidden border-l-[3px] border-l-topaz fade-up delay-${Math.min(idx, 5)}`}>
                     <div className="flex items-start gap-2.5 mb-2">
-                      <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-topaz to-topaz/70 flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-sm">
-                        {cat.name[0].toUpperCase()}
+                      <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-topaz to-topaz/70 flex items-center justify-center text-white shrink-0 shadow-sm">
+                        <UnCatIcon className="h-3.5 w-3.5" />
                       </div>
                       <h3 className="text-sm font-semibold capitalize truncate leading-tight flex-1 pt-0.5">{cat.name}</h3>
                       <button onClick={() => openAddBudget("everyday", cat.name)} className="p-1.5 rounded-lg bg-emerald/10 hover:bg-emerald/20 text-emerald transition-all" aria-label={`Create budget for ${cat.name}`}>
@@ -961,7 +1009,8 @@ export default React.memo(function BudgetPage() {
                       </div>
                     </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
             </section>
           )}
@@ -969,7 +1018,7 @@ export default React.memo(function BudgetPage() {
           {/* Upcoming Event Groups */}
           {upcomingEventGroups.length > 0 && (
             <section>
-              <div className="sticky top-[115px] z-10 flex items-center justify-between mb-3 bg-gradient-to-r from-secondary/70 via-secondary/40 to-transparent backdrop-blur-md px-4 py-2 rounded-xl border border-border/50 shadow-sm">
+              <div className="flex items-center justify-between mb-3 px-1">
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-foreground flex items-center gap-2">
                   <span className="grid h-5 w-5 place-items-center rounded-md bg-muted/70"><Calendar className="h-3 w-3 text-muted-foreground/80" /></span>
                   Upcoming Events
@@ -983,7 +1032,7 @@ export default React.memo(function BudgetPage() {
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {upcomingEventGroups.map((g) => <EventGroupCard key={g.event_group_id} group={g} setConfirmDelete={setConfirmDelete} fetchData={fetchData} />)}
+                {upcomingEventGroups.map((g, idx) => <div key={g.event_group_id} className={`fade-up delay-${Math.min(idx, 5)}`}><EventGroupCard group={g} setConfirmDelete={setConfirmDelete} fetchData={fetchData} /></div>)}
               </div>
             </section>
           )}
@@ -991,28 +1040,28 @@ export default React.memo(function BudgetPage() {
           {/* Past event groups */}
           {pastEventGroups.length > 0 && isCurrentMonth && (
             <section>
-              <div className="sticky top-[115px] z-10 flex items-center justify-between mb-3 bg-gradient-to-r from-secondary/70 via-secondary/40 to-transparent backdrop-blur-md px-4 py-2 rounded-xl border border-border/50 shadow-sm">
+              <div className="flex items-center justify-between mb-3 px-1">
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-foreground flex items-center gap-2">
                   <span className="grid h-5 w-5 place-items-center rounded-md bg-muted/70"><Calendar className="h-3 w-3 text-muted-foreground/80" /></span>
                   Past Events
                 </h2>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {pastEventGroups.map((g) => <EventGroupCard key={g.event_group_id} group={g} setConfirmDelete={setConfirmDelete} fetchData={fetchData} />)}
+                {pastEventGroups.map((g, idx) => <div key={g.event_group_id} className={`fade-up delay-${Math.min(idx, 5)}`}><EventGroupCard group={g} setConfirmDelete={setConfirmDelete} fetchData={fetchData} /></div>)}
               </div>
             </section>
           )}
 
           {Object.keys(eventGroups).length > 0 && upcomingEventGroups.length === 0 && pastEventGroups.length === 0 && (
             <section>
-              <div className="sticky top-[115px] z-10 flex items-center justify-between mb-3 bg-gradient-to-r from-secondary/70 via-secondary/40 to-transparent backdrop-blur-md px-4 py-2 rounded-xl border border-border/50 shadow-sm">
+              <div className="flex items-center justify-between mb-3 px-1">
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-foreground flex items-center gap-2">
                   <span className="grid h-5 w-5 place-items-center rounded-md bg-muted/70"><Calendar className="h-3 w-3 text-muted-foreground/80" /></span>
                   Planned Events
                 </h2>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {Object.values(eventGroups).filter((g) => !g.event_date).map((g) => <EventGroupCard key={g.event_group_id} group={g} setConfirmDelete={setConfirmDelete} fetchData={fetchData} />)}
+                {Object.values(eventGroups).filter((g) => !g.event_date).map((g, idx) => <div key={g.event_group_id} className={`fade-up delay-${Math.min(idx, 5)}`}><EventGroupCard group={g} setConfirmDelete={setConfirmDelete} fetchData={fetchData} /></div>)}
               </div>
             </section>
           )}
@@ -1121,23 +1170,25 @@ export default React.memo(function BudgetPage() {
             </div>
 
             {addTab === "expense" ? (
-              <form onSubmit={handleQuickExpense}>
+              <form onSubmit={handleQuickExpense} className="space-y-4">
+                <div>
+                  <label className="label-overline text-muted-foreground mb-1.5 block">Category</label>
+                  <CategoryCombobox
+                    value={quickForm.category}
+                    onChange={(val) => setQuickForm({ ...quickForm, category: val })}
+                    categories={allCats}
+                    placeholder="Category"
+                    onCategoryCreated={fetchCategories}
+                  />
+                </div>
                 <div className="flex items-end gap-3">
                   <div className="flex-1">
-                    <CategoryCombobox
-                      value={quickForm.category}
-                      onChange={(val) => setQuickForm({ ...quickForm, category: val })}
-                      categories={allCats}
-                      placeholder="Category"
-                      onCategoryCreated={fetchCategories}
-                    />
-                  </div>
-                  <div className="w-28">
+                    <label className="label-overline text-muted-foreground mb-1.5 block">Amount</label>
                     <Input type="number" step="0.01" min="0.01" placeholder="£0.00" value={quickForm.amount}
                       onChange={(e) => setQuickForm({ ...quickForm, amount: e.target.value })} required autoFocus className="text-right" aria-label="Expense amount" />
                   </div>
-                  <Button type="submit" variant="primary" size="pill" className="shrink-0 h-11 px-4">
-                    <Plus className="h-4 w-4" />
+                  <Button type="submit" variant="primary" size="pill" className="shrink-0 h-11 px-5 mb-[1px]">
+                    <Plus className="h-4 w-4 mr-1" /> Add
                   </Button>
                 </div>
                 {quickForm.showDesc && (
@@ -1181,8 +1232,9 @@ export default React.memo(function BudgetPage() {
                         <span className="text-sm text-emerald font-medium">Budget added — enter another below</span>
                       </div>
                     )}
-                    <div className="flex items-end gap-3">
-                      <div className="flex-1">
+                    <div className="space-y-4">
+                      <div>
+                        <label className="label-overline text-muted-foreground mb-1.5 block">Category</label>
                         <CategoryCombobox
                           value={form.category}
                           onChange={(val) => { setForm({ ...form, category: val }); setBudgetAdded(false); }}
@@ -1191,34 +1243,40 @@ export default React.memo(function BudgetPage() {
                           onCategoryCreated={fetchCategories}
                         />
                       </div>
-                      <div className="w-28">
-                        <Input type="number" step="0.01" min="0" placeholder="£0.00" value={form.limit}
-                          onChange={(e) => { setForm({ ...form, limit: e.target.value }); setBudgetAdded(false); }} required className="text-right" aria-label="Budget limit" />
+                      <div className="flex items-end gap-3">
+                        <div className="flex-1">
+                          <label className="label-overline text-muted-foreground mb-1.5 block">Monthly Limit</label>
+                          <Input type="number" step="0.01" min="0" placeholder="£0.00" value={form.limit}
+                            onChange={(e) => { setForm({ ...form, limit: e.target.value }); setBudgetAdded(false); }} required className="text-right" aria-label="Budget limit" />
+                        </div>
+                        <Button type="submit" variant="primary" size="pill" className="shrink-0 h-11 px-5 mb-[1px]">
+                          <Plus className="h-4 w-4 mr-1" /> Save
+                        </Button>
                       </div>
-                      <Button type="submit" variant="primary" size="pill" className="shrink-0 h-11 px-4">
-                        <Plus className="h-4 w-4" />
-                      </Button>
                     </div>
                   </>
                 ) : (
                   <>
                     {!form.event_group_id ? (
                       <>
-                        <div className="flex items-end gap-3">
-                          <div className="flex-[2]">
-                            <Input placeholder="Event name (e.g. Pesach 2026)" value={form.event_group_name}
+                        <div className="space-y-3">
+                          <div>
+                            <label className="label-overline text-muted-foreground mb-1.5 block">Event Name</label>
+                            <Input placeholder="e.g. Pesach 2026" value={form.event_group_name}
                               onChange={(e) => setForm({ ...form, event_group_name: e.target.value })} required aria-label="Event name" />
                           </div>
-                          <div className="w-auto">
+                          <div>
+                            <label className="label-overline text-muted-foreground mb-1.5 block">Event Date</label>
                             <Input type="date" value={form.event_date}
                               onChange={(e) => setForm({ ...form, event_date: e.target.value })}
                               className="text-sm" aria-label="Event date" />
                           </div>
                         </div>
-                        <div className="mt-3 p-3 rounded-xl bg-secondary/20 border border-border">
-                          <p className="text-xs text-muted-foreground mb-2">First budget item</p>
-                          <div className="flex items-end gap-3">
-                            <div className="flex-1">
+                        <div className="mt-4 p-3 rounded-xl bg-secondary/20 border border-border">
+                          <p className="label-overline text-muted-foreground mb-2">First budget item</p>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="label-overline text-muted-foreground mb-1.5 block">Item Category</label>
                               <CategoryCombobox
                                 value={form.category}
                                 onChange={(val) => setForm({ ...form, category: val })}
@@ -1227,18 +1285,21 @@ export default React.memo(function BudgetPage() {
                                 onCategoryCreated={fetchCategories}
                               />
                             </div>
-                            <div className="w-28">
-                               <Input type="number" step="0.01" min="0" placeholder="£0.00" value={form.limit}
-                                onChange={(e) => setForm({ ...form, limit: e.target.value })} required className="text-right" aria-label="Item budget limit" />
+                            <div className="flex items-end gap-3">
+                              <div className="flex-1">
+                                <label className="label-overline text-muted-foreground mb-1.5 block">Budget</label>
+                                <Input type="number" step="0.01" min="0" placeholder="£0.00" value={form.limit}
+                                  onChange={(e) => setForm({ ...form, limit: e.target.value })} required className="text-right" aria-label="Item budget limit" />
+                              </div>
+                              <Button type="submit" variant="primary" size="pill" className="shrink-0 h-11 px-5 mb-[1px]">
+                                <Plus className="h-4 w-4 mr-1" /> Add
+                              </Button>
                             </div>
-                            <Button type="submit" variant="primary" size="pill" className="shrink-0 h-11 px-4">
-                              <Plus className="h-4 w-4" />
-                            </Button>
                           </div>
                         </div>
                       </>
                     ) : (
-                      <>
+                      <>						
                         <div className="flex items-center gap-2 p-2 rounded-xl bg-secondary/20 border border-border mb-3">
                           <span className="text-xs text-muted-foreground">Adding to:</span>
                           <span className="text-sm font-medium">{form.event_group_name}</span>
@@ -1247,8 +1308,9 @@ export default React.memo(function BudgetPage() {
                             New event
                           </button>
                         </div>
-                        <div className="flex items-end gap-3">
-                          <div className="flex-1">
+                        <div className="space-y-3">
+                          <div>
+                            <label className="label-overline text-muted-foreground mb-1.5 block">Item Category</label>
                             <CategoryCombobox
                               value={form.category}
                               onChange={(val) => setForm({ ...form, category: val })}
@@ -1257,13 +1319,16 @@ export default React.memo(function BudgetPage() {
                               onCategoryCreated={fetchCategories}
                             />
                           </div>
-                          <div className="w-28">
+                          <div className="flex items-end gap-3">
+                            <div className="flex-1">
+                              <label className="label-overline text-muted-foreground mb-1.5 block">Budget</label>
                               <Input type="number" step="0.01" min="0" placeholder="£0.00" value={form.limit}
                                 onChange={(e) => setForm({ ...form, limit: e.target.value })} required className="text-right" aria-label="Item budget limit" />
+                            </div>
+                            <Button type="submit" variant="primary" size="pill" className="shrink-0 h-11 px-5 mb-[1px]">
+                              <Plus className="h-4 w-4 mr-1" /> Add
+                            </Button>
                           </div>
-                          <Button type="submit" variant="primary" size="pill" className="shrink-0 h-11 px-4">
-                            <Plus className="h-4 w-4" />
-                          </Button>
                         </div>
                       </>
                     )}
