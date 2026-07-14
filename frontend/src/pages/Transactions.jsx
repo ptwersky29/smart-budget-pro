@@ -571,6 +571,42 @@ const Transactions = React.memo(function Transactions() {
     finally { setClassifying(false); }
   }, [form.category]);
 
+  const allDisplayed = aiResults?.transactions || txs;
+  const splitTx = useCallback(async (t) => {
+    const amount = Math.abs(Number(t.amount || 0));
+    const firstLine = Number((amount / 2).toFixed(2));
+    setSplitTxDraft(t);
+    setSplitOpen(true);
+    setSplitSaving(false);
+    setSplitLines([
+      { category: t.category || "uncategorized", amount: firstLine.toFixed(2), description: t.description || "" },
+      { category: "uncategorized", amount: Number((amount - firstLine).toFixed(2)).toFixed(2), description: "" },
+    ]);
+    if (!t.is_split) return;
+    try {
+      const { data } = await api.get(`/transactions/${t.transaction_id}/splits`);
+      const existing = data.splits || data || [];
+      if (existing.length) {
+        setSplitLines(existing.map((line) => ({
+          category: line.category || "uncategorized",
+          amount: Math.abs(Number(line.amount || 0)).toFixed(2),
+          description: line.description || line.note || "",
+        })));
+      }
+    } catch (e) {
+      toast.error(formatApiError(e?.response?.data?.detail) || "Could not load split lines");
+    }
+  }, []);
+  const pairTransfer = useCallback((t) => {
+    const selectedOtherId = Array.from(selectedIds).find((id) => {
+      const other = allDisplayed.find(row => row.transaction_id === id);
+      return other && id !== t.transaction_id && !other.transfer_pair_id && Number(t.amount || 0) * Number(other.amount || 0) < 0;
+    });
+    setTransferTx(t);
+    setTransferTargetId(selectedOtherId || "");
+    setTransferOpen(true);
+  }, [selectedIds, allDisplayed]);
+
   const submit = useCallback(async (e) => {
     e.preventDefault();
     const amt = parseFloat(form.amount);
@@ -655,7 +691,6 @@ const Transactions = React.memo(function Transactions() {
 
   const clearClassification = useCallback(() => { setClassification(null); setSaveAsRecurring(false); }, []);
 
-  const allDisplayed = aiResults?.transactions || txs;
   const transferCandidates = useMemo(() => {
     if (!transferTx) return [];
     const baseAmount = Number(transferTx.amount || 0);
@@ -860,32 +895,6 @@ const Transactions = React.memo(function Transactions() {
     }
   }, [selectedIds, allDisplayed, load]);
 
-  const splitTx = useCallback(async (t) => {
-    const amount = Math.abs(Number(t.amount || 0));
-    const firstLine = Number((amount / 2).toFixed(2));
-    setSplitTxDraft(t);
-    setSplitOpen(true);
-    setSplitSaving(false);
-    setSplitLines([
-      { category: t.category || "uncategorized", amount: firstLine.toFixed(2), description: t.description || "" },
-      { category: "uncategorized", amount: Number((amount - firstLine).toFixed(2)).toFixed(2), description: "" },
-    ]);
-    if (!t.is_split) return;
-    try {
-      const { data } = await api.get(`/transactions/${t.transaction_id}/splits`);
-      const existing = data.splits || data || [];
-      if (existing.length) {
-        setSplitLines(existing.map((line) => ({
-          category: line.category || "uncategorized",
-          amount: Math.abs(Number(line.amount || 0)).toFixed(2),
-          description: line.description || line.note || "",
-        })));
-      }
-    } catch (e) {
-      toast.error(formatApiError(e?.response?.data?.detail) || "Could not load split lines");
-    }
-  }, []);
-
   const updateSplitLine = useCallback((index, field, value) => {
     setSplitLines(prev => prev.map((line, i) => i === index ? { ...line, [field]: value } : line));
   }, []);
@@ -927,15 +936,6 @@ const Transactions = React.memo(function Transactions() {
     }
   }, [splitTxDraft, splitLines, splitOriginalAmount]);
 
-  const pairTransfer = useCallback((t) => {
-    const selectedOtherId = Array.from(selectedIds).find((id) => {
-      const other = allDisplayed.find(row => row.transaction_id === id);
-      return other && id !== t.transaction_id && !other.transfer_pair_id && Number(t.amount || 0) * Number(other.amount || 0) < 0;
-    });
-    setTransferTx(t);
-    setTransferTargetId(selectedOtherId || "");
-    setTransferOpen(true);
-  }, [selectedIds, allDisplayed]);
 
 
 
