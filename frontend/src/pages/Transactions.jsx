@@ -1113,6 +1113,17 @@ const Transactions = React.memo(function Transactions() {
 
             {/* Right: Action buttons */}
             <div className="flex items-center gap-1.5 shrink-0">
+              {/* Search bar (inline in header) */}
+              {showSearch && (
+                <div className="relative group/search">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none transition-transform duration-200 group-focus-within/search:scale-110" />
+                  <input ref={searchRef} value={searchInput} onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
+                    placeholder="Search..."
+                    className="w-44 h-8 pl-8 pr-8 rounded-full bg-secondary/40 border border-transparent text-xs placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring/30 focus:outline-none transition-all" />
+                  {filters.search && <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"><X className="h-3.5 w-3.5" /></button>}
+                </div>
+              )}
+
               {/* Search toggle */}
               <button
                 onClick={() => setShowSearch((s) => !s)}
@@ -1246,17 +1257,6 @@ const Transactions = React.memo(function Transactions() {
           </div>
         </div>
         </PageHeader>
-
-        {/* Inline search bar */}
-        {showSearch && (
-          <div className="relative w-full group/search mt-3">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none transition-transform duration-200 group-focus-within/search:scale-110" />
-            <input ref={searchRef} value={searchInput} onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
-              placeholder="Search transactions... (/)"
-              className="w-full h-8 pl-8 pr-8 rounded-full bg-secondary/40 border border-transparent text-xs placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring/30 focus:outline-none transition-all" />
-            {filters.search && <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"><X className="h-3.5 w-3.5" /></button>}
-          </div>
-        )}
 
         {/* Active filter chips (except date range, handled by month strip) */}
         {activeFilters.filter(c => c.key !== "date_from" && c.key !== "date_to").length > 0 && (
