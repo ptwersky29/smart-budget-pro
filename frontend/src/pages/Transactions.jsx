@@ -1249,7 +1249,7 @@ const Transactions = React.memo(function Transactions() {
 
         {/* Inline search bar */}
         {showSearch && (
-          <div className="relative w-full sm:w-48 group/search mt-3">
+          <div className="relative w-full group/search mt-3">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none transition-transform duration-200 group-focus-within/search:scale-110" />
             <input ref={searchRef} value={searchInput} onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
               placeholder="Search transactions... (/)"
