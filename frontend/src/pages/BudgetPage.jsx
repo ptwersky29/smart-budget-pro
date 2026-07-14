@@ -347,32 +347,6 @@ export default React.memo(function BudgetPage() {
     setTxEditId(null);
     setTxEditForm(null);
   }, []);
-
-  const handleTxEditSubmit = useCallback(async () => {
-    if (!txEditForm || !txEditId) return;
-    const payload = {
-      description: txEditForm.description,
-      amount: txEditForm.is_income ? Math.abs(parseFloat(txEditForm.amount)) : -Math.abs(parseFloat(txEditForm.amount)),
-      category: txEditForm.category,
-      date: txEditForm.date,
-      merchant: txEditForm.merchant || undefined,
-      notes: txEditForm.notes || undefined,
-      is_income: txEditForm.is_income,
-    };
-    try {
-      await api.patch(`/transactions/${txEditId}`, payload);
-      toast.success("Transaction updated");
-      closeTxEdit();
-      const lastDay = getDaysInMonth(new Date(year, mNum - 1));
-      const { data } = await api.get("/transactions", {
-        params: { category: budgetTxCategory, date_from: `${month}-01`, date_to: `${month}-${String(lastDay).padStart(2, "0")}` },
-      });
-      setBudgetTxList(data.transactions || []);
-      await fetchData();
-    } catch (err) {
-      toast.error(err.response?.data?.detail || "Could not update");
-    }
-  }, [txEditForm, txEditId, budgetTxCategory, month, year, mNum, closeTxEdit, fetchData]);
   const monthLabel = `${MONTH_NAMES[mNum - 1]} ${year}`;
   const isCurrentMonth = month === fmtMonth(now.getFullYear(), now.getMonth() + 1);
   const daysInMonth = useMemo(() => getDaysInMonth(new Date(year, mNum - 1)), [year, mNum]);
@@ -486,6 +460,32 @@ export default React.memo(function BudgetPage() {
       setLoading(false);
     }
   }, [month]);
+
+  const handleTxEditSubmit = useCallback(async () => {
+    if (!txEditForm || !txEditId) return;
+    const payload = {
+      description: txEditForm.description,
+      amount: txEditForm.is_income ? Math.abs(parseFloat(txEditForm.amount)) : -Math.abs(parseFloat(txEditForm.amount)),
+      category: txEditForm.category,
+      date: txEditForm.date,
+      merchant: txEditForm.merchant || undefined,
+      notes: txEditForm.notes || undefined,
+      is_income: txEditForm.is_income,
+    };
+    try {
+      await api.patch(`/transactions/${txEditId}`, payload);
+      toast.success("Transaction updated");
+      closeTxEdit();
+      const lastDay = getDaysInMonth(new Date(year, mNum - 1));
+      const { data } = await api.get("/transactions", {
+        params: { category: budgetTxCategory, date_from: `${month}-01`, date_to: `${month}-${String(lastDay).padStart(2, "0")}` },
+      });
+      setBudgetTxList(data.transactions || []);
+      await fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Could not update");
+    }
+  }, [txEditForm, txEditId, budgetTxCategory, month, year, mNum, closeTxEdit, fetchData]);
 
   const fetchCategories = useCallback(async () => {
     try {
