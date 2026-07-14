@@ -168,12 +168,11 @@ const Transactions = React.memo(function Transactions() {
   const [splitTxDraft, setSplitTxDraft] = useState(null);
   const [splitLines, setSplitLines] = useState([]);
   const [splitSaving, setSplitSaving] = useState(false);
-  const [pendingSplitTransaction, setPendingSplitTransaction] = useState(null);
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferTx, setTransferTx] = useState(null);
   const [transferTargetId, setTransferTargetId] = useState("");
   const [transferSaving, setTransferSaving] = useState(false);
-  const [pendingTransferTransaction, setPendingTransferTransaction] = useState(null);
+
 
   // ── Maaser ledger state ──
   const [maaserCfg, setMaaserCfg] = useState({ enabled: false, percent: 10 });
@@ -633,8 +632,8 @@ const Transactions = React.memo(function Transactions() {
         action: async () => {
           const { data } = await api.post("/transactions", payload);
           setTxs(prev => prev.map(t => t.transaction_id === optimisticTx.transaction_id ? data : t));
-          if (shouldOpenSplit) setPendingSplitTransaction(data);
-          if (shouldOpenTransferPair) setPendingTransferTransaction(data);
+          if (shouldOpenSplit) splitTx(data);
+          if (shouldOpenTransferPair) pairTransfer(data);
         },
         undo: async () => {
           await load();
@@ -652,7 +651,7 @@ const Transactions = React.memo(function Transactions() {
       });
     }
     setForm(emptyForm); setClassification(null); setSaveAsRecurring(false);
-  }, [editingId, form, load, classification, saveAsRecurring]);
+  }, [editingId, form, load, classification, saveAsRecurring, pairTransfer, splitTx]);
 
   const clearClassification = useCallback(() => { setClassification(null); setSaveAsRecurring(false); }, []);
 
@@ -938,20 +937,7 @@ const Transactions = React.memo(function Transactions() {
     setTransferOpen(true);
   }, [selectedIds, allDisplayed]);
 
-  // These effects must live after splitTx and pairTransfer are declared
-  useEffect(() => {
-    if (pendingSplitTransaction) {
-      splitTx(pendingSplitTransaction);
-      setPendingSplitTransaction(null);
-    }
-  }, [pendingSplitTransaction, splitTx]);
 
-  useEffect(() => {
-    if (pendingTransferTransaction) {
-      pairTransfer(pendingTransferTransaction);
-      setPendingTransferTransaction(null);
-    }
-  }, [pendingTransferTransaction, pairTransfer]);
 
   const saveTransferPair = useCallback(async () => {
     if (!transferTx || !transferTargetId) {
