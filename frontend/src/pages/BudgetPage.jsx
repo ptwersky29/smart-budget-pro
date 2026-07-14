@@ -296,6 +296,8 @@ export default React.memo(function BudgetPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOption, setSortOption] = useState("progress");
   const [sortOrder, setSortOrder] = useState("desc");
+  const { year, month: mNum } = parseMonth(month);
+
   const [categoryHierarchy, setCategoryHierarchy] = useState({});
   const [categorySpend, setCategorySpend] = useState([]);
 
@@ -371,8 +373,6 @@ export default React.memo(function BudgetPage() {
       toast.error(err.response?.data?.detail || "Could not update");
     }
   }, [txEditForm, txEditId, budgetTxCategory, month, year, mNum, closeTxEdit, fetchData]);
-
-  const { year, month: mNum } = parseMonth(month);
   const monthLabel = `${MONTH_NAMES[mNum - 1]} ${year}`;
   const isCurrentMonth = month === fmtMonth(now.getFullYear(), now.getMonth() + 1);
   const daysInMonth = useMemo(() => getDaysInMonth(new Date(year, mNum - 1)), [year, mNum]);
