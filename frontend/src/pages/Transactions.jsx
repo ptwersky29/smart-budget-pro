@@ -1249,12 +1249,12 @@ const Transactions = React.memo(function Transactions() {
 
         {/* Inline search bar */}
         {showSearch && (
-          <div className="mt-3 flex items-center gap-2 rounded-full border border-border bg-card/70 backdrop-blur-xl px-4 h-9 shadow-sm transition-all duration-200">
-            <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <div className="relative w-full sm:w-48 group/search mt-3">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none transition-transform duration-200 group-focus-within/search:scale-110" />
             <input ref={searchRef} value={searchInput} onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
               placeholder="Search transactions... (/)"
-              className="w-full bg-transparent outline-none text-xs" />
-            {filters.search && <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="text-muted-foreground hover:text-foreground transition-colors"><X className="h-3.5 w-3.5" /></button>}
+              className="w-full h-8 pl-8 pr-8 rounded-full bg-secondary/40 border border-transparent text-xs placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring/30 focus:outline-none transition-all" />
+            {filters.search && <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"><X className="h-3.5 w-3.5" /></button>}
           </div>
         )}
 
