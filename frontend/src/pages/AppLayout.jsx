@@ -19,7 +19,7 @@ import {
   DropdownMenuItem,
 } from "../components/ui/dropdown-menu";
 
-import { Compass, LogOut, MoonStar, Sun, Search } from "lucide-react";
+import { Compass, LogOut, MoonStar, Sun, Search, Settings, User } from "lucide-react";
 import pkg from "../../package.json";
 
 const ProductTour = lazy(() => import("../components/ProductTour"));
@@ -249,6 +249,26 @@ export default function AppLayout() {
                   <Link to={routeMeta.primary.to}>{routeMeta.primary.label}</Link>
                 </Button>
               )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="h-10 w-10 rounded-lg bg-secondary grid place-items-center text-sm font-semibold border border-border hover:bg-secondary/80 transition-colors" aria-label="User menu">
+                    {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="mr-2 mt-1 min-w-[160px]">
+                  <div className="px-3 py-2 border-b border-border/60">
+                    <p className="text-sm font-medium truncate">{user?.name || user?.email}</p>
+                  </div>
+                  <DropdownMenuItem onClick={() => navigate("/settings")}>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={doLogout}>
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </header>
