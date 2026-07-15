@@ -2122,6 +2122,12 @@ Output ONLY valid JSON, no markdown, no explanation:
         request: Request,
         user: dict = Depends(get_current_user),
     ):
+        import json as _json
+        raw = await request.body()
+        print(f"[DEBUG_PATCH] Received PATCH /transactions/{tx_id}")
+        print(f"[DEBUG_PATCH] Raw body: {raw.decode()}")
+        print(f"[DEBUG_PATCH] Parsed payload dict: {payload.model_dump()}")
+
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
@@ -2133,6 +2139,8 @@ Output ONLY valid JSON, no markdown, no explanation:
             tx = result.scalar_one_or_none()
             if not tx:
                 raise HTTPException(404, "Not found")
+
+            print(f"[DEBUG_PATCH] Before update: category={tx.category!r} date={tx.date!r} amount={tx.amount!r} description={tx.description!r}")
 
             old_amount = float(tx.amount or 0)
             old_account_id = tx.account_id
@@ -2148,6 +2156,7 @@ Output ONLY valid JSON, no markdown, no explanation:
                 if not acct_result.scalar_one_or_none():
                     raise HTTPException(400, f"Account '{payload.account_id}' not found")
                 tx.account_id = payload.account_id
+                print(f"[DEBUG_PATCH] Updated account_id to {tx.account_id}")
 
             if payload.amount is not None:
                 if payload.is_income is None:
@@ -2159,6 +2168,7 @@ Output ONLY valid JSON, no markdown, no explanation:
                         else -abs(payload.amount),
                         2,
                     )
+                print(f"[DEBUG_PATCH] Updated amount to {tx.amount}")
             elif payload.is_income is not None:
                 tx.amount = round(
                     abs(float(tx.amount or 0))
@@ -2166,11 +2176,14 @@ Output ONLY valid JSON, no markdown, no explanation:
                     else -abs(float(tx.amount or 0)),
                     2,
                 )
+                print(f"[DEBUG_PATCH] Updated amount (via is_income toggling) to {tx.amount}")
             if payload.description is not None:
                 tx.description = sanitize_input(payload.description, max_len=500)
+                print(f"[DEBUG_PATCH] Updated description to {tx.description!r}")
             if payload.merchant is not None:
                 tx.merchant_name = sanitize_input(payload.merchant, max_len=255)
                 tx.normalized_merchant = normalize_merchant(payload.merchant)
+                print(f"[DEBUG_PATCH] Updated merchant to {tx.merchant_name!r}")
             category_changed = False
             old_category = tx.category
             if payload.category is not None and payload.category != tx.category:
@@ -2178,8 +2191,15 @@ Output ONLY valid JSON, no markdown, no explanation:
 
                 tx.category = _rc(payload.category)
                 category_changed = True
+                print(f"[DEBUG_PATCH] Updated category from {old_category!r} to {tx.category!r}")
+            else:
+                print(f"[DEBUG_PATCH] Category NOT updated: payload.category={payload.category!r} tx.category={tx.category!r}")
             if payload.date is not None:
-                tx.date = datetime.fromisoformat(payload.date)
+                new_date = datetime.fromisoformat(payload.date)
+                print(f"[DEBUG_PATCH] Updated date from {tx.date!r} to {new_date!r}")
+                tx.date = new_date
+            else:
+                print(f"[DEBUG_PATCH] Date NOT updated: payload.date is None, keeping {tx.date!r}")
             if payload.notes is not None:
                 tx.notes = payload.notes
             if payload.tags is not None:
@@ -2232,9 +2252,16 @@ Output ONLY valid JSON, no markdown, no explanation:
                     session, user["user_id"], new_account_id, new_amount
                 )
 
+            print(f"[DEBUG_PATCH] Before commit: category={tx.category!r} date={tx.date!r} amount={tx.amount!r}")
+
             await session.commit()
+            print(f"[DEBUG_PATCH] Commit done, checking session.dirty: {session.dirty}")
+
             await session.refresh(tx)
+            print(f"[DEBUG_PATCH] After refresh: category={tx.category!r} date={tx.date!r} amount={tx.amount!r}")
+
             doc = _tx_to_dict(tx)
+            print(f"[DEBUG_PATCH] Returning doc: {doc}")
             await maaser.maybe_accrue(session, user["user_id"], doc)
             _invalidate_finance_caches(user["user_id"])
             return doc

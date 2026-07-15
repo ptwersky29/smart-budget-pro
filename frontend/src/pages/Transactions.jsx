@@ -618,8 +618,12 @@ const Transactions = React.memo(function Transactions() {
       const old = txsRef.current.find(t => t.transaction_id === editingId);
       setTxs(prev => prev.map(t => t.transaction_id === editingId ? { ...t, ...payload } : t));
       setOpen(false); setEditingId(null);
+      console.log("[DEBUG_EDIT] PATCH /transactions/" + editingId, JSON.stringify(payload));
       withUndo({
-        action: () => api.patch(`/transactions/${editingId}`, payload),
+        action: async () => {
+          const res = await api.patch(`/transactions/${editingId}`, payload);
+          console.log("[DEBUG_EDIT] PATCH response status:", res.status, "data:", JSON.stringify(res.data));
+        },
         undo: async () => {
           if (old) { await api.patch(`/transactions/${editingId}`, { description: old.description, amount: old.amount, category: old.category || undefined, is_income: old.is_income, account_id: old.account_id || undefined }); }
           await load();
