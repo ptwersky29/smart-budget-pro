@@ -86,7 +86,7 @@ export default function QuickAddWidget() {
         <button onClick={() => setOpen(true)}
           data-tour="quick-add"
           aria-label="Add transaction quickly"
-          className="fixed bottom-20 right-6 z-50 w-14 h-14 rounded-full gradient-emerald text-white shadow-lg shadow-emerald/30 hover:scale-105 active:scale-95 transition-all flex items-center justify-center">
+          className="fixed bottom-24 lg:bottom-6 right-6 z-50 w-14 h-14 rounded-full gradient-emerald text-white shadow-lg shadow-emerald/30 hover:scale-105 active:scale-95 transition-all flex items-center justify-center">
           <Plus className="h-6 w-6" />
         </button>
       )}
