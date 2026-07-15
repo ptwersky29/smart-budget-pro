@@ -64,7 +64,7 @@ export default function Register() {
       toast.success("Account created - welcome to Penni!");
       navigate("/onboarding");
     } catch (err) {
-      const msg = formatApiError(err.response?.data?.detail) || "Could not create account. Please try again.";
+      const msg = formatApiError(err) || "Could not create account. Please try again.";
       toast.error(msg);
       setErrors({ submit: msg });
     } finally {

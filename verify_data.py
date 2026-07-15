@@ -4,14 +4,15 @@ Quick script to verify data exists in Neon database
 """
 import asyncio
 import os
-from sqlalchemy import create_engine, text
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
 
-# Neon database URL
-DATABASE_URL = "postgresql+asyncpg://neondb_owner:npg_DEn4SXe1YkWV@ep-silent-water-ab6f94vy-pooler.eu-west-2.aws.neon.tech/neondb"
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
+
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 async def check_data():
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL must be supplied through the environment")
     print("🔍 Connecting to Neon database...")
     engine = create_async_engine(DATABASE_URL, echo=False)
     

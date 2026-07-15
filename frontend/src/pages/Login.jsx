@@ -52,8 +52,7 @@ export default function Login() {
       }
     } catch (err) {
       const status = err.response?.status;
-      const detail = err.response?.data?.detail;
-      const msg = (status ? `(${status}) ` : "") + (formatApiError(detail) || "Incorrect email or password. Please try again.");
+      const msg = (status ? `(${status}) ` : "") + (formatApiError(err) || "Incorrect email or password. Please try again.");
       toast.error(msg);
       setErrors({ submit: msg });
     } finally {

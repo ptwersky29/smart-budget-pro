@@ -12,6 +12,7 @@ export const API = `${BACKEND_URL}/api`;
 export const api = axios.create({
   baseURL: API,
   withCredentials: true,
+  timeout: Number(process.env.REACT_APP_API_TIMEOUT_MS || 30000),
   headers: { "Content-Type": "application/json" },
 });
 
@@ -106,6 +107,12 @@ api.cachedGet = async (url, params = {}, ttl) => {
 api.invalidate = (prefix) => cacheInvalidate(prefix);
 
 export function formatApiError(errorOrDetail) {
+  if (errorOrDetail?.code === "ECONNABORTED") {
+    return "The secure service took too long to respond. Please try again in a minute.";
+  }
+  if (errorOrDetail?.request && !errorOrDetail?.response) {
+    return "The secure service is temporarily unavailable. Please try again in a minute.";
+  }
   const payload = errorOrDetail?.response?.data ?? errorOrDetail;
   const detail = payload?.detail ?? payload?.message ?? payload;
   const requestId = payload?.request_id || errorOrDetail?.response?.headers?.["x-request-id"];

@@ -11,14 +11,40 @@ services:
     startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT --workers 2
     healthCheckPath: /api/health
     envVars:
+      - key: ENVIRONMENT
+        value: production
       - key: DATABASE_URL
-        value: postgresql+asyncpg://neondb_owner:npg_DEn4SXe1YkWV@ep-silent-water-ab6f94vy-pooler.eu-west-2.aws.neon.tech/neondb
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: FRONTEND_URL
         value: https://smart-budget-pro-ewtm.vercel.app
       - key: TRUELAYER_REDIRECT_URI
         value: https://budget-pro-4jlg.onrender.com/api/truelayer/callback
+      - key: TRUELAYER_CLIENT_ID
+        sync: false
+      - key: TRUELAYER_CLIENT_SECRET
+        sync: false
+      - key: TRUELAYER_ENVIRONMENT
+        value: sandbox
+      - key: SYNC_SECRET
+        generateValue: true
+      - key: RUN_BACKGROUND_SYNC
+        value: "false"
+      - key: STRIPE_API_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_MONTHLY_PRICE_ID
+        sync: false
+      - key: STRIPE_YEARLY_PRICE_ID
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_PHONE_NUMBER
+        sync: false
       - key: ADMIN_EMAIL
         sync: false
       - key: ADMIN_PASSWORD
@@ -42,23 +68,24 @@ services:
     region: frankfurt
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: python -c "
-import asyncio, os, logging
-logging.basicConfig(level=getattr(logging, os.environ.get('LOG_LEVEL', 'INFO').upper()))
-logger = logging.getLogger('worker')
-async def run():
-    from server import startup
-    await startup()
-    logger.info('Worker started — running background tasks')
-    while True:
-        await asyncio.sleep(3600)
-asyncio.run(run())
-"
+    startCommand: python worker.py
     envVars:
+      - key: ENVIRONMENT
+        value: production
       - key: DATABASE_URL
-        value: postgresql+asyncpg://neondb_owner:npg_DEn4SXe1YkWV@ep-silent-water-ab6f94vy-pooler.eu-west-2.aws.neon.tech/neondb
+        sync: false
       - key: JWT_SECRET
         sync: false
+      - key: RUN_BACKGROUND_SYNC
+        value: "true"
+      - key: TRUELAYER_CLIENT_ID
+        sync: false
+      - key: TRUELAYER_CLIENT_SECRET
+        sync: false
+      - key: TRUELAYER_REDIRECT_URI
+        value: https://budget-pro-4jlg.onrender.com/api/truelayer/callback
+      - key: TRUELAYER_ENVIRONMENT
+        value: sandbox
       - key: JSON_LOG
         value: "true"
       - key: LOG_LEVEL
