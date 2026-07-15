@@ -19,7 +19,7 @@ import {
   DropdownMenuItem,
 } from "../components/ui/dropdown-menu";
 
-import { Compass, LogOut, Menu, X, MoonStar, Sun, Search } from "lucide-react";
+import { Compass, LogOut, MoonStar, Sun, Search } from "lucide-react";
 import pkg from "../../package.json";
 
 const ProductTour = lazy(() => import("../components/ProductTour"));
@@ -31,7 +31,6 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const noAnim = settings.preferences?.dashboard?.animations === false || settings.preferences?.accessibility?.reduce_motion === true;
-  const [open, setOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [routeLoading, setRouteLoading] = useState(false);
@@ -128,7 +127,7 @@ export default function AppLayout() {
 
   return (
     <div className="app-shell min-h-screen flex text-foreground relative">
-      <aside data-tour="sidebar" className={`${open ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:sticky top-0 left-0 z-40 h-screen w-[18rem] border-r border-border bg-card/95 backdrop-blur-xl transition-transform duration-300 shadow-[8px_0_30px_rgba(15,23,42,0.03)]`}>
+      <aside data-tour="sidebar" className="hidden lg:block lg:sticky top-0 left-0 z-40 h-screen w-[18rem] border-r border-border bg-card/95 backdrop-blur-xl shadow-[8px_0_30px_rgba(15,23,42,0.03)]">
         <div className="flex items-center justify-between px-6 h-16 border-b border-border/70">
           <Link to="/dashboard" className="flex items-center gap-3 min-w-0" data-testid="sidebar-logo">
             <Logo size="md" />
@@ -141,9 +140,6 @@ export default function AppLayout() {
               <span className="block text-[11px] text-muted-foreground mt-0.5 truncate">{APP_TAGLINE}</span>
             </div>
           </Link>
-          <button className="lg:hidden h-10 w-10 rounded-lg grid place-items-center hover:bg-secondary" onClick={() => setOpen(false)} data-testid="sidebar-close" aria-label="Close navigation menu">
-            <X className="h-5 w-5" />
-          </button>
         </div>
 
         <div className="p-4 space-y-5 overflow-y-auto h-[calc(100vh-4rem)] no-scrollbar">
@@ -157,7 +153,6 @@ export default function AppLayout() {
                     <Link
                       key={to}
                       to={to}
-                      onClick={() => setOpen(false)}
                       data-testid={`nav-${label.toLowerCase().replace(/\s+/g, "-")}`}
                       aria-current={active ? "page" : undefined}
               className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all ${
@@ -199,8 +194,6 @@ export default function AppLayout() {
         </div>
       </aside>
 
-      {open && <div className="fixed inset-0 z-30 bg-black/40 lg:hidden backdrop-blur-[2px]" onClick={() => setOpen(false)} />}
-
       <div className="relative flex-1 min-w-0">
         <header data-tour="route-header" className="sticky top-0 z-20 border-b border-border/70 bg-background/95 backdrop-blur-xl">
           {/* Route loading progress bar */}
@@ -213,9 +206,6 @@ export default function AppLayout() {
           <h1 className="sr-only">{routeMeta.title} — {APP_NAME}</h1>
           <div className="flex items-center justify-between gap-4 px-4 lg:px-8 h-16">
             <div className="flex items-center gap-3 min-w-0">
-              <button className="lg:hidden h-10 w-10 rounded-lg grid place-items-center border border-border bg-card/90" onClick={() => setOpen(true)} data-testid="sidebar-open" aria-label="Open navigation menu">
-                <Menu className="h-5 w-5" />
-              </button>
               <div className="min-w-0">
                 <p className="text-sm font-semibold truncate">{routeMeta.title}</p>
               </div>
