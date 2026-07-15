@@ -234,25 +234,22 @@ export default function AppLayout() {
               </button>
             </div>
 
-            <div className="flex items-center gap-2 lg:hidden">
-              <button onClick={startTour} data-tour="tour-launch" className="h-10 w-10 grid place-items-center rounded-lg border border-border bg-card/90 hover:bg-secondary transition-colors" aria-label="Start app walk-through">
-                <Compass className="h-4 w-4" />
+            <div className="flex items-center gap-1 lg:hidden">
+              <button onClick={startTour} data-tour="tour-launch" className="grid place-items-center w-11 h-11 rounded-xl active:bg-black/5 dark:active:bg-white/10 transition-colors" aria-label="Start app walk-through">
+                <Compass className="h-5 w-5 text-muted-foreground" />
               </button>
-              <button onClick={() => setCommandOpen(true)} data-tour="command-search" data-testid="command-open-mobile" className="h-10 w-10 grid place-items-center rounded-lg border border-border bg-card/90 hover:bg-secondary transition-colors" aria-label="Open command palette">
-                <Search className="h-4 w-4" />
+              <button onClick={() => setCommandOpen(true)} data-tour="command-search" data-testid="command-open-mobile" className="grid place-items-center w-11 h-11 rounded-xl active:bg-black/5 dark:active:bg-white/10 transition-colors" aria-label="Open command palette">
+                <Search className="h-5 w-5 text-muted-foreground" />
               </button>
-              <button onClick={toggleTheme} data-testid="theme-toggle-mobile" className="h-10 w-10 grid place-items-center rounded-lg border border-border bg-card/90 hover:bg-secondary transition-colors" aria-label="Toggle theme">
-                {dark ? <Sun className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
+              <button onClick={toggleTheme} data-testid="theme-toggle-mobile" className="grid place-items-center w-11 h-11 rounded-xl active:bg-black/5 dark:active:bg-white/10 transition-colors" aria-label="Toggle theme">
+                {dark ? <Sun className="h-5 w-5 text-muted-foreground" /> : <MoonStar className="h-5 w-5 text-muted-foreground" />}
               </button>
-              {routeMeta.primary && (
-                <Button asChild variant="primary" size="pill" className="text-xs">
-                  <Link to={routeMeta.primary.to}>{routeMeta.primary.label}</Link>
-                </Button>
-              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="h-10 w-10 rounded-lg bg-secondary grid place-items-center text-sm font-semibold border border-border hover:bg-secondary/80 transition-colors" aria-label="User menu">
-                    {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
+                  <button className="grid place-items-center w-11 h-11 rounded-xl active:bg-black/5 dark:active:bg-white/10 transition-colors text-sm font-semibold" aria-label="User menu">
+                    <span className="w-8 h-8 rounded-full bg-emerald/15 text-emerald grid place-items-center text-sm font-bold">
+                      {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
+                    </span>
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="mr-2 mt-1 min-w-[160px]">
@@ -281,9 +278,9 @@ export default function AppLayout() {
           </div>
         </main>
       </div>
-      {/* ── Bottom Navigation (mobile) ── */}
-      <nav data-tour="mobile-nav" className="lg:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/90 backdrop-blur-xl safe-bottom-fixed tap-highlight-none" role="tablist" aria-label="Main navigation">
-        <div className="flex items-center justify-around h-16 px-2">
+      {/* ── Bottom Navigation (Android Material) ── */}
+      <nav data-tour="mobile-nav" className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-background/95 border-t border-border/60 safe-bottom-fixed tap-highlight-none" role="tablist" aria-label="Main navigation">
+        <div className="flex items-center justify-around h-14 px-1 max-w-lg mx-auto pb-1">
           {BOTTOM_NAV.map(({ to, label, icon: Icon, isMore }) => {
             const active = location.pathname.startsWith(to);
             if (isMore) {
@@ -295,14 +292,17 @@ export default function AppLayout() {
                 <DropdownMenu key="more">
                   <DropdownMenuTrigger asChild>
                     <button
-                      className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-colors relative ${
-                        moreActive ? "text-emerald" : "text-muted-foreground hover:text-foreground"
+                      className={`relative flex flex-col items-center justify-center gap-0.5 w-[64px] h-12 rounded-2xl transition-all ${
+                        moreActive ? "text-emerald" : "text-muted-foreground active:text-foreground"
                       }`}
                       aria-label="More"
                     >
-                      <Icon className="h-5 w-5" />
-                      <span className="text-[10px] font-medium">More</span>
-                      {moreActive && <span className="absolute -top-1 left-1/2 -translate-x-1/2 h-1 w-6 rounded-full bg-emerald" />}
+                      <span className={`grid place-items-center w-10 h-7 rounded-xl transition-colors ${
+                        moreActive ? "bg-emerald/15" : ""
+                      }`}>
+                        <Icon className="h-6 w-6" />
+                      </span>
+                      <span className={`text-[11px] font-medium leading-none ${moreActive ? "font-semibold" : ""}`}>More</span>
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="center" side="top" className="mb-3">
@@ -322,13 +322,16 @@ export default function AppLayout() {
                 to={to}
                 role="tab"
                 aria-selected={active}
-                className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-colors relative ${
-                  active ? "text-emerald" : "text-muted-foreground hover:text-foreground"
+                className={`relative flex flex-col items-center justify-center gap-0.5 w-[64px] h-12 rounded-2xl transition-all ${
+                  active ? "text-emerald" : "text-muted-foreground active:text-foreground"
                 }`}
               >
-                <Icon className="h-5 w-5" />
-                <span className="text-[10px] font-medium">{label}</span>
-                {active && <span className="absolute -top-1 left-1/2 -translate-x-1/2 h-1 w-6 rounded-full bg-emerald" />}
+                <span className={`grid place-items-center w-10 h-7 rounded-xl transition-colors ${
+                  active ? "bg-emerald/15" : ""
+                }`}>
+                  <Icon className="h-6 w-6" />
+                </span>
+                <span className={`text-[11px] leading-none ${active ? "font-semibold" : "font-medium"}`}>{label}</span>
               </Link>
             );
           })}
