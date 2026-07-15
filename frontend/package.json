@@ -1,6 +1,6 @@
 {
   "name": "frontend",
-  "version": "0.1.49",
+  "version": "0.1.50",
   "private": true,
   "dependencies": {
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
@@ -70,7 +70,9 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "analyze": "CI=false GENERATE_SOURCEMAP=true react-scripts build && source-map-explorer 'build/static/js/*.js'",
-    "test:ci": "react-scripts test --watchAll=false --coverage"
+    "test:ci": "react-scripts test --watchAll=false --coverage",
+    "prestart": "node scripts/generate-pwa-icons.js",
+    "prebuild": "node scripts/generate-pwa-icons.js"
   },
   "browserslist": {
     "production": [
@@ -99,6 +101,7 @@
     "@testing-library/user-event": "^14.6.1",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
+    "sharp": "^0.35.3",
     "source-map-explorer": "^2.5.3",
     "tailwindcss": "^3.4.17"
   }

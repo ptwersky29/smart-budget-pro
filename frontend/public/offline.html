@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#059669" />
+    <title>Offline — Penni</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #0A0A0B;
+        color: #fafafa;
+        display: grid;
+        place-items: center;
+        min-height: 100dvh;
+        padding: 24px;
+        text-align: center;
+      }
+      .container { max-width: 320px; }
+      .icon { font-size: 64px; margin-bottom: 16px; }
+      h1 { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+      p { font-size: 14px; color: #a1a1aa; line-height: 1.5; }
+      button {
+        margin-top: 24px;
+        padding: 12px 32px;
+        border: none;
+        border-radius: 12px;
+        background: #059669;
+        color: white;
+        font-size: 15px;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      button:hover { background: #047857; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="icon">📡</div>
+      <h1>You're offline</h1>
+      <p>Connect to the internet to use Penni. Your data will sync automatically when you're back online.</p>
+      <button onclick="window.location.reload()">Try again</button>
+    </div>
+  </body>
+</html>
