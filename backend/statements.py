@@ -451,7 +451,7 @@ async def _ai_categorise(description: str, merchant: str | None, amount: float, 
     try:
         raw, provider, model, pt, ct, cost = await call_llm(
             "You categorise bank transactions. Output valid JSON only.",
-            prompt, json_mode=False,
+            prompt, model="google/gemini-2.0-flash-lite-001", json_mode=False,
         )
         if session and user_id:
             await track_ai_usage(session, user_id, provider, model, pt, ct, cost, endpoint="statement_categorize")
