@@ -36,7 +36,7 @@ export default function Statements() {
       toast.success(`AI extracted ${data.transaction_count} transaction${data.transaction_count !== 1 ? "s" : ""}`);
       await loadHistory();
     } catch (e) {
-      console.error(e);
+      console.error("[UPLOAD_ERR]", e.response?.status, e.response?.data);
       toast.error(formatApiError(e.response?.data?.detail) || "Upload failed");
     } finally { setBusy(false); }
   };

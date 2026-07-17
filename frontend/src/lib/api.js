@@ -12,7 +12,6 @@ export const API = `${BACKEND_URL}/api`;
 export const api = axios.create({
   baseURL: API,
   withCredentials: true,
-  headers: { "Content-Type": "application/json" },
 });
 
 let _csrfToken = null;
