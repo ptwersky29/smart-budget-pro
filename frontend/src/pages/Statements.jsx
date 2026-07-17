@@ -6,6 +6,8 @@ import { Upload, FileText, Loader2, Sparkles, CheckCircle2, Trash2, ArrowDownRig
 import { PageHeader, SectionCard } from "../components/ui/layout";
 import Skeleton from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
+import CategoryCombobox from "../components/CategoryCombobox";
+import { useCategories } from "../contexts/CategoriesContext";
 
 function getDisplayName(a) {
   if (!a) return "";
@@ -28,6 +30,7 @@ export default function Statements() {
   const [saving, setSaving] = useState(false);
   const [edits, setEdits] = useState({});
   const [editingCell, setEditingCell] = useState(null);
+  const { categories, resolveCategory } = useCategories();
 
   // Pick up draft from route state (e.g. after upload from account detail page)
   useEffect(() => {
@@ -217,10 +220,11 @@ export default function Statements() {
                   </div>
                   <div className="flex items-center gap-2">
                     {editingCell?.idx === i && editingCell?.field === "category" ? (
-                      <input type="text" defaultValue={val.category ?? t.category}
-                        onChange={e => setEdits(p => ({...p, [i]: {...p[i], category: e.target.value}}))}
-                        className="text-xs bg-secondary/40 rounded px-1 py-0.5 border border-emerald/50 focus:outline-none capitalize"
-                        autoFocus onBlur={() => setEditingCell(null)} />
+                      <CategoryCombobox
+                        value={val.category ?? t.category}
+                        onChange={(v) => { setEdits(p => ({...p, [i]: {...p[i], category: v}})); setEditingCell(null); }}
+                        allowClear placeholder="Category"
+                        className="h-7 rounded-lg text-xs px-2 py-0.5 min-w-[140px]" />
                     ) : (
                       <span className="text-xs px-2 py-0.5 rounded-full bg-secondary capitalize cursor-pointer hover:text-emerald flex items-center gap-1"
                             onClick={() => setEditingCell({ idx: i, field: "category" })}>
@@ -270,17 +274,18 @@ export default function Statements() {
                         )}
                       </td>
                       <td className="px-6 py-3">
-                        {editingCell?.idx === i && editingCell?.field === "category" ? (
-                          <input type="text" defaultValue={val.category ?? t.category}
-                            onChange={e => setEdits(p => ({...p, [i]: {...p[i], category: e.target.value}}))}
-                            className="w-full bg-secondary/40 rounded px-1 py-0.5 border border-emerald/50 focus:outline-none text-xs capitalize"
-                            autoFocus onBlur={() => setEditingCell(null)} />
-                        ) : (
-                          <span className="text-xs px-2 py-1 rounded-full bg-secondary capitalize cursor-pointer hover:text-emerald flex items-center gap-1 inline-flex"
-                                onClick={() => setEditingCell({ idx: i, field: "category" })}>
-                            {t.category} <Pencil className="h-3 w-3 opacity-30" />
-                          </span>
-                        )}
+                      {editingCell?.idx === i && editingCell?.field === "category" ? (
+                        <CategoryCombobox
+                          value={val.category ?? t.category}
+                          onChange={(v) => { setEdits(p => ({...p, [i]: {...p[i], category: v}})); setEditingCell(null); }}
+                          allowClear placeholder="Category"
+                          className="h-7 rounded-lg text-xs px-2 py-0.5 min-w-[140px]" />
+                      ) : (
+                        <span className="text-xs px-2 py-1 rounded-full bg-secondary capitalize cursor-pointer hover:text-emerald flex items-center gap-1 inline-flex"
+                              onClick={() => setEditingCell({ idx: i, field: "category" })}>
+                          {t.category} <Pencil className="h-3 w-3 opacity-30" />
+                        </span>
+                      )}
                       </td>
                       <td className="px-6 py-3 text-xs text-muted-foreground">{Math.round((t.confidence || 0) * 100)}%</td>
                       <td className="px-6 py-3 text-right font-medium">
