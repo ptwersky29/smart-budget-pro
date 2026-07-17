@@ -262,10 +262,13 @@ async def _ai_parse_statement(text: str, session=None, user_id: str = None) -> d
     raw, provider, model, pt, ct, cost = await call_llm(
         "You are a precise UK bank statement parser. Always output valid JSON only.",
         PARSE_PROMPT + text[:MAX_CHARS_TO_AI],
+        model="google/gemini-2.0-flash-001",
         json_mode=False,
     )
     if session and user_id:
         await track_ai_usage(session, user_id, provider, model, pt, ct, cost, endpoint="statement_parse")
+    if not raw or not raw.strip():
+        raise RuntimeError("AI returned empty response")
     try:
         return llm_parse(raw)
     except ValueError as e:

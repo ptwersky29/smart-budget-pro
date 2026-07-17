@@ -103,7 +103,7 @@ async def call_llm(
     if not choices:
         raise RuntimeError("LLM returned no choices")
 
-    content = choices[0].get("message", {}).get("content", "")
+    content = (choices[0].get("message", {}).get("content") or "")
     usage = data.get("usage", {})
     prompt_tokens = usage.get("prompt_tokens", 0)
     completion_tokens = usage.get("completion_tokens", 0)
@@ -137,7 +137,7 @@ async def track_ai_usage(session, user_id: str, provider: str, model: str,
 
 
 def parse_json(text: str) -> dict:
-    t = text.strip()
+    t = (text or "").strip()
     if t.startswith("```"):
         lines = t.split("\n")
         if lines and lines[0].startswith("```"):
