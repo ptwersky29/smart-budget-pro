@@ -1,17 +1,26 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
-import { Upload, FileText, Loader2, Sparkles, CheckCircle2, Trash2, ArrowDownRight, ArrowUpRight, Save } from "lucide-react";
+import { Upload, FileText, Loader2, Sparkles, CheckCircle2, Trash2, ArrowDownRight, ArrowUpRight, Save, ChevronDown, Building2 } from "lucide-react";
 import { PageHeader, SectionCard } from "../components/ui/layout";
 import Skeleton from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
+
+function getDisplayName(a) {
+  if (!a) return "";
+  const name = a.name || a.provider || "";
+  const suffix = a.type === "savings" ? " (Savings)" : a.type === "credit" ? " (Credit)" : "";
+  return name + suffix;
+}
 
 export default function Statements() {
   useEffect(() => { document.title = "Statements | Penni"; }, []);
   const fileRef = useRef(null);
   const [busy, setBusy] = useState(false);
-  const [current, setCurrent] = useState(null); // freshly parsed result
+  const [current, setCurrent] = useState(null);
   const [history, setHistory] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [selectedAccountId, setSelectedAccountId] = useState("");
   const [dragging, setDragging] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -22,7 +31,16 @@ export default function Statements() {
     } catch (err) { toast.error("Could not load statement history"); }
   }, []);
 
-  useEffect(() => { loadHistory(); }, [loadHistory]);
+  const loadAccounts = useCallback(async () => {
+    try {
+      const { data } = await api.get("/accounts");
+      const list = data.accounts || [];
+      setAccounts(list);
+      if (list.length === 1) setSelectedAccountId(list[0].account_id);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { loadHistory(); loadAccounts(); }, [loadHistory, loadAccounts]);
 
   const onFile = async (file) => {
     if (!file) return;
@@ -43,11 +61,15 @@ export default function Statements() {
 
   const saveAll = async () => {
     if (!current) return;
+    if (!selectedAccountId) { toast.error("Select an account before saving"); return; }
     setSaving(true);
+    const form = new FormData();
+    form.append("account_id", selectedAccountId);
     try {
-      const { data } = await api.post(`/statements/${current.statement_id}/save`);
+      const { data } = await api.post(`/statements/${current.statement_id}/save`, form);
       toast.success(`Saved ${data.saved_count} transactions`);
       setCurrent(null);
+      setSelectedAccountId(accounts.length === 1 ? accounts[0].account_id : "");
       await loadHistory();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Save failed"); }
     finally { setSaving(false); }
@@ -104,9 +126,25 @@ export default function Statements() {
               <p className="text-xl tracking-tight font-medium mt-1">{current.transaction_count} transaction{current.transaction_count !== 1 ? "s" : ""} from {current.filename}</p>
               <p className="text-xs text-muted-foreground mt-1">Review below, then save all to your account.</p>
             </div>
-            <Button onClick={saveAll} disabled={saving} data-testid="save-all-button" variant="primary" size="pill">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="h-4 w-4 mr-2" /> Save all</>}
-            </Button>
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <select
+                  value={selectedAccountId}
+                  onChange={(e) => setSelectedAccountId(e.target.value)}
+                  className="appearance-none bg-secondary/60 border border-border rounded-xl px-3 py-2 pr-8 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-emerald/40 cursor-pointer"
+                  aria-label="Select account"
+                >
+                  <option value="" disabled>{accounts.length === 0 ? "No accounts" : "Select account…"}</option>
+                  {accounts.map((a) => (
+                    <option key={a.account_id} value={a.account_id}>{getDisplayName(a)}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              </div>
+              <Button onClick={saveAll} disabled={saving || !selectedAccountId} data-testid="save-all-button" variant="primary" size="pill">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="h-4 w-4 mr-2" /> Save all</>}
+              </Button>
+            </div>
           </div>
           {/* Mobile card view */}
           <div className="block sm:hidden divide-y divide-border">

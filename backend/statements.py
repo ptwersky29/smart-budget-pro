@@ -602,7 +602,9 @@ def build_router() -> APIRouter:
             }
 
     @router.post("/{statement_id}/save")
-    async def save_all(statement_id: str, request: Request, user: dict = Depends(get_current_user)):
+    async def save_all(statement_id: str, request: Request,
+                       account_id: str = Form(None),
+                       user: dict = Depends(get_current_user)):
         sm = request.app.state.db
         async with sm() as session:
             stmt_id_int = int(statement_id.replace("stmt_", "")) if statement_id.startswith("stmt_") else int(statement_id)
@@ -618,10 +620,15 @@ def build_router() -> APIRouter:
             if rec.status != "draft":
                 raise HTTPException(400, "Already saved")
 
+            # Allow account_id to be set at save time
+            target_account = account_id or rec.account_id
+            if not target_account:
+                raise HTTPException(400, "Select an account before saving")
+            if account_id:
+                rec.account_id = account_id
+
             now = datetime.now(timezone.utc)
             txs_data = (rec.data or {}).get("transactions", [])
-            if not rec.account_id:
-                raise HTTPException(400, "Statement has no target account — assign one before saving")
             docs = []
             for t in txs_data:
                 tx = Transaction(
@@ -632,7 +639,7 @@ def build_router() -> APIRouter:
                     description=t["description"],
                     merchant_name=t.get("merchant"),
                     category=t.get("category", "uncategorized"),
-                    account_id=t.get("account_id") or rec.account_id,
+                    account_id=t.get("account_id") or target_account,
                     date=datetime.fromisoformat(t["date"]) if t.get("date") else now,
                     source="statement",
                     approval_status="unapproved",
