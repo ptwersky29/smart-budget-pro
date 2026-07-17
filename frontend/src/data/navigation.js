@@ -26,6 +26,7 @@ export const NAV_SECTIONS = [
       { to: "/transactions", label: "Transactions", icon: Receipt },
       { to: "/budgets", label: "Budgets", icon: PiggyBank },
       { to: "/subscriptions", label: "Subscriptions", icon: RefreshCcw },
+      { to: "/statements", label: "Statements", icon: FileText },
     ],
   },
   {

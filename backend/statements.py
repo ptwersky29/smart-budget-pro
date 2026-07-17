@@ -262,6 +262,7 @@ async def _ai_parse_statement(text: str, session=None, user_id: str = None) -> d
     raw, provider, model, pt, ct, cost = await call_llm(
         "You are a precise UK bank statement parser. Always output valid JSON only.",
         PARSE_PROMPT + text[:MAX_CHARS_TO_AI],
+        model="openai/gpt-4o-mini",
         json_mode=True,
     )
     if session and user_id:
@@ -447,7 +448,7 @@ async def _ai_categorise(description: str, merchant: str | None, amount: float, 
     try:
         raw, provider, model, pt, ct, cost = await call_llm(
             "You categorise bank transactions. Output valid JSON only.",
-            prompt, json_mode=False,
+            prompt, model="openai/gpt-4o-mini", json_mode=False,
         )
         if session and user_id:
             await track_ai_usage(session, user_id, provider, model, pt, ct, cost, endpoint="statement_categorize")
