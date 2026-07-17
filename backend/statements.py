@@ -10,7 +10,7 @@ from fastapi import APIRouter, Request, Depends, UploadFile, File, HTTPException
 from pydantic import BaseModel
 from pypdf import PdfReader
 from sqlalchemy import select, func, delete
-from db import Transaction, Statement, MaaserLedger
+from db import BankAccount, Transaction, Statement, MaaserLedger
 from auth import get_current_user
 import maaser as maaser_mod
 
@@ -681,6 +681,20 @@ def build_router() -> APIRouter:
                     },
                 )
                 session.add(tx)
+                # Update account balance
+                try:
+                    acct_r = await session.execute(
+                        select(BankAccount).where(
+                            BankAccount.account_id == (t.get("account_id") or target_account),
+                            BankAccount.user_id == user["user_id"],
+                        )
+                    )
+                    ba = acct_r.scalar_one_or_none()
+                    if ba:
+                        ba.balance = round(float(ba.balance or 0) + float(t["amount"]), 2)
+                        ba.balance_updated_at = datetime.now(timezone.utc)
+                except Exception:
+                    logger.warning("Balance update failed for tx", exc_info=True)
                 docs.append({
                     "transaction_id": tx.transaction_id,
                     "user_id": user["user_id"],
