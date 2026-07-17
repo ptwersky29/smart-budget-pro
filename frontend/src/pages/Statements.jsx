@@ -31,9 +31,7 @@ export default function Statements() {
     const form = new FormData();
     form.append("file", file);
     try {
-      const { data } = await api.post("/statements/upload", form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const { data } = await api.post("/statements/upload", form);
       setCurrent(data);
       toast.success(`AI extracted ${data.transaction_count} transaction${data.transaction_count !== 1 ? "s" : ""}`);
       await loadHistory();
