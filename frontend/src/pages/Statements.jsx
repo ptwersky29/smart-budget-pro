@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
-import { Upload, FileText, Loader2, Sparkles, CheckCircle2, Trash2, ArrowDownRight, ArrowUpRight, Save, ChevronDown, Building2 } from "lucide-react";
+import { Upload, FileText, Loader2, Sparkles, CheckCircle2, Trash2, ArrowDownRight, ArrowUpRight, Save, ChevronDown, Building2, Pencil, X, Check } from "lucide-react";
 import { PageHeader, SectionCard } from "../components/ui/layout";
 import Skeleton from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
@@ -14,6 +15,8 @@ function getDisplayName(a) {
 }
 
 export default function Statements() {
+  const navigate = useNavigate();
+  const location = useLocation();
   useEffect(() => { document.title = "Statements | Penni"; }, []);
   const fileRef = useRef(null);
   const [busy, setBusy] = useState(false);
@@ -23,6 +26,16 @@ export default function Statements() {
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [dragging, setDragging] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [edits, setEdits] = useState({});
+  const [editingCell, setEditingCell] = useState(null);
+
+  // Pick up draft from route state (e.g. after upload from account detail page)
+  useEffect(() => {
+    if (location.state?.draft) {
+      setCurrent(location.state.draft);
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -59,18 +72,31 @@ export default function Statements() {
     } finally { setBusy(false); }
   };
 
+  const getMergedTransactions = () => {
+    const keys = Object.keys(edits);
+    if (keys.length === 0) return current.transactions;
+    return current.transactions.map((t, i) =>
+      edits[i] ? { ...t, ...edits[i] } : t
+    );
+  };
+
   const saveAll = async () => {
     if (!current) return;
     if (!selectedAccountId) { toast.error("Select an account before saving"); return; }
     setSaving(true);
     const form = new FormData();
     form.append("account_id", selectedAccountId);
+    const merged = getMergedTransactions();
+    form.append("transactions_json", JSON.stringify(merged));
     try {
       const { data } = await api.post(`/statements/${current.statement_id}/save`, form);
       toast.success(`Saved ${data.saved_count} transactions`);
       setCurrent(null);
+      setEdits({});
+      setEditingCell(null);
       setSelectedAccountId(accounts.length === 1 ? accounts[0].account_id : "");
       await loadHistory();
+      navigate("/transactions");
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Save failed"); }
     finally { setSaving(false); }
   };
@@ -148,23 +174,64 @@ export default function Statements() {
           </div>
           {/* Mobile card view */}
           <div className="block sm:hidden divide-y divide-border">
-            {current.transactions.map((t, i) => (
-              <div key={`${t.date}-${i}-${t.description}`} className="px-4 py-3 space-y-1.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-xs text-muted-foreground">{t.date}</p>
-                    <p className="font-medium text-sm truncate max-w-[40vw]" title={t.description}>{t.description}</p>
+            {getMergedTransactions().map((t, i) => {
+              const val = edits[i] || {};
+              return (
+                <div key={`${t.date}-${i}-${t.description}`} className="px-4 py-3 space-y-1.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      {editingCell?.idx === i && editingCell?.field === "date" ? (
+                        <input type="date" value={val.date ?? t.date} onChange={e => { setEdits(p => ({...p, [i]: {...p[i], date: e.target.value}})); setEditingCell(null); }}
+                          className="w-full text-xs bg-secondary/40 rounded px-1 py-0.5 border border-emerald/50 focus:outline-none"
+                          autoFocus onBlur={() => setEditingCell(null)} />
+                      ) : (
+                        <p className="text-xs text-muted-foreground cursor-pointer hover:text-emerald flex items-center gap-1"
+                           onClick={() => setEditingCell({ idx: i, field: "date" })}>
+                          {t.date} <Pencil className="h-3 w-3 opacity-40" />
+                        </p>
+                      )}
+                      {editingCell?.idx === i && editingCell?.field === "description" ? (
+                        <input type="text" defaultValue={val.description ?? t.description}
+                          onChange={e => setEdits(p => ({...p, [i]: {...p[i], description: e.target.value}}))}
+                          className="w-full text-sm bg-secondary/40 rounded px-1 py-0.5 border border-emerald/50 focus:outline-none"
+                          autoFocus onBlur={() => setEditingCell(null)} />
+                      ) : (
+                        <p className="font-medium text-sm truncate max-w-[40vw] cursor-pointer hover:text-emerald flex items-center gap-1"
+                           title={t.description} onClick={() => setEditingCell({ idx: i, field: "description" })}>
+                          {t.description} <Pencil className="h-3 w-3 shrink-0 opacity-40" />
+                        </p>
+                      )}
+                    </div>
+                    {editingCell?.idx === i && editingCell?.field === "amount" ? (
+                      <input type="number" step="0.01" defaultValue={val.amount ?? t.amount}
+                        onChange={e => setEdits(p => ({...p, [i]: {...p[i], amount: parseFloat(e.target.value)}}))}
+                        className="w-24 text-right text-sm bg-secondary/40 rounded px-1 py-0.5 border border-emerald/50 focus:outline-none tabular-nums"
+                        autoFocus onBlur={() => setEditingCell(null)} />
+                    ) : (
+                      <span className={`shrink-0 font-medium tabular-nums cursor-pointer hover:text-emerald flex items-center gap-1 ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}
+                            onClick={() => setEditingCell({ idx: i, field: "amount" })}>
+                        {t.amount > 0 ? "+" : "−"}{current.currency === "USD" ? "$" : "£"}{Math.abs(t.amount).toFixed(2)}
+                        <Pencil className="h-3 w-3 opacity-40" />
+                      </span>
+                    )}
                   </div>
-                  <span className={`shrink-0 font-medium tabular-nums ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}>
-                    {t.amount > 0 ? "+" : "−"}{current.currency === "USD" ? "$" : "£"}{Math.abs(t.amount).toFixed(2)}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {editingCell?.idx === i && editingCell?.field === "category" ? (
+                      <input type="text" defaultValue={val.category ?? t.category}
+                        onChange={e => setEdits(p => ({...p, [i]: {...p[i], category: e.target.value}}))}
+                        className="text-xs bg-secondary/40 rounded px-1 py-0.5 border border-emerald/50 focus:outline-none capitalize"
+                        autoFocus onBlur={() => setEditingCell(null)} />
+                    ) : (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-secondary capitalize cursor-pointer hover:text-emerald flex items-center gap-1"
+                            onClick={() => setEditingCell({ idx: i, field: "category" })}>
+                        {t.category} <Pencil className="h-3 w-3 opacity-40" />
+                      </span>
+                    )}
+                    <span className="text-xs text-muted-foreground">{Math.round((t.confidence || 0) * 100)}%</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-secondary capitalize">{t.category}</span>
-                  <span className="text-xs text-muted-foreground">{Math.round((t.confidence || 0) * 100)}%</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           {/* Desktop table */}
           <div className="hidden sm:block overflow-x-auto">
@@ -173,20 +240,69 @@ export default function Statements() {
                 <th className="px-6 py-3">Date</th><th className="px-6 py-3">Description</th><th className="px-6 py-3">Category</th><th className="px-6 py-3">Conf.</th><th className="px-6 py-3 text-right">Amount</th>
               </tr></thead>
               <tbody>
-                {current.transactions.map((t, i) => (
-                  <tr key={`${t.date}-${i}-${t.description}`} className="border-b border-border last:border-0 hover:bg-secondary/40">
-                    <td className="px-6 py-3 text-xs text-muted-foreground">{t.date}</td>
-                    <td className="px-6 py-3 font-medium max-w-md truncate" title={t.description}>{t.description}</td>
-                    <td className="px-6 py-3"><span className="text-xs px-2 py-1 rounded-full bg-secondary capitalize">{t.category}</span></td>
-                    <td className="px-6 py-3 text-xs text-muted-foreground">{Math.round((t.confidence || 0) * 100)}%</td>
-                    <td className={`px-6 py-3 text-right font-medium ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}>
-                      <span className="inline-flex items-center gap-1">
-                        {t.amount > 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                        {t.amount > 0 ? "+" : "−"}{current.currency === "USD" ? "$" : "£"}{Math.abs(t.amount).toFixed(2)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {getMergedTransactions().map((t, i) => {
+                  const val = edits[i] || {};
+                  return (
+                    <tr key={`${t.date}-${i}-${t.description}`} className="border-b border-border last:border-0 hover:bg-secondary/40">
+                      <td className="px-6 py-3 text-xs text-muted-foreground">
+                        {editingCell?.idx === i && editingCell?.field === "date" ? (
+                          <input type="date" value={val.date ?? t.date} onChange={e => { setEdits(p => ({...p, [i]: {...p[i], date: e.target.value}})); }}
+                            className="w-full bg-secondary/40 rounded px-1 py-0.5 border border-emerald/50 focus:outline-none text-xs"
+                            autoFocus onBlur={() => setEditingCell(null)} />
+                        ) : (
+                          <span className="cursor-pointer hover:text-emerald flex items-center gap-1"
+                                onClick={() => setEditingCell({ idx: i, field: "date" })}>
+                            {t.date} <Pencil className="h-3 w-3 opacity-30 shrink-0" />
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-3 font-medium max-w-md truncate">
+                        {editingCell?.idx === i && editingCell?.field === "description" ? (
+                          <input type="text" defaultValue={val.description ?? t.description}
+                            onChange={e => setEdits(p => ({...p, [i]: {...p[i], description: e.target.value}}))}
+                            className="w-full bg-secondary/40 rounded px-1 py-0.5 border border-emerald/50 focus:outline-none text-sm"
+                            autoFocus onBlur={() => setEditingCell(null)} />
+                        ) : (
+                          <span className="cursor-pointer hover:text-emerald flex items-center gap-1"
+                                title={t.description} onClick={() => setEditingCell({ idx: i, field: "description" })}>
+                            {t.description} <Pencil className="h-3 w-3 opacity-30 shrink-0" />
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-3">
+                        {editingCell?.idx === i && editingCell?.field === "category" ? (
+                          <input type="text" defaultValue={val.category ?? t.category}
+                            onChange={e => setEdits(p => ({...p, [i]: {...p[i], category: e.target.value}}))}
+                            className="w-full bg-secondary/40 rounded px-1 py-0.5 border border-emerald/50 focus:outline-none text-xs capitalize"
+                            autoFocus onBlur={() => setEditingCell(null)} />
+                        ) : (
+                          <span className="text-xs px-2 py-1 rounded-full bg-secondary capitalize cursor-pointer hover:text-emerald flex items-center gap-1 inline-flex"
+                                onClick={() => setEditingCell({ idx: i, field: "category" })}>
+                            {t.category} <Pencil className="h-3 w-3 opacity-30" />
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-3 text-xs text-muted-foreground">{Math.round((t.confidence || 0) * 100)}%</td>
+                      <td className="px-6 py-3 text-right font-medium">
+                        {editingCell?.idx === i && editingCell?.field === "amount" ? (
+                          <input type="number" step="0.01" defaultValue={val.amount ?? t.amount}
+                            onChange={e => setEdits(p => ({...p, [i]: {...p[i], amount: parseFloat(e.target.value)}}))}
+                            className="w-28 text-right bg-secondary/40 rounded px-1 py-0.5 border border-emerald/50 focus:outline-none text-sm tabular-nums"
+                            autoFocus onBlur={() => setEditingCell(null)} />
+                        ) : (
+                          <span className={`cursor-pointer hover:text-emerald flex items-center gap-1 justify-end ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}
+                                onClick={() => setEditingCell({ idx: i, field: "amount" })}>
+                            <span className="inline-flex items-center gap-1">
+                              {t.amount > 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                              {t.amount > 0 ? "+" : "−"}{current.currency === "USD" ? "$" : "£"}{Math.abs(t.amount).toFixed(2)}
+                            </span>
+                            <Pencil className="h-3 w-3 opacity-30" />
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

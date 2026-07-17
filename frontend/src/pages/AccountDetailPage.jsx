@@ -209,9 +209,8 @@ export default function AccountDetailPage() {
     fd.append("account_id", accountId);
     try {
       const { data } = await api.post("/statements/upload", fd);
-      toast.success(`Statement processed: ${data.transaction_count || 0} transactions found`);
-      await loadHistory();
-      await loadTransactions();
+      toast.success(`${data.transaction_count || 0} transactions extracted — review before saving`);
+      navigate("/statements", { state: { draft: data } });
     } catch (e) { toast.error(formatApiError(e) || "Upload failed"); }
     finally { setUploadBusy(false); }
   };

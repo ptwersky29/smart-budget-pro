@@ -1,6 +1,7 @@
 """Statement upload + AI-parsed transactions (CSV / PDF)."""
 import io
 import csv
+import json
 import uuid
 import logging
 from datetime import datetime, timezone
@@ -607,6 +608,7 @@ def build_router() -> APIRouter:
     @router.post("/{statement_id}/save")
     async def save_all(statement_id: str, request: Request,
                        account_id: str = Form(None),
+                       transactions_json: str = Form(None),
                        user: dict = Depends(get_current_user)):
         sm = request.app.state.db
         async with sm() as session:
@@ -632,6 +634,11 @@ def build_router() -> APIRouter:
 
             now = datetime.now(timezone.utc)
             txs_data = (rec.data or {}).get("transactions", [])
+            if transactions_json:
+                try:
+                    txs_data = json.loads(transactions_json)
+                except json.JSONDecodeError:
+                    raise HTTPException(400, "Invalid transactions JSON")
             docs = []
             for t in txs_data:
                 tx = Transaction(
