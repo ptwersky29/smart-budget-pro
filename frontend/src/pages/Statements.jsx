@@ -178,9 +178,10 @@ export default function Statements() {
           {/* Mobile card view */}
           <div className="block sm:hidden divide-y divide-border">
             {getMergedTransactions().map((t, i) => {
+              const orig = current.transactions[i] || t;
               const val = edits[i] || {};
               return (
-                <div key={`${t.date}-${i}-${t.description}`} className="px-4 py-3 space-y-1.5">
+                <div key={`${orig.date}-${i}-${orig.description}`} className="px-4 py-3 space-y-1.5">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       {editingCell?.idx === i && editingCell?.field === "date" ? (
@@ -245,9 +246,10 @@ export default function Statements() {
               </tr></thead>
               <tbody>
                 {getMergedTransactions().map((t, i) => {
+                  const orig = current.transactions[i] || t;
                   const val = edits[i] || {};
                   return (
-                    <tr key={`${t.date}-${i}-${t.description}`} className="border-b border-border last:border-0 hover:bg-secondary/40">
+                    <tr key={`${orig.date}-${i}-${orig.description}`} className="border-b border-border last:border-0 hover:bg-secondary/40">
                       <td className="px-6 py-3 text-xs text-muted-foreground">
                         {editingCell?.idx === i && editingCell?.field === "date" ? (
                           <input type="date" value={val.date ?? t.date} onChange={e => { setEdits(p => ({...p, [i]: {...p[i], date: e.target.value}})); }}
