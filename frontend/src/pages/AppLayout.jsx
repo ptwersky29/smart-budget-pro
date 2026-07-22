@@ -127,8 +127,8 @@ export default function AppLayout() {
 
   return (
     <div className="app-shell min-h-screen flex text-foreground relative">
-      <aside data-tour="sidebar" className="hidden lg:block lg:sticky top-0 left-0 z-40 h-screen w-[18rem] border-r border-border bg-card/95 backdrop-blur-xl shadow-[8px_0_30px_rgba(15,23,42,0.03)]">
-        <div className="flex items-center justify-between px-6 h-16 border-b border-border/70">
+      <aside data-tour="sidebar" className="hidden lg:flex lg:flex-col lg:sticky top-0 left-0 z-40 h-screen w-[18rem] border-r border-border bg-card/95 backdrop-blur-xl shadow-[8px_0_30px_rgba(15,23,42,0.03)]">
+        <div className="flex items-center justify-between px-6 h-16 border-b border-border/70 shrink-0">
           <Link to="/dashboard" className="flex items-center gap-3 min-w-0" data-testid="sidebar-logo">
             <Logo size="md" />
             <div className="min-w-0 flex-1">
@@ -142,7 +142,7 @@ export default function AppLayout() {
           </Link>
         </div>
 
-        <div className="p-4 space-y-5 overflow-y-auto h-[calc(100vh-4rem)] no-scrollbar">
+        <div className="flex-1 p-4 space-y-5 overflow-y-auto no-scrollbar">
           {NAV_SECTIONS.filter((section) => !section.adminOnly || user?.role === "admin").map((section) => (
             <div key={section.label} className="space-y-2">
               <p className="px-3 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{section.label}</p>
@@ -174,10 +174,9 @@ export default function AppLayout() {
               </div>
             </div>
           ))}
-
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 border-t border-border/70 bg-card/90 backdrop-blur-xl p-4">
+        <div className="border-t border-border/70 bg-card/90 backdrop-blur-xl p-4 shrink-0">
           <div className="flex items-center gap-3 rounded-lg border border-border/70 bg-background/80 px-3 py-3">
             <div className="w-10 h-10 rounded-lg bg-secondary grid place-items-center text-sm font-semibold">
               {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
