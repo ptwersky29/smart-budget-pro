@@ -1,4 +1,4 @@
-"""Shared LLM helper — direct OpenRouter + provider-specific calls, replaces emergentintegrations.llm.chat."""
+"""Shared LLM helper — direct Google Gemini API (preferred) + OpenRouter fallback."""
 import asyncio
 import os
 import json
@@ -11,6 +11,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 OPENROUTER_API = "https://openrouter.ai/api/v1/chat/completions"
+GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 _llm_client: httpx.AsyncClient | None = None
 
@@ -28,9 +29,11 @@ async def close_llm_client():
         await _llm_client.aclose()
         _llm_client = None
 
+
 MODEL_COSTS = {
-    "google/gemini-2.0-flash-lite-001": {"input": 0.075e-6, "output": 0.3e-6},
-    "google/gemini-2.0-flash-001": {"input": 0.15e-6, "output": 0.6e-6},
+    "gemini-2.5-flash-lite": {"input": 0.1e-6, "output": 0.4e-6},
+    "gemini-2.5-flash": {"input": 0.3e-6, "output": 2.5e-6},
+    "gemini-2.0-flash": {"input": 0.1e-6, "output": 0.4e-6},
     "openai/gpt-4o-mini": {"input": 0.15e-6, "output": 0.6e-6},
     "openai/gpt-4o": {"input": 2.5e-6, "output": 10e-6},
     "anthropic/claude-3-haiku": {"input": 0.25e-6, "output": 1.25e-6},
@@ -50,19 +53,81 @@ def estimate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> flo
     return round(prompt_tokens * costs["input"] + completion_tokens * costs["output"], 6)
 
 
+async def _call_gemini(system: str, prompt: str, model: str, api_key: str,
+                       max_tokens: int, temperature: float, json_mode: bool,
+                       ) -> tuple[str, str, str, int, int, float]:
+    """Call Google Gemini REST API directly. Returns (text, provider, model, pt, ct, cost)."""
+    model_id = model.split("/", 1)[1] if model.startswith("google/") else model
+    url = GEMINI_API.format(model=model_id)
+    generation_config = {
+        "temperature": temperature,
+        "maxOutputTokens": max_tokens,
+    }
+    if json_mode:
+        generation_config["responseMimeType"] = "application/json"
+    payload = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [{"text": f"{system}\n\n{prompt}"}],
+            }
+        ],
+        "generationConfig": generation_config,
+    }
+    client = await get_llm_client()
+    for attempt in range(4):
+        resp = await client.post(url, params={"key": api_key}, json=payload)
+        if resp.status_code == 429 and attempt < 3:
+            wait = 2 ** attempt
+            logger.warning(f"Gemini rate-limited (429), retrying in {wait}s (attempt {attempt + 1}/3)")
+            await asyncio.sleep(wait)
+            continue
+        if resp.status_code != 200:
+            logger.error(f"Gemini error {resp.status_code}: {resp.text[:500]}")
+            raise RuntimeError(f"LLM call failed ({resp.status_code})")
+        break
+    data = resp.json()
+    try:
+        text = (data.get("candidates", [{}])[0]
+                    .get("content", {})
+                    .get("parts", [{}])[0]
+                    .get("text", ""))
+    except (IndexError, AttributeError):
+        text = ""
+    if not text and data.get("candidates"):
+        text = data["candidates"][0].get("output", "")
+    usage = data.get("usageMetadata", {})
+    prompt_tokens = usage.get("promptTokenCount", 0)
+    completion_tokens = usage.get("candidatesTokenCount", 0)
+    cost = estimate_cost(model_id, prompt_tokens, completion_tokens)
+    return text, "google", model_id, prompt_tokens, completion_tokens, cost
+
+
 async def call_llm(
     system: str,
     prompt: str,
-    model: str = "openai/gpt-4o-mini",
+    model: str = "gemini-2.5-flash-lite",
     api_key: str = None,
     max_tokens: int = 4096,
     temperature: float = 0.1,
     json_mode: bool = True,
 ) -> tuple[str, str, str, int, int, float]:
-    """Call LLM via OpenRouter. Returns (response_text, provider, model, prompt_toks, completion_toks, cost)."""
-    key = api_key or os.environ.get("OPENROUTER_API_KEY", "")
+    """Call LLM. Uses Gemini REST API when GEMINI_API_KEY is set, else OpenRouter.
+    Returns (response_text, provider, model, prompt_toks, completion_toks, cost)."""
+    gemini_key = api_key or os.environ.get("GEMINI_API_KEY", "")
+    if gemini_key:
+        return await _call_gemini(system, prompt, model, gemini_key,
+                                  max_tokens, temperature, json_mode)
+
+    # OpenRouter fallback
+    key = os.environ.get("OPENROUTER_API_KEY", "")
     if not key:
         raise RuntimeError("No API key configured for LLM calls")
+
+    # Map bare gemini model names to OpenRouter slugs when falling back
+    or_model = model
+    if model.startswith("gemini") and not model.startswith("openrouter"):
+        or_model = f"google/{model}"
 
     headers = {
         "Authorization": f"Bearer {key}",
@@ -76,7 +141,7 @@ async def call_llm(
     messages.append({"role": "user", "content": prompt})
 
     body = {
-        "model": model,
+        "model": or_model,
         "messages": messages,
         "max_tokens": max_tokens,
         "temperature": temperature,
@@ -107,8 +172,8 @@ async def call_llm(
     usage = data.get("usage", {})
     prompt_tokens = usage.get("prompt_tokens", 0)
     completion_tokens = usage.get("completion_tokens", 0)
-    cost = estimate_cost(model, prompt_tokens, completion_tokens)
-    used_model = data.get("model", model)
+    cost = estimate_cost(or_model, prompt_tokens, completion_tokens)
+    used_model = data.get("model", or_model)
     provider = "openrouter"
     if "claude" in used_model:
         provider = "anthropic"
@@ -118,7 +183,6 @@ async def call_llm(
         provider = "google"
 
     return content, provider, used_model, prompt_tokens, completion_tokens, cost
-
 
 async def track_ai_usage(session, user_id: str, provider: str, model: str,
                          prompt_tokens: int, completion_tokens: int, cost: float,
