@@ -106,7 +106,7 @@ async def _call_gemini(system: str, prompt: str, model: str, api_key: str,
 async def call_llm(
     system: str,
     prompt: str,
-    model: str = "gemini-2.5-flash-lite",
+    model: str = "openrouter/free",
     api_key: str = None,
     max_tokens: int = 4096,
     temperature: float = 0.1,
