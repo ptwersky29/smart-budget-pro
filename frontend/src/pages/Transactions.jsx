@@ -639,8 +639,11 @@ const Transactions = React.memo(function Transactions() {
       setOpen(false); setEditingId(null);
       const optimisticTx = { transaction_id: `optimistic-${Date.now()}`, description: form.description, amount: signed, category: form.category, date: form.date || today(), source: "manual", approval_status: "approved", category_approval_status: "approved", notes: form.notes, account_id: form.account_id };
       setTxs(prev => [optimisticTx, ...prev]);
+      setTotal(prev => prev + 1);
+      if (signed > 0) setIncomeTotal(prev => Number(prev || 0) + signed);
+      else setExpenseTotal(prev => Number(prev || 0) + Math.abs(signed));
       try {
-        await api.post("/budget-system/approve", {
+        const { data } = await api.post("/budget-system/approve", {
           description: form.description.trim(), amount: signed,
           budget_type: form.budget_type || suggestions[0]?.budget_type || "day_to_day",
           occasion: form.occasion || suggestions[0]?.occasion || "Monthly Living",
@@ -651,10 +654,13 @@ const Transactions = React.memo(function Transactions() {
           suggestion_index: chosenIdx >= 0 ? chosenIdx : null,
           save_as_recurring: saveAsRecurring,
         });
+        setTxs(prev => prev.map(t => t.transaction_id === optimisticTx.transaction_id ? data : t));
         toast.success("Transaction added");
-        await load();
       } catch {
         setTxs(prev => prev.filter(t => t.transaction_id !== optimisticTx.transaction_id));
+        setTotal(prev => Math.max(0, prev - 1));
+        if (signed > 0) setIncomeTotal(prev => Math.max(0, Number(prev || 0) - signed));
+        else setExpenseTotal(prev => Math.max(0, Number(prev || 0) - Math.abs(signed)));
         toast.error("Could not add");
       }
     } else {
@@ -850,16 +856,19 @@ const Transactions = React.memo(function Transactions() {
 
   const approveTx = useCallback(async (t, categoryOverride) => {
     const category = categoryOverride || t.ai_selected_category || t.category || "uncategorized";
+    const optimistic = { ...t, category, ai_selected_category: category, approval_status: "approved", category_approval_status: "approved" };
+    setTxs(prev => prev.map(row => row.transaction_id === t.transaction_id ? optimistic : row));
+    setReviewTx(optimistic);
+    setReviewOpen(false);
+    toast.success("Transaction approved");
     try {
       const { data } = await api.patch(`/transactions/${t.transaction_id}/approve-category`, {
         category,
         approve_transaction: true,
       });
       setTxs(prev => prev.map(row => row.transaction_id === t.transaction_id ? data : row));
-      setReviewTx(data);
-      setReviewOpen(false);
-      toast.success("Transaction approved");
     } catch (e) {
+      setTxs(prev => prev.map(row => row.transaction_id === t.transaction_id ? t : row));
       toast.error(formatApiError(e?.response?.data?.detail) || "Could not approve");
     }
   }, []);

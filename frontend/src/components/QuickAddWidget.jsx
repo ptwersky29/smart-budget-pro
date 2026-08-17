@@ -51,10 +51,12 @@ export default function QuickAddWidget() {
   const handleApprove = async (index) => {
     const s = index !== undefined ? suggestions[index] : selected;
     if (!s || !accountId) { toast.error("Select an account first"); return; }
+    const parsed = parseFloat(amount);
+    if (isNaN(parsed)) { toast.error("Invalid amount"); return; }
+    const signed = s.is_income ? Math.abs(parsed) : -Math.abs(parsed);
+    const snapshot = { desc, amount, accountId, classification };
+    setOpen(false);
     try {
-      const parsed = parseFloat(amount);
-      if (isNaN(parsed)) { toast.error("Invalid amount"); return; }
-      const signed = s.is_income ? Math.abs(parsed) : -Math.abs(parsed);
       await api.post("/budget-system/approve", {
         description: desc.trim(),
         amount: signed,
@@ -68,7 +70,14 @@ export default function QuickAddWidget() {
       });
       toast.success("Transaction added");
       handleClose();
-    } catch { toast.error("Could not add transaction"); }
+    } catch {
+      setOpen(true);
+      setDesc(snapshot.desc);
+      setAmount(snapshot.amount);
+      setAccountId(snapshot.accountId);
+      setClassification(snapshot.classification);
+      toast.error("Could not add transaction");
+    }
   };
 
   const handleClose = () => {
