@@ -38,7 +38,6 @@ from pydantic import BaseModel
 from security import sanitize_input
 from sqlalchemy import delete, func, or_, select, update
 from statements import (
-    ALL_CATEGORIES,
     CATEGORIES,
     CATEGORISE_KEYWORDS,
     CATEGORY_HIERARCHY,
@@ -586,6 +585,39 @@ async def _category_usage_map(session, user_id: str) -> dict[str, dict]:
     return usage
 
 
+async def _load_category_payload(session, user_id: str) -> dict:
+    """Build the user's active category payload (cached for 2 minutes)."""
+    cache_key = f"cats:{user_id}"
+    cached = _query_cache.get(cache_key)
+    if cached:
+        return cached
+    rows = (
+        (
+            await session.execute(
+                select(Category)
+                .where(Category.user_id == user_id)
+                .order_by(Category.sort_order, Category.name)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    usage_map = await _category_usage_map(session, user_id)
+    categories = combine_categories(rows, usage_map)
+    payload = {
+        "categories": categories,
+        "hierarchy": hierarchy_payload(categories),
+    }
+    _query_cache.set(cache_key, payload, ttl=120)
+    return payload
+
+
+async def _active_category_names(session, user_id: str) -> set[str]:
+    """Category names the user currently has — excludes archived/deleted ones."""
+    payload = await _load_category_payload(session, user_id)
+    return {c["name"] for c in payload["categories"]}
+
+
 async def _resolve_category_entity(session, user_id: str, category_id: str):
     slug = _slug_from_category_identifier(category_id)
     row = None
@@ -856,6 +888,7 @@ async def _suggest_categories_for_tx(
     session, user_id: str, description: str, merchant: str | None, amount: float
 ) -> list[dict]:
     desc = sanitize_input((description or merchant or "").strip(), max_len=200)
+    active = await _active_category_names(session, user_id)
     suggestions = []
     try:
         merchant_key = normalize_merchant(merchant or desc).lower()
@@ -872,6 +905,8 @@ async def _suggest_categories_for_tx(
                 )
             ).scalars().all()
             for rule in rules:
+                if rule.category not in active:
+                    continue
                 suggestions.append(
                     {
                         "category": rule.category,
@@ -885,7 +920,7 @@ async def _suggest_categories_for_tx(
         pass
 
     fast = smart_categorize(f"{desc} {merchant or ''}")
-    if fast and fast != "uncategorized":
+    if fast and fast != "uncategorized" and fast in active:
         suggestions.append(
             {
                 "category": fast,
@@ -904,7 +939,7 @@ async def _suggest_categories_for_tx(
             user_prompt = (
                 f"Suggest exactly 3 category options for this transaction.\n"
                 f"Description: {desc}\nMerchant: {merchant or ''}\nAmount: {amount}\n"
-                f"Categories: {', '.join(sorted(ALL_CATEGORIES))}\n"
+                f"Categories: {', '.join(sorted(active))}\n"
                 f'Return {{"suggestions":[{{"category":"slug","confidence":0.0,"reason":"short reason"}}]}}'
             )
             raw, provider, model, pt, ct, cost = await call_llm(
@@ -934,7 +969,7 @@ async def _suggest_categories_for_tx(
 
     for s in suggestions:
         cat = _rc(s.get("category") or "uncategorized")
-        if cat in seen:
+        if cat in seen or cat not in active:
             continue
         seen.add(cat)
         s["category"] = cat
@@ -943,18 +978,17 @@ async def _suggest_categories_for_tx(
             break
     while len(merged) < 3:
         fallback = "uncategorized" if not merged else "miscellaneous"
-        if fallback not in seen:
-            merged.append(
-                {
-                    "category": fallback,
-                    "confidence": 0,
-                    "reason": "No confident match found.",
-                    "source": "fallback",
-                }
-            )
-            seen.add(fallback)
-        else:
+        if fallback not in active or fallback in seen:
             break
+        merged.append(
+            {
+                "category": fallback,
+                "confidence": 0,
+                "reason": "No confident match found.",
+                "source": "fallback",
+            }
+        )
+        seen.add(fallback)
     return merged[:3]
 
 
@@ -3141,32 +3175,9 @@ Output ONLY valid JSON, no markdown, no explanation:
 
     @router.get("/categories")
     async def list_categories(request: Request, user: dict = Depends(get_current_user)):
-        cache_key = f"cats:{user['user_id']}"
-        cached = _query_cache.get(cache_key)
-        if cached:
-            return cached
-
         sm = request.app.state.db
         async with sm() as session:
-            rows = (
-                (
-                    await session.execute(
-                        select(Category)
-                        .where(Category.user_id == user["user_id"])
-                        .order_by(Category.sort_order, Category.name)
-                    )
-                )
-                .scalars()
-                .all()
-            )
-            usage_map = await _category_usage_map(session, user["user_id"])
-            categories = combine_categories(rows, usage_map)
-            payload = {
-                "categories": categories,
-                "hierarchy": hierarchy_payload(categories),
-            }
-            _query_cache.set(cache_key, payload, ttl=120)
-            return payload
+            return await _load_category_payload(session, user["user_id"])
 
     @router.post("/categories")
     async def create_category(

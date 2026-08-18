@@ -20,11 +20,22 @@ from llm import call_llm, track_ai_usage, parse_json
 from security import sanitize_input
 from statements import CATEGORY_HIERARCHY, SECTION_FOR_CATEGORY
 
-# Build a flat list of all valid category names for the LLM prompt
-_ALL_CATEGORY_SECTIONS_STR = "\n".join(
-    f"{section}: {', '.join(name for name, _ in items)}"
-    for section, items in CATEGORY_HIERARCHY.items()
-)
+# Build the LLM prompt category list from a user's active (non-deleted) categories
+
+
+def _sections_str_for_active(active: set[str]) -> str:
+    """LLM prompt category list restricted to the user's existing (non-deleted) categories."""
+    lines = []
+    listed = set()
+    for section, items in CATEGORY_HIERARCHY.items():
+        names = [name for name, _ in items if name in active]
+        if names:
+            lines.append(f"{section}: {', '.join(names)}")
+            listed.update(names)
+    extra = sorted(active - listed - {"uncategorized"})
+    if extra:
+        lines.append(f"Other: {', '.join(extra)}")
+    return "\n".join(lines)
 
 logger = logging.getLogger("budget_system")
 
@@ -984,7 +995,7 @@ def build_router() -> APIRouter:
                 break
         return suggestions
 
-    async def _classify_with_llm(session, user_id: str, description: str, amount: float) -> dict:
+    async def _classify_with_llm(session, user_id: str, description: str, amount: float, sections_str: str) -> dict:
         """Call LLM to get 4 ranked category suggestions."""
         system_prompt = (
             "You classify UK personal finance transactions. "
@@ -993,7 +1004,7 @@ def build_router() -> APIRouter:
         user_prompt = (
             f"Classify this transaction and return the top 4 category suggestions ranked by confidence:\n"
             f"Description: {description}\nAmount: £{amount}\n\n"
-            f"Available categories (section: category_names):\n{_ALL_CATEGORY_SECTIONS_STR}\n\n"
+            f"Available categories (section: category_names):\n{sections_str}\n\n"
             f"Respond with JSON array of 4 objects, each:\n"
             f'{{"budget_type": "day_to_day|yom_tov|holiday|simcha|other", '
             f'"occasion": "e.g. Monthly Living | Pesach 2026 | Summer Trip | Chaim Wedding", '
@@ -1022,13 +1033,24 @@ def build_router() -> APIRouter:
 
             clean_desc = sanitize_input(payload.description.strip(), max_len=200)
 
+            # Only suggest categories the user still has — never archived/deleted ones
+            from finance_engine import _active_category_names
+
+            active = await _active_category_names(session, user["user_id"])
+
             # Step 1: Historical lookup — check CategoryRules first
-            historical = await _lookup_historical_suggestions(session, user["user_id"], clean_desc)
+            historical = [
+                s for s in await _lookup_historical_suggestions(session, user["user_id"], clean_desc)
+                if s.get("category") in active
+            ]
 
             # Step 2: LLM classification — get 4 AI suggestions
             llm_suggestions = []
             try:
-                llm_result = await _classify_with_llm(session, user["user_id"], clean_desc, payload.amount)
+                llm_result = await _classify_with_llm(
+                    session, user["user_id"], clean_desc, payload.amount,
+                    _sections_str_for_active(active),
+                )
                 raw_suggestions = llm_result.get("suggestions", []) if isinstance(llm_result, dict) else (llm_result if isinstance(llm_result, list) else [])
                 for s in raw_suggestions[:4]:
                     s["source"] = "ai"
@@ -1050,9 +1072,10 @@ def build_router() -> APIRouter:
             merged = []
             for s in historical + llm_suggestions:
                 cat = s.get("category", "uncategorized")
-                if cat not in seen_cats:
-                    seen_cats.add(cat)
-                    merged.append(s)
+                if cat in seen_cats or cat not in active:
+                    continue
+                seen_cats.add(cat)
+                merged.append(s)
                 if len(merged) >= 4:
                     break
 
