@@ -122,12 +122,19 @@ async def create_tables():
     """Create all tables via the async engine (safe to call on every startup)."""
     if _engine:
         async with _engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
             if _engine.url.drivername.startswith("sqlite"):
+                await conn.run_sync(Base.metadata.create_all)
                 await _run_sqlite_migrations(conn)
                 return
             from sqlalchemy import text
 
+            # Serialize schema migrations across processes (e.g. web + worker
+            # services on Render) to avoid Postgres DDL deadlocks.
+            await conn.execute(
+                text("SELECT pg_advisory_xact_lock(hashtext('smart_budget_pro_migrations'))")
+            )
+
+            await conn.run_sync(Base.metadata.create_all)
             await conn.execute(
                 text("ALTER TABLE users ADD COLUMN IF NOT EXISTS picture VARCHAR(512)")
             )
