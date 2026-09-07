@@ -26,6 +26,7 @@ import {
   ChevronRight,
   Filter,
   MoreHorizontal,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -342,6 +343,16 @@ export default function AccountPage() {
       {/* Bank card mockup header */}
       <div className={`fade-up`}>
         <BankCardMockup connection={conn} size="md" showStatus />
+
+        {needsReconnect && conn.provider !== "manual" && (
+          <div className="mt-3 rounded-xl border border-ruby/40 bg-ruby/5 p-3 flex items-center gap-3">
+            <AlertCircle className="h-4 w-4 text-ruby shrink-0" />
+            <p className="text-xs text-ruby flex-1">This connection has expired and needs to be re-authenticated.</p>
+            <Button onClick={reconnectConn} variant="danger" size="pillSm">
+              Reconnect
+            </Button>
+          </div>
+        )}
 
         {/* Nickname + stats row below card */}
         <div className="mt-3 flex items-center gap-3 flex-wrap">
