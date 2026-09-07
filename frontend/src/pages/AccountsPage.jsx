@@ -273,7 +273,11 @@ export default function AccountsPage() {
     }
   };
 
-  const needsReconnect = conns.some((c) => c.status === "reconnect_required");
+  const isTokenExpired = (c) => c.expires_at && new Date(c.expires_at) < new Date();
+  const needsReconnectConn = (c) => c.status === "reconnect_required" || isTokenExpired(c);
+  const needsReconnect = conns.some(needsReconnectConn);
+
+  const connByAccountId = Object.fromEntries(conns.map((c) => [c.account_id, c]));
 
   const currentAccounts = accounts.filter((a) => a.type !== "savings");
   const savingsAccounts = accounts.filter((a) => a.type === "savings");
@@ -384,7 +388,7 @@ export default function AccountsPage() {
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {currentAccounts.map((a) => (
-              <AccountCard key={a.account_id} account={a} />
+              <AccountCard key={a.account_id} account={a} connection={connByAccountId[a.account_id]} />
             ))}
           </div>
         </div>
@@ -397,7 +401,7 @@ export default function AccountsPage() {
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {savingsAccounts.map((a) => (
-              <AccountCard key={a.account_id} account={a} />
+              <AccountCard key={a.account_id} account={a} connection={connByAccountId[a.account_id]} />
             ))}
           </div>
         </div>
