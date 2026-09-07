@@ -344,11 +344,13 @@ export default function AccountPage() {
       <div className={`fade-up`}>
         <BankCardMockup connection={conn} size="md" showStatus />
 
-        {needsReconnect && conn.provider !== "manual" && (
-          <div className="mt-3 rounded-xl border border-ruby/40 bg-ruby/5 p-3 flex items-center gap-3">
-            <AlertCircle className="h-4 w-4 text-ruby shrink-0" />
-            <p className="text-xs text-ruby flex-1">This connection has expired and needs to be re-authenticated.</p>
-            <Button onClick={reconnectConn} variant="danger" size="pillSm">
+        {conn.provider !== "manual" && (
+          <div className={`mt-3 rounded-xl p-3 flex items-center gap-3 ${needsReconnect ? "border border-ruby/40 bg-ruby/5" : "border border-border/40 bg-secondary/30"}`}>
+            <AlertCircle className={`h-4 w-4 shrink-0 ${needsReconnect ? "text-ruby" : "text-muted-foreground"}`} />
+            <p className={`text-xs flex-1 ${needsReconnect ? "text-ruby" : "text-muted-foreground"}`}>
+              {needsReconnect ? "This connection has expired and needs to be re-authenticated." : "Having issues? Reconnect your bank to refresh the link."}
+            </p>
+            <Button onClick={reconnectConn} variant={needsReconnect ? "danger" : "outlinePill"} size="pillSm">
               Reconnect
             </Button>
           </div>

@@ -332,9 +332,9 @@ export default function Connections() {
                     )}
                     {/* Action buttons */}
                     <div className="mt-2 flex items-center gap-2">
-                      {needsReconnectConn(c) && (
+                      {c.provider !== "manual" && (
                         <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); reconnectConn(c.connection_id); }}
-                          className="text-xs px-3 py-1.5 rounded-lg border border-ruby/30 text-ruby hover:bg-ruby/5 transition-colors">
+                          className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${needsReconnectConn(c) ? "border-ruby/30 text-ruby hover:bg-ruby/5" : "border-border/50 text-muted-foreground hover:text-foreground hover:bg-secondary/50"}`}>
                           Reconnect
                         </button>
                       )}
