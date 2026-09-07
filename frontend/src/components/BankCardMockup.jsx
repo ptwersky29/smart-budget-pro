@@ -40,7 +40,12 @@ function BankCardMockup({ connection, size = "sm", showStatus = false }) {
   const linkTo = accountId ? `/accounts/${accountId}` : `/accounts/legacy/${connectionId}`;
   const type = c.account_type;
 
-  const statusInfo = STATUS_CONFIG[c.status] || STATUS_CONFIG.active;
+  const statusInfo = (() => {
+    if (c.status === "reconnect_required" || (c.expires_at && new Date(c.expires_at) < new Date())) {
+      return STATUS_CONFIG.reconnect_required;
+    }
+    return STATUS_CONFIG[c.status] || STATUS_CONFIG.active;
+  })();
   const StatusIcon = statusInfo.icon;
   const balanceFmt = Number(balance).toLocaleString(undefined, {
     minimumFractionDigits: 2,

@@ -80,7 +80,9 @@ export default function Connections() {
   }, [load]);
 
   const allAccounts = [...conns, ...manualAccounts];
-  const reconnectCount = conns.filter((c) => c.status === "reconnect_required").length;
+  const isTokenExpired = (c) => c.expires_at && new Date(c.expires_at) < new Date();
+  const needsReconnectConn = (c) => c.status === "reconnect_required" || isTokenExpired(c);
+  const reconnectCount = conns.filter(needsReconnectConn).length;
   const totalBalance = allAccounts.reduce((sum, c) => sum + (c.balance || 0), 0);
 
   useEffect(() => {
@@ -255,7 +257,7 @@ export default function Connections() {
         </div>
       )}
 
-      {!needsSetup && conns.some((c) => c.status === "reconnect_required") && (
+      {!needsSetup && conns.some(needsReconnectConn) && (
         <div className="rounded-[1.5rem] border border-ruby/40 bg-ruby/5 p-4 flex items-center gap-3" data-testid="needs-reconnect">
           <AlertCircle className="h-5 w-5 text-ruby shrink-0" />
           <div className="flex-1">
@@ -317,7 +319,7 @@ export default function Connections() {
                             <Pencil className="h-3 w-3" /> {c.nickname ? "Edit" : "Rename"}
                           </button>
                           <span className="text-xs text-muted-foreground/40">·</span>
-                          {c.status === "active" ? <span className="text-[11px] text-emerald font-medium">● Active</span> : c.status === "reconnect_required" ? <span className="text-[11px] text-ruby font-medium">● Reconnect</span> : <span className="text-[11px] text-topaz">● {c.status}</span>}
+                          {c.status === "active" && !isTokenExpired(c) ? <span className="text-[11px] text-emerald font-medium">● Active</span> : needsReconnectConn(c) ? <span className="text-[11px] text-ruby font-medium">● Reconnect</span> : <span className="text-[11px] text-topaz">● {c.status}</span>}
                           {c.import_from_date && <><span className="text-xs text-muted-foreground/40">·</span><span className="text-[11px] text-muted-foreground">from {new Date(c.import_from_date).toLocaleDateString()}</span></>}
                         </div>
                       )}
@@ -330,7 +332,7 @@ export default function Connections() {
                     )}
                     {/* Action buttons */}
                     <div className="mt-2 flex items-center gap-2">
-                      {c.status === "reconnect_required" && (
+                      {needsReconnectConn(c) && (
                         <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); reconnectConn(c.connection_id); }}
                           className="text-xs px-3 py-1.5 rounded-lg border border-ruby/30 text-ruby hover:bg-ruby/5 transition-colors">
                           Reconnect

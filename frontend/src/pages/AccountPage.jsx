@@ -293,6 +293,9 @@ export default function AccountPage() {
     }
   };
 
+  const isTokenExpired = conn && conn.expires_at && new Date(conn.expires_at) < new Date();
+  const needsReconnect = conn && (conn.status === "reconnect_required" || isTokenExpired);
+
   const totalPages = Math.ceil(totalTx / limit);
   const currentPage = Math.floor(offset / limit) + 1;
 
@@ -509,7 +512,7 @@ export default function AccountPage() {
                 )}
                 {syncing ? "Syncing…" : "Sync now"}
               </Button>
-              {conn.status === "reconnect_required" && (
+              {needsReconnect && (
                 <Button onClick={reconnectConn} variant="danger" size="pill">
                   Reconnect bank
                 </Button>

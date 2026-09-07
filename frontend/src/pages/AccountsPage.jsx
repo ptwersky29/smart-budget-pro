@@ -67,13 +67,15 @@ function AccountLogo({ account, size = "md" }) {
   );
 }
 
-function AccountCard({ account }) {
+function AccountCard({ account, connection }) {
   const meta = ACCOUNT_TYPE_META[account.type] || ACCOUNT_TYPE_META.current;
   const Icon = meta.icon;
   const balanceFmt = Number(account.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const isSavings = account.type === "savings";
 
   const displayName = getDisplayName(account);
+  const isTokenExpired = connection && connection.expires_at && new Date(connection.expires_at) < new Date();
+  const needsReconnect = connection && (connection.status === "reconnect_required" || isTokenExpired);
 
   return (
     <Link to={`/accounts/${account.account_id}`}
@@ -117,6 +119,10 @@ function AccountCard({ account }) {
           {account.is_offline ? (
             <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-secondary/60 text-muted-foreground border border-border/40 inline-flex items-center gap-1">
               Offline
+            </span>
+          ) : needsReconnect ? (
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-ruby/10 text-ruby border border-ruby/20 inline-flex items-center gap-1">
+              <AlertCircle className="h-2.5 w-2.5" /> Reconnect
             </span>
           ) : (
             <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald/10 text-emerald border border-emerald/20 inline-flex items-center gap-1">
