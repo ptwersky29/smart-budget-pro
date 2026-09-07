@@ -4,7 +4,7 @@ import { api, formatApiError } from "../lib/api";
 import { getDisplayName } from "../lib/utils";
 import { CURRENCY_SYMBOL } from "../data/constants";
 import { getBankLogoOrFallback, pickBankInstitution } from "../data/bankLogos";
-import { ArrowLeft, Wallet, PiggyBank, Lock, Pencil, Trash2, Loader2, Receipt, CreditCard, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Search, X, Filter, Plus, Upload, FileText } from "lucide-react";
+import { ArrowLeft, Wallet, PiggyBank, Lock, Pencil, Trash2, Loader2, Receipt, CreditCard, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Search, X, Filter, Plus, Upload, FileText, AlertCircle, RefreshCcw } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, MetricCard, SectionCard, EmptyState } from "../components/ui/layout";
 import { SkeletonTable } from "../components/ui/Skeleton";
@@ -52,10 +52,32 @@ export default function AccountDetailPage() {
   const { categories: selectedCats, version: categoriesVersion } = useCategories();
 
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [tlConn, setTlConn] = useState(null);
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadHistory, setUploadHistory] = useState([]);
   const [dragOver, setDragOver] = useState(false);
   const fileRef = React.useRef(null);
+
+  const loadTlConn = useCallback(async () => {
+    try {
+      const { data } = await api.get("/truelayer/connections");
+      const conn = (data.connections || []).find(c => c.account_id === accountId);
+      setTlConn(conn || null);
+    } catch { }
+  }, [accountId]);
+
+  const isTokenExpired = tlConn && tlConn.expires_at && new Date(tlConn.expires_at) < new Date();
+  const needsReconnect = tlConn && (tlConn.status === "reconnect_required" || isTokenExpired);
+
+  const reconnectConn = async () => {
+    if (!tlConn) return;
+    try {
+      const { data } = await api.post(`/truelayer/reconnect/${tlConn.connection_id}`);
+      window.location.href = data.auth_url;
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Reconnect failed");
+    }
+  };
 
   const [showSearch, setShowSearch] = useState(false);
   const [searchInput, setSearchInput] = useState("");
@@ -133,7 +155,7 @@ export default function AccountDetailPage() {
     finally { setTxLoading(false); }
   }, [account?.account_id, accountId, filters, offset]);
 
-  useEffect(() => { loadAccount(); loadHistory(); }, [loadAccount, loadHistory]);
+  useEffect(() => { loadAccount(); loadHistory(); loadTlConn(); }, [loadAccount, loadHistory, loadTlConn]);
   useEffect(() => { if (account) loadTransactions(); }, [account?.account_id, loadTransactions]);
 
   const openEditTx = useCallback((t) => {
@@ -324,10 +346,15 @@ export default function AccountDetailPage() {
           </div>
 
           {/* Action buttons */}
-          <div className="mt-5 flex items-center gap-2">
+          <div className="mt-5 flex items-center gap-2 flex-wrap">
             <Button onClick={() => { closeTxForm(); setTxFormOpen(true); loadAccounts(); }} variant="outlinePill" size="pillSm" className="bg-emerald text-white hover:bg-emerald/90 border-emerald/30">
               <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Transaction
             </Button>
+            {needsReconnect && (
+              <Button onClick={reconnectConn} variant="danger" size="pillSm">
+                <RefreshCcw className="h-3.5 w-3.5 mr-1.5" /> Reconnect
+              </Button>
+            )}
             <Button onClick={() => setShowEdit(true)} variant="outlinePill" size="pillSm">
               <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
             </Button>
@@ -335,6 +362,16 @@ export default function AccountDetailPage() {
               <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Remove
             </Button>
           </div>
+
+          {needsReconnect && (
+            <div className="mt-3 rounded-xl border border-ruby/40 bg-ruby/5 p-3 flex items-center gap-3">
+              <AlertCircle className="h-4 w-4 text-ruby shrink-0" />
+              <p className="text-xs text-ruby flex-1">This bank connection has expired. Reconnect it to resume syncing transactions.</p>
+              <Button onClick={reconnectConn} variant="danger" size="pillSm">
+                Reconnect
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
