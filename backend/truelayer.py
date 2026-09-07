@@ -175,7 +175,7 @@ def _connections_url(frontend: str, status: str, reason: Optional[str] = None, a
         params["reason"] = reason
     if accounts is not None:
         params["accounts"] = str(accounts)
-    return f"{frontend.rstrip('/')}/connections?{urlencode(params)}"
+    return f"{frontend.rstrip('/')}/accounts?{urlencode(params)}"
 
 
 async def _is_configured(session=None) -> bool:
@@ -478,7 +478,8 @@ def build_router() -> APIRouter:
                             _, _ = await _sync_connection(session, existing, user_id)
                         except Exception as e:
                             logger.error(f"reconnect sync failed for {existing.connection_id}: {e}")
-                        return RedirectResponse(_connections_url(frontend, "success", accounts=1))
+                        account_id = existing.account_id
+                        return RedirectResponse(f"{frontend.rstrip('/')}/accounts/{account_id}?reconnected=1")
 
                 # New connection flow
                 accounts = await _fetch_accounts(token_data["access_token"], session)
@@ -537,7 +538,7 @@ def build_router() -> APIRouter:
                         _, _ = await _sync_connection(session, conn, user_id)
                     except Exception as e:
                         logger.error(f"initial sync failed for {conn.connection_id}: {e}")
-                return RedirectResponse(_connections_url(frontend, "success", accounts=len(accounts)))
+                return RedirectResponse(f"{frontend.rstrip('/')}/accounts?status=success&accounts={len(accounts)}")
         except Exception as e:
             rid = getattr(request.state, "request_id", "?")
             logger.exception("RID=%s TrueLayer callback failed: %s", rid, e)

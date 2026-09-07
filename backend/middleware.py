@@ -23,7 +23,7 @@ def connections_redirect_url(status: str, reason: str = None) -> str:
     params = {"status": status}
     if reason:
         params["reason"] = reason
-    return f"{frontend_base_url()}/connections?{urlencode(params)}"
+    return f"{frontend_base_url()}/accounts?{urlencode(params)}"
 
 
 def is_truelayer_callback_path(path: str) -> bool:

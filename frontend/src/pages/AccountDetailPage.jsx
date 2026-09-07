@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
 import { getDisplayName } from "../lib/utils";
 import { CURRENCY_SYMBOL } from "../data/constants";
@@ -33,7 +33,16 @@ function today() {
 export default function AccountDetailPage() {
   const { accountId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => { document.title = "Account | Penni"; }, []);
+
+  useEffect(() => {
+    if (searchParams.get("reconnected") === "1") {
+      toast.success("Bank reconnected — syncing transactions...");
+      searchParams.delete("reconnected");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const [account, setAccount] = useState(null);
   const [txs, setTxs] = useState([]);

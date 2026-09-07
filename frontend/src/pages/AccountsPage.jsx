@@ -3,7 +3,7 @@ import { api, formatApiError } from "../lib/api";
 import { getDisplayName } from "../lib/utils";
 import { CURRENCY_SYMBOL } from "../data/constants";
 import { getBankLogoOrFallback, pickBankInstitution } from "../data/bankLogos";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Plus, Wallet, Landmark, PiggyBank, CreditCard, Banknote, Lock, Loader2, ChevronRight, Building2, RefreshCcw, AlertCircle, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, PageHeader } from "../components/ui/layout";
@@ -195,6 +195,7 @@ function TotalBalanceSection({ accounts, loading }) {
 
 export default function AccountsPage() {
   useEffect(() => { document.title = "Accounts & Import | Penni"; }, []);
+  const [searchParams, setSearchParams] = useSearchParams();
   
   // Accounts state
   const [accounts, setAccounts] = useState([]);
@@ -252,6 +253,36 @@ export default function AccountsPage() {
       toast.error(formatApiError(e.response?.data?.detail) || "Sync failed");
     } finally { setSyncing(false); }
   }, [loadConns, loadAccounts]);
+
+  // Handle TrueLayer OAuth callback redirects (status=success|failed)
+  useEffect(() => {
+    const s = searchParams.get("status");
+    const reason = searchParams.get("reason");
+    const accts = parseInt(searchParams.get("accounts") || "0", 10);
+    if (s === "success") {
+      toast.success(`Bank connected — ${accts || ""} account(s) linked`);
+      if (accts > 0) {
+        setSyncing(true);
+        doSync().finally(() => setSyncing(false));
+      }
+      const sp = new URLSearchParams(searchParams);
+      sp.delete("status");
+      sp.delete("accounts");
+      sp.delete("reason");
+      setSearchParams(sp, { replace: true });
+    } else if (s === "failed") {
+      if (reason === "no_accounts") toast.error("No bank accounts were selected");
+      else if (reason === "invalid_state") toast.error("Your connect session expired. Please try again.");
+      else if (reason === "token_exchange") toast.error("Bank authentication failed. Please reconnect.");
+      else toast.error(reason || "Connection failed");
+      const sp = new URLSearchParams(searchParams);
+      sp.delete("status");
+      sp.delete("accounts");
+      sp.delete("reason");
+      setSearchParams(sp, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, setSearchParams]);
 
   const connect = async () => {
     setStatus("connecting");
