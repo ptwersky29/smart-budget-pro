@@ -471,6 +471,20 @@ def build_router() -> APIRouter:
                         existing.last_error_at = None
                         existing.last_sync_status = "connected"
                         existing.update_count = (existing.update_count or 0) + 1
+                        # Update associated BankAccount so it's no longer flagged offline
+                        try:
+                            ba_q = await session.execute(
+                                select(BankAccount).where(
+                                    BankAccount.user_id == user_id,
+                                    BankAccount.connection_id == existing.connection_id,
+                                )
+                            )
+                            ba_row = ba_q.scalar_one_or_none()
+                            if ba_row:
+                                ba_row.is_offline = False
+                                ba_row.provider = "truelayer"
+                        except Exception as e:
+                            logger.error(f"reconnect BankAccount update failed: {e}")
                         await session.delete(state_doc)
                         await session.commit()
                         # Trigger initial sync for reconnected connection
