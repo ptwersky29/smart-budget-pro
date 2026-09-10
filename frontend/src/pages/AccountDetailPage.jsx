@@ -41,8 +41,10 @@ export default function AccountDetailPage() {
       toast.success("Bank reconnected — syncing transactions...");
       searchParams.delete("reconnected");
       setSearchParams(searchParams, { replace: true });
+      // Force refetch connection data since component may not remount
+      loadTlConn();
     }
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, loadTlConn]);
 
   const [account, setAccount] = useState(null);
   const [txs, setTxs] = useState([]);
@@ -359,11 +361,6 @@ export default function AccountDetailPage() {
             <Button onClick={() => { closeTxForm(); setTxFormOpen(true); loadAccounts(); }} variant="outlinePill" size="pillSm" className="bg-emerald text-white hover:bg-emerald/90 border-emerald/30">
               <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Transaction
             </Button>
-            {needsReconnect && (
-              <Button onClick={reconnectConn} variant="danger" size="pillSm">
-                <RefreshCcw className="h-3.5 w-3.5 mr-1.5" /> Reconnect
-              </Button>
-            )}
             <Button onClick={() => setShowEdit(true)} variant="outlinePill" size="pillSm">
               <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
             </Button>
@@ -377,7 +374,7 @@ export default function AccountDetailPage() {
               <AlertCircle className="h-4 w-4 text-ruby shrink-0" />
               <p className="text-xs text-ruby flex-1">This bank connection has expired. Reconnect it to resume syncing transactions.</p>
               <Button onClick={reconnectConn} variant="danger" size="pillSm">
-                Reconnect
+                <RefreshCcw className="h-3.5 w-3.5 mr-1.5" /> Reconnect
               </Button>
             </div>
           )}
