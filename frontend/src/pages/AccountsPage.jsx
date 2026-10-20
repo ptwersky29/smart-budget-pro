@@ -6,7 +6,7 @@ import { getBankLogoOrFallback, pickBankInstitution } from "../data/bankLogos";
 import { Link, useSearchParams } from "react-router-dom";
 import { Plus, Wallet, Landmark, PiggyBank, CreditCard, Banknote, Lock, Loader2, ChevronRight, Building2, RefreshCcw, AlertCircle, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
-import { EmptyState, PageHeader } from "../components/ui/layout";
+import { EmptyState, PageToolbar } from "../components/ui/layout";
 import Skeleton from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
 import {
@@ -149,7 +149,7 @@ function TotalBalanceSection({ accounts, loading }) {
       <div className="relative overflow-hidden rounded-[1.75rem] border border-border/60 bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-xl shadow-card p-6 sm:p-8 flex items-center justify-center h-full">
         <div className="w-full">
           <Skeleton className="h-10 w-48 mb-4" />
-          <Skeleton className="h-8 w-64 mb-2" />
+            <Skeleton className="h-8 w-64 max-w-full mb-2" />
           <Skeleton className="h-4 w-full max-w-sm" />
         </div>
       </div>
@@ -315,34 +315,27 @@ export default function AccountsPage() {
 
   return (
     <div className="space-y-8 pb-8">
-      <PageHeader
-        eyebrow="Accounts & Import"
-        title="Your accounts."
-        description="All your bank accounts, wallets, savings, and statement imports in one place."
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outlinePill" size="pill" onClick={doSync} disabled={syncing || conns.length === 0}>
-              {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-              Sync now
+      <PageToolbar className="justify-end">
+        <Button variant="outlinePill" size="pill" onClick={doSync} disabled={syncing || conns.length === 0}>
+          {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+          Sync now
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="primary" size="pill">
+              <Plus className="h-4 w-4 mr-1.5" /> New Account
             </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="primary" size="pill">
-                  <Plus className="h-4 w-4 mr-1.5" /> New Account
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 rounded-xl p-2">
-                <DropdownMenuItem onClick={connect} disabled={status === "connecting" || status === "redirecting"} className="cursor-pointer gap-2 py-3">
-                  <Building2 className="h-4 w-4 text-emerald-500" /> Connect Bank
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setShowCreateModal(true)} className="cursor-pointer gap-2 py-3">
-                  <Wallet className="h-4 w-4 text-muted-foreground" /> Offline Account
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        }
-      />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48 rounded-xl p-2">
+            <DropdownMenuItem onClick={connect} disabled={status === "connecting" || status === "redirecting"} className="cursor-pointer gap-2 py-3">
+              <Building2 className="h-4 w-4 text-emerald-500" /> Connect Bank
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setShowCreateModal(true)} className="cursor-pointer gap-2 py-3">
+              <Wallet className="h-4 w-4 text-muted-foreground" /> Offline Account
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </PageToolbar>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">

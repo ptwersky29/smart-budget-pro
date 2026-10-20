@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { api } from "../lib/api";
 import { Landmark, Calculator, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { PageHeader } from "../components/ui/layout";
 import { Button } from "../components/ui/button";
 
 export default function UKTools() {
@@ -24,12 +23,6 @@ export default function UKTools() {
 
   return (
     <div className="space-y-8" data-testid="uk-tools-root">
-      <PageHeader
-        eyebrow="Tools"
-        title="Benefits & tax, demystified."
-        description="Simple UK calculators with a cleaner layout and clear outputs."
-      />
-
       <div className="grid lg:grid-cols-2 gap-4">
         <div className="rounded-2xl border border-border bg-card p-6">
           <div className="flex items-center gap-2 mb-4"><Landmark className="h-4 w-4 text-emerald" /><p className="label-overline">Universal Credit estimate</p></div>

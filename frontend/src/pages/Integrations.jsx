@@ -7,7 +7,6 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
-import { PageHeader } from "../components/ui/layout";
 import ConfirmModal from "../components/ui/ConfirmModal";
 
 const PROVIDERS = [
@@ -116,14 +115,6 @@ export default function Integrations({ embedded }) {
 
   return (
     <div className="space-y-6" data-testid="integrations-root">
-      {!embedded && (
-        <PageHeader
-          eyebrow="Settings"
-          title="Connect everything in one place."
-          description="Wire up TrueLayer, Twilio, and AI providers in a layout that matches the rest of Penni."
-        />
-      )}
-
       {/* AI Provider — bring your own key (works for free tier too) */}
       <Card icon={Sparkles} title="AI Provider"
             subtitle={activeAi

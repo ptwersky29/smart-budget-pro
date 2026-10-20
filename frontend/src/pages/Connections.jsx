@@ -3,7 +3,7 @@ import { api, formatApiError } from "../lib/api";
 import { useSearchParams, Link } from "react-router-dom";
 import { Building2, Loader2, CheckCircle2, XCircle, RefreshCcw, Trash2, ArrowRight, AlertCircle, Clock, Wallet, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { EmptyState, MetricCard, PageHeader, SectionCard } from "../components/ui/layout";
+import { EmptyState, MetricCard, PageToolbar, SectionCard } from "../components/ui/layout";
 import Skeleton from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -217,25 +217,16 @@ export default function Connections() {
 
   return (
     <div className="space-y-8" data-testid="connections-root">
-      <PageHeader
-        eyebrow="Import"
-        title="Bank connections."
-        description="Connect your UK bank securely via TrueLayer, keep sync status visible, and reconnect when needed."
-        actions={
-          <div className="flex items-center gap-3">
-            <div>
-              <input type="date" value={importFromDate} onChange={(e) => setImportFromDate(e.target.value)}
-                className="h-10 px-3 rounded-xl bg-secondary/50 border border-transparent text-xs sm:text-sm focus:border-ring focus:outline-none" />
-            </div>
-            <Button onClick={connect} disabled={status === "connecting" || status === "redirecting" || initialSync} data-testid="connect-bank-button" variant="primary" size="pill">
-              {status === "connecting" || status === "redirecting" ? <><Loader2 className="h-4 w-4 animate-spin" /> Working…</> : <>Connect Bank <ArrowRight className="h-4 w-4 ml-2" /></>}
-            </Button>
-            {status === "failed" && (
-              <Button onClick={connect} data-testid="retry-connect" variant="outlinePill" size="pill">Retry</Button>
-            )}
-          </div>
-        }
-      />
+      <PageToolbar className="justify-end">
+        <input type="date" value={importFromDate} onChange={(e) => setImportFromDate(e.target.value)}
+          className="h-10 px-3 rounded-xl bg-secondary/50 border border-transparent text-xs sm:text-sm focus:border-ring focus:outline-none" />
+        <Button onClick={connect} disabled={status === "connecting" || status === "redirecting" || initialSync} data-testid="connect-bank-button" variant="primary" size="pill">
+          {status === "connecting" || status === "redirecting" ? <><Loader2 className="h-4 w-4 animate-spin" /> Working…</> : <>Connect Bank <ArrowRight className="h-4 w-4 ml-2" /></>}
+        </Button>
+        {status === "failed" && (
+          <Button onClick={connect} data-testid="retry-connect" variant="outlinePill" size="pill">Retry</Button>
+        )}
+      </PageToolbar>
 
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <MetricCard label="Connections" value={conns.length.toString()} icon={Building2} />
@@ -272,7 +263,7 @@ export default function Connections() {
           <Skeleton className="h-10 w-10 rounded-full shrink-0" />
           <div className="flex-1 space-y-2">
             <Skeleton className="h-4 w-48" />
-            <Skeleton className="h-3 w-72" />
+            <Skeleton className="h-3 w-72 max-w-full" />
           </div>
         </div>
       )}

@@ -5,7 +5,6 @@ import { TrendingUp, Loader2, ArrowUpRight, ArrowDownRight, RefreshCw, ChevronDo
 import { toast } from "sonner";
 import AIInsightPanel from "../components/AIInsightPanel";
 import { Button } from "../components/ui/button";
-import { PageHeader } from "../components/ui/layout";
 
 const SYMBOLS = ["VUSA","VWRL","VUKE","VFEM","IWDA","EQQQ","ISF","IUSA","VHVG","SP500","FTSE","NASDAQ","BRK.B","BTC","ETH"];
 const CRYPTO_TICKERS = "BTC,ETH,SOL,ADA,XRP,DOGE";
@@ -65,12 +64,6 @@ export default function Investments() {
 
   return (
     <div className="space-y-6" data-testid="investments-root">
-      <PageHeader
-        eyebrow="Investments"
-        title="See your future net worth."
-        description="Simple investment projections and live market context in a cleaner, easier-to-scan layout."
-      />
-
       <div className="rounded-2xl border border-border bg-card p-6" data-testid="live-prices">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">

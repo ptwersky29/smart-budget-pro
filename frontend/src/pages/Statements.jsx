@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
 import { Upload, FileText, Loader2, Sparkles, CheckCircle2, Trash2, ArrowDownRight, ArrowUpRight, Save, ChevronDown, Building2, Pencil, X, Check } from "lucide-react";
-import { PageHeader, SectionCard } from "../components/ui/layout";
+import { SectionCard } from "../components/ui/layout";
 import Skeleton from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
 import CategoryCombobox from "../components/CategoryCombobox";
@@ -116,12 +116,6 @@ export default function Statements() {
 
   return (
     <div className="space-y-8" data-testid="statements-root">
-      <PageHeader
-        eyebrow="Money"
-        title="Drop a statement. AI reads it."
-        description="Upload a CSV or PDF bank statement — the system extracts each transaction so you can review and save it in one click."
-      />
-
       <div
         data-testid="statement-dropzone"
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -136,7 +130,7 @@ export default function Statements() {
           <div className="space-y-4">
             <Skeleton className="h-14 w-14 rounded-2xl mx-auto" />
             <Skeleton className="h-5 w-48 mx-auto" />
-            <Skeleton className="h-4 w-72 mx-auto" />
+            <Skeleton className="h-4 w-72 max-w-full mx-auto" />
           </div>
         ) : (
           <div className="flex flex-col items-center gap-3">

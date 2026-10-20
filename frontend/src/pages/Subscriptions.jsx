@@ -3,7 +3,7 @@ import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
 import { withUndo } from "../lib/undo";
 import { Loader2, Plus, Trash2, Pencil, RefreshCcw, Sparkles, Bell, ChevronDown, RefreshCw } from "lucide-react";
-import { EmptyState, PageHeader, SectionCard } from "../components/ui/layout";
+import { EmptyState, PageToolbar, SectionCard } from "../components/ui/layout";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -161,31 +161,29 @@ export default function Subscriptions() {
   return (
     <div className="space-y-6">
 
-      {/* Summary header */}
-      <PageHeader eyebrow="Subscriptions" title="Subscriptions."
-        description={`${subs.filter((s) => s.active).length} active · £${monthlyTotal.toFixed(2)} / month · £${annualTotal.toLocaleString()} / year`}
-        actions={
-          <div className="flex gap-2">
-            <Button variant="outlinePill" size="pillSm" onClick={load}><RefreshCw className="h-3.5 w-3.5" /></Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="primary" size="pillSm">
-                  <Plus className="h-3.5 w-3.5" /> Add <ChevronDown className="h-3 w-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={openAdd}>
-                  <Plus className="h-4 w-4 mr-2" /> Add manually
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={detectRecurring} disabled={detecting}>
-                  {detecting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
-                  Detect with AI
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        }
-      />
+      {/* Summary toolbar */}
+      <PageToolbar className="justify-between">
+        <p className="mr-auto text-sm text-muted-foreground">
+          {subs.filter((s) => s.active).length} active · £{monthlyTotal.toFixed(2)} / month · £{annualTotal.toLocaleString()} / year
+        </p>
+        <Button variant="outlinePill" size="pillSm" onClick={load}><RefreshCw className="h-3.5 w-3.5" /></Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="primary" size="pillSm">
+              <Plus className="h-3.5 w-3.5" /> Add <ChevronDown className="h-3 w-3" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={openAdd}>
+              <Plus className="h-4 w-4 mr-2" /> Add manually
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={detectRecurring} disabled={detecting}>
+              {detecting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
+              Detect with AI
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </PageToolbar>
 
       {/* Mini stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

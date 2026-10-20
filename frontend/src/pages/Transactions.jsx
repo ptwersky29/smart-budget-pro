@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
-import { Plus, Trash2, Loader2, Pencil, Search, Sparkles, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, BarChart3, Star, Receipt, Download, MoreHorizontal, Wallet, RefreshCw, CheckCircle2, PieChart as PieChartIcon } from "lucide-react";
+import { Plus, Trash2, Loader2, Pencil, Search, Sparkles, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, BarChart3, Star, Receipt, Download, MoreHorizontal, RefreshCw, CheckCircle2, PieChart as PieChartIcon } from "lucide-react";
 import { toast } from "sonner";
-import { EmptyState, PageHeader } from "../components/ui/layout";
+import { EmptyState } from "../components/ui/layout";
 import { SkeletonTable } from "../components/ui/Skeleton";
 import { withUndo } from "../lib/undo";
 import ConfirmModal from "../components/ui/ConfirmModal";
@@ -1032,15 +1032,9 @@ const Transactions = React.memo(function Transactions() {
   return (
     <div className="space-y-4" data-testid="transactions-root">
 
-      {/* ─── Sticky Header ─── */}
-      <div className="sticky top-16 z-20 -mx-4 px-4 sm:-mx-8 sm:px-8 bg-background/70 backdrop-blur-xl border-b border-border/40 pb-4 pt-2 shadow-sm transition-all duration-300">
-        <PageHeader eyebrow="Transactions" title="Transactions" hideDivider sticky={false}>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 mt-2 pt-2">
-            {/* Wallet badge */}
-            <div className="relative shrink-0 h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center drop-shadow-[0_0_8px_rgba(48,164,108,0.2)]">
-              <Wallet className="h-6 w-6 sm:h-8 sm:w-8 text-emerald" />
-            </div>
-
+      {/* ─── Ledger toolbar ─── */}
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
             {/* Middle: Month picker + stats */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
@@ -1111,14 +1105,14 @@ const Transactions = React.memo(function Transactions() {
             </div>
 
             {/* Right: Action buttons */}
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:shrink-0">
               {/* Search bar (inline in header) */}
               {showSearch && (
-                <div className="relative group/search">
+                <div className="relative group/search w-full sm:w-auto">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none transition-transform duration-200 group-focus-within/search:scale-110" />
                   <input ref={searchRef} value={searchInput} onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
                     placeholder="Search..."
-                    className="w-44 h-8 pl-8 pr-8 rounded-full bg-secondary/40 border border-transparent text-xs placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring/30 focus:outline-none transition-all" />
+                    className="w-full sm:w-44 h-8 pl-8 pr-8 rounded-full bg-secondary/40 border border-transparent text-xs placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring/30 focus:outline-none transition-all" />
                   {filters.search && <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"><X className="h-3.5 w-3.5" /></button>}
                 </div>
               )}
@@ -1126,7 +1120,7 @@ const Transactions = React.memo(function Transactions() {
               {/* Search toggle */}
               <button
                 onClick={() => setShowSearch((s) => !s)}
-                className={`h-8 w-8 rounded-full grid place-items-center transition-all duration-200 ${
+                className={`h-8 w-8 shrink-0 rounded-full grid place-items-center transition-all duration-200 ${
                   showSearch || filters.search
                     ? "bg-emerald text-white shadow-sm"
                     : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
@@ -1136,8 +1130,8 @@ const Transactions = React.memo(function Transactions() {
                 <Search className="h-3.5 w-3.5" />
               </button>
 
-              {/* Sort + order */}
-              <div className="flex items-center gap-0.5">
+              {/* Sort + order (desktop) */}
+              <div className="hidden sm:flex items-center gap-0.5">
                 <select value={filters.sort} onChange={(e) => setFilter("sort", e.target.value)}
                   className="h-8 px-2 rounded-lg bg-secondary/50 border border-border/50 text-[11px] font-medium focus:outline-none focus:border-ring">
                   <option value="date">Date</option>
@@ -1153,12 +1147,14 @@ const Transactions = React.memo(function Transactions() {
               {/* Filter */}
               <Sheet>
                 <SheetTrigger asChild>
-                  <button className={`h-8 px-3 rounded-full text-xs font-medium transition-all duration-200 ${
+                  <button className={`h-8 px-3 shrink-0 rounded-full text-xs font-medium transition-all duration-200 inline-flex items-center ${
                     activeFilters.length > 0
                       ? "bg-emerald/10 text-emerald border border-emerald/20"
                       : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
-                  }`}>
-                    <Filter className="h-3 w-3 mr-1 inline" /> Filters{activeFilters.length > 0 && <span className="ml-1">{activeFilters.length}</span>}
+                  }`} aria-label="Filters">
+                    <Filter className="h-3 w-3" />
+                    <span className="ml-1 hidden min-[360px]:inline">Filters</span>
+                    {activeFilters.length > 0 && <span className="ml-1">{activeFilters.length}</span>}
                   </button>
                 </SheetTrigger>
               <SheetContent side="right" className="w-full sm:max-w-md">
@@ -1167,6 +1163,18 @@ const Transactions = React.memo(function Transactions() {
                   <SheetDescription className="text-xs sm:text-sm">Refine your transaction list</SheetDescription>
                 </SheetHeader>
                 <div className="mt-4 sm:mt-6 space-y-4 sm:space-y-5">
+                  <div className="flex items-center gap-2 sm:hidden">
+                    <select value={filters.sort} onChange={(e) => setFilter("sort", e.target.value)}
+                      className="h-10 flex-1 px-3 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:outline-none">
+                      <option value="date">Sort by date</option>
+                      <option value="amount">Sort by amount</option>
+                      <option value="description">Sort by description</option>
+                    </select>
+                    <button onClick={() => setFilter("order", filters.order === "desc" ? "asc" : "desc")}
+                      className="h-10 w-10 shrink-0 grid place-items-center rounded-xl bg-secondary/50 border border-transparent hover:bg-secondary/80 transition-colors" aria-label="Toggle sort order">
+                      {filters.order === "desc" ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronUp className="h-4 w-4 text-muted-foreground" />}
+                    </button>
+                  </div>
                   <div className="grid grid-cols-2 gap-2 sm:gap-3">
                     <select value={filters.tx_type} onChange={(e) => toggleFilter("tx_type", e.target.value)} className="h-10 px-4 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors">
                       <option value="">All types</option><option value="income">Income</option><option value="expense">Expense</option>
@@ -1255,7 +1263,6 @@ const Transactions = React.memo(function Transactions() {
             </DropdownMenu>
           </div>
         </div>
-        </PageHeader>
 
         {/* Active filter chips (except date range, handled by month strip) */}
         {activeFilters.filter(c => c.key !== "date_from" && c.key !== "date_to").length > 0 && (

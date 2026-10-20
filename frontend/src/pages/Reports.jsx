@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import AIInsightPanel from "../components/AIInsightPanel";
-import { PageHeader, SectionCard } from "../components/ui/layout";
+import { PageToolbar, SectionCard } from "../components/ui/layout";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -128,8 +128,8 @@ export default function Reports() {
       <div className="space-y-8" data-testid="reports-loading">
         <div className="animate-pulse space-y-4">
           <div className="h-4 w-32 rounded bg-secondary" />
-          <div className="h-8 w-64 rounded bg-secondary" />
-          <div className="h-4 w-96 rounded bg-secondary" />
+          <div className="h-8 w-64 max-w-full rounded bg-secondary" />
+          <div className="h-4 w-full max-w-96 rounded bg-secondary" />
         </div>
         <div className="grid lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 rounded-2xl border border-border bg-card p-6 space-y-4">
@@ -150,76 +150,69 @@ export default function Reports() {
 
   return (
     <div className="space-y-8" data-testid="reports-root">
-      <PageHeader
-        eyebrow="Reports"
-        title="Your financial health, explained."
-        description="A cleaner monthly readout with health score, insights, and PDF reports."
-        actions={
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-              <label className="text-[11px] sm:text-xs text-muted-foreground">
-                From
-              </label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="h-10 px-2 sm:px-3 rounded-xl bg-secondary/50 border border-transparent text-xs sm:text-sm focus:border-ring focus:outline-none w-[130px] sm:w-auto"
-              />
-              <label className="text-[11px] sm:text-xs text-muted-foreground">
-                To
-              </label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="h-10 px-2 sm:px-3 rounded-xl bg-secondary/50 border border-transparent text-xs sm:text-sm focus:border-ring focus:outline-none w-[130px] sm:w-auto"
-              />
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="primary"
-                  size="pill"
-                >
-                  {busy ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Download className="h-4 w-4" />
-                  )}
-                  Download <ChevronDown className="h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={() => download("monthly")}
-                  disabled={busy === "monthly"}
-                >
-                  This month PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => download("yearly")}
-                  disabled={busy === "yearly"}
-                >
-                  This year PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => download("full")}
-                  disabled={busy === "full"}
-                >
-                  Full snapshot PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => downloadCsv()}
-                  disabled={busy === "csv-monthly"}
-                >
-                  CSV export
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        }
-      />
+      <PageToolbar className="justify-end">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <label className="flex items-center gap-2 text-[11px] text-muted-foreground sm:text-xs">
+            <span className="w-8 shrink-0">From</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="h-10 min-w-0 flex-1 px-2 sm:px-3 rounded-xl bg-secondary/50 border border-transparent text-xs sm:text-sm focus:border-ring focus:outline-none sm:w-auto sm:flex-none"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-[11px] text-muted-foreground sm:text-xs">
+            <span className="w-8 shrink-0">To</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="h-10 min-w-0 flex-1 px-2 sm:px-3 rounded-xl bg-secondary/50 border border-transparent text-xs sm:text-sm focus:border-ring focus:outline-none sm:w-auto sm:flex-none"
+            />
+          </label>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="primary"
+              size="pill"
+            >
+              {busy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              Download <ChevronDown className="h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={() => download("monthly")}
+              disabled={busy === "monthly"}
+            >
+              This month PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => download("yearly")}
+              disabled={busy === "yearly"}
+            >
+              This year PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => download("full")}
+              disabled={busy === "full"}
+            >
+              Full snapshot PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => downloadCsv()}
+              disabled={busy === "csv-monthly"}
+            >
+              CSV export
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </PageToolbar>
 
       <div className="rounded-2xl border border-border bg-card p-6">
         <div className="flex items-center gap-2 sm:gap-3">

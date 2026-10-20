@@ -3,18 +3,9 @@ import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { Button } from "./button";
 
-export const PageHeader = React.memo(function PageHeader({ eyebrow, title, description, actions, meta, children, className = "", hideDivider, sticky = true, titleClassName = "", ...props }) {
+export const PageToolbar = React.memo(function PageToolbar({ children, className = "", ...props }) {
   return (
-    <div {...props} className={`${sticky ? "sticky top-20 z-20" : "relative"} rounded-lg border border-border bg-card/95 backdrop-blur-xl p-5 sm:p-6 lg:p-7 shadow-card ring-1 ring-white/40 dark:ring-white/5 ${className}`}>
-      <div className="relative flex flex-col gap-4 lg:gap-6 lg:flex-row lg:items-end lg:justify-between z-10">
-        <div className="max-w-3xl space-y-2 lg:space-y-3">
-          {eyebrow && <p className="label-overline text-emerald">{eyebrow}</p>}
-          <h1 className={`text-2xl sm:text-3xl lg:text-4xl font-semibold leading-[1.08] ${titleClassName}`}>{title}</h1>
-          {description && <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">{description}</p>}
-          {meta && <div className="flex flex-wrap gap-2 pt-1">{meta}</div>}
-        </div>
-        {actions && <div className="flex flex-wrap items-center gap-2 shrink-0">{actions}</div>}
-      </div>
+    <div {...props} className={`relative flex flex-wrap items-center gap-2 ${className}`}>
       {children}
     </div>
   );
@@ -22,18 +13,18 @@ export const PageHeader = React.memo(function PageHeader({ eyebrow, title, descr
 
 export const SectionCard = React.memo(function SectionCard({ eyebrow, title, description, actions, children, className = "", contentClassName = "", ...props }) {
   return (
-    <section {...props} className={`rounded-lg border border-border bg-card/95 backdrop-blur-xl shadow-card ring-1 ring-white/40 dark:ring-white/5 ${className}`}>
+    <section {...props} className={`glass-panel rounded-[1.5rem] ${className}`}>
       {(eyebrow || title || description || actions) && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between p-4 sm:p-6 border-b border-border/70">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between p-5 sm:p-6 border-b border-white/40 dark:border-white/5">
           <div className="max-w-2xl space-y-1">
             {eyebrow && <p className="label-overline text-emerald">{eyebrow}</p>}
-            {title && <h2 className="text-lg sm:text-xl lg:text-2xl tracking-tight font-medium">{title}</h2>}
+            {title && <h2 className="text-lg sm:text-xl lg:text-2xl tracking-[-0.03em] font-semibold">{title}</h2>}
             {description && <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>}
           </div>
           {actions && <div className="flex flex-wrap items-center gap-2 shrink-0">{actions}</div>}
         </div>
       )}
-      <div className={`p-4 sm:p-6 ${contentClassName}`}>{children}</div>
+      <div className={`p-5 sm:p-6 ${contentClassName}`}>{children}</div>
     </section>
   );
 });
@@ -41,13 +32,13 @@ export const SectionCard = React.memo(function SectionCard({ eyebrow, title, des
 export const MetricCard = React.memo(function MetricCard({ label, value, icon: Icon, tone = "emerald", detail, testid, className = "", ...props }) {
   const toneClasses = tone === "ruby" ? "text-ruby bg-ruby/10" : tone === "topaz" ? "text-topaz bg-topaz/10" : "text-emerald bg-emerald/10";
   return (
-    <div {...props} data-testid={testid} className={`rounded-lg border border-border bg-card/95 backdrop-blur-xl p-4 sm:p-5 shadow-card ring-1 ring-white/40 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg dark:ring-white/5 ${className}`}>
+    <div {...props} data-testid={testid} className={`glass-tile rounded-[1.35rem] p-4 sm:p-5 transition-all duration-300 hover:-translate-y-1 ${className}`}>
       <div className="flex items-center justify-between gap-2">
         <p className="label-overline">{label}</p>
-        {Icon && <span className={`grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-lg ${toneClasses}`}><Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></span>}
+        {Icon && <span className={`grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-xl ${toneClasses}`}><Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></span>}
       </div>
-      <p className="mt-2 sm:mt-3 text-xl sm:text-2xl lg:text-3xl font-semibold leading-none">{value}</p>
-      {detail && <div className="mt-1.5 sm:mt-2 text-xs text-muted-foreground leading-relaxed">{detail}</div>}
+      <p className="mt-2 sm:mt-3 text-2xl font-bold tracking-[-0.04em] leading-none tabular-nums">{value}</p>
+      {detail && <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{detail}</div>}
     </div>
   );
 });
@@ -66,9 +57,9 @@ export const SectionHeading = React.memo(function SectionHeading({ icon: Icon, l
 
 export const EmptyState = React.memo(function EmptyState({ icon: Icon, title, description, action, className = "", ...props }) {
   return (
-    <div {...props} className={`rounded-lg border border-dashed border-border bg-card/80 backdrop-blur-xl p-8 sm:p-10 text-center ${className}`}>
-      {Icon && <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-lg bg-secondary text-muted-foreground"><Icon className="h-6 w-6" /></div>}
-      <h3 className="text-xl tracking-tight font-medium">{title}</h3>
+    <div {...props} className={`glass-panel rounded-[1.75rem] p-8 sm:p-10 text-center ${className}`}>
+      {Icon && <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-white/55 dark:bg-white/10 text-emerald shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"><Icon className="h-6 w-6" /></div>}
+      <h3 className="text-xl tracking-[-0.03em] font-semibold">{title}</h3>
       {description && <p className="mt-2 text-sm text-muted-foreground max-w-lg mx-auto leading-relaxed">{description}</p>}
       {action && <div className="mt-6 flex justify-center">{action}</div>}
     </div>

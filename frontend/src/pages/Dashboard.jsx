@@ -6,7 +6,6 @@ import { useCategories } from "../contexts/CategoriesContext";
 import { toast } from "sonner";
 import {
   EmptyState,
-  PageHeader,
   SectionHeading,
 } from "../components/ui/layout";
 import Skeleton from "../components/ui/Skeleton";
@@ -205,68 +204,75 @@ const Dashboard = React.memo(function Dashboard() {
 
   const empty = (!overview.recent || overview.recent.length === 0) && (!overview.accounts || overview.accounts.length === 0) && (!budgets || budgets.length === 0);
 
+  const dashboardIntro = (
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0 max-w-2xl">
+        <h2 className="text-2xl sm:text-3xl tracking-[-0.035em] font-semibold">
+          Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}{user?.name ? `, ${user?.name?.split(" ")[0]}` : ""}.
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
+          A clean snapshot of your money, cash flow, and what needs attention next.
+        </p>
+      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="chip" className="self-start">
+            <MoreHorizontal className="h-3.5 w-3.5" /> Actions
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => loadAll(true)}>
+            <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate("/accounts")}>
+            <Building2 className="h-4 w-4 mr-2" /> Import
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate("/transactions")}>
+            <Plus className="h-4 w-4 mr-2" /> Add transaction
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+
   return (
     <div className="space-y-6" data-testid="dashboard-root">
-      {/* Header */}
-      <PageHeader
-        eyebrow="Dashboard"
-        title={`Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}${user?.name ? `, ${user?.name?.split(" ")[0]}` : ""}.`}
-        description="A clean snapshot of your money, cash flow, and what needs attention next."
-        actions={
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="chip">
-                <MoreHorizontal className="h-3.5 w-3.5" /> Actions
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => loadAll(true)}>
-                <RefreshCw className="h-4 w-4 mr-2" /> Refresh
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate("/accounts")}>
-                <Building2 className="h-4 w-4 mr-2" /> Import
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate("/transactions")}>
-                <Plus className="h-4 w-4 mr-2" /> Add transaction
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        }
-      />
-
       {empty && (
-        <EmptyState
-          icon={Wallet}
-          title="Welcome to Penni"
-          description="Connect your bank to import transactions automatically, upload a CSV statement, or add your first transaction manually to get started."
-          action={
-            <div className="flex flex-wrap gap-3 justify-center">
-              <Button variant="primary" size="pill" asChild>
-                <Link to="/accounts">
-                  Connect bank <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
-              <Button variant="outlinePill" size="pill" asChild>
-                <Link to="/accounts">Upload statement</Link>
-              </Button>
-              <Button variant="outlinePill" size="pill" asChild>
-                <Link to="/transactions">Add manually</Link>
-              </Button>
-              <button
-                onClick={seed}
-                className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
-              >
-                Explore with sample data
-              </button>
-            </div>
-          }
-        />
+        <>
+          <div className="px-1">{dashboardIntro}</div>
+          <EmptyState
+            icon={Wallet}
+            title="Welcome to Penni"
+            description="Connect your bank to import transactions automatically, upload a CSV statement, or add your first transaction manually to get started."
+            action={
+              <div className="flex flex-wrap gap-3 justify-center">
+                <Button variant="primary" size="pill" asChild>
+                  <Link to="/accounts">
+                    Connect bank <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+                <Button variant="outlinePill" size="pill" asChild>
+                  <Link to="/accounts">Upload statement</Link>
+                </Button>
+                <Button variant="outlinePill" size="pill" asChild>
+                  <Link to="/transactions">Add manually</Link>
+                </Button>
+                <button
+                  onClick={seed}
+                  className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+                >
+                  Explore with sample data
+                </button>
+              </div>
+            }
+          />
+        </>
       )}
 
       {!empty && (
         <>
           {/* LIVE BALANCE HERO */}
-          {hasKpi && (
+          {hasKpi ? (
             <LiveBalanceHero
               overview={overview}
               truelayerBalance={overview.truelayer_balance}
@@ -274,6 +280,7 @@ const Dashboard = React.memo(function Dashboard() {
               trendData={trendData}
               loading={refreshing}
               onRefresh={() => loadAll(true)}
+              intro={dashboardIntro}
             >
               {showWidget("net_worth") && (
                 <NetWorthCard
@@ -289,6 +296,8 @@ const Dashboard = React.memo(function Dashboard() {
                 <HealthScoreCard overview={overview} />
               )}
             </LiveBalanceHero>
+          ) : (
+            <div className="px-1">{dashboardIntro}</div>
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">

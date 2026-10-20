@@ -50,7 +50,7 @@ export default function PaymentSuccess() {
           <div className="space-y-4">
             <Skeleton className="h-10 w-10 rounded-full mx-auto" />
             <Skeleton className="h-8 w-48 mx-auto" />
-            <Skeleton className="h-4 w-64 mx-auto" />
+            <Skeleton className="h-4 w-64 max-w-full mx-auto" />
             <Skeleton className="h-12 w-full mt-6" />
           </div>
         ) : status === "success" ? (

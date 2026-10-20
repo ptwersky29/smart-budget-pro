@@ -3,7 +3,7 @@ import { api, formatApiError } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import { MessageSquare, Sparkles, Loader2, Trash2, CheckCircle2, AlertTriangle, Phone } from "lucide-react";
-import { PageHeader, SectionCard } from "../components/ui/layout";
+import { SectionCard } from "../components/ui/layout";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 
@@ -106,14 +106,6 @@ export default function SMS({ embedded }) {
 
   return (
     <div className="space-y-6" data-testid="sms-root">
-      {!embedded && (
-        <PageHeader
-          eyebrow="Accounts"
-          title="Paste any bank SMS. AI does the rest."
-          description="Drop in a bank SMS and Penni will extract the transaction, category, and useful metadata."
-        />
-      )}
-
       <SectionCard eyebrow="Your Phone" title={senders.length ? `${senders.length} phone${senders.length !== 1 ? "s" : ""} registered` : "Register your phone"} data-testid="phone-card">
         <p className="text-xs text-muted-foreground mb-4">Register your mobile number so the system recognises your SMS messages and can send automatic replies.</p>
         <form onSubmit={registerPhone} className="flex items-center gap-3 mb-4">

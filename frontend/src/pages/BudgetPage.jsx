@@ -14,7 +14,6 @@ import { toast } from "sonner";
 import { withUndo } from "../lib/undo";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { PageHeader } from "../components/ui/layout";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import CategoryCombobox from "../components/CategoryCombobox";
 import MonthPicker from "../components/MonthPicker";
@@ -749,10 +748,9 @@ export default React.memo(function BudgetPage() {
   return (
     <div className="space-y-5">
 
-      {/* Dashboard overview */}
-      <div className="sticky top-16 z-20 -mx-4 px-4 sm:-mx-8 sm:px-8 bg-background/70 backdrop-blur-xl border-b border-border/40 pb-4 pt-2 shadow-sm transition-all duration-300">
-        <PageHeader eyebrow="Budgets" title="Budgets" titleClassName="text-2xl" hideDivider sticky={false}>
-          <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 mt-2 pt-2">
+      {/* Budget summary */}
+      <div className="glass-panel rounded-[1.5rem] p-4 sm:p-5">
+        <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
           {/* Large progress ring with subtle shadow */}
           <div className="relative shrink-0 drop-shadow-[0_0_8px_rgba(48,164,108,0.4)]">
             <ProgressRing pct={summary.totalPlanned ? (summary.totalSpent / summary.totalPlanned) * 100 : 0} size={80} stroke={5}
@@ -786,13 +784,25 @@ export default React.memo(function BudgetPage() {
               )}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <div className="relative w-full sm:w-40 lg:w-48 group/search order-last sm:order-none">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:shrink-0">
+            <div className="relative w-full sm:w-40 lg:w-48 group/search order-first sm:order-none">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none transition-transform duration-200 group-focus-within/search:scale-110" />
               <input type="search" placeholder="Search budgets..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} aria-label="Search budgets"
                 className="w-full h-8 pl-8 pr-3 rounded-full bg-secondary/40 border border-transparent text-xs placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring/30 focus:outline-none transition-all" />
             </div>
-            <div className="flex flex-wrap gap-1.5">
+            <select value={sortOption} onChange={(e) => { setSortOption(e.target.value); setSortOrder("desc"); }} aria-label="Sort budgets"
+              className="sm:hidden h-8 flex-1 basis-0 min-w-0 px-2 rounded-full bg-secondary/50 border border-border/50 text-[11px] font-medium focus:outline-none focus:border-ring">
+              <option value="progress">Progress</option>
+              <option value="name">Name</option>
+              <option value="limit">Limit</option>
+              <option value="spent">Spent</option>
+              <option value="remaining">Remaining</option>
+            </select>
+            <button onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")} aria-label="Toggle sort order"
+              className="sm:hidden h-8 w-8 shrink-0 grid place-items-center rounded-full bg-secondary/50 border border-border/50 hover:bg-secondary/80 transition-colors">
+              {sortOrder === "desc" ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronUp className="h-3 w-3 text-muted-foreground" />}
+            </button>
+            <div className="hidden sm:flex flex-wrap gap-1.5">
               {["progress", "name", "limit", "spent", "remaining"].map((opt) => (
                 <button key={opt} onClick={() => {
                   if (sortOption === opt) setSortOrder(sortOrder === "desc" ? "asc" : "desc");
@@ -806,8 +816,8 @@ export default React.memo(function BudgetPage() {
                 </button>
               ))}
             </div>
-            <Button variant="primary" size="sm" onClick={() => openAddBudget("everyday")}>
-              <Plus className="h-3.5 w-3.5" /> Add
+            <Button variant="primary" size="sm" onClick={() => openAddBudget("everyday")} aria-label="Add budget">
+              <Plus className="h-3.5 w-3.5" /> <span className="hidden min-[360px]:inline">Add</span>
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -829,7 +839,6 @@ export default React.memo(function BudgetPage() {
             </DropdownMenu>
           </div>
         </div>
-        </PageHeader>
       </div>
 
       {/* Quick stats row */}

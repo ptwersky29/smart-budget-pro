@@ -6,7 +6,7 @@ import { CURRENCY_SYMBOL } from "../data/constants";
 import { getBankLogoOrFallback, pickBankInstitution } from "../data/bankLogos";
 import { ArrowLeft, Wallet, PiggyBank, Lock, Pencil, Trash2, Loader2, Receipt, CreditCard, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Search, X, Filter, Plus, Upload, FileText, AlertCircle, RefreshCcw } from "lucide-react";
 import { toast } from "sonner";
-import { PageHeader, MetricCard, SectionCard, EmptyState } from "../components/ui/layout";
+import { MetricCard, SectionCard, EmptyState } from "../components/ui/layout";
 import { SkeletonTable } from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -272,7 +272,7 @@ export default function AccountDetailPage() {
 
   if (loading && !error) return (
     <div className="space-y-6">
-      <div className="h-12 w-64 rounded-2xl bg-secondary/50 animate-pulse" />
+        <div className="h-12 w-64 max-w-full rounded-2xl bg-secondary/50 animate-pulse" />
       <div className="h-44 rounded-[1.75rem] bg-secondary/30 animate-pulse" />
       <div className="h-96 rounded-2xl bg-secondary/20 animate-pulse" />
     </div>

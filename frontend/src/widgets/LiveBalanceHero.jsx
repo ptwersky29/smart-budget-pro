@@ -26,7 +26,7 @@ function groupAccounts(accounts) {
   return order.map((k) => groups[k]);
 }
 
-export default React.memo(function LiveBalanceHero({ overview, truelayerBalance, accounts, trendData, loading, onRefresh, children }) {
+export default React.memo(function LiveBalanceHero({ overview, truelayerBalance, accounts, trendData, loading, onRefresh, intro, children }) {
   const [syncTime] = useState(() => Date.now());
   const [syncLabel, setSyncLabel] = useState("syncing...");
 
@@ -41,8 +41,10 @@ export default React.memo(function LiveBalanceHero({ overview, truelayerBalance,
 
   return (
     <div className="relative overflow-hidden rounded-lg border border-border/60 bg-card/95 backdrop-blur-xl shadow-card ring-1 ring-white/40 dark:ring-white/5">
-      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald via-topaz to-chart-3" />
+      <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-emerald/50 to-transparent" />
       <div className="relative p-5 sm:p-6 lg:p-8">
+        {intro && <div className="mb-6">{intro}</div>}
+
         {/* Top row: Balance + Sync */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div className="space-y-1">

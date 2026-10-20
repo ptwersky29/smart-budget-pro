@@ -27,7 +27,7 @@ export default function MonthPicker({ label, onPrev, onNext, onToday, isToday, c
       >
         <ChevronLeft className="h-4 w-4" />
       </button>
-      <span className="text-base font-semibold min-w-[150px] text-center leading-snug">
+      <span className="text-base font-semibold min-w-[120px] sm:min-w-[150px] text-center leading-snug">
         {label}
       </span>
       <button

@@ -5,7 +5,7 @@ import { cva } from "class-variance-authority";
 import { cn } from "../../lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -21,15 +21,15 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
         /* ─── App Design System Variants ─── */
         primary:
-          "rounded-lg gradient-emerald text-white shadow-sm shadow-emerald/15 active:scale-[0.98]",
+          "rounded-full gradient-emerald text-white shadow-lg shadow-emerald/25 ring-1 ring-white/20 active:scale-[0.97]",
         warning:
-          "rounded-lg gradient-topaz text-white active:scale-[0.98]",
+          "rounded-full gradient-topaz text-white shadow-lg shadow-topaz/20 ring-1 ring-white/20 active:scale-[0.97]",
         danger:
-          "rounded-lg border border-ruby text-ruby hover:bg-ruby/5 active:scale-[0.98]",
+          "rounded-full border border-ruby/40 bg-white/55 backdrop-blur-xl text-ruby hover:bg-ruby/5 active:scale-[0.97]",
         outlinePill:
-          "rounded-lg border border-border bg-card/90 hover:bg-secondary/60 text-muted-foreground hover:text-foreground active:scale-[0.98]",
+          "rounded-full border border-white/70 bg-white/55 backdrop-blur-xl text-foreground/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_8px_22px_-18px_rgba(15,23,42,0.5)] hover:bg-white/75 hover:text-foreground active:scale-[0.97] dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/10",
         chip:
-          "rounded-lg border border-border bg-card/90 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary/60 hover:text-foreground active:scale-[0.98]",
+          "rounded-full border border-white/70 bg-white/50 px-3 py-1.5 text-xs font-medium text-foreground/75 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] hover:bg-white/75 hover:text-foreground active:scale-[0.97] dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/10",
       },
       size: {
         default: "h-9 px-4 py-2",

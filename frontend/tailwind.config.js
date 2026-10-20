@@ -8,13 +8,13 @@ module.exports = {
   theme: {
   	extend: {
   		fontFamily: {
-  			heading: ['Cabinet Grotesk', 'Fraunces', 'ui-sans-serif', 'system-ui'],
-  			body: ['Manrope', 'ui-sans-serif', 'system-ui'],
+  			heading: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', 'Manrope', 'ui-sans-serif', 'system-ui'],
+  			body: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', 'Manrope', 'ui-sans-serif', 'system-ui'],
   		},
   		boxShadow: {
-  			card: '0 12px 30px rgba(15,23,42,0.05)',
-  			modal: '0 20px 60px rgba(15,23,42,0.08)',
-  			dropdown: '0 4px 20px rgba(15,23,42,0.06)',
+  			card: '0 24px 60px -34px rgba(15,23,42,0.32)',
+  			modal: '0 30px 80px -24px rgba(15,23,42,0.28)',
+  			dropdown: '0 24px 60px -20px rgba(15,23,42,0.35)',
   		},
   		borderRadius: {
   			lg: 'var(--radius)',

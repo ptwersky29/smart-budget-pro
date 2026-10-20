@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Loader2, Pencil, Plus, Shuffle, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
-import { PageHeader } from "../components/ui/layout";
+import { PageToolbar } from "../components/ui/layout";
 import CategoryBadge from "../components/CategoryBadge";
 import CategoryEditorDialog from "../components/CategoryEditorDialog";
 import {
@@ -173,17 +173,12 @@ export default function CategoryManager() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Settings"
-        title="Categories"
-        description="Manage the emoji, colour, label, and lifecycle of every category in one place. Changes update transactions, budgets, and summaries across the app."
-        actions={
-          <Button variant="primary" size="pill" onClick={openCreate}>
-            <Plus className="h-4 w-4" />
-            Add category
-          </Button>
-        }
-      />
+      <PageToolbar className="justify-end">
+        <Button variant="primary" size="pill" onClick={openCreate}>
+          <Plus className="h-4 w-4" />
+          Add category
+        </Button>
+      </PageToolbar>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[

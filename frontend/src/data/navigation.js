@@ -84,12 +84,41 @@ export const ROUTE_META = [
     primary: { label: "Add subscription", to: "/subscriptions" },
   },
   {
+    paths: ["/accounts/legacy", "/accounts/"],
+    eyebrow: "Account",
+    title: "Account Details",
+    description: "View transactions, settings, and balance for this bank account.",
+  },
+  {
     paths: ["/accounts"],
     eyebrow: "Accounts & Import",
-    title: "Your accounts.",
+    title: "Accounts",
     description: "All your bank accounts, wallets, savings, and statement imports in one place.",
-    primary: { label: "Connect bank", to: "/accounts" },
     secondary: { label: "Settings", to: "/settings" },
+  },
+  {
+    paths: ["/connections"],
+    eyebrow: "Import",
+    title: "Connections",
+    description: "Connect your UK bank securely and manage sync status.",
+  },
+  {
+    paths: ["/integrations"],
+    eyebrow: "Settings",
+    title: "Integrations",
+    description: "Connect banking, messaging, and AI providers.",
+  },
+  {
+    paths: ["/sms"],
+    eyebrow: "Transactions",
+    title: "SMS",
+    description: "Turn bank SMS messages into transactions.",
+  },
+  {
+    paths: ["/statements"],
+    eyebrow: "Import",
+    title: "Statements",
+    description: "Upload a bank statement and review the extracted transactions.",
   },
   {
     paths: ["/investments"],
@@ -119,10 +148,10 @@ export const ROUTE_META = [
     secondary: { label: "Dashboard", to: "/dashboard" },
   },
   {
-    paths: ["/accounts/legacy", "/accounts/"],
-    eyebrow: "Account",
-    title: "Account Details",
-    description: "View transactions, settings, and balance for this bank account.",
+    paths: ["/settings/categories"],
+    eyebrow: "Settings",
+    title: "Categories",
+    description: "Manage categories, colours, and labels across the app.",
   },
   {
     paths: ["/settings"],
@@ -141,7 +170,10 @@ export const ROUTE_META = [
 ];
 
 export function getRouteMeta(pathname) {
-  return ROUTE_META.find((meta) => meta.paths.some((path) => pathname === path || pathname.startsWith(`${path}/`))) || ROUTE_META[0];
+  return ROUTE_META.find((meta) => meta.paths.some((path) => {
+    const prefix = path.endsWith("/") ? path : `${path}/`;
+    return pathname === path || pathname.startsWith(prefix);
+  })) || ROUTE_META[0];
 }
 
 export const KEYBOARD_GOTO = { d: "/dashboard", t: "/transactions", b: "/budgets", s: "/subscriptions", r: "/reports", a: "/accounts", g: "/settings" };

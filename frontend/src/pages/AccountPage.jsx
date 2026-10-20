@@ -30,7 +30,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  PageHeader,
   MetricCard,
   SectionCard,
   EmptyState,
@@ -303,7 +302,7 @@ export default function AccountPage() {
   if (loading)
     return (
       <div className="space-y-6">
-        <div className="h-12 w-64 rounded-2xl bg-secondary/50 animate-pulse" />
+        <div className="h-12 w-64 max-w-full rounded-2xl bg-secondary/50 animate-pulse" />
         <div className="h-44 rounded-[1.75rem] bg-secondary/30 animate-pulse" />
         <div className="h-96 rounded-2xl bg-secondary/20 animate-pulse" />
       </div>

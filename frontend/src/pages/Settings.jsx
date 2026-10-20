@@ -1,6 +1,5 @@
 import React, { lazy, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { PageHeader } from "../components/ui/layout";
 import SettingsLayout from "../components/SettingsLayout";
 import AppearanceSettings from "../components/settings/AppearanceSettings";
 import DashboardSettings from "../components/settings/DashboardSettings";
@@ -25,12 +24,6 @@ export default function Settings() {
 
   return (
     <div className="space-y-6" data-testid="settings-root">
-      <PageHeader
-        eyebrow="Settings"
-        title="Settings"
-        description="Customize your experience — appearance, automation, notifications, and account."
-      />
-
       <SettingsLayout active={activeSection} onChange={setSection}>
         {activeSection === "appearance" && <AppearanceSettings />}
         {activeSection === "dashboard" && <DashboardSettings />}

@@ -6,7 +6,7 @@ import {
   Loader2, ChevronLeft, ChevronRight as ChevronRightIcon, Activity, LogIn,
   UserCheck, UserX, Trash2,
 } from "lucide-react";
-import { PageHeader, SectionCard, MetricCard } from "../components/ui/layout";
+import { SectionCard, MetricCard } from "../components/ui/layout";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
@@ -278,12 +278,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        eyebrow="Admin"
-        title="Admin Panel"
-        description="Manage users, feature flags, and view system stats."
-      />
-
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <MetricCard label="Total Users" value={stats.stats.total_users} icon={Users} tone="emerald" />
@@ -299,20 +293,20 @@ export default function AdminDashboard() {
         eyebrow="Management"
         title={`Users (${totalUsers})`}
         actions={
-          <div className="flex items-center gap-2">
-            <div className="relative">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            <div className="relative w-full min-w-0 sm:w-auto sm:flex-none">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by email or name..."
-                className="pl-9 w-48 text-sm"
+                className="pl-9 w-full sm:w-48 text-sm"
               />
             </div>
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="h-11 rounded-xl bg-secondary/50 border border-transparent px-3 text-xs font-medium focus:border-ring focus:outline-none"
+              className="h-11 shrink-0 rounded-xl bg-secondary/50 border border-transparent px-3 text-xs font-medium focus:border-ring focus:outline-none"
             >
               <option value="all">All roles</option>
               <option value="user">Users</option>
@@ -321,7 +315,7 @@ export default function AdminDashboard() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="h-11 rounded-xl bg-secondary/50 border border-transparent px-3 text-xs font-medium focus:border-ring focus:outline-none"
+              className="h-11 shrink-0 rounded-xl bg-secondary/50 border border-transparent px-3 text-xs font-medium focus:border-ring focus:outline-none"
             >
               <option value="all">All status</option>
               <option value="active">Active</option>
@@ -416,7 +410,7 @@ export default function AdminDashboard() {
       )}
 
       <SectionCard eyebrow="Security" title="Login History" description="Recent login attempts across all users.">
-        <div className="-mx-6 -mb-4">
+        <div className="overflow-x-auto -mx-6 -mb-4">
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-border text-muted-foreground">

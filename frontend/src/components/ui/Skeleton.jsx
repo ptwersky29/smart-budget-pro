@@ -1,7 +1,7 @@
 import React from "react";
 
 export default function Skeleton({ className = "" }) {
-  return <div className={`animate-pulse rounded-xl bg-secondary/50 ${className}`} />;
+  return <div className={`animate-pulse rounded-xl bg-foreground/[0.07] dark:bg-white/[0.09] ${className}`} />;
 }
 
 export const SkeletonCard = React.memo(function SkeletonCard({ className = "" }) {
@@ -28,9 +28,9 @@ export const SkeletonTable = React.memo(function SkeletonTable({ rows = 5, class
       {Array.from({ length: rows }).map((_, i) => (
         <div key={i} className="flex items-center space-x-4">
           <Skeleton className="h-12 w-12 rounded-full" />
-          <div className="space-y-2 flex-1">
-            <Skeleton className="h-4 w-[250px]" />
-            <Skeleton className="h-4 w-[200px]" />
+          <div className="space-y-2 flex-1 min-w-0">
+            <Skeleton className="h-4 w-full max-w-[250px]" />
+            <Skeleton className="h-4 w-full max-w-[200px]" />
           </div>
         </div>
       ))}

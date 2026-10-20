@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { Calendar, Sunrise, MapPin } from "lucide-react";
 import { toast } from "sonner";
-import { PageHeader } from "../components/ui/layout";
 import MaaserPanel from "../components/MaaserPanel";
 import Skeleton from "../components/ui/Skeleton";
 import YearEndJewishReport from "../components/YearEndJewishReport";
@@ -38,12 +37,6 @@ export default function Jewish() {
 
   return (
     <div className="space-y-8" data-testid="jewish-root">
-      <PageHeader
-        eyebrow="Jewish"
-        title="Maaser & Calendar."
-        description="A dedicated space for Jewish finance planning, tzedakah, and zmanim."
-      />
-
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="rounded-2xl border border-border bg-card p-6">
           <div className="flex items-center gap-2 mb-3"><Calendar className="h-4 w-4 text-topaz" /><p className="label-overline">Today's Hebrew date</p></div>
