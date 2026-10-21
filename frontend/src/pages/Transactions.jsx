@@ -29,6 +29,7 @@ import {
 import ComparePeriods from "../components/ComparePeriods";
 import MonthPicker from "../components/MonthPicker";
 import TransactionRow from "../components/TransactionRow";
+import { getBankLogoOrFallback, pickBankInstitution } from "../data/bankLogos";
 const CategoryPieChart = React.lazy(() => import("../components/CategoryPieChart"));
 import TransactionForm from "../components/TransactionForm";
 import { Button } from "../components/ui/button";
@@ -62,6 +63,29 @@ function addMonth(mm, delta) {
 
 const fmt = (n) => `£${Number(n || 0).toFixed(2)}`;
 const PIE_COLORS = ["#30a46c", "#e8a838", "#60a5fa", "#a78bfa", "#f472b6", "#fb923c", "#34d399", "#818cf8", "#f87171", "#2dd4bf", "#fbbf24", "#e879f9"];
+
+function transactionDate(value) {
+  const [year, month, day] = String(value || "").slice(0, 10).split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+}
+
+function transactionDayLabel(value, { weekday = true } = {}) {
+  const date = transactionDate(value);
+  if (!date) return "Unknown date";
+  const now = new Date();
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const day = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+  const diff = Math.round((today - day) / 86400000);
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Yesterday";
+  return date.toLocaleDateString("en-GB", {
+    ...(weekday ? { weekday: "short" } : {}),
+    day: "numeric",
+    month: "short",
+    ...(date.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}),
+  });
+}
 
 function groupCatsBySection(cats) {
   const groups = {};
@@ -1007,6 +1031,18 @@ const Transactions = React.memo(function Transactions() {
   const netTotal = incomeTotal - expenseTotal;
   const [showSearch, setShowSearch] = useState(false);
 
+  const mobileRows = aiResults?.transactions || txs;
+  const mobileDateGroups = useMemo(() => {
+    if (filters.sort !== "date" || mobileRows.length === 0) return null;
+    return mobileRows.reduce((groups, tx) => {
+      const date = tx.date?.slice(0, 10) || "";
+      const last = groups[groups.length - 1];
+      if (last?.date === date) last.items.push(tx);
+      else groups.push({ date, items: [tx] });
+      return groups;
+    }, []);
+  }, [mobileRows, filters.sort]);
+
   const exportCsv = useCallback(() => {
     const rows = aiResults?.transactions || txs;
     if (!rows.length) { toast.info("No transactions to export"); return; }
@@ -1280,15 +1316,15 @@ const Transactions = React.memo(function Transactions() {
 
       {/* Spend breakdown pie chart */}
       {categorySpend.length > 0 && (
-        <div className="rounded-2xl border border-border/50 bg-card/40 backdrop-blur-sm p-4 sm:p-5">
+        <div className="rounded-xl border border-border/50 bg-card/40 p-3 backdrop-blur-sm sm:rounded-2xl sm:p-5">
           <button onClick={() => setShowPie(!showPie)} className="flex items-center justify-between w-full text-left">
-            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <span className="grid h-6 w-6 place-items-center rounded-md bg-muted/70"><PieChartIcon className="h-3 w-3 text-muted-foreground/80" /></span>
-              Spend breakdown <span className="text-xs font-normal text-muted-foreground">· {monthLabel}</span>
+            <h3 className="flex items-center gap-2 text-[13px] font-semibold text-foreground sm:text-sm">
+              <span className="grid h-5 w-5 place-items-center rounded-md bg-muted/70 sm:h-6 sm:w-6"><PieChartIcon className="h-3 w-3 text-muted-foreground/80" /></span>
+              Spend breakdown <span className="hidden text-xs font-normal text-muted-foreground min-[360px]:inline">· {monthLabel}</span>
             </h3>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">{categorySpend.length} categories</span>
-              {showPie ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+              <span className="hidden text-xs text-muted-foreground min-[360px]:inline">{categorySpend.length} categories</span>
+              {showPie ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground sm:h-4 sm:w-4" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground sm:h-4 sm:w-4" />}
             </div>
           </button>
           {showPie && (
@@ -1338,25 +1374,62 @@ const Transactions = React.memo(function Transactions() {
                 <span><kbd className="px-1 rounded bg-secondary font-mono text-[9px]">⌘⌫</kbd> delete</span>
                 <span className="ml-auto text-muted-foreground/40">{currentPage}/{totalPages}</span>
               </div>
-              {/* Mobile card view with swipe to delete */}
+              {/* Mobile list */}
               <div className="block sm:hidden">
-                {(aiResults?.transactions || txs).map((t) => (
-                  <SwipeableCard
-                    key={t.transaction_id}
-                    t={t}
-                    isSelected={selectedIds.has(t.transaction_id)}
-                    swipedId={swipedId}
-                    setSwipedId={setSwipedId}
-                    onToggleSelect={toggleSelect}
-                    onEdit={openEdit}
-                    onDelete={del}
-                    onApprove={approveTx}
-                    onClassify={classifySavedTx}
-                    onSplit={splitTx}
-                    onPairTransfer={pairTransfer}
-                    onUnpairTransfer={unpairTransfer}
-                  />
-                ))}
+                {mobileDateGroups ? (
+                  mobileDateGroups.map((group) => (
+                    <section key={group.date || "unknown"}>
+                      <div className="flex items-center justify-between border-y border-border/50 bg-secondary/25 px-4 py-1.5 first:border-t-0">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                          {transactionDayLabel(group.date)}
+                        </span>
+                        <span className="text-[10px] tabular-nums text-muted-foreground/50">
+                          {group.items.length}
+                        </span>
+                      </div>
+                      <div className="divide-y divide-border/60">
+                        {group.items.map((t) => (
+                          <SwipeableCard
+                            key={t.transaction_id}
+                            t={t}
+                            isSelected={selectedIds.has(t.transaction_id)}
+                            swipedId={swipedId}
+                            setSwipedId={setSwipedId}
+                            onToggleSelect={toggleSelect}
+                            onEdit={openEdit}
+                            onDelete={del}
+                            onApprove={approveTx}
+                            onClassify={classifySavedTx}
+                            onSplit={splitTx}
+                            onPairTransfer={pairTransfer}
+                            onUnpairTransfer={unpairTransfer}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  ))
+                ) : (
+                  <div className="divide-y divide-border/60">
+                    {mobileRows.map((t) => (
+                      <SwipeableCard
+                        key={t.transaction_id}
+                        t={t}
+                        isSelected={selectedIds.has(t.transaction_id)}
+                        swipedId={swipedId}
+                        setSwipedId={setSwipedId}
+                        onToggleSelect={toggleSelect}
+                        onEdit={openEdit}
+                        onDelete={del}
+                        onApprove={approveTx}
+                        onClassify={classifySavedTx}
+                        onSplit={splitTx}
+                        onPairTransfer={pairTransfer}
+                        onUnpairTransfer={unpairTransfer}
+                        showDate
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
               {/* Desktop table */}
               <div className="hidden sm:block overflow-x-auto">
@@ -1906,38 +1979,72 @@ const Transactions = React.memo(function Transactions() {
   );
 });
 
-function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, onEdit, onDelete, onApprove, onClassify, onSplit, onPairTransfer, onUnpairTransfer }) {
+function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, onEdit, onDelete, onApprove, onClassify, onSplit, onPairTransfer, onUnpairTransfer, showDate = false }) {
   const handlers = useSwipe(
     () => setSwipedId(t.transaction_id),
     () => setSwipedId(null),
     50,
   );
   const deleting = swipedId === t.transaction_id;
+  const brandInstitution = t.institution ? pickBankInstitution(t.institution, t.source_label) : null;
+  const unapproved = t.approval_status === "unapproved" || t.category_approval_status === "unapproved";
+  const status = t.approval_status === "failed"
+    ? { label: "Failed", className: "bg-ruby/10 text-ruby" }
+    : unapproved
+      ? { label: "Unapproved", className: "bg-topaz/10 text-topaz" }
+      : t.is_transfer
+        ? { label: "Transfer", className: "bg-sky/10 text-sky" }
+        : t.is_split
+          ? { label: "Split", className: "bg-violet/10 text-violet" }
+          : null;
 
   return (
     <div className="relative overflow-hidden tap-highlight-none" {...handlers} onClick={() => { if (deleting) setSwipedId(null); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSwipedId(t.transaction_id); } }} role="button" tabIndex={0}>
       <div
-        className={`transition-transform duration-200 ease-out ${deleting ? "-translate-x-20" : "translate-x-0"} ${isSelected ? "bg-emerald/5" : ""} divide-y divide-border`}
+        className={`transition-transform duration-200 ease-out ${deleting ? "-translate-x-20" : "translate-x-0"} ${isSelected ? "bg-emerald/5" : ""}`}
       >
-        <div className="px-4 py-4 space-y-1.5">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-3 min-w-0">
-              <label className="flex items-center justify-center">
-                <input type="checkbox" checked={isSelected}
-                  onChange={() => onToggleSelect(t.transaction_id)}
-                  aria-label="Select transaction"
-                  className="h-5 w-5 rounded border-border accent-emerald cursor-pointer shrink-0" />
-              </label>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">{t.date?.slice(0, 10)}</p>
-                <p className="font-medium text-sm truncate">{t.description}</p>
-                {t.normalized_merchant && t.normalized_merchant !== t.description && (
-                  <p className="text-xs text-muted-foreground truncate">{t.normalized_merchant}</p>
-                )}
-              </div>
+        <div className="flex items-start gap-2 px-3 py-2.5">
+          <label className="-ml-0.5 flex h-11 w-7 shrink-0 items-center justify-center">
+            <input type="checkbox" checked={isSelected}
+              onChange={() => onToggleSelect(t.transaction_id)}
+              aria-label="Select transaction"
+              className="h-[18px] w-[18px] rounded-[5px] border-border accent-emerald cursor-pointer shrink-0" />
+          </label>
+          <div className="min-w-0 flex-1 pt-0.5">
+            <p
+              className="truncate text-[13px] font-medium leading-5 text-foreground"
+              title={t.normalized_merchant && t.normalized_merchant !== t.description ? `${t.description} · ${t.normalized_merchant}` : t.description}
+            >
+              {t.description}
+            </p>
+            <div className="mt-1 flex min-w-0 items-center gap-1.5">
+              <CategoryBadge category={t.category || "uncategorized"} size="sm" truncate className="min-w-0" />
+              {status && (
+                <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${status.className}`}>
+                  {status.label}
+                </span>
+              )}
+              {showDate && (
+                <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground/60">
+                  {transactionDayLabel(t.date, { weekday: false })}
+                </span>
+              )}
+              {brandInstitution && (
+                <img
+                  src={getBankLogoOrFallback(brandInstitution)}
+                  alt=""
+                  title={t.source_label || brandInstitution}
+                  className="ml-auto hidden h-4 w-4 shrink-0 rounded-[3px] object-contain min-[360px]:block"
+                />
+              )}
             </div>
+          </div>
+          <div className="flex shrink-0 flex-col items-end justify-between self-stretch pl-0.5">
+            <span className={`whitespace-nowrap text-[13px] font-semibold leading-5 tabular-nums ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}>
+              {t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}
+            </span>
             <DropdownMenu>
-              <DropdownMenuTrigger className="p-3 -mr-1 text-muted-foreground hover:text-foreground active:scale-95 transition-transform" aria-label="Transaction actions">
+              <DropdownMenuTrigger className="-mb-1 -mr-1 grid h-10 w-10 place-items-center rounded-xl text-muted-foreground transition-transform hover:bg-secondary/50 hover:text-foreground active:scale-95" aria-label="Transaction actions">
                 <MoreHorizontal className="h-5 w-5" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -1947,7 +2054,7 @@ function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, o
                 <DropdownMenuItem onClick={() => onClassify?.(t)}>
                   <Sparkles className="h-4 w-4 mr-2" /> AI classify
                 </DropdownMenuItem>
-                {(t.approval_status === "unapproved" || t.category_approval_status === "unapproved") && (
+                {unapproved && (
                   <DropdownMenuItem onClick={() => onApprove?.(t)}>
                     <CheckCircle2 className="h-4 w-4 mr-2" /> Approve
                   </DropdownMenuItem>
@@ -1970,17 +2077,6 @@ function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, o
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
-          <div className="flex items-center justify-between pl-11">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-xs px-2.5 py-1 rounded-full bg-secondary capitalize">{t.category || "uncategorized"}</span>
-              {t.is_split && <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet/10 text-violet">Split</span>}
-              {t.is_transfer && <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky/10 text-sky">Transfer</span>}
-              {(t.approval_status === "unapproved" || t.category_approval_status === "unapproved") && <span className="text-[10px] px-2 py-0.5 rounded-full bg-topaz/10 text-topaz">Unapproved</span>}
-            </div>
-            <span className={`font-semibold tabular-nums text-sm ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}>
-              {t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}
-            </span>
           </div>
         </div>
       </div>
