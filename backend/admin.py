@@ -217,6 +217,7 @@ def build_router() -> APIRouter:
             if not u:
                 raise HTTPException(404, "User not found")
             u.tier = tier
+            u.premium_until = None
             if tier == "premium":
                 u.subscription_status = "active"
             else:
@@ -236,6 +237,7 @@ def build_router() -> APIRouter:
                 raise HTTPException(404, "User not found")
             u.tier = "premium"
             u.subscription_status = "active"
+            u.premium_until = None
             if not u.stripe_customer_id:
                 u.stripe_customer_id = f"manual_{user_id}"
             await session.commit()
@@ -254,6 +256,7 @@ def build_router() -> APIRouter:
             u.tier = "free"
             u.subscription_status = "canceled"
             u.stripe_subscription_id = None
+            u.premium_until = None
             await session.commit()
         await log_action(user["user_id"], "user_revoke_premium", "user", user_id, request=request)
         return {"status": "ok", "user_id": user_id, "tier": "free"}

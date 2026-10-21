@@ -6,6 +6,7 @@ import warnings
 import requests
 from urllib3.exceptions import InsecureRequestWarning
 
+os.environ.setdefault("JWT_SECRET", "local-test-only-jwt-secret-32-chars")
 
 warnings.simplefilter("ignore", InsecureRequestWarning)
 

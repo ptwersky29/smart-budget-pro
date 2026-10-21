@@ -3,6 +3,7 @@ import os
 import uuid
 import secrets
 import hashlib
+import hmac
 import json
 import logging
 import asyncio
@@ -442,6 +443,13 @@ def build_router() -> APIRouter:
                 state_doc = result.scalar_one_or_none()
                 if not state_doc:
                     return RedirectResponse(_connections_url(frontend, "failed", reason="invalid_state"))
+                state_expires = state_doc.expires_at
+                if state_expires and state_expires.tzinfo is None:
+                    state_expires = state_expires.replace(tzinfo=timezone.utc)
+                if state_expires and state_expires < datetime.now(timezone.utc):
+                    await session.delete(state_doc)
+                    await session.commit()
+                    return RedirectResponse(_connections_url(frontend, "failed", reason="expired_state"))
                 user_id = state_doc.user_id
                 state_meta = state_doc.meta or {}
                 raw_from_date = state_meta.get("from_date") if isinstance(state_meta, dict) else None
@@ -615,11 +623,17 @@ def build_router() -> APIRouter:
             if not conn:
                 raise HTTPException(status_code=404, detail="Connection not found")
             tx_count_result = await session.execute(
-                select(func.count()).where(Transaction.connection_id == connection_id)
+                select(func.count()).where(
+                    Transaction.connection_id == connection_id,
+                    Transaction.user_id == user["user_id"],
+                )
             )
             tx_count = tx_count_result.scalar() or 0
             last_tx_result = await session.execute(
-                select(Transaction).where(Transaction.connection_id == connection_id)
+                select(Transaction).where(
+                    Transaction.connection_id == connection_id,
+                    Transaction.user_id == user["user_id"],
+                )
                 .order_by(Transaction.date.desc()).limit(1)
             )
             last_tx = last_tx_result.scalar_one_or_none()
@@ -723,10 +737,12 @@ def build_router() -> APIRouter:
 
     @router.post("/sync/all")
     async def sync_all_users(request: Request):
-        """Background sync — called by cron or scheduler. Accepts a secret token for auth."""
-        token = request.headers.get("X-Sync-Secret")
+        """Background sync - called by cron or scheduler. Requires a configured secret token."""
+        token = request.headers.get("X-Sync-Secret", "")
         expected = os.environ.get("SYNC_SECRET", "")
-        if expected and token != expected:
+        if not expected:
+            raise HTTPException(503, "SYNC_SECRET is not configured")
+        if not token or not hmac.compare_digest(token, expected):
             raise HTTPException(403, "Invalid sync secret")
         result = await run_background_sync(request.app.state.db)
         return result

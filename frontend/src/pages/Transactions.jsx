@@ -849,8 +849,11 @@ const Transactions = React.memo(function Transactions() {
           if (filters.search) body.search = filters.search;
           if (filters.date_from) body.date_from = filters.date_from;
           if (filters.date_to) body.date_to = filters.date_to;
-          if (filters.amount_min) body.amount_min = parseFloat(filters.amount_min);
-          if (filters.amount_max) body.amount_max = parseFloat(filters.amount_max);
+          const amountMin = parseFloat(filters.amount_min);
+          if (Number.isFinite(amountMin)) body.amount_min = amountMin;
+          const amountMax = parseFloat(filters.amount_max);
+          if (Number.isFinite(amountMax)) body.amount_max = amountMax;
+          if (filters.account_id) body.account_id = filters.account_id;
           const { data } = await api.post("/transactions/clear", body);
           toast.success(`Deleted ${data.deleted}`);
           setSelectedIds(new Set());

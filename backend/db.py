@@ -116,6 +116,7 @@ async def _run_sqlite_migrations(conn):
 
     await _sqlite_add_column_if_missing(conn, "bank_accounts", "image", "TEXT")
     await _sqlite_add_column_if_missing(conn, "bank_accounts", "color", "VARCHAR(7)")
+    await _sqlite_add_column_if_missing(conn, "users", "premium_until", "TIMESTAMP")
 
 
 async def create_tables():
@@ -161,6 +162,11 @@ async def create_tables():
             await conn.execute(
                 text(
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(32)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_until TIMESTAMPTZ"
                 )
             )
             await conn.execute(
@@ -808,7 +814,7 @@ class User(Base, TimestampMixin):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     google_sub: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     role: Mapped[str] = mapped_column(String(32), default="user")
-    tier: Mapped[str] = mapped_column(String(32), default="premium")
+    tier: Mapped[str] = mapped_column(String(32), default="free")
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     stripe_customer_id: Mapped[Optional[str]] = mapped_column(
         String(255), nullable=True
@@ -818,6 +824,9 @@ class User(Base, TimestampMixin):
     )
     subscription_status: Mapped[Optional[str]] = mapped_column(
         String(32), nullable=True
+    )
+    premium_until: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
     free_trial_end: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True

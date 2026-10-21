@@ -14,7 +14,7 @@ API = f"{BASE_URL}/api"
 from dotenv import load_dotenv
 load_dotenv()
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@financeai.app")
-ADMIN_PASS = os.environ.get("ADMIN_PASSWORD", "FinanceAI2026!")
+ADMIN_PASS = os.environ.get("ADMIN_PASSWORD", "")
 TS = int(time.time())
 TEST_EMAIL = f"tester+{TS}@financeai.app"
 DUP_EMAIL = f"dup+{TS}@financeai.app"

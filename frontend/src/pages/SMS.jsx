@@ -23,6 +23,9 @@ export default function SMS({ embedded }) {
   const [senders, setSenders] = useState([]);
   const [phoneInput, setPhoneInput] = useState("");
   const [regBusy, setRegBusy] = useState(false);
+  const [pendingPhone, setPendingPhone] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [verifyBusy, setVerifyBusy] = useState(false);
 
   const loadSenders = useCallback(async () => {
     try {
@@ -87,13 +90,30 @@ export default function SMS({ embedded }) {
     if (!phoneInput.trim()) return;
     setRegBusy(true);
     try {
-      await api.post("/sms/register-sender", { phone_number: phoneInput.trim() });
-      toast.success("Phone number registered");
-      setPhoneInput("");
+      const { data } = await api.post("/sms/register-sender", { phone_number: phoneInput.trim() });
+      toast.success("Verification code sent");
+      setPendingPhone(data.phone_number);
+      setOtpCode("");
       await loadSenders();
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail) || "Could not register");
     } finally { setRegBusy(false); }
+  };
+
+  const verifyPhone = async (e) => {
+    e.preventDefault();
+    if (!pendingPhone || otpCode.trim().length !== 6) return;
+    setVerifyBusy(true);
+    try {
+      await api.post("/sms/verify-sender", { phone_number: pendingPhone, code: otpCode.trim() });
+      toast.success("Phone number verified");
+      setPendingPhone("");
+      setOtpCode("");
+      setPhoneInput("");
+      await loadSenders();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail) || "Could not verify phone");
+    } finally { setVerifyBusy(false); }
   };
 
   const deleteSender = async (id) => {
@@ -114,11 +134,19 @@ export default function SMS({ embedded }) {
             {regBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Register"}
           </Button>
         </form>
+        {pendingPhone && (
+          <form onSubmit={verifyPhone} className="flex items-center gap-3 mb-4" data-testid="sms-verify-form">
+            <Input value={otpCode} onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder={`6-digit code sent to ${pendingPhone}`} inputMode="numeric" autoComplete="one-time-code" className="flex-1 font-mono text-sm" />
+            <Button type="submit" disabled={verifyBusy || otpCode.length !== 6} variant="primary" size="pill" className="shrink-0">
+              {verifyBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
+            </Button>
+          </form>
+        )}
         {senders.length > 0 && (
           <ul className="divide-y divide-border -mx-6 -mb-4">
             {senders.map((s) => (
               <li key={s.id} className="px-6 py-3 flex items-center gap-3">
-                <CheckCircle2 className="h-4 w-4 text-emerald shrink-0" />
+                {s.verified ? <CheckCircle2 className="h-4 w-4 text-emerald shrink-0" /> : <AlertTriangle className="h-4 w-4 text-topaz shrink-0" />}
                 <span className="text-sm font-mono">{s.phone_number}</span>
                 <span className="text-xs text-muted-foreground">{s.verified_at ? `verified ${s.verified_at.slice(0, 10)}` : "pending"}</span>
                 <button onClick={() => deleteSender(s.id)} className="ml-auto p-3 text-muted-foreground hover:text-ruby" title="Remove">

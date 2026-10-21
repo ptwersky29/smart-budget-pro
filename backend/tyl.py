@@ -5,7 +5,7 @@ import hashlib
 import hmac
 import base64
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import html
 import urllib.parse
 from zoneinfo import ZoneInfo
@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, or_
 
 from db import PaymentTransaction, User
 from auth import get_current_user
@@ -28,8 +28,8 @@ TYL_CURRENCY_CODE = os.environ.get("TYL_CURRENCY_CODE", "826")  # 826 = GBP
 TYL_HASH_ALGORITHM = os.environ.get("TYL_HASH_ALGORITHM", "HMAC_SHA256")
 
 PACKAGES = {
-    "premium_monthly": {"amount": "5.00", "label": "Premium Monthly"},
-    "premium_yearly": {"amount": "48.00", "label": "Premium Yearly"},
+    "premium_monthly": {"amount": "5.00", "label": "Premium Monthly", "days": 30},
+    "premium_yearly": {"amount": "48.00", "label": "Premium Yearly", "days": 365},
 }
 
 
@@ -46,17 +46,83 @@ def _tyl_now() -> str:
     return now.strftime("%Y:%m:%d-%H:%M:%S")
 
 
+def extend_premium_until(package_id, current=None, now=None):
+    days = PACKAGES.get(package_id, {}).get("days")
+    if not days:
+        return current
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    if current:
+        if current.tzinfo is None:
+            current = current.replace(tzinfo=timezone.utc)
+        base = max(now, current)
+    else:
+        base = now
+    return base + timedelta(days=days)
+
+
+def apply_tyl_entitlement(user, package_id, already_paid=False, now=None):
+    expiry = (
+        user.premium_until
+        if already_paid
+        else extend_premium_until(package_id, user.premium_until, now)
+    )
+    if not expiry:
+        logger.warning(
+            "Paid Tyl transaction has no entitlement duration for package %s",
+            package_id,
+        )
+        return user
+    user.tier = "premium"
+    user.premium_until = expiry
+    return user
+
+
 def _verify_response_hash(response: dict, secret: str) -> bool:
     received = response.get("extended_response_hash") or ""
     if not received:
         return False
     pairs = [(k, str(v)) for k, v in response.items()
              if v not in (None, "") and k != "extended_response_hash"]
-    pairs.sort(key=lambda kv: kv[0])
-    base_str = "|".join(v for _, v in pairs)
+    pairs.sort(key=lambda item: item[0])
+    base_str = "|".join(value for _, value in pairs)
     mac = hmac.new(secret.encode("utf-8"), base_str.encode("utf-8"), hashlib.sha256).digest()
     computed = base64.b64encode(mac).decode("ascii")
     return hmac.compare_digest(computed, received)
+
+
+def _tyl_approved(signature_ok: bool, approval: str, status: str) -> bool:
+    status_u = (status or "").upper()
+    if not signature_ok or status_u in {"WAITING", "PENDING", "DECLINED", "FAILED", "CANCELLED"}:
+        return False
+    return approval.startswith("Y") or status_u == "APPROVED"
+
+
+def _tyl_payment_status(approved: bool, status: str) -> str:
+    if approved:
+        return "paid"
+    if (status or "").upper() in {"WAITING", "PENDING"}:
+        return "pending"
+    return "failed"
+
+
+def _allowed_origins() -> set[str]:
+    configured = {
+        origin.strip().rstrip("/")
+        for origin in os.environ.get("CORS_EXTRA_ORIGINS", "").split(",")
+        if origin.strip()
+    }
+    return {
+        origin
+        for origin in [
+            os.environ.get("FRONTEND_URL", "").rstrip("/"),
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            *configured,
+        ]
+        if origin
+    }
 
 
 class TylCheckoutIn(BaseModel):
@@ -79,6 +145,8 @@ def build_router() -> APIRouter:
             )
         pkg = PACKAGES[payload.package_id]
         origin = payload.origin_url.rstrip("/")
+        if origin not in _allowed_origins():
+            raise HTTPException(400, "Invalid checkout origin")
         session_id = uuid.uuid4().hex
         oid = f"fai_{session_id[:16]}"
 
@@ -227,54 +295,63 @@ def build_router() -> APIRouter:
 </body>
 </html>""")
 
-    async def _process_tyl_response(db_maker, data: dict) -> dict:
+    async def _process_tyl_response(db_maker, data: dict, user_id: str | None = None) -> dict:
         sig_ok = _verify_response_hash(data, TYL_SHARED_SECRET) if data.get("extended_response_hash") else False
         approval = (data.get("approval_code") or "")
         status_u = (data.get("status") or "").upper()
-        approved = approval.startswith("Y") or status_u in {"APPROVED", "WAITING"}
+        approved = _tyl_approved(sig_ok, approval, status_u)
         session_id = data.get("merchantTransactionId")
         result = {"approved": approved, "signature_valid": sig_ok, "status": status_u,
                   "approval_code": approval, "user_id": None}
+        if not sig_ok:
+            return result
 
         async with db_maker() as db_session:
             rec = None
             if session_id:
-                r = await db_session.execute(
-                    select(PaymentTransaction).where(PaymentTransaction.session_id == session_id)
-                )
+                query = select(PaymentTransaction).where(PaymentTransaction.session_id == session_id)
+                if user_id:
+                    query = query.where(PaymentTransaction.user_id == user_id)
+                r = await db_session.execute(query.with_for_update())
                 rec = r.scalar_one_or_none()
             if not rec and data.get("oid"):
-                r = await db_session.execute(
-                    select(PaymentTransaction).where(PaymentTransaction.oid == data.get("oid"))
-                )
+                query = select(PaymentTransaction).where(PaymentTransaction.oid == data.get("oid"))
+                if user_id:
+                    query = query.where(PaymentTransaction.user_id == user_id)
+                r = await db_session.execute(query.with_for_update())
                 rec = r.scalar_one_or_none()
+            already_paid = bool(rec and rec.payment_status == "paid")
 
             update_data = {
                 "status": status_u or "UNKNOWN",
                 "approval_code": approval,
                 "ipg_transaction_id": data.get("ipgTransactionId"),
-                "payment_status": "paid" if approved else "failed",
+                "payment_status": _tyl_payment_status(approved, status_u),
                 "signature_valid": sig_ok,
                 "raw_response": data,
             }
             if rec:
-                for k, v in update_data.items():
-                    setattr(rec, k, v)
-                if approved and sig_ok and rec.user_id:
-                    u_r = await db_session.execute(select(User).where(User.user_id == rec.user_id))
-                    u = u_r.scalar_one_or_none()
-                    if u:
-                        u.tier = "premium"
-                    result["user_id"] = rec.user_id
+                if not already_paid:
+                    for k, v in update_data.items():
+                        setattr(rec, k, v)
+                    if approved and rec.user_id:
+                        u_r = await db_session.execute(
+                            select(User).where(User.user_id == rec.user_id)
+                        )
+                        u = u_r.scalar_one_or_none()
+                        if u:
+                            apply_tyl_entitlement(u, rec.package_id, already_paid)
+                if already_paid:
+                    result["approved"] = True
+                result["user_id"] = rec.user_id
             await db_session.commit()
         return result
 
     @router.api_route("/billing/tyl/return", methods=["GET", "POST"])
     async def tyl_return(request: Request):
-        origin_raw = request.query_params.get("origin") or ""
-        frontend_url = os.environ.get("FRONTEND_URL", "")
-        allowed_domains = {frontend_url, "http://localhost:3000"}
-        origin = origin_raw if any(origin_raw.startswith(d) for d in allowed_domains if d) else frontend_url
+        origin_raw = (request.query_params.get("origin") or "").rstrip("/")
+        frontend_url = os.environ.get("FRONTEND_URL", "").rstrip("/")
+        origin = origin_raw if origin_raw in _allowed_origins() else frontend_url
         session_id_qs = request.query_params.get("session_id")
         result_hint = request.query_params.get("result", "")
         data: dict = {}
@@ -317,62 +394,61 @@ def build_router() -> APIRouter:
         if not TYL_SHARED_SECRET:
             raise HTTPException(503, "Tyl is not configured")
         response = {k: ("" if v is None else str(v)) for k, v in (payload or {}).items()}
-        signature_ok = _verify_response_hash(response, TYL_SHARED_SECRET) if response.get("extended_response_hash") else False
+        signature_ok = _verify_response_hash(response, TYL_SHARED_SECRET)
+        if not signature_ok:
+            raise HTTPException(400, "Invalid Tyl signature")
 
-        approval = (response.get("approval_code") or "")
+        approval = response.get("approval_code") or ""
         status = (response.get("status") or "").upper()
-        approved = approval.startswith("Y") or status in {"APPROVED", "WAITING"}
+        if not _tyl_approved(signature_ok, approval, status):
+            return {
+                "approved": False,
+                "signature_valid": True,
+                "status": status,
+                "approval_code": approval,
+                "ipg_transaction_id": response.get("ipgTransactionId"),
+            }
 
         session_id = response.get("merchantTransactionId") or response.get("session_id")
+        oid = response.get("oid")
+        if not session_id and not oid:
+            raise HTTPException(400, "Missing Tyl transaction identifier")
 
         db_maker = request.app.state.db
         async with db_maker() as db_session:
-            rec = None
+            identifiers = []
             if session_id:
-                r = await db_session.execute(
-                    select(PaymentTransaction).where(PaymentTransaction.session_id == session_id)
-                )
-                rec = r.scalar_one_or_none()
-            if not rec and response.get("oid"):
-                r = await db_session.execute(
-                    select(PaymentTransaction).where(PaymentTransaction.oid == response.get("oid"))
-                )
-                rec = r.scalar_one_or_none()
+                identifiers.append(PaymentTransaction.session_id == session_id)
+            if oid:
+                identifiers.append(PaymentTransaction.oid == oid)
+            query = select(PaymentTransaction).where(
+                PaymentTransaction.user_id == user["user_id"],
+                or_(*identifiers),
+            )
+            rec = (await db_session.execute(query)).scalars().first()
+            if not rec:
+                raise HTTPException(404, "Payment transaction not found")
 
-            if rec:
-                rec.status = status or "UNKNOWN"
-                rec.approval_code = approval
-                rec.ipg_transaction_id = response.get("ipgTransactionId")
-                rec.payment_status = "paid" if approved else "failed"
-                rec.signature_valid = signature_ok
-                rec.raw_response = response
-            else:
-                rec = PaymentTransaction(
-                    session_id=session_id or uuid.uuid4().hex,
-                    oid=response.get("oid"),
-                    provider="tyl",
-                    user_id=user["user_id"],
-                    status=status or "UNKNOWN",
-                    approval_code=approval,
-                    ipg_transaction_id=response.get("ipgTransactionId"),
-                    payment_status="paid" if approved else "failed",
-                    signature_valid=signature_ok,
-                    raw_response=response,
-                )
-                db_session.add(rec)
+            amount = response.get("amount")
+            if amount not in (None, ""):
+                try:
+                    if abs(float(amount) - float(rec.amount)) > 0.01:
+                        raise HTTPException(400, "Payment amount does not match")
+                except ValueError:
+                    raise HTTPException(400, "Invalid payment amount")
+            currency = (response.get("currency") or "").upper()
+            currency_aliases = {"826": "GBP", "840": "USD", "978": "EUR"}
+            expected_currency = rec.currency.upper() if rec.currency else ""
+            if currency and expected_currency:
+                if currency_aliases.get(currency, currency) != expected_currency:
+                    raise HTTPException(400, "Payment currency does not match")
 
-            if approved:
-                u_r = await db_session.execute(select(User).where(User.user_id == user["user_id"]))
-                u = u_r.scalar_one_or_none()
-                if u:
-                    u.tier = "premium"
-            await db_session.commit()
-
+        result = await _process_tyl_response(db_maker, response, user_id=user["user_id"])
         return {
-            "approved": approved,
-            "signature_valid": signature_ok,
-            "status": status,
-            "approval_code": approval,
+            "approved": result["approved"],
+            "signature_valid": result["signature_valid"],
+            "status": result["status"],
+            "approval_code": result.get("approval_code") or "",
             "ipg_transaction_id": response.get("ipgTransactionId"),
         }
 
@@ -383,38 +459,12 @@ def build_router() -> APIRouter:
         if not TYL_SHARED_SECRET:
             logger.error("Tyl notify received but TYL_SHARED_SECRET is not set")
             return {"ok": False}
-        sig_ok = _verify_response_hash(data, TYL_SHARED_SECRET)
-        approved = (data.get("approval_code") or "").startswith("Y") \
-                   or (data.get("status") or "").upper() == "APPROVED"
-
-        db_maker = request.app.state.db
-        async with db_maker() as db_session:
-            session_id = data.get("merchantTransactionId")
-            rec = None
-            if session_id:
-                r = await db_session.execute(
-                    select(PaymentTransaction).where(PaymentTransaction.session_id == session_id)
-                )
-                rec = r.scalar_one_or_none()
-            elif data.get("oid"):
-                r = await db_session.execute(
-                    select(PaymentTransaction).where(PaymentTransaction.oid == data.get("oid"))
-                )
-                rec = r.scalar_one_or_none()
-
-            if rec:
-                rec.status = (data.get("status") or "").upper()
-                rec.approval_code = data.get("approval_code")
-                rec.ipg_transaction_id = data.get("ipgTransactionId")
-                rec.payment_status = "paid" if approved else "failed"
-                rec.signature_valid = sig_ok
-                if approved and sig_ok and rec.user_id:
-                    u_r = await db_session.execute(select(User).where(User.user_id == rec.user_id))
-                    u = u_r.scalar_one_or_none()
-                    if u:
-                        u.tier = "premium"
-            await db_session.commit()
-        return {"ok": True, "signature_valid": sig_ok, "approved": approved}
+        result = await _process_tyl_response(request.app.state.db, data)
+        return {
+            "ok": result["signature_valid"],
+            "signature_valid": result["signature_valid"],
+            "approved": result["approved"],
+        }
 
     @router.get("/billing/tyl/config")
     async def tyl_config():

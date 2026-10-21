@@ -9,7 +9,8 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 # Neon database URL
-DATABASE_URL = "postgresql+asyncpg://neondb_owner:npg_DEn4SXe1YkWV@ep-silent-water-ab6f94vy-pooler.eu-west-2.aws.neon.tech/neondb"
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "").strip()
 
 async def check_data():
     print("🔍 Connecting to Neon database...")
@@ -41,7 +42,7 @@ async def check_data():
         # Check specific user data
         result = await conn.execute(
             text("SELECT user_id, email, name, tier, is_admin FROM users WHERE email = :email"),
-            {"email": "ptwersky29@gmail.com"}
+            {"email": ADMIN_EMAIL}
         )
         user = result.fetchone()
         if user:

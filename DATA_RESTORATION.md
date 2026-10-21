@@ -25,7 +25,7 @@ The application was using **TWO DIFFERENT DATABASES**:
 
 1. **Neon PostgreSQL** (where all the data is stored):
    ```
-   postgresql+asyncpg://...@ep-silent-water-ab6f94vy-pooler.eu-west-2.aws.neon.tech/neondb
+   <REDACTED_DATABASE_URL>
    ```
    - Contains all user transactions, budgets, accounts
    - Used during development
@@ -66,7 +66,7 @@ envVars:
 # AFTER:
 envVars:
   - key: DATABASE_URL
-    value: postgresql+asyncpg://neondb_owner:npg_DEn4SXe1YkWV@ep-silent-water-ab6f94vy-pooler.eu-west-2.aws.neon.tech/neondb
+    value: <REDACTED_DATABASE_URL>
 ```
 
 ### Commit `c0012b1` - Remove Unused Database
@@ -124,7 +124,7 @@ Once Render redeploys (watch https://dashboard.render.com):
      - ✅ Everything else
 
 3. **Verify User Account:**
-   - Email: `ptwersky29@gmail.com`
+   - Email: `<ADMIN_EMAIL>`
    - Role: Admin
    - Tier: Premium
    - All historical data intact
@@ -162,7 +162,7 @@ All data is intact:
                ↓
 ┌─────────────────────────────────────────────┐
 │  Neon PostgreSQL (Primary Database)         │
-│  ep-silent-water-ab6f94vy-pooler.eu-west-2  │
+│  <NEON_HOST>  │
 │  neondb                                     │
 │                                             │
 │  📦 All user data stored here               │

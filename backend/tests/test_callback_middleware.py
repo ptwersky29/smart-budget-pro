@@ -38,7 +38,7 @@ def test_truelayer_callback_path_detection():
 def test_connections_redirect_url(monkeypatch):
     monkeypatch.setenv("FRONTEND_URL", "https://app.example.com/")
     assert connections_redirect_url("failed", "callback_error") == (
-        "https://app.example.com/connections?status=failed&reason=callback_error"
+        "https://app.example.com/accounts?status=failed&reason=callback_error"
     )
 
 
@@ -52,7 +52,7 @@ def test_error_monitor_redirects_callback_failures(monkeypatch):
 
     assert response.status_code == 302
     assert response.headers["location"] == (
-        "https://app.example.com/connections?status=failed&reason=callback_error"
+        "https://app.example.com/accounts?status=failed&reason=callback_error"
     )
 
 

@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from db import PaymentTransaction, User
-from auth import get_current_user
+from auth import _effective_tier, get_current_user
 
 logger = logging.getLogger("billing")
 
@@ -40,6 +40,14 @@ PACKAGES = {
 def _get_stripe_key() -> str:
     require_stripe_configured()
     return os.environ["STRIPE_API_KEY"]
+
+
+def _payment_confirmed(status: str | None) -> bool:
+    return (status or "").lower() in {"paid", "no_payment_required"}
+
+
+def _subscription_grants_premium(status: str | None) -> bool:
+    return (status or "").lower() in {"active", "trialing"}
 
 
 class CheckoutIn(BaseModel):
@@ -135,17 +143,25 @@ def build_router() -> APIRouter:
             rec.payment_status = cs.payment_status
             rec.status = cs.status
 
-            if cs.payment_status == "paid" or (cs.mode == "subscription" and cs.status == "complete"):
+            if _payment_confirmed(cs.payment_status):
                 if rec.user_id == user["user_id"]:
-                    u_result = await session.execute(select(User).where(User.user_id == user["user_id"]))
+                    u_result = await session.execute(
+                        select(User).where(User.user_id == user["user_id"])
+                    )
                     u = u_result.scalar_one_or_none()
                     if u:
-                        u.tier = "premium"
                         u.subscription_status = "active"
                         if cs.subscription:
                             sub = stripe.Subscription.retrieve(cs.subscription)
                             u.stripe_subscription_id = cs.subscription
                             u.subscription_status = sub.status
+                            u.tier = (
+                                "premium"
+                                if _subscription_grants_premium(sub.status)
+                                else "free"
+                            )
+                        else:
+                            u.tier = "premium"
             await session.commit()
 
             return {
@@ -166,13 +182,16 @@ def build_router() -> APIRouter:
                 raise HTTPException(404, "User not found")
 
             free_trial_end = u.free_trial_end.isoformat() if u.free_trial_end else None
+            premium_until = u.premium_until.isoformat() if u.premium_until else None
+            tier = _effective_tier(u)
             sub_info = {
-                "tier": u.tier,
+                "tier": tier,
                 "subscription_status": u.subscription_status,
+                "premium_until": premium_until,
                 "free_trial_end": free_trial_end,
-                "on_trial": bool(u.free_trial_end and u.free_trial_end > datetime.now(timezone.utc) and u.tier != "premium"),
-                "is_premium": u.tier == "premium",
-                "is_admin": u.role == "admin",
+                "on_trial": bool(u.free_trial_end and u.free_trial_end > datetime.now(timezone.utc) and tier != "premium"),
+                "is_premium": tier == "premium",
+                "is_admin": bool(u.is_admin or u.role == "admin"),
             }
 
             if u.stripe_subscription_id:
@@ -290,7 +309,8 @@ def build_router() -> APIRouter:
             if evt.type == "checkout.session.completed":
                 session_obj = evt.data.object
                 user_id = (session_obj.metadata or {}).get("user_id", "")
-                if user_id:
+                paid = _payment_confirmed(session_obj.payment_status)
+                if user_id and paid:
                     u_result = await session.execute(select(User).where(User.user_id == user_id))
                     u = u_result.scalar_one_or_none()
                     if u:
@@ -324,7 +344,7 @@ def build_router() -> APIRouter:
                     if u:
                         u.stripe_subscription_id = sub.id
                         u.subscription_status = sub.status
-                        if sub.status == "active" or sub.status == "trialing":
+                        if _subscription_grants_premium(sub.status):
                             u.tier = "premium"
                         elif sub.status in ("past_due", "incomplete", "canceled"):
                             u.tier = "free"

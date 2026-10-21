@@ -1,4 +1,5 @@
-"""In-memory rate limiter using a sliding window per user/IP + CSRF middleware."""
+"""Rate limiter with optional Redis backing, plus CSRF middleware."""
+import os
 import time
 import logging
 import uuid
@@ -12,11 +13,26 @@ logger = logging.getLogger("rate_limit")
 DEFAULT_LIMIT = 120
 DEFAULT_WINDOW = 60
 CSRF_SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
-CSRF_SAFE_PATH_PREFIXES = ("/api/auth/",)
+CSRF_SAFE_PATHS = {
+    "/api/auth/login",
+    "/api/auth/register",
+    "/api/auth/forgot-password",
+    "/api/auth/reset-password",
+    "/api/auth/verify-email",
+    "/api/auth/emergent-session",
+}
 
 # Stricter limits for sensitive endpoints
 AUTH_LIMIT = 20
 AUTH_WINDOW = 300  # 5 minutes
+AUTH_RATE_LIMIT_PATHS = {
+    "/api/auth/login",
+    "/api/auth/register",
+    "/api/auth/forgot-password",
+    "/api/auth/reset-password",
+    "/api/sms/register-sender",
+    "/api/sms/verify-sender",
+}
 
 
 def _request_id(request: Request) -> str:
@@ -35,10 +51,20 @@ def _error(detail: str, status_code: int, code: str, request: Request) -> JSONRe
 
 
 class RateLimiter:
-    def __init__(self, limit: int = DEFAULT_LIMIT, window: int = DEFAULT_WINDOW):
+    def __init__(
+        self,
+        limit: int = DEFAULT_LIMIT,
+        window: int = DEFAULT_WINDOW,
+        redis_client=None,
+        redis_url: str | None = None,
+    ):
         self.limit = limit
         self.window = window
         self._buckets: dict[str, deque] = defaultdict(deque)
+        self._redis = redis_client
+        self._redis_url = (
+            redis_url if redis_url is not None else os.environ.get("REDIS_URL", "")
+        ).strip()
 
     def _key(self, request: Request) -> str:
         user_id = getattr(request.state, "user_id", None)
@@ -47,8 +73,31 @@ class RateLimiter:
         ip = request.client.host if request.client else "unknown"
         return f"ip:{ip}:{request.url.path}"
 
-    def check(self, request: Request) -> bool:
-        key = self._key(request)
+    def _get_redis(self):
+        if self._redis is not None:
+            return self._redis
+        if not self._redis_url:
+            return None
+        try:
+            from redis.asyncio import from_url
+
+            self._redis = from_url(
+                self._redis_url,
+                decode_responses=True,
+                socket_connect_timeout=1.0,
+                socket_timeout=1.0,
+            )
+        except Exception as exc:
+            logger.error(
+                "Redis rate limiter configuration failed (%s); using in-memory fallback",
+                type(exc).__name__,
+            )
+            self._redis = None
+            self._redis_url = ""
+            return None
+        return self._redis
+
+    def _check_memory(self, key: str) -> bool:
         now = time.time()
         bucket = self._buckets[key]
         cutoff = now - self.window
@@ -58,6 +107,27 @@ class RateLimiter:
             return False
         bucket.append(now)
         return True
+
+    async def _check_redis(self, client, key: str) -> bool:
+        bucket = f"ratelimit:{key}:{int(time.time()) // self.window}"
+        count = await client.incr(bucket)
+        await client.expire(bucket, self.window + 1)
+        return count <= self.limit
+
+    async def check(self, request: Request) -> bool:
+        key = self._key(request)
+        client = self._get_redis()
+        if client is not None:
+            try:
+                return await self._check_redis(client, key)
+            except Exception as exc:
+                logger.error(
+                    "Redis rate limiter unavailable (%s); using in-memory fallback",
+                    type(exc).__name__,
+                )
+                self._redis = None
+                self._redis_url = ""
+        return self._check_memory(key)
 
 
 class AuthRateLimiter(RateLimiter):
@@ -76,9 +146,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if request.url.path in ("/api/health", "/api/"):
             return await call_next(request)
         # Sensitive auth endpoints get stricter rate limiting
-        auth_paths = ("/api/auth/login", "/api/auth/forgot-password", "/api/auth/reset-password")
-        limiter = self.auth_limiter if request.url.path in auth_paths else self.limiter
-        if not limiter.check(request):
+        limiter = self.auth_limiter if request.url.path in AUTH_RATE_LIMIT_PATHS else self.limiter
+        if not await limiter.check(request):
             logger.warning("Rate limit exceeded for %s", limiter._key(request))
             return _error("Too many requests. Please slow down.", 429, "rate_limited", request)
         return await call_next(request)
@@ -87,7 +156,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 class CsrfProtectionMiddleware(BaseHTTPMiddleware):
     """CSRF protection for cookie-authenticated state-changing requests.
 
-    Requires GET /api/auth/csrf-token to return a CSRF token that is then
+    Requires GET /api/csrf-token to return a CSRF token that is then
     sent as X-CSRF-Token header on POST/PUT/PATCH/DELETE requests.
     Skips CSRF for API-key or Bearer-token authenticated requests.
     """
@@ -96,7 +165,7 @@ class CsrfProtectionMiddleware(BaseHTTPMiddleware):
         if request.method in CSRF_SAFE_METHODS:
             return await call_next(request)
         # Auth-flow endpoints skip CSRF (no cookie session yet)
-        if any(request.url.path.startswith(p) for p in CSRF_SAFE_PATH_PREFIXES):
+        if request.url.path in CSRF_SAFE_PATHS:
             return await call_next(request)
         # Check if request uses Bearer token (API clients skip CSRF)
         auth = request.headers.get("Authorization", "")

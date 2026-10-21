@@ -33,3 +33,6 @@ out/
 .cache/
 .vercel
 memory/test_credentials.md
+
+health_check_report.json
+test_reports/

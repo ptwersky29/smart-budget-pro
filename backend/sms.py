@@ -4,10 +4,12 @@ import hashlib
 import hmac
 import base64
 import re
+import os
+import secrets
 import logging
 from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, HTTPException, Request, Form, Depends
+from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel
 from sqlalchemy import select, func
 
@@ -139,6 +141,67 @@ class SendSmsIn(BaseModel):
 
 class RegisterSenderIn(BaseModel):
     phone_number: str
+
+
+class VerifySenderIn(BaseModel):
+    phone_number: str
+    code: str
+
+
+_OTP_TTL = timedelta(minutes=10)
+_OTP_MAX_ATTEMPTS = 5
+
+
+def _otp_config_key(sender_id: int) -> str:
+    return f"sms_otp:{sender_id}"
+
+
+def _hash_otp(code: str, secret: str | None = None) -> str:
+    key = secret or os.environ.get("OTP_HASH_SECRET") or os.environ.get("JWT_SECRET")
+    if not key:
+        raise RuntimeError("OTP_HASH_SECRET or JWT_SECRET is required")
+    return hmac.new(key.encode("utf-8"), code.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def _otp_config_value(code_hash: str, expires_at: datetime, attempts: int = 0) -> str:
+    return f"{code_hash}|{expires_at.isoformat()}|{int(attempts)}"
+
+
+def _parse_otp_config(value: str | None):
+    if not value:
+        return None
+    parts = value.split("|")
+    if len(parts) < 2:
+        return None
+    try:
+        expires_at = datetime.fromisoformat(parts[1])
+    except ValueError:
+        return None
+    attempts = 0
+    if len(parts) > 2:
+        try:
+            attempts = max(0, int(parts[2]))
+        except ValueError:
+            attempts = 0
+    return parts[0], expires_at, attempts
+
+
+def _twilio_signature(url: str, params: dict[str, str], token: str) -> str:
+    payload = url + "".join(f"{key}{params[key]}" for key in sorted(params))
+    digest = hmac.new(token.encode("utf-8"), payload.encode("utf-8"), hashlib.sha1).digest()
+    return base64.b64encode(digest).decode("ascii")
+
+
+def _signed_webhook_url(request: Request) -> str:
+    configured = os.environ.get("TWILIO_WEBHOOK_URL")
+    if configured:
+        return configured
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
+    url = f"{proto}://{host}{request.url.path}"
+    if request.url.query:
+        url += f"?{request.url.query}"
+    return url
 
 
 async def _lookup_user_by_phone(session, phone: str):
@@ -358,21 +421,24 @@ def build_router() -> APIRouter:
     router = APIRouter(tags=["sms"])
 
     @router.post("/sms/webhook")
-    async def twilio_webhook(request: Request,
-                             From: str = Form(""), To: str = Form(""), Body: str = Form(""),
-                             SmsMessageSid: str = Form("")):
+    async def twilio_webhook(request: Request):
         sm = request.app.state.db
+        form = await request.form()
+        params = {key: str(value) for key, value in form.multi_items()}
+        From = params.get("From", "")
+        To = params.get("To", "")
+        Body = params.get("Body", "")
+        SmsMessageSid = params.get("SmsMessageSid", "")
         async with sm() as session:
             twilio_token = await get_config(session, "twilio_auth_token", "TWILIO_AUTH_TOKEN")
             if not twilio_token:
                 logger.error("sms webhook: TWILIO_AUTH_TOKEN not configured")
-                return {"ok": False, "error": "webhook not configured"}
+                raise HTTPException(503, "Webhook not configured")
             sig = request.headers.get("X-Twilio-Signature", "")
-            url = str(request.url)
-            expected = base64.b64encode(hmac.new(twilio_token.encode(), (url + Body).encode(), hashlib.sha256).digest()).decode()
-            if not hmac.compare_digest(expected, sig):
+            expected = _twilio_signature(_signed_webhook_url(request), params, twilio_token)
+            if not sig or not hmac.compare_digest(expected, sig):
                 logger.warning("sms webhook: invalid Twilio signature")
-                return {"ok": False, "error": "invalid signature"}
+                raise HTTPException(403, "Invalid signature")
             twilio_number = await get_config(session, "twilio_phone_number", "TWILIO_PHONE_NUMBER")
             if twilio_number and To != twilio_number:
                 logger.info(f"sms webhook skipped: To {To} != configured {twilio_number}")
@@ -381,13 +447,7 @@ def build_router() -> APIRouter:
             phone = From.strip()
             user = await _lookup_user_by_phone(session, phone)
             if not user:
-                logger.info(f"sms webhook: no user found for {phone}, storing as orphan")
-                sms = SmsMessage(
-                    user_id="orphan", to_number=To, body=Body[:2000], direction="inbound",
-                    provider="twilio", external_id=SmsMessageSid[:128], sender_phone=phone,
-                )
-                session.add(sms)
-                await session.commit()
+                logger.info(f"sms webhook: no verified sender found for {phone}")
                 return {"ok": True, "status": "unidentified_sender"}
 
             if await _dedup_check(session, user.user_id, Body):
@@ -474,18 +534,34 @@ def build_router() -> APIRouter:
                 await session.commit()
 
             return {"ok": True, "parsed": parsed.get("is_transaction"), "confidence": parsed.get("confidence", 0),
-                    "transaction_id": transaction_id, "user_id": user.user_id,
+                    "transaction_id": transaction_id,
                     "reply_sent": sent_ok, "reply_text": reply_text}
 
     @router.post("/sms/make-webhook")
     async def make_webhook(request: Request):
         """Generic JSON webhook for Make.com / n8n / Zapier. Accepts JSON body with {text, phone_number}."""
-        body = await request.json()
+        sm = request.app.state.db
+        async with sm() as auth_session:
+            webhook_secret = await get_config(auth_session, "sms_webhook_secret", "SMS_WEBHOOK_SECRET")
+            if not webhook_secret:
+                logger.error("make webhook: SMS_WEBHOOK_SECRET not configured")
+                raise HTTPException(503, "Webhook not configured")
+        provided = request.headers.get("X-Webhook-Secret", "")
+        auth_header = request.headers.get("Authorization", "")
+        if not provided and auth_header.lower().startswith("bearer "):
+            provided = auth_header[7:]
+        if not provided or not hmac.compare_digest(provided, webhook_secret):
+            logger.warning("make webhook: invalid shared secret")
+            raise HTTPException(403, "Invalid webhook secret")
+
+        try:
+            body = await request.json()
+        except Exception:
+            raise HTTPException(400, "Invalid JSON body")
         text = (body or {}).get("text", "")
         phone = (body or {}).get("phone_number", "")
         if not text:
             return {"ok": False, "error": "Missing 'text' field"}
-        sm = request.app.state.db
         async with sm() as session:
             user = None
             if phone:
@@ -573,25 +649,100 @@ def build_router() -> APIRouter:
                 await session.commit()
 
             return {"ok": True, "parsed": parsed.get("is_transaction"), "confidence": parsed.get("confidence", 0),
-                    "transaction_id": transaction_id, "user_id": user.user_id,
+                    "transaction_id": transaction_id,
                     "reply_sent": sent_ok, "reply_text": reply_text}
 
     @router.post("/sms/register-sender")
     async def register_sender(payload: RegisterSenderIn, request: Request, user: dict = Depends(get_current_user)):
+        phone = payload.phone_number.strip()
+        if not re.fullmatch(r"\+?[1-9]\d{6,14}", phone):
+            raise HTTPException(400, "Invalid phone number")
         sm = request.app.state.db
         async with sm() as session:
             existing = await session.execute(
-                select(SmsSender).where(SmsSender.phone_number == payload.phone_number.strip())
+                select(SmsSender).where(SmsSender.phone_number == phone)
             )
-            if existing.scalar_one_or_none():
-                raise HTTPException(400, "Phone number already registered")
-            sender = SmsSender(
-                user_id=user["user_id"], phone_number=payload.phone_number.strip(),
-                verified=True, verified_at=datetime.now(timezone.utc),
-            )
-            session.add(sender)
+            sender = existing.scalar_one_or_none()
+            if sender and sender.user_id != user["user_id"]:
+                raise HTTPException(400, "Phone number unavailable")
+            if sender and sender.verified:
+                raise HTTPException(400, "Phone number already verified")
+            if not sender:
+                sender = SmsSender(user_id=user["user_id"], phone_number=phone, verified=False)
+                session.add(sender)
+                await session.flush()
+
+            code = f"{secrets.randbelow(1_000_000):06d}"
+            key = _otp_config_key(sender.id)
+            expires_at = datetime.now(timezone.utc) + _OTP_TTL
+            value = _otp_config_value(_hash_otp(code), expires_at)
+            cfg_result = await session.execute(select(AppConfig).where(AppConfig.key == key))
+            cfg = cfg_result.scalar_one_or_none()
+            if cfg:
+                cfg.value = value
+            else:
+                session.add(AppConfig(key=key, value=value))
             await session.commit()
-            return {"ok": True, "phone_number": payload.phone_number.strip()}
+
+            sent = await _send_twilio_sms(
+                session, phone, f"FinanceAI verification code: {code}. Expires in 10 minutes."
+            )
+            if not sent:
+                raise HTTPException(502, "Could not send verification SMS")
+            return {"ok": True, "phone_number": phone, "verification_required": True}
+
+    @router.post("/sms/verify-sender")
+    async def verify_sender(payload: VerifySenderIn, request: Request, user: dict = Depends(get_current_user)):
+        phone = payload.phone_number.strip()
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(
+                select(SmsSender).where(
+                    SmsSender.user_id == user["user_id"],
+                    SmsSender.phone_number == phone,
+                )
+            )
+            sender = result.scalar_one_or_none()
+            if not sender:
+                raise HTTPException(404, "Sender not registered")
+            if sender.verified:
+                return {"ok": True, "phone_number": phone, "verified": True}
+
+            key = _otp_config_key(sender.id)
+            cfg_result = await session.execute(
+                select(AppConfig).where(AppConfig.key == key).with_for_update()
+            )
+            cfg = cfg_result.scalar_one_or_none()
+            parsed = _parse_otp_config(cfg.value if cfg else None)
+            if not parsed:
+                if cfg:
+                    await session.delete(cfg)
+                    await session.commit()
+                raise HTTPException(400, "Verification code expired")
+            code_hash, expires_at, attempts = parsed
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            if expires_at < datetime.now(timezone.utc):
+                await session.delete(cfg)
+                await session.commit()
+                raise HTTPException(400, "Verification code expired")
+            if not hmac.compare_digest(code_hash, _hash_otp(payload.code.strip())):
+                attempts += 1
+                if attempts >= _OTP_MAX_ATTEMPTS:
+                    await session.delete(cfg)
+                    await session.commit()
+                    raise HTTPException(
+                        429, "Too many verification attempts. Request a new code."
+                    )
+                cfg.value = _otp_config_value(code_hash, expires_at, attempts)
+                await session.commit()
+                raise HTTPException(400, "Invalid verification code")
+
+            sender.verified = True
+            sender.verified_at = datetime.now(timezone.utc)
+            await session.delete(cfg)
+            await session.commit()
+            return {"ok": True, "phone_number": phone, "verified": True}
 
     @router.get("/sms/senders")
     async def list_senders(request: Request, user: dict = Depends(get_current_user)):

@@ -12,7 +12,7 @@ from typing import Optional
 import asyncio
 import bcrypt
 import jwt as pyjwt
-from fastapi import APIRouter, HTTPException, Request, Response, Depends
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response, Depends
 from pydantic import BaseModel, EmailStr, Field
 import json
 from sqlalchemy import select, update, delete
@@ -22,6 +22,13 @@ from starlette.responses import RedirectResponse
 
 from db import User, UserSession, PasswordResetToken, TokenBlacklist, TrueLayerState, AuditLog
 from security import validate_password, _require_jwt_secret, generate_csrf_token, verify_csrf_token
+from email_service import (
+    EmailDeliveryError,
+    EmailNotConfigured,
+    send_password_reset_email_safe,
+    send_verification_email,
+    send_verification_email_safe,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -114,15 +121,24 @@ def _resolve_role(user_obj: User) -> str:
     """Map DB user to role hierarchy: admin > premium_user > free_user > guest."""
     if user_obj.is_admin or user_obj.role == "admin":
         return "admin"
-    if user_obj.tier == "premium":
+    if _effective_tier(user_obj) == "premium":
         return "premium_user"
     return "free_user"
 
 
 def _effective_tier(user_obj: User) -> str:
-    """Admins are always premium; other users use their stored tier."""
+    """Admins and active Stripe subscribers are premium; Tyl access can expire."""
     if user_obj.is_admin or user_obj.role == "admin":
         return "premium"
+    status = (user_obj.subscription_status or "").lower()
+    if status in {"active", "trialing"}:
+        return "premium"
+    until = getattr(user_obj, "premium_until", None)
+    if user_obj.tier == "premium" and until:
+        if until.tzinfo is None:
+            until = until.replace(tzinfo=timezone.utc)
+        if until <= datetime.now(timezone.utc):
+            return "free"
     return user_obj.tier
 
 
@@ -168,6 +184,7 @@ class UserOut(BaseModel):
     role: str = "free_user"
     tier: str = "free"
     subscription_status: Optional[str] = None
+    premium_until: Optional[str] = None
     free_trial_end: Optional[str] = None
     onboarded: bool = False
     preferences: dict = Field(default_factory=dict)
@@ -187,6 +204,7 @@ class EmailVerifyIn(BaseModel):
 def _user_to_dict(u: User) -> dict:
     role = _resolve_role(u)
     tier = _effective_tier(u)
+    premium_until = u.premium_until.isoformat() if u.premium_until else None
     free_trial_end = u.free_trial_end.isoformat() if u.free_trial_end else None
     return {
         "user_id": u.user_id,
@@ -196,6 +214,7 @@ def _user_to_dict(u: User) -> dict:
         "role": role,
         "tier": tier,
         "subscription_status": u.subscription_status,
+        "premium_until": premium_until,
         "free_trial_end": free_trial_end,
         "created_at": u.created_at.isoformat() if u.created_at else None,
         "onboarded": u.onboarded or False,
@@ -310,7 +329,7 @@ def build_router() -> APIRouter:
     router = APIRouter(prefix="/auth", tags=["auth"])
 
     @router.post("/register", response_model=UserOut)
-    async def register(payload: RegisterIn, request: Request, response: Response):
+    async def register(payload: RegisterIn, request: Request, response: Response, background_tasks: BackgroundTasks):
         valid, msg = validate_password(payload.password)
         if not valid:
             raise HTTPException(400, msg)
@@ -346,7 +365,8 @@ def build_router() -> APIRouter:
 
             await session.commit()
 
-            logger.info("User %s registered. Verification token: %s", user_id[:16], verify_token[:16])
+            logger.info("User %s registered", user_id[:16])
+            background_tasks.add_task(send_verification_email_safe, email, verify_token)
 
             access = create_access_token(user_id, email)
             refresh = create_refresh_token(user_id)
@@ -609,8 +629,7 @@ def build_router() -> APIRouter:
     # ── Email verification ──────────────────────────────────────────────
 
     @router.post("/verify-email/send")
-    async def send_verification_email(request: Request, user: dict = Depends(get_current_user)):
-        """Generate and store a verification token, log it (in production would email it)."""
+    async def send_verification_email_endpoint(request: Request, user: dict = Depends(get_current_user)):
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
@@ -624,11 +643,16 @@ def build_router() -> APIRouter:
             token = secrets.token_urlsafe(32)
             db_user.email_verification_token = token
             db_user.email_verification_sent_at = datetime.now(timezone.utc)
+            email = db_user.email
             await session.commit()
-            frontend = os.environ.get("FRONTEND_URL", "")
-            verify_link = f"{frontend}/verify-email?token={token}"
-            logger.info("Verification link for %s: %s", user["user_id"][:16], verify_link)
-            return {"ok": True, "message": "Verification email sent", "verify_url": verify_link}
+        logger.info("Verification token created for %s", user["user_id"][:16])
+        try:
+            await send_verification_email(email, token)
+        except EmailNotConfigured:
+            raise HTTPException(503, "Email delivery is not configured")
+        except EmailDeliveryError:
+            raise HTTPException(502, "Email delivery failed")
+        return {"ok": True, "message": "Verification email sent"}
 
     @router.post("/verify-email")
     async def verify_email(token: str, request: Request):
@@ -809,7 +833,7 @@ def build_router() -> APIRouter:
     # ── Password reset ──────────────────────────────────────────────────
 
     @router.post("/forgot-password")
-    async def forgot_password(payload: ForgotPasswordIn, request: Request):
+    async def forgot_password(payload: ForgotPasswordIn, request: Request, background_tasks: BackgroundTasks):
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(
@@ -825,9 +849,8 @@ def build_router() -> APIRouter:
                 )
                 session.add(reset)
                 await session.commit()
-                frontend_url = os.environ.get("FRONTEND_URL", "")
-                reset_link = f"{frontend_url}/reset-password?token={token}"
-                logger.info("Password reset link for %s: %s", user.user_id[:16], reset_link)
+                logger.info("Password reset token created for user %s", user.user_id[:16])
+                background_tasks.add_task(send_password_reset_email_safe, user.email, token)
         return {"ok": True, "message": "If the email exists, a reset link has been sent."}
 
     @router.post("/change-password")
@@ -917,16 +940,7 @@ async def seed_admin(session):
         await session.commit()
         logger.info("Seeded admin user.")
     else:
-        changed = False
-        if not existing.is_admin or existing.tier != "premium":
-            existing.is_admin = True
-            existing.tier = "premium"
-            existing.role = "admin"
-            existing.subscription_status = "active"
-            changed = True
-        if not await verify_password_async(password, existing.hashed_password):
-            existing.hashed_password = await hash_password_async(password)
-            changed = True
-        if changed:
-            await session.commit()
-            logger.info("Upgraded existing user to admin.")
+        logger.warning(
+            "Admin seed skipped: %s already exists. Promote or rotate credentials manually.",
+            email,
+        )

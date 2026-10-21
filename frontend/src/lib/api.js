@@ -68,7 +68,11 @@ api.interceptors.response.use(
       originalRequest._retry = true;
       try {
         const storedRt = getToken("refresh_token");
-        const refreshHeaders = storedRt ? { Authorization: `Bearer ${storedRt}` } : {};
+        const csrf = await _ensureCsrf();
+        const refreshHeaders = {
+          ...(storedRt ? { Authorization: `Bearer ${storedRt}` } : {}),
+          ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+        };
         const refreshResponse = await axios.post(`${API}/auth/refresh`, {}, {
           withCredentials: true,
           headers: refreshHeaders,

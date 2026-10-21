@@ -2563,6 +2563,9 @@ Output ONLY valid JSON, no markdown, no explanation:
         search: Optional[str] = None
         date_from: Optional[str] = None
         date_to: Optional[str] = None
+        amount_min: Optional[float] = None
+        amount_max: Optional[float] = None
+        account_id: Optional[str] = None
 
     @router.post("/transactions/bulk-delete")
     async def bulk_delete(
@@ -2695,6 +2698,12 @@ Output ONLY valid JSON, no markdown, no explanation:
                 base = base.where(Transaction.amount < 0)
             if payload.search:
                 base = base.where(Transaction.description.ilike(f"%{payload.search}%"))
+            if payload.amount_min is not None:
+                base = base.where(func.abs(Transaction.amount) >= abs(payload.amount_min))
+            if payload.amount_max is not None:
+                base = base.where(func.abs(Transaction.amount) <= abs(payload.amount_max))
+            if payload.account_id:
+                base = base.where(Transaction.account_id == payload.account_id)
             if payload.date_from:
                 base = base.where(
                     Transaction.date >= datetime.fromisoformat(payload.date_from)

@@ -187,7 +187,7 @@ npm install
 ```
 
 ### ❌ "DATABASE_URL: Invalid format"
-**Expected:** `postgresql://user:pass@host:port/db` or `postgres://...`
+**Expected:** `postgresql://USER:PASSWORD@HOST:5432/DBNAME`
 **Fix:** Update DATABASE_URL in `.env` file with correct PostgreSQL connection string
 
 ### ❌ "No REACT_APP_BACKEND_URL env var"

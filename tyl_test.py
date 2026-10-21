@@ -7,8 +7,8 @@ BACKEND_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://clone-builder-154
 API = f"{BACKEND_URL}/api"
 
 # Admin credentials from review request
-ADMIN_EMAIL = "admin@financeai.app"
-ADMIN_PASSWORD = "FinanceAI2026!"
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 
 print(f"🔍 Testing Tyl by NatWest Billing Endpoints at: {API}")
 print("=" * 80)

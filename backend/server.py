@@ -283,16 +283,24 @@ async def download_jewish_report(year: int, request: Request, user: dict = Depen
 app.include_router(api)
 
 # CORS config (defined before exception handlers that reference it)
-frontend_url = os.environ.get("FRONTEND_URL", "")
-vercel_url = "https://smart-budget-pro-ewtm.vercel.app"
-origins = list({o for o in [frontend_url, vercel_url, "http://localhost:3000", "http://127.0.0.1:3000"] if o})
+frontend_url = os.environ.get("FRONTEND_URL", "").rstrip("/")
+extra_origins = {
+    origin.strip().rstrip("/")
+    for origin in os.environ.get("CORS_EXTRA_ORIGINS", "").split(",")
+    if origin.strip()
+}
+origins = sorted({
+    origin
+    for origin in [frontend_url, "http://localhost:3000", "http://127.0.0.1:3000", *extra_origins]
+    if origin and "*" not in origin
+})
 
 def _cors_headers(request: StarletteRequest):
     """Build CORS headers for the given origin."""
-    origin = request.headers.get("origin", "")
+    origin = request.headers.get("origin", "").rstrip("/")
     if not origin:
         return {}
-    if origin in origins or (origin.startswith("https://") and origin.endswith(".vercel.app")):
+    if origin in origins:
         return {
             "Access-Control-Allow-Origin": origin,
             "Access-Control-Allow-Credentials": "true",
@@ -362,8 +370,7 @@ async def global_exception_handler(request: StarletteRequest, exc: Exception):
 # CORS: allow frontend origin with credentials
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins or ["http://localhost:3000"],
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

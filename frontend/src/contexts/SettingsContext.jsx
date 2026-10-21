@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
+import { useAuth } from "./AuthContext";
 
 const LS_KEY = "financeai_settings";
 
@@ -63,6 +64,7 @@ function applyToDOM(preferences) {
 
 export function SettingsProvider({ children }) {
   const { setTheme } = useTheme();
+  const { user, loading: authLoading } = useAuth();
   const cached = useMemo(() => loadFromStorage(), []);
   const [settings, setSettings] = useState(cached || {
     language: "en", theme: "system", currency: "GBP",
@@ -79,6 +81,11 @@ export function SettingsProvider({ children }) {
   }, []);
 
   const load = useCallback(async () => {
+    if (authLoading) return;
+    if (!user) {
+      setLoaded(true);
+      return;
+    }
     try {
       const { data } = await api.get("/settings/app");
       setSettings(data);
@@ -90,7 +97,7 @@ export function SettingsProvider({ children }) {
     } finally {
       setLoaded(true);
     }
-  }, [setTheme]);
+  }, [authLoading, user, setTheme]);
 
   useEffect(() => { load(); }, [load]);
 

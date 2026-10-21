@@ -39,7 +39,7 @@
 
 1. Go to https://console.neon.tech
 2. Sign in with your account
-3. Find your project: `ep-silent-water-ab6f94vy`
+3. Find your project: `<NEON_PROJECT_ID>`
 4. Check if database is:
    - ✅ **Active** - Good, data is there
    - ⏸️ **Paused** - Click "Resume" to wake it up
@@ -168,8 +168,8 @@ If no backups exist:
 - `DATABASE_URL` = `postgresql+asyncpg://...@neon.tech/neondb`
 - `FRONTEND_URL` = `https://smart-budget-pro-ewtm.vercel.app`
 - `JWT_SECRET` = (auto-generated)
-- `ADMIN_EMAIL` = `ptwersky29@gmail.com`
-- `ADMIN_PASSWORD` = `146Osbaldeston!`
+- `ADMIN_EMAIL` = `<ADMIN_EMAIL>`
+- `ADMIN_PASSWORD` = `<REDACTED_SET_IN_RENDER>`
 
 **GitHub Latest Commit:**
 - Commit: `fc95711`
@@ -177,9 +177,9 @@ If no backups exist:
 - Includes improved BETA badge
 
 **Neon Database:**
-- Host: `ep-silent-water-ab6f94vy-pooler.eu-west-2.aws.neon.tech`
-- Database: `neondb`
-- User: `neondb_owner`
+- Host: `<NEON_HOST>`
+- Database: `<NEON_DATABASE>`
+- User: `<NEON_USER>`
 
 ---
 

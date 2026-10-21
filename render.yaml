@@ -12,7 +12,9 @@ services:
     healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
-        value: postgresql+asyncpg://neondb_owner:npg_DEn4SXe1YkWV@ep-silent-water-ab6f94vy-pooler.eu-west-2.aws.neon.tech/neondb
+        sync: false
+      - key: REDIS_URL
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: FRONTEND_URL
@@ -31,6 +33,26 @@ services:
         sync: false
       - key: SENTRY_DSN
         sync: false
+      - key: SMS_WEBHOOK_SECRET
+        sync: false
+      - key: SYNC_SECRET
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_FROM_NAME
+        value: Smart Budget Pro
+      - key: SMTP_STARTTLS
+        value: "true"
+      - key: SMTP_SSL
+        value: "false"
       - key: JSON_LOG
         value: "true"
       - key: LOG_LEVEL
@@ -56,7 +78,7 @@ asyncio.run(run())
 "
     envVars:
       - key: DATABASE_URL
-        value: postgresql+asyncpg://neondb_owner:npg_DEn4SXe1YkWV@ep-silent-water-ab6f94vy-pooler.eu-west-2.aws.neon.tech/neondb
+        sync: false
       - key: JWT_SECRET
         sync: false
       - key: JSON_LOG

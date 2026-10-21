@@ -138,8 +138,8 @@ if (!hash || hash === "#") {
 
 ### Test 1: Regular Email/Password Login
 1. Go to https://smart-budget-pro-ewtm.vercel.app/login
-2. Enter email: `ptwersky29@gmail.com`
-3. Enter password: `146Osbaldeston!`
+2. Enter email: `<ADMIN_EMAIL>`
+3. Enter password: `<REDACTED_SET_IN_RENDER>`
 4. Click "Sign in"
 5. **Expected:** Redirect to `/dashboard`, user logged in
 6. **Failure modes:**

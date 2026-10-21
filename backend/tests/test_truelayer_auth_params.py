@@ -63,10 +63,10 @@ def test_normalize_accounts_payload():
 
 def test_connections_url():
     assert _connections_url("https://app.example.com", "success", accounts=2) == (
-        "https://app.example.com/connections?status=success&accounts=2"
+        "https://app.example.com/accounts?status=success&accounts=2"
     )
     assert _connections_url("https://app.example.com/", "failed", reason="callback_error") == (
-        "https://app.example.com/connections?status=failed&reason=callback_error"
+        "https://app.example.com/accounts?status=failed&reason=callback_error"
     )
 
 

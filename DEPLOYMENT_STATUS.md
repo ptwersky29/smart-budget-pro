@@ -114,7 +114,7 @@ python deep_health_check.py
 
 ### Backend (.env in Render)
 ```
-DATABASE_URL=postgresql+asyncpg://...  ✓
+DATABASE_URL=<REDACTED_DATABASE_URL>  ✓
 JWT_SECRET=64-char-key                  ✓
 FRONTEND_URL=https://smart-budget-pro.vercel.app  ✓
 ```
@@ -162,7 +162,7 @@ Expected: Page loads with no 404 errors
 ```bash
 curl -X POST https://clone-builder-154.preview.emergentagent.com/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@financeai.app","password":"FinanceAI2026!"}'
+  -d '{"email":"admin@financeai.app","password":"<REDACTED_ADMIN_PASSWORD>"}'
 ```
 Expected: JWT token response
 
