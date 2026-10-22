@@ -1,10 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
-import { Plus, Trash2, Loader2, Pencil, Search, Sparkles, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, BarChart3, Star, Receipt, Download, MoreHorizontal, RefreshCw, CheckCircle2, PieChart as PieChartIcon } from "lucide-react";
+import { Plus, Trash2, Loader2, Pencil, Search, Sparkles, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, BarChart3, Star, Receipt, Download, MoreHorizontal, RefreshCw, CheckCircle2, PieChart as PieChartIcon, ArrowDownLeft, ArrowUpRight, CalendarDays, Tag, Wallet, StickyNote, Building2, Scissors, Link2, Link2Off, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "../components/ui/layout";
+import { PageHeader, Surface } from "../components/ui/page";
 import { SkeletonTable } from "../components/ui/Skeleton";
+import { useAssistant } from "../contexts/AssistantContext";
+import { formatCurrency, formatLongDate } from "../lib/format";
 import { withUndo } from "../lib/undo";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import {
@@ -132,8 +135,118 @@ function TransactionActionPanel({ open, title, description, onClose, children, f
   );
 }
 
+function InspectorRow({ icon: Icon, label, children }) {
+  return (
+    <div className="flex items-start gap-3 py-3">
+      <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-secondary/70 text-muted-foreground">
+        <Icon className="h-3.5 w-3.5" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{label}</p>
+        <div className="mt-0.5 break-words text-[12.5px] text-foreground">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function TransactionInspector({ transaction, onClose, onEdit, onDelete, onApprove, onClassify, onSplit, onPairTransfer, onUnpairTransfer, onAsk }) {
+  if (!transaction) return null;
+  const income = Number(transaction.amount) > 0;
+  const unapproved = transaction.approval_status === "unapproved" || transaction.category_approval_status === "unapproved";
+  const failed = transaction.approval_status === "failed";
+
+  return (
+    <Sheet open={Boolean(transaction)} onOpenChange={(next) => (next ? null : onClose())}>
+      <SheetContent side="right" className="flex w-full flex-col overflow-y-auto p-0 sm:max-w-[430px]">
+        <div className="border-b border-border/60 px-5 pb-5 pr-14 pt-6">
+          <div className="flex items-center gap-3">
+            <span className={`grid h-11 w-11 place-items-center rounded-2xl ${income ? "bg-emerald/10 text-emerald" : "bg-secondary text-muted-foreground"}`}>
+              {income ? <ArrowDownLeft className="h-5 w-5" /> : <ArrowUpRight className="h-5 w-5" />}
+            </span>
+            <div className="min-w-0 flex-1">
+              <SheetTitle className="truncate text-[15px] font-semibold tracking-[-0.02em]">
+                {transaction.description || transaction.merchant || "Transaction"}
+              </SheetTitle>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {formatLongDate(transaction.date, { weekday: false })}
+              </p>
+            </div>
+          </div>
+          <p className={`money-tabular mt-5 text-[2rem] font-semibold leading-none tracking-[-0.05em] ${income ? "text-emerald" : "text-foreground"}`}>
+            {formatCurrency(transaction.amount, { signed: true })}
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <CategoryBadge category={transaction.category || "uncategorized"} size="sm" />
+            {transaction.is_transfer ? <span className="rounded-full bg-sky/10 px-2 py-0.5 text-[10px] font-medium text-sky">Transfer</span> : null}
+            {transaction.is_split ? <span className="rounded-full bg-violet/10 px-2 py-0.5 text-[10px] font-medium text-violet">Split</span> : null}
+            {unapproved ? <span className="rounded-full bg-topaz/10 px-2 py-0.5 text-[10px] font-medium text-topaz">Needs approval</span> : null}
+            {failed ? <span className="rounded-full bg-ruby/10 px-2 py-0.5 text-[10px] font-medium text-ruby">Failed</span> : null}
+          </div>
+        </div>
+
+        <div className="divide-y divide-border/50 px-5">
+          <InspectorRow icon={CalendarDays} label="Date">{formatLongDate(transaction.date)}</InspectorRow>
+          <InspectorRow icon={Tag} label="Category"><span className="capitalize">{transaction.category || "Uncategorized"}</span></InspectorRow>
+          {transaction.merchant || transaction.normalized_merchant ? (
+            <InspectorRow icon={Building2} label="Merchant">{transaction.merchant || transaction.normalized_merchant}</InspectorRow>
+          ) : null}
+          {transaction.account_name ? (
+            <InspectorRow icon={Wallet} label="Account">{transaction.account_name}</InspectorRow>
+          ) : null}
+          {transaction.notes ? (
+            <InspectorRow icon={StickyNote} label="Notes">{transaction.notes}</InspectorRow>
+          ) : null}
+          {transaction.failed_reason ? (
+            <InspectorRow icon={AlertTriangle} label="Issue">{transaction.failed_reason}</InspectorRow>
+          ) : null}
+        </div>
+
+        <div className="mt-auto space-y-2 border-t border-border/60 p-4">
+          <button
+            type="button"
+            onClick={() => onAsk(transaction)}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald/10 px-4 py-2.5 text-[12px] font-semibold text-emerald transition hover:bg-emerald/15"
+          >
+            <Sparkles className="h-3.5 w-3.5" /> Ask Penni about this
+          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => onEdit(transaction)} className="flex items-center justify-center gap-1.5 rounded-xl border border-border/70 px-3 py-2.5 text-[11.5px] font-medium transition hover:bg-secondary/60">
+              <Pencil className="h-3.5 w-3.5" /> Edit
+            </button>
+            {unapproved ? (
+              <button type="button" onClick={() => onApprove(transaction)} className="flex items-center justify-center gap-1.5 rounded-xl border border-emerald/20 bg-emerald/5 px-3 py-2.5 text-[11.5px] font-medium text-emerald transition hover:bg-emerald/10">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Approve
+              </button>
+            ) : (
+              <button type="button" onClick={() => onClassify(transaction)} className="flex items-center justify-center gap-1.5 rounded-xl border border-border/70 px-3 py-2.5 text-[11.5px] font-medium transition hover:bg-secondary/60">
+                <Sparkles className="h-3.5 w-3.5" /> Classify
+              </button>
+            )}
+            <button type="button" onClick={() => onSplit(transaction)} className="flex items-center justify-center gap-1.5 rounded-xl border border-border/70 px-3 py-2.5 text-[11.5px] font-medium transition hover:bg-secondary/60">
+              <Scissors className="h-3.5 w-3.5" /> Split
+            </button>
+            {transaction.transfer_pair_id ? (
+              <button type="button" onClick={() => onUnpairTransfer(transaction)} className="flex items-center justify-center gap-1.5 rounded-xl border border-border/70 px-3 py-2.5 text-[11.5px] font-medium transition hover:bg-secondary/60">
+                <Link2Off className="h-3.5 w-3.5" /> Unpair
+              </button>
+            ) : (
+              <button type="button" onClick={() => onPairTransfer(transaction)} className="flex items-center justify-center gap-1.5 rounded-xl border border-border/70 px-3 py-2.5 text-[11.5px] font-medium transition hover:bg-secondary/60">
+                <Link2 className="h-3.5 w-3.5" /> Pair
+              </button>
+            )}
+          </div>
+          <button type="button" onClick={() => onDelete(transaction.transaction_id)} className="flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[11.5px] font-medium text-ruby transition hover:bg-ruby/5">
+            <Trash2 className="h-3.5 w-3.5" /> Delete transaction
+          </button>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 const Transactions = React.memo(function Transactions() {
   useEffect(() => { document.title = "Transactions | Penni"; }, []);
+  const { openAssistant } = useAssistant();
   const [txs, setTxs] = useState([]);
   const [total, setTotal] = useState(0);
   const [incomeTotal, setIncomeTotal] = useState(0);
@@ -184,6 +297,7 @@ const Transactions = React.memo(function Transactions() {
   const confirmCb = useRef(null);
   const [newCategoryModal, setNewCategoryModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [inspectTx, setInspectTx] = useState(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewTx, setReviewTx] = useState(null);
   const [reviewSuggestions, setReviewSuggestions] = useState([]);
@@ -1069,10 +1183,23 @@ const Transactions = React.memo(function Transactions() {
   }, [txs, aiResults]);
 
   return (
-    <div className="space-y-4" data-testid="transactions-root">
+    <div className="page-stack pb-4" data-testid="transactions-root">
+
+      <PageHeader
+        eyebrow="Ledger"
+        title="Transactions"
+        description="Every payment, deposit and transfer, with the detail you need close at hand."
+        actions={
+          <Button variant="outlinePill" size="pill" onClick={() => openAssistant({ prompt: "Help me understand my recent transactions" })}>
+            <Sparkles className="h-4 w-4" />
+            Ask Penni
+          </Button>
+        }
+      />
 
       {/* ─── Ledger toolbar ─── */}
-      <div className="space-y-3">
+      <Surface className="space-y-3 p-3 sm:p-4">
+        <div className="space-y-3">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
             {/* Middle: Month picker + stats */}
             <div className="flex-1 min-w-0">
@@ -1315,7 +1442,8 @@ const Transactions = React.memo(function Transactions() {
             <button onClick={clearAllFilters} className="text-[10px] px-2 py-0.5 rounded-full border border-border text-muted-foreground hover:text-foreground">Clear</button>
           </div>
         )}
-      </div>
+        </div>
+      </Surface>
 
       {/* Spend breakdown pie chart */}
       {categorySpend.length > 0 && (
@@ -1400,6 +1528,7 @@ const Transactions = React.memo(function Transactions() {
                             setSwipedId={setSwipedId}
                             onToggleSelect={toggleSelect}
                             onEdit={openEdit}
+                            onInspect={setInspectTx}
                             onDelete={del}
                             onApprove={approveTx}
                             onClassify={classifySavedTx}
@@ -1422,6 +1551,7 @@ const Transactions = React.memo(function Transactions() {
                         setSwipedId={setSwipedId}
                         onToggleSelect={toggleSelect}
                         onEdit={openEdit}
+                            onInspect={setInspectTx}
                         onDelete={del}
                         onApprove={approveTx}
                         onClassify={classifySavedTx}
@@ -1449,7 +1579,8 @@ const Transactions = React.memo(function Transactions() {
                       <TransactionRow key={t.transaction_id} t={t}
                         isSelected={selectedIds.has(t.transaction_id)}
                         isFocused={focusedIndex === idx}
-                        onToggleSelect={toggleSelect} onEdit={openEdit} onDelete={del}
+                        onToggleSelect={toggleSelect} onEdit={openEdit}
+                            onInspect={setInspectTx} onDelete={del}
                         onApprove={approveTx}
                         onClassify={classifySavedTx}
                         onSplit={splitTx}
@@ -1978,11 +2109,27 @@ const Transactions = React.memo(function Transactions() {
           </div>
         </div>
       )}
+
+      <TransactionInspector
+        transaction={inspectTx}
+        onClose={() => setInspectTx(null)}
+        onEdit={(transaction) => { setInspectTx(null); openEdit(transaction); }}
+        onDelete={(id) => { setInspectTx(null); del(id); }}
+        onApprove={(transaction) => { setInspectTx(null); approveTx(transaction); }}
+        onClassify={(transaction) => { setInspectTx(null); classifySavedTx(transaction); }}
+        onSplit={(transaction) => { setInspectTx(null); splitTx(transaction); }}
+        onPairTransfer={(transaction) => { setInspectTx(null); pairTransfer(transaction); }}
+        onUnpairTransfer={(transaction) => { setInspectTx(null); unpairTransfer(transaction); }}
+        onAsk={(transaction) => {
+          setInspectTx(null);
+          openAssistant({ prompt: `Explain this transaction: ${transaction.description || transaction.merchant || "transaction"} for ${formatCurrency(transaction.amount)} on ${transaction.date}.` });
+        }}
+      />
     </div>
   );
 });
 
-function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, onEdit, onDelete, onApprove, onClassify, onSplit, onPairTransfer, onUnpairTransfer, showDate = false }) {
+function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, onEdit, onInspect, onDelete, onApprove, onClassify, onSplit, onPairTransfer, onUnpairTransfer, showDate = false }) {
   const handlers = useSwipe(
     () => setSwipedId(t.transaction_id),
     () => setSwipedId(null),
@@ -2002,7 +2149,7 @@ function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, o
           : null;
 
   return (
-    <div className="relative overflow-hidden tap-highlight-none" {...handlers} onClick={() => { if (deleting) setSwipedId(null); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSwipedId(t.transaction_id); } }} role="button" tabIndex={0}>
+    <div className="relative overflow-hidden tap-highlight-none" {...handlers} onClick={(event) => { if (deleting) { setSwipedId(null); return; } if (event.target.closest("button, input, a, [role='menuitem'], [data-radix-collection-item]")) return; onInspect?.(t); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onInspect?.(t); } }} role="button" tabIndex={0}>
       <div
         className={`transition-transform duration-200 ease-out ${deleting ? "-translate-x-20" : "translate-x-0"} ${isSelected ? "bg-emerald/5" : ""}`}
       >

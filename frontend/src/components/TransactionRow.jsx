@@ -41,6 +41,7 @@ const TransactionRow = React.memo(
     onToggleSelect,
     onEdit,
     onDelete,
+    onInspect,
     onSetFocus,
     onApprove,
     onClassify,
@@ -71,7 +72,11 @@ const TransactionRow = React.memo(
                   ? "bg-topaz/5"
                   : "hover:bg-secondary/30"
             } ${isFocused ? "ring-1 ring-inset ring-topaz/30" : ""}`}
-            onClick={() => onSetFocus?.()}
+            onClick={(event) => {
+              onSetFocus?.();
+              if (event.target.closest("button, input, a, [role='menuitem'], [data-radix-collection-item]")) return;
+              onInspect?.(t);
+            }}
             onDoubleClick={() => onEdit?.(t)}
           >
             <td className="px-4 py-3">

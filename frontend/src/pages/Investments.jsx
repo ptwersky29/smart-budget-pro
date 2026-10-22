@@ -5,6 +5,7 @@ import { TrendingUp, Loader2, ArrowUpRight, ArrowDownRight, RefreshCw, ChevronDo
 import { toast } from "sonner";
 import AIInsightPanel from "../components/AIInsightPanel";
 import { Button } from "../components/ui/button";
+import { PageHeader } from "../components/ui/page";
 
 const SYMBOLS = ["VUSA","VWRL","VUKE","VFEM","IWDA","EQQQ","ISF","IUSA","VHVG","SP500","FTSE","NASDAQ","BRK.B","BTC","ETH"];
 const CRYPTO_TICKERS = "BTC,ETH,SOL,ADA,XRP,DOGE";
@@ -27,7 +28,7 @@ export default function Investments() {
     setPricesBusy(true);
     try {
       const { data } = await api.get(`/prices/crypto?symbols=${CRYPTO_TICKERS}`);
-      setLivePrices(data.prices); setPriceTs(data.as_of);
+      setLivePrices(Array.isArray(data.prices) ? data.prices : []); setPriceTs(data.as_of);
     } catch (err) { console.error(err); toast.error("Could not load live prices"); }
     finally { setPricesBusy(false); }
   }, []);
@@ -36,7 +37,7 @@ export default function Investments() {
     setStocksBusy(true);
     try {
       const { data } = await api.get("/prices/stocks", { params: { symbols: STOCK_TICKERS.join(",") } });
-      setStocks(data.prices);
+      setStocks(Array.isArray(data.prices) ? data.prices : []);
     } catch (err) { console.error(err); toast.error("Could not load stock prices"); }
     finally { setStocksBusy(false); }
   }, []);
@@ -63,7 +64,8 @@ export default function Investments() {
   };
 
   return (
-    <div className="space-y-6" data-testid="investments-root">
+    <div className="page-stack pb-4" data-testid="investments-root">
+      <PageHeader eyebrow="Wealth" title="Investments" description="Explore long-term growth with clear assumptions and live market context." />
       <div className="rounded-2xl border border-border bg-card p-6" data-testid="live-prices">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">

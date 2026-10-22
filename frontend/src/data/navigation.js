@@ -1,46 +1,34 @@
 import {
-  LayoutDashboard, Wallet, Receipt, PiggyBank, Building2, TrendingUp, Star,
+  LayoutDashboard, Wallet, Receipt, PiggyBank, TrendingUp, Star,
   Landmark, FileText, Settings, RefreshCcw, MoreHorizontal, Shield,
 } from "lucide-react";
 
 export const BOTTOM_NAV = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/dashboard", label: "Home", icon: LayoutDashboard },
   { to: "/accounts", label: "Accounts", icon: Wallet },
   { to: "/transactions", label: "Transactions", icon: Receipt },
-  { to: "/budgets", label: "Budgets", icon: PiggyBank },
-  { to: "/settings", label: "More", icon: MoreHorizontal, isMore: true },
+  { to: "/more", label: "More", icon: MoreHorizontal, isMore: true },
 ];
 
 export const NAV_SECTIONS = [
   {
-    label: "Overview",
+    label: "Main",
     items: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { to: "/accounts", label: "Accounts & Import", icon: Wallet },
-      { to: "/reports", label: "Reports", icon: FileText },
-    ],
-  },
-  {
-    label: "Finance",
-    items: [
+      { to: "/accounts", label: "Accounts", icon: Wallet },
       { to: "/transactions", label: "Transactions", icon: Receipt },
       { to: "/budgets", label: "Budgets", icon: PiggyBank },
+      { to: "/reports", label: "Reports", icon: FileText },
       { to: "/subscriptions", label: "Subscriptions", icon: RefreshCcw },
       { to: "/statements", label: "Statements", icon: FileText },
     ],
   },
   {
-    label: "Connect",
+    label: "Plan",
     items: [
       { to: "/investments", label: "Investments", icon: TrendingUp },
-    ],
-  },
-  {
-    label: "More",
-    items: [
       { to: "/jewish", label: "Jewish Tools", icon: Star },
       { to: "/uk-tools", label: "UK Benefits", icon: Landmark },
-      { to: "/settings", label: "Settings", icon: Settings },
     ],
   },
   {
@@ -52,6 +40,8 @@ export const NAV_SECTIONS = [
   },
 ];
 
+export const SETTINGS_NAV_ITEM = { to: "/settings", label: "Settings", icon: Settings };
+
 export const ROUTE_META = [
   {
     paths: ["/dashboard"],
@@ -60,6 +50,13 @@ export const ROUTE_META = [
     description: "A clean snapshot of your money, cash flow, and what needs attention next.",
     primary: { label: "Add transaction", to: "/transactions" },
     secondary: { label: "Accounts & Import", to: "/accounts" },
+  },
+  {
+    paths: ["/more"],
+    eyebrow: "Workspace",
+    title: "More",
+    description: "Every tool, connection and setting in one calm place.",
+    primary: { label: "Settings", to: "/settings" },
   },
   {
     paths: ["/transactions"],
@@ -91,7 +88,7 @@ export const ROUTE_META = [
   },
   {
     paths: ["/accounts"],
-    eyebrow: "Accounts & Import",
+    eyebrow: "Accounts",
     title: "Accounts",
     description: "All your bank accounts, wallets, savings, and statement imports in one place.",
     secondary: { label: "Settings", to: "/settings" },
@@ -176,4 +173,4 @@ export function getRouteMeta(pathname) {
   })) || ROUTE_META[0];
 }
 
-export const KEYBOARD_GOTO = { d: "/dashboard", t: "/transactions", b: "/budgets", s: "/subscriptions", r: "/reports", a: "/accounts", g: "/settings" };
+export const KEYBOARD_GOTO = { d: "/dashboard", t: "/transactions", b: "/budgets", s: "/subscriptions", r: "/reports", a: "/accounts", g: "/settings", m: "/more" };

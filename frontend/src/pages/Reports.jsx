@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner";
 import AIInsightPanel from "../components/AIInsightPanel";
 import { PageToolbar, SectionCard } from "../components/ui/layout";
+import { PageHeader, Surface } from "../components/ui/page";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -55,10 +56,19 @@ export default function Reports() {
     (async () => {
       try {
         setLoadError(false);
-        const { data } = await api.get("/dashboard/overview", {
-          params: { date_from: dateFrom, date_to: dateTo },
+        const [overview, spend] = await Promise.all([
+          api.get("/dashboard/overview"),
+          api.get("/analytics/spending-by-category", {
+            params: { date_from: dateFrom, date_to: dateTo },
+          }),
+        ]);
+        setData({
+          balance: 0,
+          savings_rate: 0,
+          categories: [],
+          ...overview.data,
+          categories: spend.data.categories || [],
         });
-        setData({ balance: 0, savings_rate: 0, category_spend: [], ...data });
       } catch {
         setLoadError(true);
         toast.error("Could not load report data");
@@ -149,7 +159,12 @@ export default function Reports() {
   const subs = data.categories?.find((c) => c.name === "subscriptions");
 
   return (
-    <div className="space-y-8" data-testid="reports-root">
+    <div className="page-stack pb-4" data-testid="reports-root">
+      <PageHeader
+        eyebrow="Insights"
+        title="Reports"
+        description="A considered review of your money, with clear ranges and downloadable records."
+      />
       <PageToolbar className="justify-end">
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <label className="flex items-center gap-2 text-[11px] text-muted-foreground sm:text-xs">
@@ -214,7 +229,7 @@ export default function Reports() {
         </DropdownMenu>
       </PageToolbar>
 
-      <div className="rounded-2xl border border-border bg-card p-6">
+      <Surface className="p-5 sm:p-6">
         <div className="flex items-center gap-2 sm:gap-3">
           <ShieldCheck className="h-4 w-4 text-emerald shrink-0" />
           <p className="label-overline">Health score</p>
@@ -264,7 +279,7 @@ export default function Reports() {
             </span>
           </span>
         </div>
-      </div>
+      </Surface>
 
       <SectionCard eyebrow="Savings" title="AI savings suggestions">
         <ul className="mt-4 space-y-3 text-sm">

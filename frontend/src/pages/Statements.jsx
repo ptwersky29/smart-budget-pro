@@ -4,6 +4,7 @@ import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
 import { Upload, FileText, Loader2, Sparkles, CheckCircle2, Trash2, ArrowDownRight, ArrowUpRight, Save, ChevronDown, Building2, Pencil, X, Check } from "lucide-react";
 import { SectionCard } from "../components/ui/layout";
+import { PageHeader } from "../components/ui/page";
 import Skeleton from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
 import CategoryCombobox from "../components/CategoryCombobox";
@@ -115,7 +116,8 @@ export default function Statements() {
   };
 
   return (
-    <div className="space-y-8" data-testid="statements-root">
+    <div className="page-stack pb-4" data-testid="statements-root">
+      <PageHeader eyebrow="Documents" title="Statements" description="Upload a PDF or CSV and turn it into clean, categorised transactions." />
       <div
         data-testid="statement-dropzone"
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}

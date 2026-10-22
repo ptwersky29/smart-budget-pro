@@ -4,6 +4,8 @@ import { toast } from "sonner";
 import { Download, Loader2, TrendingDown, TrendingUp, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "./ui/button";
 
+const amount = (value) => Number(value || 0).toFixed(2);
+
 /**
  * Year-End Jewish Finance Report Component
  * Displays comprehensive Maaser and Holiday budget summaries for the year
@@ -98,15 +100,15 @@ export default function YearEndJewishReport({ year }) {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <div className="rounded-xl border border-border bg-secondary/30 p-4 text-center">
             <p className="label-overline">Income</p>
-            <p className="mt-2 text-2xl font-semibold text-emerald">£{maaser.total_income.toFixed(2)}</p>
+            <p className="mt-2 text-2xl font-semibold text-emerald">£{amount(maaser.total_income)}</p>
           </div>
           <div className="rounded-xl border border-border bg-secondary/30 p-4 text-center">
             <p className="label-overline">Obligation</p>
-            <p className="mt-2 text-2xl font-semibold text-topaz">£{maaser.obligation.toFixed(2)}</p>
+            <p className="mt-2 text-2xl font-semibold text-topaz">£{amount(maaser.obligation)}</p>
           </div>
           <div className="rounded-xl border border-border bg-secondary/30 p-4 text-center">
             <p className="label-overline">Given</p>
-            <p className="mt-2 text-2xl font-semibold text-emerald">£{maaser.total_given.toFixed(2)}</p>
+            <p className="mt-2 text-2xl font-semibold text-emerald">£{amount(maaser.total_given)}</p>
           </div>
           <div className={`rounded-xl border border-border bg-secondary/30 p-4 text-center`}>
             <p className="label-overline">Status</p>
@@ -127,7 +129,7 @@ export default function YearEndJewishReport({ year }) {
             <div>
               <p className="font-medium text-ruby">Balance Outstanding</p>
               <p className="text-sm text-muted-foreground mt-0.5">
-                You are still obligated for <strong>£{maaser.balance_owed.toFixed(2)}</strong>
+                You are still obligated for <strong>£{amount(maaser.balance_owed)}</strong>
               </p>
             </div>
           </div>
@@ -139,7 +141,7 @@ export default function YearEndJewishReport({ year }) {
             <div>
               <p className="font-medium text-emerald">Over-fulfilled</p>
               <p className="text-sm text-muted-foreground mt-0.5">
-                You have given <strong>£{maaser.credit.toFixed(2)}</strong> more than obligated
+                You have given <strong>£{amount(maaser.credit)}</strong> more than obligated
               </p>
             </div>
           </div>
@@ -159,11 +161,11 @@ export default function YearEndJewishReport({ year }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.entries(maaser.monthly_breakdown).map(([month, data]) => (
+                  {Object.entries(maaser.monthly_breakdown || {}).map(([month, data]) => (
                     <tr key={month} className="border-b border-border/50">
                       <td className="py-2">{new Date(month + "-01").toLocaleDateString("en-US", { month: "long", year: "numeric" })}</td>
-                      <td className="text-right">£{data.income.toFixed(2)}</td>
-                      <td className="text-right text-emerald font-medium">£{data.given.toFixed(2)}</td>
+                      <td className="text-right">£{amount(data.income)}</td>
+                      <td className="text-right text-emerald font-medium">£{amount(data.given)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -229,8 +231,8 @@ export default function YearEndJewishReport({ year }) {
                     </div>
                   </div>
                   <div className="text-right whitespace-nowrap">
-                    <p className="font-medium">£{holiday.spent.toFixed(2)}</p>
-                    <p className="text-xs text-muted-foreground">of £{holiday.budgeted.toFixed(2)}</p>
+                    <p className="font-medium">£{amount(holiday.spent)}</p>
+                    <p className="text-xs text-muted-foreground">of £{amount(holiday.budgeted)}</p>
                   </div>
                 </div>
               </div>

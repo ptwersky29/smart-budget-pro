@@ -9,6 +9,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import BankCardMockup from "../components/BankCardMockup";
 import AddManualAccountModal from "../components/AddManualAccountModal";
+import { PageHeader, Surface } from "../components/ui/page";
 
 export default function Connections() {
   useEffect(() => { document.title = "Bank Connections | Penni"; }, []);
@@ -216,7 +217,8 @@ export default function Connections() {
   };
 
   return (
-    <div className="space-y-8" data-testid="connections-root">
+    <div className="page-stack pb-4" data-testid="connections-root">
+      <PageHeader eyebrow="Connections" title="Bank connections" description="Securely connect accounts, sync balances and keep shared data in one place." />
       <PageToolbar className="justify-end">
         <input type="date" value={importFromDate} onChange={(e) => setImportFromDate(e.target.value)}
           className="h-10 px-3 rounded-xl bg-secondary/50 border border-transparent text-xs sm:text-sm focus:border-ring focus:outline-none" />

@@ -6,6 +6,7 @@ import { MessageSquare, Sparkles, Loader2, Trash2, CheckCircle2, AlertTriangle, 
 import { SectionCard } from "../components/ui/layout";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { PageHeader } from "../components/ui/page";
 
 const SAMPLE = "Tesco: You spent £42.50 at TESCO EXPRESS on 03/05/26. Available balance £812.40.";
 
@@ -125,7 +126,8 @@ export default function SMS({ embedded }) {
   };
 
   return (
-    <div className="space-y-6" data-testid="sms-root">
+    <div className="page-stack pb-4" data-testid="sms-root">
+      {!embedded && <PageHeader eyebrow="Capture" title="SMS transactions" description="Turn bank text messages into transactions in a couple of taps." />}
       <SectionCard eyebrow="Your Phone" title={senders.length ? `${senders.length} phone${senders.length !== 1 ? "s" : ""} registered` : "Register your phone"} data-testid="phone-card">
         <p className="text-xs text-muted-foreground mb-4">Register your mobile number so the system recognises your SMS messages and can send automatic replies.</p>
         <form onSubmit={registerPhone} className="flex items-center gap-3 mb-4">

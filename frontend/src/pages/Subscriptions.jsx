@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { withUndo } from "../lib/undo";
 import { Loader2, Plus, Trash2, Pencil, RefreshCcw, Sparkles, Bell, ChevronDown, RefreshCw } from "lucide-react";
 import { EmptyState, PageToolbar, SectionCard } from "../components/ui/layout";
+import { PageHeader, Surface } from "../components/ui/page";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -159,7 +160,13 @@ export default function Subscriptions() {
   }, [subs]);
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack pb-4">
+
+      <PageHeader
+        eyebrow="Recurring"
+        title="Subscriptions"
+        description="See what renews, what it costs and where you can usefully trim back."
+      />
 
       {/* Summary toolbar */}
       <PageToolbar className="justify-between">
@@ -187,19 +194,19 @@ export default function Subscriptions() {
 
       {/* Mini stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-xl border border-border bg-secondary/20 p-3 text-center">
+        <div className="surface p-3 text-center">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Active</p>
           <p className="text-lg font-semibold mt-0.5">{subs.filter((s) => s.active).length}</p>
         </div>
-        <div className="rounded-xl border border-border bg-secondary/20 p-3 text-center">
+        <div className="surface p-3 text-center">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Monthly</p>
           <p className="text-lg font-semibold mt-0.5 tabular-nums">£{monthlyTotal.toFixed(2)}</p>
         </div>
-        <div className="rounded-xl border border-border bg-secondary/20 p-3 text-center">
+        <div className="surface p-3 text-center">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Annual</p>
           <p className="text-lg font-semibold mt-0.5 tabular-nums">£{annualTotal.toLocaleString()}</p>
         </div>
-        <div className="rounded-xl border border-border bg-secondary/20 p-3 text-center">
+        <div className="surface p-3 text-center">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Paused</p>
           <p className="text-lg font-semibold mt-0.5">{subs.filter((s) => !s.active).length}</p>
         </div>
@@ -207,7 +214,7 @@ export default function Subscriptions() {
 
       {/* Category breakdown */}
       {categoryBreakdown.length > 0 && (
-        <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl p-5">
+        <Surface className="p-5">
           <p className="text-xs font-medium text-muted-foreground mb-2">Spending by category (active)</p>
           <div className="space-y-1.5">
             {categoryBreakdown.map(([cat, amt]) => {
@@ -224,7 +231,7 @@ export default function Subscriptions() {
               );
             })}
           </div>
-        </div>
+        </Surface>
       )}
 
       <SectionCard eyebrow="Managed" title={`${subs.length} subscription${subs.length !== 1 ? "s" : ""}`}>

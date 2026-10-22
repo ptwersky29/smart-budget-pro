@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { CommandDialog, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty, CommandSeparator } from "./ui/command";
-import { 
-  LayoutDashboard, Receipt, PiggyBank, Building2, TrendingUp, Star,
-  Landmark, FileText, Settings, RefreshCcw, Plus, Search, Zap
+import {
+  LayoutDashboard, Receipt, PiggyBank, TrendingUp, Star,
+  Landmark, FileText, Settings, RefreshCcw, Plus, Search, Sparkles,
+  MoreHorizontal, MessageSquare, Plug2, Upload,
 } from "lucide-react";
 
 const COMMAND_GROUPS = [
@@ -14,12 +15,16 @@ const COMMAND_GROUPS = [
       { key: "nav-dashboard", label: "Dashboard", icon: LayoutDashboard, to: "/dashboard" },
       { key: "nav-transactions", label: "Transactions", icon: Receipt, to: "/transactions" },
       { key: "nav-budgets", label: "Budgets", icon: PiggyBank, to: "/budgets" },
+      { key: "nav-accounts", label: "Accounts & Import", icon: Upload, to: "/accounts" },
       { key: "nav-reports", label: "Reports", icon: FileText, to: "/reports" },
       { key: "nav-subscriptions", label: "Subscriptions", icon: RefreshCcw, to: "/subscriptions" },
-      { key: "nav-import", label: "Accounts & Import", icon: Building2, to: "/accounts" },
+      { key: "nav-statements", label: "Statements", icon: FileText, to: "/statements" },
       { key: "nav-investments", label: "Investments", icon: TrendingUp, to: "/investments" },
       { key: "nav-jewish", label: "Jewish Tools", icon: Star, to: "/jewish" },
       { key: "nav-uk", label: "UK Benefits", icon: Landmark, to: "/uk-tools" },
+      { key: "nav-connections", label: "Bank Connections", icon: Plug2, to: "/connections" },
+      { key: "nav-sms", label: "SMS Import", icon: MessageSquare, to: "/sms" },
+      { key: "nav-more", label: "More Tools", icon: MoreHorizontal, to: "/more" },
       { key: "nav-settings", label: "Settings", icon: Settings, to: "/settings" },
     ]
   },
@@ -29,6 +34,7 @@ const COMMAND_GROUPS = [
     items: [
       { key: "action-new-tx", label: "New transaction", icon: Plus, action: "new-transaction" },
       { key: "action-search-tx", label: "Search transactions", icon: Search, action: "search-transactions" },
+      { key: "action-ai", label: "Ask Penni AI", icon: Sparkles, action: "open-assistant" },
     ]
   },
 ];
@@ -60,7 +66,6 @@ export default function CommandPalette({ open, onOpenChange }) {
     if (item.to) {
       navigate(item.to);
     } else if (item.action) {
-      // Dispatch custom actions (could emit events or call callbacks)
       window.dispatchEvent(new CustomEvent("command-action", { detail: { action: item.action } }));
     }
     onOpenChange(false);
@@ -70,7 +75,7 @@ export default function CommandPalette({ open, onOpenChange }) {
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
       <CommandInput
-        placeholder="Search navigation, commands... (Cmd+K)"
+        placeholder="Search pages, settings or actions..."
         value={search}
         onValueChange={setSearch}
         autoFocus

@@ -27,7 +27,7 @@ test.describe("100k-user route and flow readiness", () => {
     await authenticate(page);
     await page.goto("/dashboard");
     await expect(page.getByTestId("dashboard-root")).toBeVisible();
-    await page.getByTestId("nav-accounts-&-import").click();
+    await page.getByTestId("nav-accounts").click();
     await expect(page).toHaveURL(/\/accounts/);
     await page.getByTestId("nav-transactions").click();
     await expect(page).toHaveURL(/\/transactions/);
@@ -46,7 +46,7 @@ test.describe("100k-user route and flow readiness", () => {
     await authenticate(page);
     await page.goto("/dashboard");
     await page.getByTestId("command-open").click();
-    await expect(page.getByPlaceholder(/search navigation/i)).toBeVisible();
+    await expect(page.getByPlaceholder(/search pages/i)).toBeVisible();
     await page.keyboard.press("Escape");
     for (const path of ["/transactions", "/budgets", "/reports", "/accounts", "/settings", "/dashboard"]) {
       await page.goto(path);
@@ -66,11 +66,14 @@ test.describe("100k-user route and flow readiness", () => {
     await authenticate(page);
     await installApiMocks(page, { latency: 150 });
     await page.goto("/dashboard");
-    await page.getByRole("tab", { name: /accounts/i }).click();
+    const mobileNav = page.getByRole("navigation", { name: /main navigation/i });
+    await mobileNav.getByRole("link", { name: /accounts/i }).click();
     await expect(page).toHaveURL(/\/accounts/);
-    await page.getByRole("tab", { name: /transactions/i }).click();
+    await mobileNav.getByRole("link", { name: /transactions/i }).click();
     await expect(page).toHaveURL(/\/transactions/);
-    await page.getByRole("tab", { name: /budgets/i }).click();
-    await expect(page).toHaveURL(/\/budgets/);
+    await expect(page.getByTestId("transactions-root")).toBeVisible();
+    await mobileNav.getByRole("link", { name: /more/i }).click();
+    await expect(page).toHaveURL(/\/more/);
+    await expect(page.getByTestId("more-root")).toBeVisible();
   });
 });

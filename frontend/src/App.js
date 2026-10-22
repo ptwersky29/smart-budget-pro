@@ -2,8 +2,10 @@ import React, { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import "./App.css";
 import { AuthProvider } from "./contexts/AuthContext";
+import { AssistantProvider } from "./contexts/AssistantContext";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { CategoriesProvider } from "./contexts/CategoriesContext";
+import AssistantPanel from "./components/assistant/AssistantPanel";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "next-themes";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -37,6 +39,7 @@ const Statements = lazy(() => import("./pages/Statements"));
 const AccountPage = lazy(() => import("./pages/AccountPage"));
 const AccountsPage = lazy(() => import("./pages/AccountsPage"));
 const AccountDetailPage = lazy(() => import("./pages/AccountDetailPage"));
+const MorePage = lazy(() => import("./pages/MorePage"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
 const OnboardingWizard = lazy(() => import("./pages/OnboardingWizard"));
@@ -85,6 +88,7 @@ function AppRouter() {
         }
       >
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/more" element={<MorePage />} />
         <Route path="/transactions" element={<Transactions />} />
         <Route path="/budgets" element={<BudgetPage />} />
         <Route path="/subscriptions" element={<Subscriptions />} />
@@ -114,17 +118,20 @@ export default function App() {
     <BrowserRouter>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <AuthProvider>
-          <SettingsProvider>
-            <CategoriesProvider>
-              <ErrorBoundary>
-                <Suspense fallback={<PageLoader />}>
-                  <AppRouter />
-                </Suspense>
-                <ConsentBanner />
-                <Toaster richColors position="top-right" />
-              </ErrorBoundary>
-            </CategoriesProvider>
-          </SettingsProvider>
+          <AssistantProvider>
+            <SettingsProvider>
+              <CategoriesProvider>
+                <ErrorBoundary>
+                  <Suspense fallback={<PageLoader />}>
+                    <AppRouter />
+                  </Suspense>
+                  <AssistantPanel />
+                  <ConsentBanner />
+                  <Toaster richColors position="top-right" />
+                </ErrorBoundary>
+              </CategoriesProvider>
+            </SettingsProvider>
+          </AssistantProvider>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>

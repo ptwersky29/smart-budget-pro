@@ -30,10 +30,10 @@ const steps = [
     placement: "top",
   },
   {
-    selector: "[data-tour='quick-add']",
-    title: "Save faster",
-    body: "Add a transaction from anywhere, classify it, and keep moving. Your tour progress is saved automatically too.",
-    placement: "left",
+    selector: "[data-tour='assistant-launch'], [data-tour='assistant-launch-mobile']",
+    title: "Ask Penni",
+    body: "Open your private finance assistant for help with spending, budgets and unusual transactions. Financial context is only shared when you allow it.",
+    placement: "bottom",
   },
 ];
 

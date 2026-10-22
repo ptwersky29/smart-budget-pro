@@ -13,6 +13,7 @@ import { api } from "../lib/api";
 import { toast } from "sonner";
 import { withUndo } from "../lib/undo";
 import { Button } from "../components/ui/button";
+import { PageHeader } from "../components/ui/page";
 import { Input } from "../components/ui/input";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import CategoryCombobox from "../components/CategoryCombobox";
@@ -746,10 +747,16 @@ export default React.memo(function BudgetPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="page-stack pb-4">
+
+      <PageHeader
+        eyebrow="Planning"
+        title="Budgets"
+        description="Set simple limits, follow your pace and keep everyday spending easy to understand."
+      />
 
       {/* Budget summary */}
-      <div className="glass-panel rounded-[1.5rem] p-4 sm:p-5">
+      <div className="surface p-4 sm:p-5">
         <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
           {/* Large progress ring with subtle shadow */}
           <div className="relative shrink-0 drop-shadow-[0_0_8px_rgba(48,164,108,0.4)]">
@@ -843,22 +850,22 @@ export default React.memo(function BudgetPage() {
 
       {/* Quick stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 relative z-10 fade-up">
-        <div className="rounded-xl border border-border bg-card/95 backdrop-blur-xl p-4 sm:p-5 shadow-card ring-1 ring-white/40 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300">
+        <div className="surface surface-hover p-4 sm:p-5">
           <div className="mx-auto mb-2 grid h-9 w-9 place-items-center rounded-xl bg-emerald/10 text-emerald"><Wallet className="h-4 w-4" /></div>
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Budgets</p>
           <p className="text-2xl sm:text-3xl font-bold tracking-tight tabular-nums">{summary.count}</p>
         </div>
-        <div className="rounded-xl border border-border bg-card/95 backdrop-blur-xl p-4 sm:p-5 shadow-card ring-1 ring-white/40 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300">
+        <div className="surface surface-hover p-4 sm:p-5">
           <div className="mx-auto mb-2 grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary"><Target className="h-4 w-4" /></div>
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Budgeted</p>
           <p className="text-2xl sm:text-3xl font-bold tracking-tight tabular-nums">£{summary.totalPlanned.toLocaleString()}</p>
         </div>
-        <div className="rounded-xl border border-border bg-card/95 backdrop-blur-xl p-4 sm:p-5 shadow-card ring-1 ring-white/40 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300">
+        <div className="surface surface-hover p-4 sm:p-5">
           <div className="mx-auto mb-2 grid h-9 w-9 place-items-center rounded-xl bg-ruby/10 text-ruby"><TrendingDown className="h-4 w-4" /></div>
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Spent</p>
           <p className={`text-2xl sm:text-3xl font-bold tracking-tight tabular-nums ${summary.overCount > 0 ? "text-ruby" : "text-emerald"}`}>£{summary.totalSpent.toLocaleString()}</p>
         </div>
-        <div className={`rounded-xl border border-border bg-card/95 backdrop-blur-xl p-4 sm:p-5 shadow-card ring-1 ring-white/40 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300 ${summary.totalRemaining < 0 ? "border-ruby/30" : ""}`}>
+        <div className={`surface surface-hover p-4 sm:p-5 ${summary.totalRemaining < 0 ? "border-ruby/30" : ""}`}>
           <div className={`mx-auto mb-2 grid h-9 w-9 place-items-center rounded-xl ${summary.totalRemaining < 0 ? "bg-ruby/10 text-ruby" : "bg-emerald/10 text-emerald"}`}><PiggyBank className="h-4 w-4" /></div>
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Remaining</p>
           <p className={`text-2xl sm:text-3xl font-bold tracking-tight tabular-nums ${summary.totalRemaining < 0 ? "text-ruby" : "text-emerald"}`}>£{Math.abs(summary.totalRemaining).toLocaleString()}</p>

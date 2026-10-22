@@ -4,6 +4,7 @@ import { Calendar, Sunrise, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import MaaserPanel from "../components/MaaserPanel";
 import Skeleton from "../components/ui/Skeleton";
+import { PageHeader } from "../components/ui/page";
 import YearEndJewishReport from "../components/YearEndJewishReport";
 
 const CITIES = ["london","manchester","gateshead","leeds","jerusalem","tel-aviv","new-york","monsey","lakewood","stamford-hill"];
@@ -28,15 +29,19 @@ export default function Jewish() {
         api.get("/jewish/hebcal/upcoming-holidays"),
       ]);
       setHebDate(today.data);
-      setZmanim(zm.data);
-      setUpcomingHols(up.data.upcoming || []);
+      setZmanim({
+        ...zm.data,
+        times: Array.isArray(zm.data?.times) ? zm.data.times : [],
+      });
+      setUpcomingHols(Array.isArray(up.data?.upcoming) ? up.data.upcoming : []);
     } catch (err) { toast.error("Could not load Hebrew calendar data"); }
   }, [city]);
 
   useEffect(() => { loadHebcal(); }, [loadHebcal]);
 
   return (
-    <div className="space-y-8" data-testid="jewish-root">
+    <div className="page-stack pb-4" data-testid="jewish-root">
+      <PageHeader eyebrow="Calendar" title="Jewish calendar" description="Zmanim, holidays and giving, kept alongside the rest of your money." />
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="rounded-2xl border border-border bg-card p-6">
           <div className="flex items-center gap-2 mb-3"><Calendar className="h-4 w-4 text-topaz" /><p className="label-overline">Today's Hebrew date</p></div>
@@ -68,7 +73,7 @@ export default function Jewish() {
           </div>
           {zmanim ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 text-sm">
-              {zmanim.times.map((t) => (
+              {(zmanim.times || []).map((t) => (
                 <div key={t.key} className="flex justify-between border-b border-border/60 py-1.5">
                   <span className="text-muted-foreground">{t.label}</span>
                   <span className="font-mono font-medium">{t.time}</span>

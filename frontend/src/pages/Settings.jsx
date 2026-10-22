@@ -8,6 +8,7 @@ import AutomationSettings from "../components/settings/AutomationSettings";
 import NotificationSettings from "../components/settings/NotificationSettings";
 import AccessibilitySettings from "../components/settings/AccessibilitySettings";
 import AccountSettings from "../components/settings/AccountSettings";
+import { PageHeader } from "../components/ui/page";
 
 const CategoryManager = lazy(() => import("./CategoryManager"));
 
@@ -23,7 +24,8 @@ export default function Settings() {
   };
 
   return (
-    <div className="space-y-6" data-testid="settings-root">
+    <div className="page-stack pb-4" data-testid="settings-root">
+      <PageHeader eyebrow="Preferences" title="Settings" description="Shape Penni around how you like to work, spend and plan." />
       <SettingsLayout active={activeSection} onChange={setSection}>
         {activeSection === "appearance" && <AppearanceSettings />}
         {activeSection === "dashboard" && <DashboardSettings />}
