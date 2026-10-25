@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
@@ -117,16 +118,16 @@ function useMediaQuery(query) {
 
 function TransactionActionPanel({ open, title, description, onClose, children, footer, className = "max-w-md" }) {
   if (!open) return null;
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4"
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label={title}
     >
       <div
-        className={`rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full ${className}`}
+        className={`my-auto rounded-2xl border border-border bg-card shadow-2xl p-6 w-full ${className} animate-[fadeUp_0.2s_ease-out]`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 mb-4">
@@ -146,7 +147,8 @@ function TransactionActionPanel({ open, title, description, onClose, children, f
         {children}
         {footer && <div className="flex flex-col-reverse sm:flex-row gap-3 justify-end pt-4">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

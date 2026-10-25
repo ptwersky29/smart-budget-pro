@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -44,6 +45,15 @@ export default function TransactionForm({
 }) {
   const [showMore, setShowMore] = useState(false);
 
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   if (!open) return null;
 
   const canClassify =
@@ -73,16 +83,16 @@ export default function TransactionForm({
   const topSuggestion = suggestions[0];
   const autoFill = topSuggestion && topSuggestion.confidence >= 0.95;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-3 sm:p-5"
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label={editingId ? "Edit transaction" : "New transaction"}
     >
       <div
-        className="rounded-2xl border border-border bg-card shadow-2xl w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden animate-[fadeUp_0.2s_ease-out]"
+        className="my-auto rounded-2xl border border-border bg-card shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-[fadeUp_0.2s_ease-out]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -611,6 +621,7 @@ export default function TransactionForm({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

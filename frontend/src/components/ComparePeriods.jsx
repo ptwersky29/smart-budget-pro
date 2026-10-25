@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { api, formatApiError } from "../lib/api";
 import {
   BarChart3,
@@ -258,21 +259,30 @@ export default function ComparePeriods({ open, onClose }) {
     return max;
   }, [result?.category_breakdown]);
 
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   if (!open) return null;
 
   const spendDiff = result ? result.period_a.spend - result.period_b.spend : 0;
   const incomeDiff = result ? result.period_a.income - result.period_b.income : 0;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-3 sm:p-5"
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label="Compare periods"
     >
       <div
-        className="rounded-2xl border border-border bg-card shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden animate-[fadeUp_0.2s_ease-out]"
+        className="my-auto rounded-2xl border border-border bg-card shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-[fadeUp_0.2s_ease-out]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -710,6 +720,7 @@ export default function ComparePeriods({ open, onClose }) {
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
