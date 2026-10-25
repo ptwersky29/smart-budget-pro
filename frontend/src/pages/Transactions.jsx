@@ -1838,7 +1838,7 @@ const Transactions = React.memo(function Transactions() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 xl:grid xl:grid-cols-[36px_176px_110px_118px_86px_96px_104px_32px_76px] xl:gap-2">
                 {/* Inline search – always visible */}
                 {showSearch || filters.search ? (
                 <div className="relative w-[190px] shrink-0">
@@ -1883,7 +1883,7 @@ const Transactions = React.memo(function Transactions() {
                 <select
                   value={filters.account_id}
                   onChange={(event) => toggleFilter("account_id", event.target.value)}
-                  className={`h-9 shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.account_id ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
+                  className={`h-9 w-[110px] shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.account_id ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
                 >
                   <option value="">All Accounts</option>
                   {accounts.map((account) => <option key={account.account_id} value={account.account_id}>{account.name}</option>)}
@@ -1895,7 +1895,7 @@ const Transactions = React.memo(function Transactions() {
                   onChange={(value) => toggleFilter("category", value)}
                   categories={selectedCats.categories || selectedCats}
                   placeholder="All Categories"
-                  className={`h-9 shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium text-foreground transition ${filters.category ? "border-emerald/30 bg-emerald/5" : "border-border"}`}
+                  className={`!h-9 !w-[118px] shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium text-foreground transition ${filters.category ? "border-emerald/30 bg-emerald/5" : "border-border"}`}
                   allowClear
                   onCategoryCreated={loadCats}
                 />
@@ -1904,7 +1904,7 @@ const Transactions = React.memo(function Transactions() {
                 <select
                   value={filters.tx_type}
                   onChange={(event) => { toggleFilter("tx_type", event.target.value); setLedgerTab(event.target.value === "expense" ? "expenses" : event.target.value === "income" ? "income" : event.target.value === "transfer" ? "transfers" : "all"); }}
-                  className={`h-9 shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.tx_type ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
+                  className={`h-9 w-[86px] shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.tx_type ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
                 >
                   <option value="">All Types</option>
                   <option value="income">Income</option>
@@ -1916,7 +1916,7 @@ const Transactions = React.memo(function Transactions() {
                 <select
                   value={filters.approval_status}
                   onChange={(event) => { toggleFilter("approval_status", event.target.value); setLedgerTab(event.target.value === "unapproved" ? "unapproved" : "all"); }}
-                  className={`h-9 shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.approval_status ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
+                  className={`h-9 w-[96px] shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.approval_status ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
                 >
                   <option value="">All Statuses</option>
                   <option value="approved">Approved</option>
@@ -1930,7 +1930,7 @@ const Transactions = React.memo(function Transactions() {
                     value={filters.merchant}
                     onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, merchant: event.target.value })); }}
                     placeholder="All Merchants"
-                    className={`h-9 w-[110px] rounded-[9px] border bg-card px-2.5 pr-7 text-[11px] outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.merchant ? "border-emerald/30 bg-emerald/5" : "border-border"}`}
+                    className={`h-9 w-[104px] rounded-[9px] border bg-card px-2.5 pr-7 text-[11px] outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.merchant ? "border-emerald/30 bg-emerald/5" : "border-border"}`}
                   />
                   {filters.merchant ? (
                     <button onClick={() => { setOffset(0); setFilters((previous) => ({ ...previous, merchant: "" })); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="Clear merchant">
@@ -2035,7 +2035,7 @@ const Transactions = React.memo(function Transactions() {
                     </div>
                   </SheetContent>
                 </Sheet>
-                <button onClick={clearAllFilters} className="ml-1.5 h-9 w-[87px] shrink-0 rounded-[9px] border border-border bg-card px-3 text-[11px] font-medium text-muted-foreground transition hover:text-foreground">
+                <button onClick={clearAllFilters} className="h-9 w-[76px] shrink-0 rounded-[9px] border border-border bg-card px-3 text-[11px] font-medium text-muted-foreground transition hover:text-foreground">
                   Reset
                 </button>
               </div>
