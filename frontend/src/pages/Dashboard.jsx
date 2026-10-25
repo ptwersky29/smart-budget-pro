@@ -311,7 +311,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="page-stack" data-testid="dashboard-root">
+    <div className="page-stack dashboard-reference" data-testid="dashboard-root">
       {header}
 
       {topAlerts.length > 0 ? (
@@ -382,7 +382,7 @@ export default function Dashboard() {
         ) : null}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,0.85fr)]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_288px]">
         <div className="space-y-4">
           <Surface className="overflow-hidden">
             <SurfaceHeader
@@ -483,36 +483,37 @@ export default function Dashboard() {
 
         <div className="space-y-4">
           {showWidget("ai_insights") ? (
-            <div className="relative overflow-hidden rounded-[1.25rem] bg-[#123c30] p-5 text-white shadow-[0_24px_50px_-34px_rgba(10,42,32,0.9)]">
-              <div className="absolute -right-10 -top-12 h-36 w-36 rounded-full bg-white/10 blur-2xl" />
+            <div className="surface relative overflow-hidden rounded-[1.25rem] p-4 shadow-[0_20px_42px_-30px_hsl(var(--foreground)/0.3)]">
+              <div className="absolute -right-10 -top-12 h-36 w-36 rounded-full bg-sky/10 blur-2xl" />
               <div className="relative">
                 <div className="flex items-center justify-between">
-                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-white/12 ring-1 ring-white/15">
-                    <Sparkles className="h-[18px] w-[18px] text-[#f3c970]" />
+                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet via-sky to-emerald text-white shadow-[0_6px_14px_hsl(var(--sky)/0.25)]">
+                    <Sparkles className="h-[18px] w-[18px]" />
                   </span>
-                  <span className="rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/70">
-                    Penni AI
+                  <span className="rounded-full bg-secondary px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                    AI assistant
                   </span>
                 </div>
-                <h2 className="mt-4 text-[17px] font-semibold leading-tight tracking-[-0.03em]">
-                  {topAlerts.length ? "A few things deserve a closer look." : "Your money, made clearer."}
+                <h2 className="mt-4 text-[15px] font-semibold leading-tight tracking-[-0.03em]">
+                  {topAlerts.length ? "A few things deserve a closer look." : `Good ${greetingForNow().replace("Good ", "").toLowerCase()}!`}
                 </h2>
-                <p className="mt-1.5 text-[11.5px] leading-relaxed text-white/65">
+                <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
                   Ask about spending patterns, budgets or anything that looks unusual. You choose whether your financial data is shared.
                 </p>
                 <div className="mt-4 space-y-1.5">
-                  {["Analyse my spending this month", "Help me improve my budget"].map((prompt) => (
+                  {["Analyse my spending", "Create a budget", "Find unusual transactions", "Show this month's summary"].map((prompt) => (
                     <button
                       key={prompt}
                       type="button"
                       onClick={() => openAssistant({ prompt })}
-                      className="flex w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-left text-[11px] text-white/85 transition hover:bg-white/[0.1]"
+                      className="flex w-full items-center justify-between gap-2 rounded-xl border border-border/70 bg-card px-3 py-2.5 text-left text-[10.5px] transition hover:border-emerald/25 hover:bg-emerald/[0.04]"
                     >
                       <span>{prompt}</span>
-                      <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-white/45" />
+                      <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-emerald" />
                     </button>
                   ))}
                 </div>
+                <button type="button" onClick={() => openAssistant()} className="mt-3 flex w-full items-center justify-between rounded-xl border border-border bg-background px-3 py-2 text-left text-[10.5px] text-muted-foreground transition focus-within:border-emerald/40 hover:border-emerald/30"><span>Ask anything...</span><span className="grid h-6 w-6 place-items-center rounded-full bg-emerald text-white"><ArrowUpRight className="h-3 w-3" /></span></button>
               </div>
             </div>
           ) : null}
