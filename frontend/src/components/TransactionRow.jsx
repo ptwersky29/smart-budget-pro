@@ -71,6 +71,7 @@ const TransactionRow = React.memo(
       : "—";
     const description = t.description || t.merchant || "Transaction";
     const subtitle = t.merchant || t.normalized_merchant || t.source_label;
+    const displaySubtitle = subtitle && subtitle.trim().toLowerCase() !== description.trim().toLowerCase() ? subtitle : null;
 
     const copyDescription = useCallback(() => {
       navigator.clipboard.writeText(t.description || "");
@@ -132,8 +133,8 @@ const TransactionRow = React.memo(
                 </span>
                 <div className="min-w-0">
                   <div className="truncate text-[12px] font-medium leading-tight">{description}</div>
-                  {subtitle ? (
-                    <div className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground">{subtitle}</div>
+                  {displaySubtitle ? (
+                    <div className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground">{displaySubtitle}</div>
                   ) : null}
                 </div>
               </div>

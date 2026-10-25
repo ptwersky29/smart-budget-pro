@@ -567,7 +567,7 @@ const Transactions = React.memo(function Transactions() {
   const [newCategoryModal, setNewCategoryModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [inspectTx, setInspectTx] = useState(null);
-  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const openInspector = useCallback((transaction) => {
     setInspectTx(transaction);
     setInspectorOpen(true);
@@ -989,6 +989,8 @@ const Transactions = React.memo(function Transactions() {
     if (filters.date_to) chips.push({ key: "date_to", label: `To ${filters.date_to}` });
     return chips;
   }, [accounts, filters]);
+
+  const hasRefinements = activeFilters.some(({ key }) => key !== "date_from" && key !== "date_to");
 
   const selectLedgerTab = useCallback((tab) => {
     setLedgerTab(tab);
@@ -1745,7 +1747,7 @@ const Transactions = React.memo(function Transactions() {
             <>
               <div className="grid gap-[16px] px-0 sm:grid-cols-3 xl:px-[14px] 2xl:grid-cols-[276px_276px_minmax(0,1fr)]">
                 <div className="surface rounded-[16px] p-3.5">
-                  <div className="grid grid-cols-[38px_minmax(0,1fr)_90px] items-center gap-3">
+                  <div className="grid grid-cols-[38px_minmax(0,1fr)] items-center gap-3 2xl:grid-cols-[38px_minmax(0,1fr)_90px]">
                     <span className="grid h-[38px] w-[38px] place-items-center rounded-full bg-emerald/10 text-emerald">
                       <TrendingUp className="h-[18px] w-[18px]" />
                     </span>
@@ -1758,11 +1760,11 @@ const Transactions = React.memo(function Transactions() {
                         </p>
                       ) : null}
                     </div>
-                    <Sparkline values={sparklines.income} height={38} stroke="hsl(var(--emerald))" />
+                    <div className="hidden 2xl:block"><Sparkline values={sparklines.income} height={38} stroke="hsl(var(--emerald))" /></div>
                   </div>
                 </div>
                 <div className="surface rounded-[16px] p-3.5">
-                  <div className="grid grid-cols-[38px_minmax(0,1fr)_90px] items-center gap-3">
+                  <div className="grid grid-cols-[38px_minmax(0,1fr)] items-center gap-3 2xl:grid-cols-[38px_minmax(0,1fr)_90px]">
                     <span className="grid h-[38px] w-[38px] place-items-center rounded-full bg-ruby/10 text-ruby">
                       <TrendingDown className="h-[18px] w-[18px]" />
                     </span>
@@ -1775,11 +1777,11 @@ const Transactions = React.memo(function Transactions() {
                         </p>
                       ) : null}
                     </div>
-                    <Sparkline values={sparklines.expenses} height={38} stroke="hsl(var(--ruby))" />
+                    <div className="hidden 2xl:block"><Sparkline values={sparklines.expenses} height={38} stroke="hsl(var(--ruby))" /></div>
                   </div>
                 </div>
                 <div className="surface rounded-[16px] p-3.5">
-                  <div className="grid grid-cols-[38px_minmax(0,1fr)_90px] items-center gap-3">
+                  <div className="grid grid-cols-[38px_minmax(0,1fr)] items-center gap-3 2xl:grid-cols-[38px_minmax(0,1fr)_90px]">
                     <span className="grid h-[38px] w-[38px] place-items-center rounded-full bg-secondary text-muted-foreground">
                       <Calculator className="h-[18px] w-[18px]" />
                     </span>
@@ -1790,7 +1792,7 @@ const Transactions = React.memo(function Transactions() {
                       </p>
                       <p className="mt-1.5 text-[10px] text-muted-foreground">{monthLabel}</p>
                     </div>
-                    <Sparkline values={sparklines.net} height={38} stroke={monthTotals.net >= 0 ? "hsl(var(--emerald))" : "hsl(var(--ruby))"} />
+                    <div className="hidden 2xl:block"><Sparkline values={sparklines.net} height={38} stroke={monthTotals.net >= 0 ? "hsl(var(--emerald))" : "hsl(var(--ruby))"} /></div>
                   </div>
                 </div>
               </div>
@@ -1799,14 +1801,14 @@ const Transactions = React.memo(function Transactions() {
                 <button
                   type="button"
                   onClick={() => setShowSearch((visible) => !visible)}
-                  className={`mr-2 grid h-9 w-10 shrink-0 place-items-center rounded-[9px] border transition ${
+                  className={`mr-1 inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-[9px] border px-2.5 text-[11px] font-medium transition ${
                     showSearch || filters.search
                       ? "border-emerald/30 bg-emerald/10 text-emerald"
                       : "border-border bg-card text-muted-foreground hover:text-foreground"
                   }`}
                   aria-label="Search transactions"
                 >
-                  <Search className="h-3.5 w-3.5" />
+                  <Search className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Search</span>
                 </button>
                 {showSearch ? (
                   <div className="relative w-full sm:w-48">
@@ -1840,7 +1842,7 @@ const Transactions = React.memo(function Transactions() {
                     <DropdownMenuItem onClick={() => { setMonth(fmtMonth(new Date().getFullYear(), "01")); setFilters((previous) => ({ ...previous, date_from: `${new Date().getFullYear()}-01-01`, date_to: `${new Date().getFullYear()}-12-31` })); }}>This year</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <select value={filters.account_id} onChange={(event) => toggleFilter("account_id", event.target.value)} className="h-9 w-[105px] shrink-0 rounded-[9px] border border-border bg-card px-2 text-[11px] font-medium outline-none focus:border-emerald/40">
+                <select value={filters.account_id} onChange={(event) => toggleFilter("account_id", event.target.value)} className="hidden h-9 w-[105px] shrink-0 rounded-[9px] border border-border bg-card px-2 text-[11px] font-medium outline-none focus:border-emerald/40 min-[1700px]:block">
                   <option value="">All Accounts</option>
                   {accounts.map((account) => <option key={account.account_id} value={account.account_id}>{account.name}</option>)}
                 </select>
@@ -1849,17 +1851,17 @@ const Transactions = React.memo(function Transactions() {
                   onChange={(value) => toggleFilter("category", value)}
                   categories={selectedCats.categories || selectedCats}
                   placeholder="All Categories"
-                  className="h-9 w-[112px] shrink-0 rounded-[9px] border border-border bg-card px-2 text-[11px] font-medium text-foreground"
+                  className="hidden h-9 w-[112px] shrink-0 rounded-[9px] border border-border bg-card px-2 text-[11px] font-medium text-foreground min-[1700px]:block"
                   allowClear
                   onCategoryCreated={loadCats}
                 />
-                <select value={filters.tx_type} onChange={(event) => { toggleFilter("tx_type", event.target.value); setLedgerTab(event.target.value === "expense" ? "expenses" : event.target.value === "income" ? "income" : event.target.value === "transfer" ? "transfers" : "all"); }} className="h-9 w-[86px] shrink-0 rounded-[9px] border border-border bg-card px-2 text-[11px] font-medium outline-none focus:border-emerald/40">
+                <select value={filters.tx_type} onChange={(event) => { toggleFilter("tx_type", event.target.value); setLedgerTab(event.target.value === "expense" ? "expenses" : event.target.value === "income" ? "income" : event.target.value === "transfer" ? "transfers" : "all"); }} className="hidden h-9 w-[86px] shrink-0 rounded-[9px] border border-border bg-card px-2 text-[11px] font-medium outline-none focus:border-emerald/40 min-[1700px]:block">
                   <option value="">All Types</option>
                   <option value="income">Income</option>
                   <option value="expense">Expense</option>
                   <option value="transfer">Transfer</option>
                 </select>
-                <select value={filters.approval_status} onChange={(event) => { toggleFilter("approval_status", event.target.value); setLedgerTab(event.target.value === "unapproved" ? "unapproved" : "all"); }} className="h-9 w-[101px] shrink-0 rounded-[9px] border border-border bg-card px-2 text-[11px] font-medium outline-none focus:border-emerald/40">
+                <select value={filters.approval_status} onChange={(event) => { toggleFilter("approval_status", event.target.value); setLedgerTab(event.target.value === "unapproved" ? "unapproved" : "all"); }} className="hidden h-9 w-[101px] shrink-0 rounded-[9px] border border-border bg-card px-2 text-[11px] font-medium outline-none focus:border-emerald/40 min-[1700px]:block">
                   <option value="">All Statuses</option>
                   <option value="approved">Approved</option>
                   <option value="unapproved">Unapproved</option>
@@ -1869,12 +1871,12 @@ const Transactions = React.memo(function Transactions() {
                   value={filters.merchant}
                   onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, merchant: event.target.value })); }}
                   placeholder="All Merchants"
-                  className="h-9 w-[100px] shrink-0 rounded-[9px] border border-border bg-card px-2 text-[11px] outline-none transition focus:border-emerald/40"
+                  className="hidden h-9 w-[100px] shrink-0 rounded-[9px] border border-border bg-card px-2 text-[11px] outline-none transition focus:border-emerald/40 min-[1700px]:block"
                 />
                 <Sheet>
                   <SheetTrigger asChild>
                     <button className={`grid h-9 w-8 shrink-0 place-items-center rounded-[9px] border transition ${
-                      activeFilters.length > 0
+                      hasRefinements
                         ? "border-emerald/30 bg-emerald/10 text-emerald"
                         : "border-border bg-card text-muted-foreground hover:text-foreground"
                     }`} aria-label="Filters">
@@ -1896,6 +1898,37 @@ const Transactions = React.memo(function Transactions() {
                         <button onClick={() => setFilter("order", filters.order === "desc" ? "asc" : "desc")} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-transparent bg-secondary/50 transition-colors hover:bg-secondary/80" aria-label="Toggle sort order">
                           {filters.order === "desc" ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronUp className="h-4 w-4 text-muted-foreground" />}
                         </button>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground">Narrow results</p>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
+                          <select value={filters.account_id} onChange={(event) => toggleFilter("account_id", event.target.value)} className="h-10 rounded-xl border border-transparent bg-secondary/50 px-3 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30">
+                            <option value="">All accounts</option>
+                            {accounts.map((account) => <option key={account.account_id} value={account.account_id}>{account.name}</option>)}
+                          </select>
+                          <select value={filters.tx_type} onChange={(event) => { toggleFilter("tx_type", event.target.value); setLedgerTab(event.target.value === "expense" ? "expenses" : event.target.value === "income" ? "income" : event.target.value === "transfer" ? "transfers" : "all"); }} className="h-10 rounded-xl border border-transparent bg-secondary/50 px-3 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30">
+                            <option value="">All types</option>
+                            <option value="income">Income</option>
+                            <option value="expense">Expense</option>
+                            <option value="transfer">Transfer</option>
+                          </select>
+                          <select value={filters.approval_status} onChange={(event) => { toggleFilter("approval_status", event.target.value); setLedgerTab(event.target.value === "unapproved" ? "unapproved" : "all"); }} className="h-10 rounded-xl border border-transparent bg-secondary/50 px-3 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30">
+                            <option value="">All statuses</option>
+                            <option value="approved">Approved</option>
+                            <option value="unapproved">Unapproved</option>
+                            <option value="failed">Failed</option>
+                          </select>
+                          <Input value={filters.merchant} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, merchant: event.target.value })); }} placeholder="Merchant" className="h-10 text-sm" />
+                        </div>
+                        <CategoryCombobox
+                          value={filters.category}
+                          onChange={(value) => toggleFilter("category", value)}
+                          categories={selectedCats.categories || selectedCats}
+                          placeholder="All categories"
+                          className="h-10 w-full rounded-xl border border-transparent bg-secondary/50 px-3 text-sm text-foreground"
+                          allowClear
+                          onCategoryCreated={loadCats}
+                        />
                       </div>
                       <div className="grid grid-cols-2 gap-2 sm:gap-3">
                         <select value={filters.source} onChange={(event) => toggleFilter("source", event.target.value)} className="h-10 rounded-xl border border-transparent bg-secondary/50 px-4 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30">
@@ -1923,7 +1956,7 @@ const Transactions = React.memo(function Transactions() {
                           </div>
                         ) : null}
                       </div>
-                      {activeFilters.length > 0 && total > 0 ? (
+                      {hasRefinements && total > 0 ? (
                         <div className="flex items-center justify-between border-t border-border pt-4">
                           <p className="text-xs text-muted-foreground">{total} transaction{total !== 1 ? "s" : ""} match current filters</p>
                           <button onClick={clearAllMatching} className="rounded-full border border-ruby/40 px-3 py-1.5 text-xs text-ruby transition-colors hover:bg-ruby/5">
@@ -1937,9 +1970,9 @@ const Transactions = React.memo(function Transactions() {
                     </div>
                   </SheetContent>
                 </Sheet>
-                <button onClick={clearAllFilters} className="ml-1.5 h-9 w-[87px] shrink-0 rounded-[9px] border border-border bg-card px-3 text-[11px] font-medium text-muted-foreground transition hover:text-foreground">
+                {hasRefinements ? <button onClick={clearAllFilters} className="ml-1.5 h-9 w-[87px] shrink-0 rounded-[9px] border border-border bg-card px-3 text-[11px] font-medium text-muted-foreground transition hover:text-foreground">
                   Reset
-                </button>
+                </button> : null}
               </div>
 
               {activeFilters.filter((chip) => chip.key !== "date_from" && chip.key !== "date_to").length > 0 ? (
@@ -2098,6 +2131,8 @@ const Transactions = React.memo(function Transactions() {
                   {(aiResults?.transactions || txs).map((transaction) => {
                     const account = accountsById[transaction.account_id];
                     const negative = Number(transaction.amount) < 0;
+                    const merchant = transaction.merchant || transaction.normalized_merchant || transaction.source_label;
+                    const showsDistinctMerchant = merchant && merchant.trim().toLowerCase() !== (transaction.description || "").trim().toLowerCase();
                     return (
                       <button
                         key={transaction.transaction_id}
@@ -2107,8 +2142,8 @@ const Transactions = React.memo(function Transactions() {
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <p className="truncate text-[12.5px] font-medium">{transaction.description}</p>
-                            <p className="mt-0.5 truncate text-[10.5px] text-muted-foreground">{transaction.merchant || transaction.normalized_merchant || transaction.source_label}</p>
+                            <p className="truncate text-[12.5px] font-medium">{transaction.description || merchant || "Transaction"}</p>
+                            {showsDistinctMerchant ? <p className="mt-0.5 truncate text-[10.5px] text-muted-foreground">{merchant}</p> : null}
                           </div>
                           <span className={`money-tabular shrink-0 text-[12px] font-semibold ${negative ? "text-ruby" : "text-emerald"}`}>{formatCurrency(transaction.amount, { signed: true })}</span>
                         </div>
