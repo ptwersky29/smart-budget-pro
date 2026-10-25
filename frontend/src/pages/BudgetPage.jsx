@@ -8,6 +8,7 @@ import {
   Car, Utensils, Zap, Gift, Film, Heart, BookOpen,
   Shirt, Gamepad2, Plane, Coffee, Briefcase, Smartphone,
   ArrowUpRight,
+  List, LayoutGrid, Bell, FolderCog, BarChart3,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
@@ -31,6 +32,7 @@ import {
   SheetTitle,
 } from "../components/ui/sheet";
 import TransactionForm from "../components/TransactionForm";
+import CategoryPieChart from "../components/CategoryPieChart";
 
 function fmtMonth(y, m) { return `${y}-${String(m).padStart(2, "0")}`; }
 
@@ -285,6 +287,42 @@ const EventGroupCard = React.memo(({ group, setConfirmDelete, fetchData }) => {
   );
 });
 
+const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
+  monthControl, summary, everyday, atRiskCount, budgetTableRows, budgetView, setBudgetView,
+  categorySpend, recentTransactions, onAdd, onRefresh, onCopyPrevious, openBudgetTransactions,
+  startEdit,
+}) {
+  const statCards = [
+    { label: "Total Budgeted", value: `£${summary.totalPlanned.toFixed(2)}`, note: `${summary.count} categories`, icon: Target, tone: "emerald" },
+    { label: "Total Spent", value: `£${summary.totalSpent.toFixed(2)}`, note: `${summary.totalPlanned ? Math.round((summary.totalSpent / summary.totalPlanned) * 100) : 0}% of budget`, icon: TrendingDown, tone: "ruby", progress: summary.totalPlanned ? (summary.totalSpent / summary.totalPlanned) * 100 : 0 },
+    { label: "Remaining", value: `£${Math.max(0, summary.totalRemaining).toFixed(2)}`, note: `${summary.totalPlanned ? Math.max(0, Math.round((summary.totalRemaining / summary.totalPlanned) * 100)) : 0}% left`, icon: PiggyBank, tone: "emerald", progress: summary.totalPlanned ? (summary.totalRemaining / summary.totalPlanned) * 100 : 0 },
+    { label: "At Risk", value: String(atRiskCount), note: atRiskCount ? `${atRiskCount} categories over 80% spent` : "All budgets on track", icon: AlertCircle, tone: "topaz" },
+  ];
+  const tabs = [
+    { key: "all", label: "All Categories", count: everyday.length },
+    { key: "track", label: "On Track", count: everyday.filter((b) => (Number(b.progress_pct) || 0) < 80).length },
+    { key: "risk", label: "At Risk", count: atRiskCount },
+    { key: "exceeded", label: "Exceeded", count: summary.overCount },
+  ];
+
+  return (
+    <div className="hidden xl:block">
+      <div className="mb-4 flex items-start justify-between gap-6 px-[14px]">
+        <div><h1 className="text-[30px] font-semibold leading-none tracking-[-0.045em]">Budgets</h1><p className="mt-2 text-[13px] text-muted-foreground">Track your spending, set budgets and stay in control.</p></div>
+        <div className="flex items-center gap-2">{monthControl}<button type="button" onClick={onAdd} className="inline-flex h-9 items-center gap-2 rounded-[10px] bg-emerald px-4 text-[12px] font-semibold text-white shadow-[0_6px_16px_hsl(var(--emerald)/0.18)]"><Plus className="h-3.5 w-3.5" /> Add budget</button><DropdownMenu><DropdownMenuTrigger asChild><button className="grid h-9 w-9 place-items-center rounded-[10px] border border-border bg-card text-muted-foreground"><MoreHorizontal className="h-4 w-4" /></button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={onCopyPrevious}><Copy className="mr-2 h-4 w-4" /> Copy previous month</DropdownMenuItem><DropdownMenuItem onClick={onRefresh}><RefreshCw className="mr-2 h-4 w-4" /> Refresh</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
+      </div>
+      <div className="grid grid-cols-4 gap-3 px-[14px]">{statCards.map(({ label, value, note, icon: Icon, tone, progress }) => <div key={label} className="surface rounded-[16px] p-3.5"><div className="flex items-start gap-3"><span className={`grid h-10 w-10 place-items-center rounded-xl ${tone === "ruby" ? "bg-ruby/10 text-ruby" : tone === "topaz" ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}><Icon className="h-[18px] w-[18px]" /></span><div><p className="text-[11px] text-muted-foreground">{label}</p><p className={`money-tabular mt-1 text-[22px] font-semibold leading-none tracking-[-0.03em] ${tone === "topaz" && value !== "0" ? "text-ruby" : ""}`}>{value}</p><p className={`mt-2 text-[10.5px] font-medium ${tone === "ruby" ? "text-emerald" : tone === "topaz" && value !== "0" ? "text-ruby" : "text-muted-foreground"}`}>{note}</p></div></div>{progress !== undefined ? <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary"><div className={`h-full rounded-full ${tone === "ruby" ? "bg-gradient-to-r from-emerald to-topaz" : "bg-emerald/70"}`} style={{ width: `${Math.min(100, progress)}%` }} /></div> : null}</div>)}</div>
+      <div className="mt-4 grid grid-cols-[minmax(0,1fr)_430px] gap-4 px-[14px]">
+        <div className="min-w-0"><div className="mb-3 flex items-center justify-between"><div className="flex items-center gap-2">{tabs.map((tab) => <button key={tab.key} type="button" onClick={() => setBudgetView(tab.key)} className={`inline-flex h-8 items-center gap-2 rounded-full px-3 text-[11px] font-medium ${budgetView === tab.key ? "bg-emerald text-white shadow-[0_5px_12px_hsl(var(--emerald)/0.18)]" : "border border-border bg-card text-muted-foreground"}`}>{tab.label}<span className={`rounded-full px-1.5 py-0.5 text-[10px] ${budgetView === tab.key ? "bg-white/20" : "bg-secondary"}`}>{tab.count}</span></button>)}</div><div className="flex gap-1"><button className="grid h-8 w-8 place-items-center rounded-[9px] bg-emerald/10 text-emerald"><List className="h-3.5 w-3.5" /></button><button className="grid h-8 w-8 place-items-center rounded-[9px] border border-border bg-card text-muted-foreground"><LayoutGrid className="h-3.5 w-3.5" /></button></div></div>
+          <div className="surface overflow-hidden rounded-[16px]"><table className="w-full text-left"><thead><tr className="border-b border-border text-[11px] font-medium text-muted-foreground"><th className="px-4 py-3">Category</th><th className="px-3 py-3 text-right">Spent</th><th className="px-3 py-3 text-right">Budget</th><th className="w-[180px] px-3 py-3">Progress</th><th className="px-3 py-3">Status</th><th className="w-[42px]" /></tr></thead><tbody>{budgetTableRows.map((budget) => { const pct = Number(budget.progress_pct) || 0; const risk = pct >= 80; const over = pct >= 100; const Icon = CATEGORY_ICONS[budget.category.toLowerCase().trim()] || Target; return <tr key={budget.budget_id} onClick={() => openBudgetTransactions(budget)} className="cursor-pointer border-b border-border/70 last:border-0 hover:bg-secondary/30"><td className="px-4 py-2.5"><span className="flex items-center gap-2.5"><span className={`grid h-8 w-8 place-items-center rounded-xl ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}><Icon className="h-4 w-4" /></span><span className="text-[12px] font-medium capitalize">{budget.category}</span></span></td><td className="money-tabular px-3 py-2.5 text-right text-[12px]">£{Number(budget.spent || 0).toFixed(2)}</td><td className="money-tabular px-3 py-2.5 text-right text-[12px] text-muted-foreground">£{Number(budget.limit || 0).toFixed(2)}</td><td className="px-3 py-2.5"><div className="flex items-center gap-2"><div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary"><div className={`h-full rounded-full ${over ? "bg-ruby" : risk ? "bg-gradient-to-r from-topaz to-ruby/70" : "bg-gradient-to-r from-emerald to-sky"}`} style={{ width: `${Math.min(100, pct)}%` }} /></div><span className="w-7 text-right text-[10px] text-muted-foreground">{Math.round(pct)}%</span></div></td><td className="px-3 py-2.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-medium ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}>{over ? "Exceeded" : risk ? "At risk" : "On track"}</span></td><td className="px-3 py-2.5"><button onClick={(event) => { event.stopPropagation(); startEdit(budget); }} className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-secondary"><MoreHorizontal className="h-4 w-4" /></button></td></tr>; })}</tbody></table>{budgetTableRows.length === 0 ? <div className="py-10 text-center text-sm text-muted-foreground">No budgets in this view.</div> : null}</div>
+          <div className="surface mt-4 overflow-hidden rounded-[16px]"><div className="flex items-center justify-between border-b border-border px-4 py-3"><p className="text-[13px] font-semibold">Recent Budget Activity</p><span className="text-[11px] font-medium text-emerald">View all <ArrowUpRight className="inline h-3 w-3" /></span></div><table className="w-full text-left"><thead className="text-[10.5px] text-muted-foreground"><tr><th className="px-4 py-2">Date</th><th className="px-3 py-2">Category</th><th className="px-3 py-2">Description</th><th className="px-4 py-2 text-right">Amount</th></tr></thead><tbody>{recentTransactions.map((tx) => <tr key={tx.transaction_id} className="border-t border-border/60 text-[11px]"><td className="px-4 py-2 text-muted-foreground">{tx.date ? format(new Date(tx.date), "d MMM yyyy") : "—"}</td><td className="px-3 py-2 capitalize">{tx.category || "Uncategorised"}</td><td className="max-w-[240px] truncate px-3 py-2">{tx.description || tx.merchant || "Transaction"}</td><td className={`money-tabular px-4 py-2 text-right font-medium ${Number(tx.amount) < 0 ? "text-ruby" : "text-emerald"}`}>{Number(tx.amount) < 0 ? "-" : "+"}£{Math.abs(Number(tx.amount) || 0).toFixed(2)}</td></tr>)}</tbody></table></div>
+        </div>
+        <aside className="space-y-4"><div className="surface rounded-[16px] p-4"><div className="flex items-center justify-between"><h2 className="text-[15px] font-semibold">Spending by Category</h2><span className="rounded-lg bg-secondary px-2.5 py-1 text-[10px] text-muted-foreground">This Month</span></div>{categorySpend.length ? <CategoryPieChart data={categorySpend.slice(0, 7)} /> : <div className="py-16 text-center text-sm text-muted-foreground">No category spending this month.</div>}</div><div className="surface rounded-[16px] p-4"><div className="flex items-center justify-between"><h2 className="text-[15px] font-semibold">Monthly Trend</h2><span className="text-[10px] text-muted-foreground">Budget vs spent</span></div><div className="mt-6 flex h-[112px] items-end justify-between gap-3">{budgetTableRows.slice(0, 6).map((budget) => { const limit = Math.max(Number(budget.limit) || 0, 1); const spent = Number(budget.spent) || 0; return <div key={budget.budget_id} className="flex min-w-0 flex-1 flex-col items-center gap-1"><div className="flex h-[88px] items-end gap-1"><span className="w-3 rounded-t bg-sky" style={{ height: `${Math.max(5, Math.min(100, spent / limit * 100))}%` }} /><span className="w-3 rounded-t bg-secondary" style={{ height: "100%" }} /></div><span className="max-w-full truncate text-[9px] text-muted-foreground">{budget.category}</span></div>; })}</div><div className="mt-3 flex justify-end gap-3 text-[10px] text-muted-foreground"><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-sky" />Spent</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-secondary" />Budget</span></div></div><div className="surface rounded-[16px] p-4"><h2 className="text-[15px] font-semibold">Quick Actions</h2><div className="mt-3 grid grid-cols-2 gap-2">{[{ label: "Add Budget", sub: "Create a new budget", icon: Plus, tone: "emerald", action: onAdd }, { label: "Manage Categories", sub: "Edit spending categories", icon: FolderCog, tone: "topaz", action: () => window.location.assign("/settings") }, { label: "View Reports", sub: "Detailed analysis", icon: BarChart3, tone: "violet", action: () => window.location.assign("/reports") }, { label: "Set Alerts", sub: "Notifications near limits", icon: Bell, tone: "ruby", action: () => {} }].map(({ label, sub, icon: Icon, tone, action }) => <button key={label} type="button" onClick={action} className="rounded-xl border border-border/70 p-3 text-left hover:border-emerald/30 hover:bg-secondary/30"><span className={`mb-2 grid h-8 w-8 place-items-center rounded-xl ${tone === "topaz" ? "bg-topaz/10 text-topaz" : tone === "ruby" ? "bg-ruby/10 text-ruby" : tone === "violet" ? "bg-violet/10 text-violet" : "bg-emerald/10 text-emerald"}`}><Icon className="h-4 w-4" /></span><span className="block text-[11px] font-semibold">{label}</span><span className="mt-0.5 block text-[9.5px] text-muted-foreground">{sub}</span></button>)}</div></div></aside>
+      </div>
+    </div>
+  );
+});
+
 export default React.memo(function BudgetPage() {
   useEffect(() => { document.title = "Budgets | Penni"; }, []);
   const [now, setNow] = useState(new Date());
@@ -327,6 +365,8 @@ export default React.memo(function BudgetPage() {
 
   const [categoryHierarchy, setCategoryHierarchy] = useState({});
   const [categorySpend, setCategorySpend] = useState([]);
+  const [recentTransactions, setRecentTransactions] = useState([]);
+  const [budgetView, setBudgetView] = useState("all");
 
   // Transaction sheet state
   const [budgetTxOpen, setBudgetTxOpen] = useState(false);
@@ -419,6 +459,14 @@ export default React.memo(function BudgetPage() {
     return { count: budgets.length, totalPlanned, totalSpent, totalRemaining, overCount };
   }, [budgets]);
 
+  const atRiskCount = useMemo(
+    () => everyday.filter((budget) => {
+      const pct = Number(budget.progress_pct) || 0;
+      return pct >= 80 && pct < 100;
+    }).length,
+    [everyday],
+  );
+
   const sectionForCategory = useMemo(() => {
     const map = {};
     Object.entries(categoryHierarchy).forEach(([section, names]) => {
@@ -446,6 +494,17 @@ export default React.memo(function BudgetPage() {
     });
     return sorted;
   }, [everyday, searchQuery, sortOption, sortOrder]);
+
+  const budgetTableRows = useMemo(() => {
+    const matchesView = (budget) => {
+      const pct = Number(budget.progress_pct) || 0;
+      if (budgetView === "track") return pct < 80;
+      if (budgetView === "risk") return pct >= 80 && pct < 100;
+      if (budgetView === "exceeded") return pct >= 100;
+      return true;
+    };
+    return filteredEveryday.filter(matchesView);
+  }, [filteredEveryday, budgetView]);
 
   const sectionsForDisplay = useMemo(() => {
     const groups = {};
@@ -483,6 +542,9 @@ export default React.memo(function BudgetPage() {
       api.get("/dashboard/overview", { params: { date_from: `${month}-01`, date_to: `${month}-${String(lastDay).padStart(2, "0")}` } })
         .then((res) => setCategorySpend(res.data.categories || []))
         .catch(() => {});
+      api.get("/transactions", { params: { date_from: `${month}-01`, date_to: `${month}-${String(lastDay).padStart(2, "0")}`, limit: 4, sort: "date", order: "desc" } })
+        .then((res) => setRecentTransactions(res.data.transactions || []))
+        .catch(() => setRecentTransactions([]));
     } catch (err) {
       setLoadError(err.response?.data?.detail || "Failed to load budgets");
     } finally {
@@ -748,6 +810,25 @@ export default React.memo(function BudgetPage() {
 
   return (
     <div className="page-stack pb-4">
+
+      <BudgetReferenceDesktop
+        monthControl={<MonthPicker label={monthLabelWithDot} onPrev={() => setMonth(addMonth(month, -1))} onNext={() => setMonth(addMonth(month, 1))} onToday={() => setMonth(fmtMonth(now.getFullYear(), now.getMonth() + 1))} isToday={isCurrentMonth} />}
+        summary={summary}
+        everyday={everyday}
+        atRiskCount={atRiskCount}
+        budgetTableRows={budgetTableRows}
+        budgetView={budgetView}
+        setBudgetView={setBudgetView}
+        categorySpend={categorySpend}
+        recentTransactions={recentTransactions}
+        onAdd={() => openAddBudget("everyday")}
+        onRefresh={fetchData}
+        onCopyPrevious={handleCopyPreviousMonth}
+        openBudgetTransactions={openBudgetTransactions}
+        startEdit={startEdit}
+      />
+
+      <div className="xl:hidden">
 
       <PageHeader
         eyebrow="Planning"
@@ -1160,6 +1241,8 @@ export default React.memo(function BudgetPage() {
       )}
 
       {/* Bottom sheet — mobile sheet, desktop centered dialog */}
+      </div>
+
       {showAdd && (
         <div className="fixed inset-0 z-50 bg-black/40 lg:flex lg:items-start lg:justify-center lg:pt-[10vh]" onClick={() => { setShowAdd(false); resetForm(); resetQuickForm(); if (addTab === "budget") setForm((prev) => ({ ...prev, event_group_id: "", event_group_name: "" })); }}>
           <div
