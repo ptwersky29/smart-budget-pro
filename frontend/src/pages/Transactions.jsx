@@ -1,4 +1,4 @@
-import { createPortal } from "react-dom";
+﻿import { createPortal } from "react-dom";
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
@@ -1828,42 +1828,31 @@ const Transactions = React.memo(function Transactions() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-[11px]">
-                <button
-                  type="button"
-                  onClick={() => setShowSearch((visible) => !visible)}
-                  className={`mr-1 inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-[9px] border px-2.5 text-[11px] font-medium transition ${
-                    showSearch || filters.search
-                      ? "border-emerald/30 bg-emerald/10 text-emerald"
-                      : "border-border bg-card text-muted-foreground hover:text-foreground"
-                  }`}
-                  aria-label="Search transactions"
-                >
-                  <Search className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Search</span>
-                </button>
-                {showSearch ? (
-                  <div className="relative w-full sm:w-48">
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      ref={searchRef}
-                      value={searchInput}
-                      onChange={(event) => { setSearchInput(event.target.value); debouncedSetSearch(event.target.value); }}
-                      placeholder="Search transactions..."
-                      className="h-9 w-full rounded-[9px] border border-border bg-card pl-8 pr-8 text-[11.5px] outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10"
-                    />
-                    {filters.search ? (
-                      <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="Clear search">
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Inline search – always visible */}
+                <div className="relative min-w-[150px] flex-1 sm:max-w-[200px]">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    ref={searchRef}
+                    value={searchInput}
+                    onChange={(event) => { setSearchInput(event.target.value); debouncedSetSearch(event.target.value); }}
+                    placeholder="Search…"
+                    className={`h-9 w-full rounded-[9px] border bg-card pl-8 pr-7 text-[11.5px] outline-none transition focus:ring-2 ${filters.search ? "border-emerald/40 bg-emerald/5 focus:ring-emerald/10" : "border-border focus:border-emerald/40 focus:ring-emerald/10"}`}
+                  />
+                  {filters.search ? (
+                    <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="Clear search">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+
+                {/* Date range */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="inline-flex h-9 w-[218px] shrink-0 items-center gap-1.5 rounded-[9px] border border-border bg-card px-2.5 text-[11px] font-medium text-foreground transition hover:bg-secondary/50">
+                    <button className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[9px] border px-2.5 text-[11px] font-medium transition hover:bg-secondary/50 ${filters.date_from ? "border-emerald/30 bg-emerald/5 text-foreground" : "border-border bg-card text-foreground"}`}>
                       <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      <span className="truncate">{rangeLabel}</span>
-                      <ChevronDown className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" />
+                      <span className="hidden truncate sm:inline">{rangeLabel}</span>
+                      <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
@@ -1873,37 +1862,66 @@ const Transactions = React.memo(function Transactions() {
                     <DropdownMenuItem onClick={() => { setMonth(fmtMonth(new Date().getFullYear(), "01")); setFilters((previous) => ({ ...previous, date_from: `${new Date().getFullYear()}-01-01`, date_to: `${new Date().getFullYear()}-12-31` })); }}>This year</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <select value={filters.account_id} onChange={(event) => toggleFilter("account_id", event.target.value)} className="hidden h-9 w-[105px] shrink-0 rounded-[9px] border border-border bg-card px-2 text-[11px] font-medium outline-none focus:border-emerald/40 min-[1700px]:block">
-                  <option value="">All Accounts</option>
+
+                {/* Account */}
+                <select
+                  value={filters.account_id}
+                  onChange={(event) => toggleFilter("account_id", event.target.value)}
+                  className={`h-9 shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.account_id ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
+                >
+                  <option value="">Account</option>
                   {accounts.map((account) => <option key={account.account_id} value={account.account_id}>{account.name}</option>)}
                 </select>
+
+                {/* Category */}
                 <CategoryCombobox
                   value={filters.category}
                   onChange={(value) => toggleFilter("category", value)}
                   categories={selectedCats.categories || selectedCats}
-                  placeholder="All Categories"
-                  className="hidden h-9 w-[112px] shrink-0 rounded-[9px] border border-border bg-card px-2 text-[11px] font-medium text-foreground min-[1700px]:flex"
+                  placeholder="Category"
+                  className={`h-9 shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium text-foreground transition ${filters.category ? "border-emerald/30 bg-emerald/5" : "border-border"}`}
                   allowClear
                   onCategoryCreated={loadCats}
                 />
-                <select value={filters.tx_type} onChange={(event) => { toggleFilter("tx_type", event.target.value); setLedgerTab(event.target.value === "expense" ? "expenses" : event.target.value === "income" ? "income" : event.target.value === "transfer" ? "transfers" : "all"); }} className="hidden h-9 w-[86px] shrink-0 rounded-[9px] border border-border bg-card px-2 text-[11px] font-medium outline-none focus:border-emerald/40 min-[1700px]:block">
-                  <option value="">All Types</option>
+
+                {/* Type */}
+                <select
+                  value={filters.tx_type}
+                  onChange={(event) => { toggleFilter("tx_type", event.target.value); setLedgerTab(event.target.value === "expense" ? "expenses" : event.target.value === "income" ? "income" : event.target.value === "transfer" ? "transfers" : "all"); }}
+                  className={`h-9 shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.tx_type ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
+                >
+                  <option value="">Type</option>
                   <option value="income">Income</option>
                   <option value="expense">Expense</option>
                   <option value="transfer">Transfer</option>
                 </select>
-                <select value={filters.approval_status} onChange={(event) => { toggleFilter("approval_status", event.target.value); setLedgerTab(event.target.value === "unapproved" ? "unapproved" : "all"); }} className="hidden h-9 w-[101px] shrink-0 rounded-[9px] border border-border bg-card px-2 text-[11px] font-medium outline-none focus:border-emerald/40 min-[1700px]:block">
-                  <option value="">All Statuses</option>
+
+                {/* Status */}
+                <select
+                  value={filters.approval_status}
+                  onChange={(event) => { toggleFilter("approval_status", event.target.value); setLedgerTab(event.target.value === "unapproved" ? "unapproved" : "all"); }}
+                  className={`h-9 shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.approval_status ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
+                >
+                  <option value="">Status</option>
                   <option value="approved">Approved</option>
                   <option value="unapproved">Unapproved</option>
                   <option value="failed">Failed</option>
                 </select>
-                <input
-                  value={filters.merchant}
-                  onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, merchant: event.target.value })); }}
-                  placeholder="All Merchants"
-                  className="hidden h-9 w-[100px] shrink-0 rounded-[9px] border border-border bg-card px-2 text-[11px] outline-none transition focus:border-emerald/40 min-[1700px]:block"
-                />
+
+                {/* Merchant */}
+                <div className="relative shrink-0">
+                  <input
+                    value={filters.merchant}
+                    onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, merchant: event.target.value })); }}
+                    placeholder="Merchant"
+                    className={`h-9 w-[110px] rounded-[9px] border bg-card px-2.5 pr-7 text-[11px] outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.merchant ? "border-emerald/30 bg-emerald/5" : "border-border"}`}
+                  />
+                  {filters.merchant ? (
+                    <button onClick={() => { setOffset(0); setFilters((previous) => ({ ...previous, merchant: "" })); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="Clear merchant">
+                      <X className="h-3 w-3" />
+                    </button>
+                  ) : null}
+                </div>
                 <Sheet>
                   <SheetTrigger asChild>
                     <button className={`grid h-9 w-8 shrink-0 place-items-center rounded-[9px] border transition ${
