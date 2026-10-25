@@ -25,6 +25,7 @@ export default function CategoryBadge({
   muted = false,
   showSource = false,
   truncate = false,
+  showIcon = true,
 }) {
   const { resolveCategory } = useCategories();
   const meta = typeof category === "string" || !category
@@ -51,7 +52,7 @@ export default function CategoryBadge({
       }}
       title={label}
     >
-      <span className={styles.emoji} aria-hidden="true">{meta.emoji || meta.icon || "🏷️"}</span>
+      <span className={cn(styles.emoji, !showIcon && "hidden")} aria-hidden="true">{meta.emoji || meta.icon || "🏷️"}</span>
       <span className={cn("min-w-0", truncate && "truncate")}>{label}</span>
       {showSource && meta.source && (
         <span className="ml-0.5 rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground/70 dark:bg-white/10 dark:text-white/70">

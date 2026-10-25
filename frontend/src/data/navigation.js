@@ -24,9 +24,14 @@ export const NAV_SECTIONS = [
     ],
   },
   {
-    label: "Plan",
+    label: "Connect",
     items: [
       { to: "/investments", label: "Investments", icon: TrendingUp },
+    ],
+  },
+  {
+    label: "More",
+    items: [
       { to: "/jewish", label: "Jewish Tools", icon: Star },
       { to: "/uk-tools", label: "UK Benefits", icon: Landmark },
     ],

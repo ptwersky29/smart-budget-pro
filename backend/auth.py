@@ -696,7 +696,8 @@ def build_router() -> APIRouter:
     async def google_login(request: Request):
         client_id = os.environ.get("GOOGLE_CLIENT_ID")
         if not client_id:
-            raise HTTPException(500, "Google OAuth not configured")
+            frontend_url = os.environ.get("FRONTEND_URL", "").rstrip("/") or str(request.base_url).rstrip("/")
+            return RedirectResponse(f"{frontend_url}/login?error=google_not_configured")
         scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
         redirect_uri = f"{scheme}://{request.url.hostname}/api/auth/google/callback"
         state = generate_csrf_token()

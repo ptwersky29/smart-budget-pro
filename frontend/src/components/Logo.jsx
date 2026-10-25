@@ -4,6 +4,7 @@ export default function Logo({ size = "md", className = "" }) {
   const sizeClasses = {
     sm: "w-8 h-8",
     md: "w-10 h-10",
+    sidebar: "w-[42px] h-[42px]",
     lg: "w-16 h-16",
   };
 

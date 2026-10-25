@@ -29,6 +29,23 @@ export const CATEGORY_COLOR_PALETTE = [
   "#334155",
 ];
 
+const FALLBACK_CATEGORY_COLORS = {
+  income: "#10b981",
+  groceries: "#f59e0b",
+  grocery: "#f59e0b",
+  takeaway: "#f59e0b",
+  restaurants: "#f97316",
+  public_transport: "#3b82f6",
+  transport: "#3b82f6",
+  mobile_phone: "#3b82f6",
+  utilities: "#38bdf8",
+  house_supplies: "#ec4899",
+  rent: "#8b5cf6",
+  other_charity: "#eab308",
+  charity: "#eab308",
+  maaser_tzedakah: "#eab308",
+};
+
 export const CATEGORY_EMOJI_OPTIONS = [
   "🛒", "🥬", "🥖", "🐟", "🥩", "🥡", "🍷", "🧼", "💊", "🏡",
   "⚡", "🔥", "💧", "🏛️", "☎️", "📱", "🧹", "🛡️", "🎓", "🚌",
@@ -84,7 +101,7 @@ export function buildFallbackCategory(name, overrides = {}) {
     display_name: label,
     emoji: overrides.emoji || overrides.icon || "🏷️",
     icon: overrides.icon || overrides.emoji || "🏷️",
-    color: overrides.color || "#64748b",
+    color: overrides.color || FALLBACK_CATEGORY_COLORS[slug] || "#64748b",
     description: overrides.description || null,
     section: overrides.section || "🧩 Ungrouped",
     section_key: overrides.section_key || "ungrouped",

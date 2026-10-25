@@ -168,22 +168,21 @@ export default function AppLayout() {
     <div className="app-shell relative flex min-h-screen text-foreground">
       <aside
         data-tour="sidebar"
-        className={`sticky top-3 z-40 my-3 ml-3 hidden h-[calc(100vh-1.5rem)] shrink-0 flex-col overflow-hidden rounded-[1.5rem] glass-panel transition-[width] duration-300 lg:flex ${
-          collapsed ? "w-[4.75rem]" : "w-[13.75rem]"
+        className={`sticky top-0 z-40 hidden h-screen shrink-0 flex-col overflow-hidden border-r border-border/45 bg-[linear-gradient(180deg,hsl(150_30%_98%)_0%,hsl(150_18%_94%)_100%)] transition-[width] duration-300 lg:flex dark:bg-[hsl(160_16%_8%)] ${
+          collapsed ? "w-[4.75rem]" : "w-[242px]"
         }`}
       >
-        <div className={`flex h-16 shrink-0 items-center border-b border-border/60 ${collapsed ? "justify-center px-2" : "justify-between px-4"}`}>
-          <Link to="/dashboard" className="flex min-w-0 items-center gap-2.5" data-testid="sidebar-logo">
-            <Logo size={collapsed ? "sm" : "md"} />
+        <div className={`shrink-0 ${collapsed ? "flex h-16 items-center justify-center px-2" : "flex items-start justify-between px-6 pb-5 pt-[50px]"}`}>
+          <Link to="/dashboard" className="flex min-w-0 items-center gap-3" data-testid="sidebar-logo">
+            <Logo size={collapsed ? "sm" : "sidebar"} />
             {!collapsed ? (
               <span className="min-w-0">
                 <span className="flex items-center gap-1.5">
-                  <span className="truncate text-[15px] font-semibold tracking-[-0.03em]">{APP_NAME}</span>
+                  <span className="truncate text-[17px] font-semibold tracking-[-0.03em]">{APP_NAME}</span>
                   <span className="rounded-md border border-topaz/25 bg-topaz/10 px-1 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] text-topaz">
                     Beta
                   </span>
                 </span>
-                <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">Your penny, planned.</span>
               </span>
             ) : null}
           </Link>
@@ -191,7 +190,7 @@ export default function AppLayout() {
             <button
               type="button"
               onClick={toggleSidebar}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+              className="mt-2 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
               aria-label="Collapse sidebar"
               title="Collapse sidebar"
             >
@@ -200,7 +199,7 @@ export default function AppLayout() {
           ) : null}
         </div>
 
-        <div className="subtle-scroll flex-1 space-y-5 overflow-y-auto px-2.5 py-4">
+        <div className="subtle-scroll flex-1 space-y-5 overflow-y-auto px-6 py-3">
           {NAV_SECTIONS.filter((section) => !section.adminOnly || user?.role === "admin").map((section) => (
             <div key={section.label} className="space-y-1">
               {!collapsed ? (
@@ -221,20 +220,17 @@ export default function AppLayout() {
                       collapsed ? "justify-center px-0 py-2.5" : "gap-2.5 px-2.5 py-2"
                     } ${
                       active
-                        ? "border-border/70 bg-card text-foreground shadow-sm"
+                        ? "border-emerald bg-emerald text-white shadow-[0_6px_16px_hsl(var(--emerald)/0.18)]"
                         : "border-transparent text-muted-foreground hover:bg-secondary/55 hover:text-foreground"
                     }`}
                   >
                     <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-colors ${
-                      active ? "bg-emerald/10 text-emerald" : "text-muted-foreground group-hover:text-foreground"
+                      active ? "bg-white/15 text-white" : "text-muted-foreground group-hover:text-foreground"
                     }`}>
                       <Icon className="h-[17px] w-[17px]" strokeWidth={active ? 2.1 : 1.8} />
                     </span>
                     {!collapsed ? (
-                      <>
-                        <span className="flex-1 truncate text-[12.5px] font-medium">{label}</span>
-                        {active ? <span className="h-1.5 w-1.5 rounded-full bg-emerald" /> : null}
-                      </>
+                      <span className="flex-1 truncate text-[13px] font-medium">{label}</span>
                     ) : null}
                   </Link>
                 );
@@ -243,44 +239,44 @@ export default function AppLayout() {
           ))}
         </div>
 
-        <div className="shrink-0 border-t border-border/60 p-2.5">
+        <div className={`shrink-0 ${collapsed ? "p-2.5" : "px-6 pb-[30px] pt-4"}`}>
           <Link
             to={SETTINGS_NAV_ITEM.to}
             aria-current={settingsActive ? "page" : undefined}
             title={collapsed ? "Settings" : undefined}
-            className={`group mb-1.5 flex items-center rounded-xl border transition-colors ${
+            className={`group mb-3 flex items-center rounded-xl border transition-colors ${
               collapsed ? "justify-center px-0 py-2.5" : "gap-2.5 px-2.5 py-2"
             } ${
               settingsActive
-                ? "border-border/70 bg-card text-foreground shadow-sm"
+                ? "border-emerald bg-emerald text-white shadow-[0_6px_16px_hsl(var(--emerald)/0.18)]"
                 : "border-transparent text-muted-foreground hover:bg-secondary/55 hover:text-foreground"
             }`}
           >
-            <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${settingsActive ? "bg-emerald/10 text-emerald" : ""}`}>
+            <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${settingsActive ? "bg-white/15 text-white" : ""}`}>
               <Settings className="h-[17px] w-[17px]" strokeWidth={settingsActive ? 2.1 : 1.8} />
             </span>
-            {!collapsed ? <span className="flex-1 text-[12.5px] font-medium">Settings</span> : null}
+            {!collapsed ? <span className="flex-1 text-[13px] font-medium">Settings</span> : null}
           </Link>
 
-          <div className={`flex items-center rounded-xl bg-secondary/45 ${collapsed ? "justify-center p-1.5" : "gap-2 p-2"}`}>
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-emerald/12 text-[11px] font-semibold text-emerald">
+          <div className={`flex items-center rounded-2xl border border-border/60 bg-card shadow-[0_10px_26px_-22px_hsl(var(--foreground)/0.35)] ${collapsed ? "justify-center p-1.5" : "gap-2.5 p-2"}`}>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald/12 text-[12px] font-semibold text-emerald">
               {initials}
             </span>
             {!collapsed ? (
               <>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[11.5px] font-medium">{user?.name || user?.email}</span>
-                  <span className="block truncate text-[10px] capitalize text-muted-foreground">{user?.tier || "free"} plan</span>
+                  <span className="block truncate text-[12px] font-medium">{user?.name || user?.email}</span>
+                  <span className="block truncate text-[10.5px] capitalize text-muted-foreground">{user?.tier || "free"} plan</span>
                 </span>
                 <button
                   type="button"
                   onClick={doLogout}
                   data-testid="logout-button"
-                  className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition hover:bg-card hover:text-foreground"
+                  className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
                   aria-label="Sign out"
                   title="Sign out"
                 >
-                  <LogOut className="h-3.5 w-3.5" />
+                  <LogOut className="h-4 w-4" />
                 </button>
               </>
             ) : null}
@@ -300,49 +296,31 @@ export default function AppLayout() {
       </aside>
 
       <div className="relative min-w-0 flex-1">
-        <header data-tour="route-header" className="sticky top-3 z-30 mx-3 mt-3 overflow-hidden rounded-[1.1rem] glass-bar">
+        <header data-tour="route-header" className="sticky top-0 z-30 border-b border-border/50 bg-background/80 backdrop-blur-md">
           {routeLoading ? (
             <div className="absolute left-0 right-0 top-0 z-50 h-0.5 overflow-hidden">
               <div className={`h-full bg-emerald ${noAnim ? "" : "animate-[routeProgress_0.4s_ease-out_forwards]"}`} />
             </div>
           ) : null}
           <h1 className="sr-only">{routeMeta.title} - {APP_NAME}</h1>
-          <div className="flex h-14 items-center justify-between gap-3 px-3 sm:px-4 lg:px-5">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <Link to="/dashboard" className="grid h-9 w-9 shrink-0 place-items-center lg:hidden" aria-label={`${APP_NAME} home`}>
+          <div className="flex h-[56px] items-center justify-between gap-3 pl-3 pr-3 sm:px-4 lg:pl-[10px] lg:pr-[18px]">
+            <div className="flex min-w-0 flex-1 items-center gap-2.5">
+              <Link to="/dashboard" className="grid h-9 w-9 shrink-0 place-items-center md:hidden" aria-label={`${APP_NAME} home`}>
                 <Logo size="sm" />
               </Link>
-              <div className="hidden min-w-0 lg:block">
-                <p className="truncate text-[13px] font-semibold tracking-[-0.02em]">{routeMeta.title}</p>
-                <p className="truncate text-[10px] text-muted-foreground">Penni workspace</p>
-              </div>
-              <p className="truncate text-[14px] font-semibold tracking-[-0.02em] lg:hidden">{routeMeta.title}</p>
-            </div>
-
-            <div className="flex shrink-0 items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => setCommandOpen(true)}
                 data-tour="command-search"
                 data-testid="command-open"
-                className="hidden h-9 items-center gap-2 rounded-full border border-border/70 bg-card/70 px-3 text-[11px] text-muted-foreground transition hover:border-border hover:text-foreground md:flex"
+                className="hidden h-8 w-full max-w-[552px] items-center gap-2.5 rounded-[9px] border border-border/80 bg-card px-3 text-left text-[12px] text-muted-foreground shadow-[0_1px_2px_hsl(var(--foreground)/0.03)] transition hover:border-border hover:text-foreground md:flex"
                 aria-label="Search or jump to"
               >
-                <Search className="h-3.5 w-3.5" />
-                <span>Search</span>
-                <kbd className="ml-2 rounded-md border border-border/70 bg-secondary/60 px-1.5 py-0.5 text-[9px] font-medium">
-                  Ctrl K
+                <Search className="h-4 w-4 shrink-0" />
+                <span className="truncate">Search transactions, accounts, categories, merchants...</span>
+                <kbd className="ml-auto shrink-0 rounded-[6px] border border-border/70 bg-secondary/45 px-1.5 py-0.5 text-[9.5px] font-medium text-muted-foreground">
+                  ⌘ K
                 </kbd>
-              </button>
-              <button
-                type="button"
-                onClick={() => openAssistant()}
-                data-tour="assistant-launch"
-                data-testid="assistant-open"
-                className="hidden h-9 items-center gap-1.5 rounded-full bg-emerald/10 px-3 text-[11px] font-medium text-emerald transition hover:bg-emerald/15 sm:flex"
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                Ask Penni
               </button>
               <button
                 type="button"
@@ -358,21 +336,14 @@ export default function AppLayout() {
                 onClick={() => openAssistant()}
                 data-tour="assistant-launch-mobile"
                 data-testid="assistant-open-mobile"
-                className="grid h-9 w-9 place-items-center rounded-full text-emerald transition hover:bg-emerald/10 sm:hidden"
+                className="grid h-9 w-9 place-items-center rounded-full text-emerald transition hover:bg-emerald/10 md:hidden"
                 aria-label="Open Penni AI"
               >
                 <Sparkles className="h-[18px] w-[18px]" />
               </button>
-              <button
-                type="button"
-                onClick={startTour}
-                data-tour="tour-launch"
-                className="hidden h-9 w-9 place-items-center rounded-full text-muted-foreground transition hover:bg-secondary hover:text-foreground lg:grid"
-                aria-label="Start app walk-through"
-                title="Start app walk-through"
-              >
-                <Compass className="h-[18px] w-[18px]" />
-              </button>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-1.5">
               <NotificationCenter />
               <button
                 type="button"
@@ -399,6 +370,10 @@ export default function AppLayout() {
                     <p className="truncate text-xs font-medium">{user?.name || "Penni member"}</p>
                     <p className="truncate text-[10px] text-muted-foreground">{user?.email}</p>
                   </div>
+                  <DropdownMenuItem onClick={() => openAssistant()} data-testid="assistant-open">
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Ask Penni
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/settings")}>
                     <Settings className="mr-2 h-4 w-4" />
                     Settings
@@ -406,6 +381,10 @@ export default function AppLayout() {
                   <DropdownMenuItem onClick={() => navigate("/more")}>
                     <Compass className="mr-2 h-4 w-4" />
                     More tools
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={startTour} data-tour="tour-launch">
+                    <Compass className="mr-2 h-4 w-4" />
+                    App walk-through
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={doLogout} data-testid="logout-menu-button">
                     <LogOut className="mr-2 h-4 w-4" />
@@ -417,7 +396,7 @@ export default function AppLayout() {
           </div>
         </header>
 
-        <main data-tour="main-content" className="mx-auto w-full max-w-[1440px] px-3 pb-24 pt-5 sm:px-4 lg:px-5 lg:pb-8">
+        <main data-tour="main-content" className="mx-auto w-full max-w-[1440px] px-3 pb-24 pt-3 sm:px-4 lg:pl-[10px] lg:pr-[9px] lg:pb-[14px] lg:pt-[21px]">
           <div key={location.pathname} className={noAnim ? "" : "page-in"}>
             <Outlet />
           </div>

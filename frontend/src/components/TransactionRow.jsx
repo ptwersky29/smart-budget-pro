@@ -10,7 +10,10 @@ import {
   Link2,
   Link2Off,
   AlertTriangle,
+  Receipt,
+  Wallet,
 } from "lucide-react";
+import { formatCurrency } from "../lib/format";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -28,7 +31,6 @@ import {
 import { toast } from "sonner";
 import {
   getBankLogoOrFallback,
-  getBankColor,
   pickBankInstitution,
 } from "../data/bankLogos";
 import CategoryBadge from "./CategoryBadge";
@@ -36,6 +38,7 @@ import CategoryBadge from "./CategoryBadge";
 const TransactionRow = React.memo(
   ({
     t,
+    account,
     isSelected,
     isFocused,
     onToggleSelect,
@@ -49,7 +52,25 @@ const TransactionRow = React.memo(
     onPairTransfer,
     onUnpairTransfer,
   }) => {
-    const brandInstitution = pickBankInstitution(t.institution, t.source_label);
+    const brandInstitution = pickBankInstitution(
+      account?.provider,
+      account?.name,
+      t.institution,
+      t.source_label,
+    );
+    const accountName = account?.name || t.source_label || t.institution || "Manual";
+    const brandLogo = brandInstitution ? getBankLogoOrFallback(brandInstitution) : null;
+    const amount = Number(t.amount) || 0;
+    const negative = amount < 0;
+    const income = amount > 0;
+    const unapproved = t.approval_status === "unapproved" || t.category_approval_status === "unapproved";
+    const failed = t.approval_status === "failed";
+    const status = failed ? "Failed" : unapproved ? "Unapproved" : t.pending ? "Pending" : "Approved";
+    const dateLabel = t.date
+      ? new Date(`${String(t.date).slice(0, 10)}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+      : "—";
+    const description = t.description || t.merchant || "Transaction";
+    const subtitle = t.merchant || t.normalized_merchant || t.source_label;
 
     const copyDescription = useCallback(() => {
       navigator.clipboard.writeText(t.description || "");
@@ -79,82 +100,81 @@ const TransactionRow = React.memo(
             }}
             onDoubleClick={() => onEdit?.(t)}
           >
-            <td className="px-4 py-3">
-              <label className="flex items-center justify-center min-h-[44px] min-w-[44px] cursor-pointer">
+            <td className="px-2.5 py-2">
+              <label className="flex min-h-[30px] min-w-[24px] cursor-pointer items-center justify-center">
                 <input
                   type="checkbox"
                   checked={isSelected}
                   onChange={() => onToggleSelect(t.transaction_id)}
-                  className="h-4 w-4 rounded border-border accent-emerald"
+                  className="h-3.5 w-3.5 rounded border-border accent-emerald"
+                  aria-label={`Select ${description}`}
                 />
               </label>
             </td>
-            <td className="px-6 py-3 text-xs text-muted-foreground whitespace-nowrap">
-              {t.date?.slice(0, 10)}
+            <td className="whitespace-nowrap px-3 py-2 text-[11px] text-muted-foreground">
+              {dateLabel}
             </td>
-            <td className="px-6 py-3 max-w-[200px]">
-              <div className="font-medium truncate">{t.description}</div>
-              {t.normalized_merchant &&
-                t.normalized_merchant !== t.description && (
-                  <div className="text-xs text-muted-foreground truncate">
-                    {t.normalized_merchant}
-                  </div>
-                )}
+            <td className="px-1.5 py-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className={`grid h-6 w-6 shrink-0 place-items-center overflow-hidden rounded-full ${income ? "bg-emerald/10 text-emerald" : "bg-secondary text-muted-foreground"}`}>
+                  {brandLogo ? (
+                    <img
+                      src={brandLogo}
+                      alt=""
+                      className="h-[18px] w-[18px] rounded-full object-contain"
+                      onError={(event) => {
+                        event.currentTarget.style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <Receipt className="h-3 w-3" />
+                  )}
+                </span>
+                <div className="min-w-0">
+                  <div className="truncate text-[12px] font-medium leading-tight">{description}</div>
+                  {subtitle ? (
+                    <div className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground">{subtitle}</div>
+                  ) : null}
+                </div>
+              </div>
             </td>
-            <td className="px-6 py-3">
-              <div className="flex flex-wrap items-center gap-2">
-                {t.is_transfer && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky/10 text-sky text-[10px] font-medium">
-                    Transfer
-                  </span>
-                )}
-                {t.is_split && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet/10 text-violet text-[10px] font-medium">
-                    Split {t.split_count ? `(${t.split_count})` : ""}
-                  </span>
-                )}
-                {(t.approval_status === "unapproved" || t.category_approval_status === "unapproved") && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-topaz/10 text-topaz text-[10px] font-medium">
-                    Unapproved
-                  </span>
-                )}
-                {t.approval_status === "failed" && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-ruby/10 text-ruby text-[10px] font-medium">
-                    Failed
-                  </span>
-                )}
+            <td className="px-1.5 py-2">
+              <div className="flex min-w-0 items-center gap-1">
                 <CategoryBadge
                   category={t.category || "uncategorized"}
                   size="sm"
                   truncate
+                  showIcon={false}
                 />
-                {t.source_label && (
-                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                    {brandInstitution && (
-                      <img
-                        src={getBankLogoOrFallback(brandInstitution)}
-                        alt=""
-                        className="h-5 w-5 object-contain shrink-0 rounded-sm"
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="${getBankColor(brandInstitution)}"/><text x="16" y="22" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="700" font-size="18" fill="white">${(brandInstitution || "?")[0].toUpperCase()}</text></svg>`)}`;
-                        }}
-                      />
-                    )}
-                    {t.source_label}
-                  </span>
-                )}
+                {t.is_split ? <span className="shrink-0 rounded-full bg-violet/10 px-1.5 py-0.5 text-[9px] font-medium text-violet">Split</span> : null}
               </div>
             </td>
-            <td
-              className={`px-6 py-3 text-right font-medium tabular-nums ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}
-            >
-              {t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}
+            <td className="px-1 py-2">
+              <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-foreground">
+                {brandLogo ? <img src={brandLogo} alt="" className="h-4 w-4 shrink-0 rounded-full object-contain" /> : <Wallet className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                <span className="truncate">{accountName}</span>
+              </span>
             </td>
-            <td className="px-6 py-3 text-right">
+            <td className={`money-tabular px-2 py-2 text-right text-[11.5px] font-semibold ${negative ? "text-ruby" : "text-emerald"}`}>
+              {amount > 0 ? "+" : "-"}{formatCurrency(Math.abs(amount))}
+            </td>
+            <td className="px-1.5 py-2">
+              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                failed
+                  ? "bg-ruby/10 text-ruby"
+                  : unapproved
+                    ? "bg-topaz/10 text-topaz"
+                    : t.pending
+                      ? "bg-sky/10 text-sky"
+                      : "bg-emerald/10 text-emerald"
+              }`}>
+                {status}
+              </span>
+            </td>
+            <td className="px-1 py-2 text-right">
               <DropdownMenu>
                 <DropdownMenuTrigger
-                  className="p-3 text-muted-foreground hover:text-foreground"
+                  className="p-2 text-muted-foreground hover:text-foreground"
                   aria-label="Transaction actions"
                 >
                   <MoreHorizontal className="h-4 w-4" />
@@ -235,6 +255,8 @@ const TransactionRow = React.memo(
     prev.t.category_approval_status === next.t.category_approval_status &&
     prev.t.is_split === next.t.is_split &&
     prev.t.transfer_pair_id === next.t.transfer_pair_id &&
+    prev.account?.name === next.account?.name &&
+    prev.account?.provider === next.account?.provider &&
     prev.isSelected === next.isSelected &&
     prev.isFocused === next.isFocused
 );

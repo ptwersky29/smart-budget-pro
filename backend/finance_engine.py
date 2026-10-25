@@ -1153,6 +1153,13 @@ def build_router() -> APIRouter:
                 stmt = stmt.where(Transaction.amount > 0)
             elif tx_type == "expense":
                 stmt = stmt.where(Transaction.amount < 0)
+            elif tx_type == "transfer":
+                stmt = stmt.where(
+                    or_(
+                        Transaction.tx_type == "transfer",
+                        Transaction.transfer_pair_id.isnot(None),
+                    )
+                )
             if date_from:
                 stmt = stmt.where(Transaction.date >= datetime.fromisoformat(date_from))
             if date_to:

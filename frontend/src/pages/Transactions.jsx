@@ -1,13 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
-import { Plus, Trash2, Loader2, Pencil, Search, Sparkles, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, BarChart3, Star, Receipt, Download, MoreHorizontal, RefreshCw, CheckCircle2, PieChart as PieChartIcon, ArrowDownLeft, ArrowUpRight, CalendarDays, Tag, Wallet, StickyNote, Building2, Scissors, Link2, Link2Off, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Loader2, Pencil, Search, Sparkles, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, BarChart3, Star, Receipt, Download, MoreHorizontal, RefreshCw, CheckCircle2, PieChart as PieChartIcon, ArrowDownLeft, ArrowUpRight, CalendarDays, Tag, Wallet, StickyNote, Building2, Scissors, Link2, Link2Off, AlertTriangle, Calculator, TrendingUp, TrendingDown, LayoutGrid, List, Copy, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "../components/ui/layout";
-import { PageHeader, Surface } from "../components/ui/page";
 import { SkeletonTable } from "../components/ui/Skeleton";
 import { useAssistant } from "../contexts/AssistantContext";
-import { formatCurrency, formatLongDate } from "../lib/format";
+import { formatCurrency, formatLongDate, formatShortDate } from "../lib/format";
+import Sparkline from "../components/ui/Sparkline";
 import { withUndo } from "../lib/undo";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import {
@@ -30,7 +30,6 @@ import {
   SheetDescription,
 } from "../components/ui/sheet";
 import ComparePeriods from "../components/ComparePeriods";
-import MonthPicker from "../components/MonthPicker";
 import TransactionRow from "../components/TransactionRow";
 import { getBankLogoOrFallback, pickBankInstitution } from "../data/bankLogos";
 const CategoryPieChart = React.lazy(() => import("../components/CategoryPieChart"));
@@ -64,7 +63,7 @@ function addMonth(mm, delta) {
   return fmtMonth(d.getFullYear(), String(d.getMonth() + 1));
 }
 
-const fmt = (n) => `£${Number(n || 0).toFixed(2)}`;
+const fmt = (n) => `Â£${Number(n || 0).toFixed(2)}`;
 const PIE_COLORS = ["#30a46c", "#e8a838", "#60a5fa", "#a78bfa", "#f472b6", "#fb923c", "#34d399", "#818cf8", "#f87171", "#2dd4bf", "#fbbf24", "#e879f9"];
 
 function transactionDate(value) {
@@ -157,7 +156,7 @@ function TransactionInspector({ transaction, onClose, onEdit, onDelete, onApprov
 
   return (
     <Sheet open={Boolean(transaction)} onOpenChange={(next) => (next ? null : onClose())}>
-      <SheetContent side="right" className="flex w-full flex-col overflow-y-auto p-0 sm:max-w-[430px]">
+      <SheetContent side="right" className="flex w-full flex-col overflow-y-auto p-0 sm:max-w-[430px] xl:hidden">
         <div className="border-b border-border/60 px-5 pb-5 pr-14 pt-6">
           <div className="flex items-center gap-3">
             <span className={`grid h-11 w-11 place-items-center rounded-2xl ${income ? "bg-emerald/10 text-emerald" : "bg-secondary text-muted-foreground"}`}>
@@ -244,6 +243,271 @@ function TransactionInspector({ transaction, onClose, onEdit, onDelete, onApprov
   );
 }
 
+function TransactionInspectorPanel({
+  transaction,
+  account,
+  similarTransactions = [],
+  onClose,
+  onEdit,
+  onDelete,
+  onApprove,
+  onClassify,
+  onSplit,
+  onPairTransfer,
+  onUnpairTransfer,
+  onInspect,
+  onAsk,
+}) {
+  const [tab, setTab] = useState("details");
+
+  if (!transaction) {
+    return (
+      <div className="surface flex min-h-[420px] flex-col items-center justify-center rounded-[14px] p-6 text-center">
+        <span className="grid h-11 w-11 place-items-center rounded-full bg-secondary text-muted-foreground">
+          <Receipt className="h-5 w-5" />
+        </span>
+        <p className="mt-3 text-[13px] font-semibold">Select a transaction</p>
+        <p className="mt-1 max-w-[190px] text-[11px] leading-relaxed text-muted-foreground">Choose a row to see its full details, approvals and similar activity.</p>
+      </div>
+    );
+  }
+
+  const amount = Number(transaction.amount) || 0;
+  const income = amount > 0;
+  const unapproved = transaction.approval_status === "unapproved" || transaction.category_approval_status === "unapproved";
+  const failed = transaction.approval_status === "failed";
+  const accountName = account?.name || transaction.source_label || transaction.institution || "Manual account";
+  const institution = pickBankInstitution(account?.provider, account?.name, transaction.institution, transaction.source_label);
+  const accountLogo = institution ? getBankLogoOrFallback(institution) : null;
+  const transactionType = transaction.is_transfer ? "Transfer" : income ? "Income" : "Expense";
+  const addedAt = transaction.created_at
+    ? new Date(transaction.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    : null;
+
+  return (
+    <div className="surface flex h-[calc(100vh-94px)] min-h-[540px] flex-col overflow-hidden rounded-[14px]">
+      <div className="subtle-scroll flex-1 overflow-y-auto">
+        <div className="relative p-4 pb-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+            aria-label="Close transaction details"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <div className="flex items-start gap-3 pr-7">
+            <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-full bg-sky/10 text-sky">
+              {accountLogo ? (
+                <img
+                  src={accountLogo}
+                  alt=""
+                  className="h-8 w-8 rounded-full object-contain"
+                  onError={(event) => { event.target.style.display = "none"; }}
+                />
+              ) : (
+                <Receipt className="h-5 w-5" />
+              )}
+            </span>
+            <div className="min-w-0 pt-0.5">
+              <p className="line-clamp-2 text-[15px] font-semibold leading-tight tracking-[-0.02em]">{transaction.description || transaction.merchant || "Transaction"}</p>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                <p className="truncate text-[10.5px] text-muted-foreground">{transaction.merchant || transaction.normalized_merchant || transaction.source_label || "Transaction"}</p>
+                {unapproved ? <span className="rounded-full bg-topaz/10 px-2 py-0.5 text-[9.5px] font-medium text-topaz">Unapproved</span> : null}
+                {failed ? <span className="rounded-full bg-ruby/10 px-2 py-0.5 text-[9.5px] font-medium text-ruby">Failed</span> : null}
+              </div>
+            </div>
+          </div>
+          <p className={`money-tabular mt-3 text-[1.85rem] font-semibold leading-none tracking-[-0.045em] ${income ? "text-emerald" : "text-ruby"}`}>
+            {formatCurrency(amount, { signed: true })}
+          </p>
+          <div className="mt-3 flex items-center gap-1.5">
+            {unapproved ? (
+              <button type="button" onClick={() => onApprove(transaction)} className="inline-flex h-[34px] flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-emerald px-3 text-[11.5px] font-semibold text-white transition hover:bg-emerald/90">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Approve
+              </button>
+            ) : (
+              <button type="button" onClick={() => onClassify(transaction)} className="inline-flex h-[34px] flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-emerald/10 px-3 text-[11.5px] font-semibold text-emerald transition hover:bg-emerald/15">
+                <Sparkles className="h-3.5 w-3.5" /> Classify
+              </button>
+            )}
+            <button type="button" onClick={() => onEdit(transaction)} className="inline-flex h-[34px] flex-1 items-center justify-center gap-1.5 rounded-[8px] border border-border bg-card px-3 text-[11.5px] font-medium transition hover:bg-secondary/60">
+              <Pencil className="h-3.5 w-3.5" /> Edit
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className="grid h-[34px] w-[34px] place-items-center rounded-[8px] border border-border bg-card text-muted-foreground transition hover:text-foreground" aria-label="More transaction actions">
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {!unapproved ? (
+                  <DropdownMenuItem onClick={() => onApprove(transaction)}>
+                    <CheckCircle2 className="mr-2 h-4 w-4" /> Approve
+                  </DropdownMenuItem>
+                ) : null}
+                <DropdownMenuItem onClick={() => onClassify(transaction)}>
+                  <Sparkles className="mr-2 h-4 w-4" /> AI classify
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onSplit(transaction)}>
+                  <Scissors className="mr-2 h-4 w-4" /> Split transaction
+                </DropdownMenuItem>
+                {transaction.transfer_pair_id ? (
+                  <DropdownMenuItem onClick={() => onUnpairTransfer(transaction)}>
+                    <Link2Off className="mr-2 h-4 w-4" /> Unpair transfer
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onClick={() => onPairTransfer(transaction)}>
+                    <Link2 className="mr-2 h-4 w-4" /> Pair transfer
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={() => onAsk(transaction)}>
+                  <Sparkles className="mr-2 h-4 w-4" /> Ask Penni
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => onDelete(transaction.transaction_id)} className="text-ruby">
+                  <Trash2 className="mr-2 h-4 w-4" /> Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        <div className="flex gap-4 border-b border-border px-4">
+          {[
+            { key: "details", label: "Details" },
+            { key: "notes", label: "Notes" },
+            { key: "attachments", label: "Attachments" },
+            { key: "history", label: "History" },
+          ].map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setTab(item.key)}
+              className={`-mb-px h-10 border-b-2 text-[12px] transition ${tab === item.key ? "border-emerald font-semibold text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        {tab === "details" ? (
+          <div className="divide-y divide-border/60 px-4">
+            <DetailRow icon={CalendarDays} label="Date">
+              {formatLongDate(transaction.date, { weekday: false })}
+            </DetailRow>
+            <DetailRow icon={Receipt} label="Description">
+              <span className="line-clamp-2">{transaction.description || "—"}</span>
+            </DetailRow>
+            <DetailRow icon={Building2} label="Merchant">
+              {transaction.merchant || transaction.normalized_merchant || "—"}
+            </DetailRow>
+            <DetailRow icon={Tag} label="Category">
+              <CategoryBadge category={transaction.category || "uncategorized"} size="sm" truncate />
+            </DetailRow>
+            <DetailRow icon={Wallet} label="Account">
+              <span className="inline-flex items-center justify-end gap-1.5">
+                {accountLogo ? <img src={accountLogo} alt="" className="h-4 w-4 rounded-sm object-contain" /> : null}
+                <span className="truncate">{accountName}</span>
+              </span>
+            </DetailRow>
+            <DetailRow icon={transaction.is_transfer ? Link2 : income ? ArrowDownLeft : ArrowUpRight} label="Type">
+              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${transaction.is_transfer ? "bg-sky/10 text-sky" : income ? "bg-emerald/10 text-emerald" : "bg-ruby/10 text-ruby"}`}>
+                {transactionType}
+              </span>
+            </DetailRow>
+            <DetailRow icon={CheckCircle2} label="Status">
+              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${failed ? "bg-ruby/10 text-ruby" : unapproved ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}>
+                {failed ? "Failed" : unapproved ? "Unapproved" : "Approved"}
+              </span>
+            </DetailRow>
+            <DetailRow icon={Calculator} label="Amount">
+              <span className={`money-tabular font-semibold ${income ? "text-emerald" : "text-ruby"}`}>{formatCurrency(amount, { signed: true })}</span>
+            </DetailRow>
+            <DetailRow icon={Tag} label="Source">
+              {transaction.source_label || SOURCE_LABELS[transaction.source] || transaction.source || "Manual"}
+            </DetailRow>
+            <DetailRow icon={Tag} label="Transaction ID">
+              <span className="break-all font-mono text-[10.5px] text-muted-foreground">{transaction.transaction_id}</span>
+            </DetailRow>
+            {transaction.notes ? (
+              <DetailRow icon={StickyNote} label="Notes">
+                <span className="line-clamp-3">{transaction.notes}</span>
+              </DetailRow>
+            ) : null}
+            {addedAt ? (
+              <DetailRow icon={CalendarDays} label="Added">
+                {addedAt}
+              </DetailRow>
+            ) : null}
+          </div>
+        ) : null}
+
+        {tab === "notes" ? (
+          <div className="p-4">
+            {transaction.notes ? (
+              <p className="whitespace-pre-wrap text-[12px] leading-relaxed text-foreground">{transaction.notes}</p>
+            ) : (
+              <p className="text-[12px] text-muted-foreground">No notes on this transaction yet.</p>
+            )}
+            <button onClick={() => onEdit(transaction)} className="mt-3 text-[11px] font-medium text-emerald hover:underline">Edit notes</button>
+          </div>
+        ) : null}
+
+        {tab === "attachments" ? (
+          <div className="p-4 text-[12px] text-muted-foreground">No attachments linked to this transaction.</div>
+        ) : null}
+
+        {tab === "history" ? (
+          <div className="divide-y divide-border/60 px-4">
+            {addedAt ? <DetailRow icon={CalendarDays} label="Added">{addedAt}</DetailRow> : null}
+            {transaction.approved_at ? <DetailRow icon={CheckCircle2} label="Approved">{new Date(transaction.approved_at).toLocaleString("en-GB")}</DetailRow> : null}
+            <DetailRow icon={RefreshCw} label="Last sync">{transaction.date ? formatShortDate(transaction.date) : "—"}</DetailRow>
+            {transaction.failed_reason ? <DetailRow icon={AlertTriangle} label="Issue">{transaction.failed_reason}</DetailRow> : null}
+          </div>
+        ) : null}
+
+        {similarTransactions.length > 0 ? (
+          <div className="border-t border-border/70 p-4">
+            <p className="text-[11.5px] font-semibold">Similar transactions</p>
+            <div className="mt-2 divide-y divide-border/50">
+              {similarTransactions.map((similar) => (
+                <button
+                  key={similar.transaction_id}
+                  type="button"
+                  onClick={() => onInspect(similar)}
+                  className="flex w-full items-center gap-2 py-2.5 text-left transition hover:opacity-80"
+                >
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-sky/10 text-sky">
+                    <Receipt className="h-3.5 w-3.5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[11px] font-medium">{similar.description}</span>
+                    <span className="mt-0.5 block text-[9.5px] text-muted-foreground">{formatShortDate(similar.date, { year: "numeric" })}</span>
+                  </span>
+                  <span className={`money-tabular shrink-0 text-[10.5px] font-semibold ${Number(similar.amount) > 0 ? "text-emerald" : "text-ruby"}`}>{formatCurrency(similar.amount, { signed: true })}</span>
+                  <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function DetailRow({ icon: Icon, label, children }) {
+  return (
+    <div className="grid grid-cols-[100px_minmax(0,1fr)] items-start gap-2 py-2.5">
+      <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <Icon className="h-3 w-3 shrink-0" /> {label}
+      </span>
+      <span className="min-w-0 text-right text-[11.5px] text-foreground">{children}</span>
+    </div>
+  );
+}
+
 const Transactions = React.memo(function Transactions() {
   useEffect(() => { document.title = "Transactions | Penni"; }, []);
   const { openAssistant } = useAssistant();
@@ -273,7 +537,12 @@ const Transactions = React.memo(function Transactions() {
   const [month, setMonth] = useState(urlMonth || fmtMonth(now.getFullYear(), String(now.getMonth() + 1)));
   const [categorySpend, setCategorySpend] = useState([]);
   const [showPie, setShowPie] = useState(false);
-  const defaultFilters = useMemo(() => ({ search: "", category: "", source: "", tx_type: "", date_from: "", date_to: "", amount_min: "", amount_max: "", sort: "date", order: "desc", account_id: "" }), []);
+  const [overview, setOverview] = useState(null);
+  const [monthRows, setMonthRows] = useState([]);
+  const [previousMonthRows, setPreviousMonthRows] = useState([]);
+  const [ledgerTab, setLedgerTab] = useState("all");
+  const [viewMode, setViewMode] = useState("list");
+  const defaultFilters = useMemo(() => ({ search: "", category: "", source: "", tx_type: "", approval_status: "", merchant: "", date_from: "", date_to: "", amount_min: "", amount_max: "", sort: "date", order: "desc", account_id: "" }), []);
   const [filters, setFilters] = useState(() => {
     const fromUrl = {};
     for (const k of Object.keys(defaultFilters)) {
@@ -298,6 +567,11 @@ const Transactions = React.memo(function Transactions() {
   const [newCategoryModal, setNewCategoryModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [inspectTx, setInspectTx] = useState(null);
+  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const openInspector = useCallback((transaction) => {
+    setInspectTx(transaction);
+    setInspectorOpen(true);
+  }, []);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewTx, setReviewTx] = useState(null);
   const [reviewSuggestions, setReviewSuggestions] = useState([]);
@@ -312,7 +586,7 @@ const Transactions = React.memo(function Transactions() {
   const [transferSaving, setTransferSaving] = useState(false);
 
 
-  // ── Maaser ledger state ──
+  // â”€â”€ Maaser ledger state â”€â”€
   const [maaserCfg, setMaaserCfg] = useState({ enabled: false, percent: 10 });
   const [maaserSum, setMaaserSum] = useState(null);
   const [maaserBusy, setMaaserBusy] = useState(false);
@@ -407,7 +681,7 @@ const Transactions = React.memo(function Transactions() {
       if (data.enabled === false) {
         toast.error("Turn auto-Maaser on first");
       } else {
-        const parts = [`Accrued maaser for ${data.created} income tx · ${fmt(data.total_amount)}`];
+        const parts = [`Accrued maaser for ${data.created} income tx Â· ${fmt(data.total_amount)}`];
         if (data.charity_applied > 0) {
           parts.push(`\nApplied ${data.charity_applied} charity tx (${fmt(data.charity_amount)}) against obligation`);
         }
@@ -437,7 +711,7 @@ const Transactions = React.memo(function Transactions() {
 
   const handleMaaserGive = () => {
     if (!maaserSum || maaserSum.balance_owed <= 0) {
-      toast.success("Nothing owed — you're up to date!");
+      toast.success("Nothing owed â€” you're up to date!");
       return;
     }
     setMaaserGiveAmount(maaserSum.balance_owed.toFixed(2));
@@ -576,6 +850,8 @@ const Transactions = React.memo(function Transactions() {
       if (filters.category) params.category = filters.category;
       if (filters.source) params.source = filters.source;
       if (filters.tx_type) params.tx_type = filters.tx_type;
+      if (filters.approval_status) params.approval_status = filters.approval_status;
+      if (filters.merchant) params.merchant = filters.merchant;
       if (filters.date_from) params.date_from = filters.date_from;
       if (filters.date_to) params.date_to = filters.date_to;
       if (filters.amount_min && !isNaN(filters.amount_min)) params.amount_min = parseFloat(filters.amount_min);
@@ -628,6 +904,41 @@ const Transactions = React.memo(function Transactions() {
   }, []);
   useEffect(() => { loadAccounts(); }, [loadAccounts]);
 
+  useEffect(() => {
+    let cancelled = false;
+    api.get("/dashboard/overview")
+      .then(({ data }) => { if (!cancelled) setOverview(data || null); })
+      .catch(() => { if (!cancelled) setOverview(null); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const [year, monthNumber] = month.split("-").map(Number);
+    const lastDay = new Date(year, monthNumber, 0).getDate();
+    const from = `${month}-01`;
+    const to = `${month}-${String(lastDay).padStart(2, "0")}`;
+    const previous = addMonth(month, -1);
+    const [previousYear, previousMonthNumber] = previous.split("-").map(Number);
+    const previousLastDay = new Date(previousYear, previousMonthNumber, 0).getDate();
+    const params = { limit: 1000, sort: "date", order: "desc" };
+    Promise.all([
+      api.get("/transactions", { params: { ...params, date_from: from, date_to: to } }),
+      api.get("/transactions", { params: { ...params, date_from: `${previous}-01`, date_to: `${previous}-${String(previousLastDay).padStart(2, "0")}` } }),
+    ])
+      .then(([currentResponse, previousResponse]) => {
+        if (cancelled) return;
+        setMonthRows(currentResponse.data?.transactions || []);
+        setPreviousMonthRows(previousResponse.data?.transactions || []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setMonthRows([]);
+        setPreviousMonthRows([]);
+      });
+    return () => { cancelled = true; };
+  }, [month]);
+
   const applyGregorianMonth = useCallback((mm) => {
     setOffset(0);
     setMonth(mm);
@@ -646,6 +957,15 @@ const Transactions = React.memo(function Transactions() {
   })();
 
   const isCurrentMonth = month === fmtMonth(new Date().getFullYear(), String(new Date().getMonth() + 1));
+  const rangeLabel = useMemo(() => {
+    if (!filters.date_from || !filters.date_to) return monthLabel;
+    const format = (value) => {
+      const date = new Date(`${value}T00:00:00`);
+      if (Number.isNaN(date.getTime())) return value;
+      return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    };
+    return `${format(filters.date_from)} â€“ ${format(filters.date_to)}`;
+  }, [filters.date_from, filters.date_to, monthLabel]);
 
   // Set initial date filters to current month if no date params in URL
   useEffect(() => {
@@ -657,21 +977,43 @@ const Transactions = React.memo(function Transactions() {
 
   const activeFilters = useMemo(() => {
     const chips = [];
-    if (filters.tx_type) chips.push({ key: "tx_type", label: filters.tx_type === "income" ? "Income" : "Expense" });
+    if (filters.tx_type) chips.push({ key: "tx_type", label: filters.tx_type === "income" ? "Income" : filters.tx_type === "transfer" ? "Transfer" : "Expense" });
+    if (filters.approval_status) chips.push({ key: "approval_status", label: filters.approval_status === "unapproved" ? "Unapproved" : filters.approval_status });
     if (filters.source) chips.push({ key: "source", label: SOURCE_LABELS[filters.source] || filters.source });
     if (filters.category) chips.push({ key: "category", label: filters.category });
-    if (filters.amount_min) chips.push({ key: "amount_min", label: `≥${fmt(filters.amount_min)}` });
-    if (filters.amount_max) chips.push({ key: "amount_max", label: `≤${fmt(filters.amount_max)}` });
+    if (filters.merchant) chips.push({ key: "merchant", label: filters.merchant });
+    if (filters.account_id) chips.push({ key: "account_id", label: accounts.find((account) => account.account_id === filters.account_id)?.name || "Account" });
+    if (filters.amount_min) chips.push({ key: "amount_min", label: `â‰¥ ${formatCurrency(filters.amount_min)}` });
+    if (filters.amount_max) chips.push({ key: "amount_max", label: `â‰¤ ${formatCurrency(filters.amount_max)}` });
     if (filters.date_from) chips.push({ key: "date_from", label: `From ${filters.date_from}` });
     if (filters.date_to) chips.push({ key: "date_to", label: `To ${filters.date_to}` });
     return chips;
-  }, [filters]);
+  }, [accounts, filters]);
+
+  const selectLedgerTab = useCallback((tab) => {
+    setLedgerTab(tab);
+    setOffset(0);
+    setFilters((previous) => ({
+      ...previous,
+      tx_type: tab === "expenses" ? "expense" : tab === "income" ? "income" : tab === "transfers" ? "transfer" : "",
+      approval_status: tab === "unapproved" ? "unapproved" : "",
+    }));
+  }, []);
 
   const clearAllFilters = useCallback(() => {
     setSearchInput("");
+    setLedgerTab("all");
+    setOffset(0);
     const mm = fmtMonth(new Date().getFullYear(), String(new Date().getMonth() + 1));
-    applyGregorianMonth(mm);
-  }, [applyGregorianMonth]);
+    const [year, monthNumber] = mm.split("-").map(Number);
+    const lastDay = new Date(year, monthNumber, 0).getDate();
+    setMonth(mm);
+    setFilters({
+      ...defaultFilters,
+      date_from: `${mm}-01`,
+      date_to: `${mm}-${String(lastDay).padStart(2, "0")}`,
+    });
+  }, [defaultFilters]);
 
   const totalPages = Math.ceil(total / limit);
   const currentPage = Math.floor(offset / limit) + 1;
@@ -699,7 +1041,7 @@ const Transactions = React.memo(function Transactions() {
     try {
       const { data } = await api.post("/budget-system/classify", { description: description.trim(), amount });
       setClassification(data);
-      // Auto-fill category from top suggestion if very confident (≥ 95%)
+      // Auto-fill category from top suggestion if very confident (â‰¥ 95%)
       const top = data.suggestions?.[0];
       if (top && top.confidence >= 0.95 && !form.category) {
         setForm(prev => ({ ...prev, category: top.category, budget_type: top.budget_type || "", occasion: top.occasion || "", merchant: top.merchant || "" }));
@@ -875,7 +1217,7 @@ const Transactions = React.memo(function Transactions() {
     }
   }, [allDisplayedSelected, allDisplayed]);
 
-  // ── Desktop power-user keyboard shortcuts ──
+  // â”€â”€ Desktop power-user keyboard shortcuts â”€â”€
   useKeyboardShortcut("n", () => { if (!open) openAdd(); }, { enabled: !open });
   useKeyboardShortcut("/", () => { searchRef.current?.focus(); });
   useKeyboardShortcut("r", () => { load(); }, { when: !open });
@@ -948,6 +1290,31 @@ const Transactions = React.memo(function Transactions() {
       }
     );
   }, [selectedIds, load, showConfirm]);
+
+  const duplicateSelected = useCallback(async () => {
+    const rows = (aiResults?.transactions || txs).filter((transaction) => selectedIds.has(transaction.transaction_id));
+    if (rows.length === 0) return;
+    try {
+      await Promise.all(rows.map((transaction) => api.post("/transactions", {
+        amount: transaction.amount,
+        currency: transaction.currency || "GBP",
+        description: transaction.description || transaction.merchant || "Transaction",
+        merchant: transaction.merchant || undefined,
+        category: transaction.category || undefined,
+        date: today(),
+        account_id: transaction.account_id,
+        is_income: Number(transaction.amount) > 0,
+        is_transfer: Boolean(transaction.is_transfer),
+        notes: transaction.notes || undefined,
+        source: "manual",
+      })));
+      toast.success(`Duplicated ${rows.length} transaction${rows.length > 1 ? "s" : ""}`);
+      setSelectedIds(new Set());
+      await load();
+    } catch (error) {
+      toast.error(formatApiError(error?.response?.data?.detail) || "Could not duplicate transactions");
+    }
+  }, [aiResults, load, selectedIds, txs]);
 
   const clearAllMatching = useCallback(async () => {
     const label = filters.source ? `all "${SOURCE_LABELS[filters.source] || filters.source}"` : "all matching";
@@ -1148,7 +1515,83 @@ const Transactions = React.memo(function Transactions() {
   const netTotal = incomeTotal - expenseTotal;
   const [showSearch, setShowSearch] = useState(false);
 
+  const accountsById = useMemo(
+    () => Object.fromEntries(accounts.map((account) => [account.account_id, account])),
+    [accounts],
+  );
+
+  const tabCounts = useMemo(() => {
+    const approved = monthRows.filter((transaction) => (
+      (transaction.approval_status || "approved") === "approved" &&
+      (transaction.category_approval_status || "approved") === "approved"
+    ));
+    return {
+      all: monthRows.length || total,
+      expenses: monthRows.filter((transaction) => Number(transaction.amount) < 0 && !transaction.is_transfer).length,
+      income: monthRows.filter((transaction) => Number(transaction.amount) > 0 && !transaction.is_transfer).length,
+      transfers: monthRows.filter((transaction) => transaction.is_transfer).length,
+      unapproved: monthRows.filter((transaction) => (
+        transaction.approval_status === "unapproved" || transaction.category_approval_status === "unapproved"
+      )).length,
+      approved: approved.length,
+    };
+  }, [monthRows, total]);
+
+  const monthTotals = useMemo(() => {
+    const totals = monthRows.reduce((result, transaction) => {
+      if (transaction.is_transfer) return result;
+      const amount = Number(transaction.amount) || 0;
+      if (amount > 0) result.income += amount;
+      else result.expenses += Math.abs(amount);
+      return result;
+    }, { income: 0, expenses: 0 });
+    return { ...totals, net: totals.income - totals.expenses };
+  }, [monthRows]);
+
+  const previousMonthTotals = useMemo(() => {
+    return previousMonthRows.reduce((result, transaction) => {
+      if (transaction.is_transfer) return result;
+      const amount = Number(transaction.amount) || 0;
+      if (amount > 0) result.income += amount;
+      else result.expenses += Math.abs(amount);
+      return result;
+    }, { income: 0, expenses: 0 });
+  }, [previousMonthRows]);
+
+  const sparklines = useMemo(() => {
+    const [year, monthNumber] = month.split("-").map(Number);
+    const days = new Date(year, monthNumber, 0).getDate();
+    const income = Array.from({ length: days }, () => 0);
+    const expenses = Array.from({ length: days }, () => 0);
+    monthRows.forEach((transaction) => {
+      if (transaction.is_transfer) return;
+      const day = Number(String(transaction.date || "").slice(8, 10));
+      if (!day || day > days) return;
+      const amount = Number(transaction.amount) || 0;
+      if (amount > 0) income[day - 1] += amount;
+      else expenses[day - 1] += Math.abs(amount);
+    });
+    let running = 0;
+    const net = income.map((value, index) => {
+      running += value - expenses[index];
+      return running;
+    });
+    return { income, expenses, net };
+  }, [month, monthRows]);
+
+  const deltaFor = (current, previous) => {
+    if (!previous) return null;
+    return Math.round(((current - previous) / previous) * 100);
+  };
+  const incomeDelta = deltaFor(monthTotals.income, previousMonthTotals.income);
+  const expenseDelta = deltaFor(monthTotals.expenses, previousMonthTotals.expenses);
+  const previousMonthName = MONTH_NAMES[Number(addMonth(month, -1).split("-")[1]) - 1];
+
+  const selectedTransactions = (aiResults?.transactions || txs).filter((transaction) => selectedIds.has(transaction.transaction_id));
+  const selectedTotal = selectedTransactions.reduce((sum, transaction) => sum + (Number(transaction.amount) || 0), 0);
+
   const mobileRows = aiResults?.transactions || txs;
+  const panelTransaction = inspectTx || txs[0] || null;
   const mobileDateGroups = useMemo(() => {
     if (filters.sort !== "date" || mobileRows.length === 0) return null;
     return mobileRows.reduce((groups, tx) => {
@@ -1185,273 +1628,382 @@ const Transactions = React.memo(function Transactions() {
   return (
     <div className="page-stack pb-4" data-testid="transactions-root">
 
-      <PageHeader
-        eyebrow="Ledger"
-        title="Transactions"
-        description="Every payment, deposit and transfer, with the detail you need close at hand."
-        actions={
-          <Button variant="outlinePill" size="pill" onClick={() => openAssistant({ prompt: "Help me understand my recent transactions" })}>
-            <Sparkles className="h-4 w-4" />
-            Ask Penni
-          </Button>
-        }
-      />
-
-      {/* ─── Ledger toolbar ─── */}
-      <Surface className="space-y-3 p-3 sm:p-4">
-        <div className="space-y-3">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
-            {/* Middle: Month picker + stats */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <MonthPicker
-                  label={monthLabel}
-                  onPrev={() => applyGregorianMonth(addMonth(month, -1))}
-                  onNext={() => applyGregorianMonth(addMonth(month, 1))}
-                  onToday={() => applyGregorianMonth(fmtMonth(new Date().getFullYear(), String(new Date().getMonth() + 1)))}
-                  isToday={isCurrentMonth}
-                />
-              </div>
-              {(!someSelected) ? (
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                  <span>Income <strong className="text-emerald font-medium tabular-nums">{fmt(incomeTotal)}</strong></span>
-                  <span className="text-muted-foreground/30">·</span>
-                  <span>Expenses <strong className="text-ruby font-medium tabular-nums">{fmt(expenseTotal)}</strong></span>
-                  <span className="text-muted-foreground/30">·</span>
-                  <span>Net <strong className={`font-medium tabular-nums ${netTotal >= 0 ? "text-emerald" : "text-ruby"}`}>{netTotal >= 0 ? "+" : ""}{fmt(netTotal)}</strong></span>
-                  <span className="ml-auto text-xs text-muted-foreground/50">{total} transaction{total !== 1 ? "s" : ""}</span>
-                </div>
+      <div className={`grid items-start gap-4 ${activeTab === "ledger" && inspectorOpen ? "xl:grid-cols-[minmax(0,1fr)_304px]" : ""}`}>
+        <div className="min-w-0 space-y-4">
+          <div className="flex flex-col gap-4 pl-0 lg:flex-row lg:items-start lg:justify-between xl:pl-[14px]">
+            <div className="min-w-0">
+              <h1 className="text-[30px] font-semibold leading-none tracking-[-0.045em]">
+                {activeTab === "maaser" ? "Maaser" : "Transactions"}
+              </h1>
+              <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+                {activeTab === "maaser"
+                  ? "Track your giving, review the audit trail and keep your obligation up to date."
+                  : "View, search and manage all your income, expenses and transfers."}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 lg:mt-2">
+              {activeTab === "maaser" ? (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("ledger")}
+                  className="inline-flex h-9 items-center gap-2 rounded-[10px] border border-border bg-card px-3 text-[12px] font-medium text-muted-foreground transition hover:text-foreground"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" /> Back to transactions
+                </button>
               ) : (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="text-muted-foreground">{selectedIds.size} selected</span>
-                    <button onClick={() => setSelectedIds(new Set())} className="text-muted-foreground hover:text-foreground">Clear</button>
+                <>
+                  <div className="inline-flex h-[36px] items-center rounded-[10px] border border-border bg-card px-1 shadow-[0_1px_2px_hsl(var(--foreground)/0.03)]">
+                    <button
+                      type="button"
+                      onClick={() => applyGregorianMonth(addMonth(month, -1))}
+                      className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                      aria-label="Previous month"
+                    >
+                      <CalendarDays className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="min-w-[104px] px-1 text-center text-[12px] font-medium">{monthLabel}</span>
+                    <button
+                      type="button"
+                      onClick={() => applyGregorianMonth(addMonth(month, 1))}
+                      className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                      aria-label="Next month"
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="inline-flex h-[36px] items-stretch overflow-hidden rounded-[10px] bg-emerald text-white shadow-[0_6px_16px_hsl(var(--emerald)/0.18)]">
+                    <button
+                      type="button"
+                      onClick={openAdd}
+                      data-testid="add-transaction"
+                      className="inline-flex min-w-[160px] items-center justify-center gap-1.5 px-3.5 text-[12px] font-semibold transition hover:bg-emerald/90"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Add transaction
+                    </button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <button className="text-xs px-2.5 py-1 rounded-full border border-ruby/40 text-ruby hover:bg-ruby/5 transition-colors">
-                          <Trash2 className="h-3 w-3 inline mr-1" /> Bulk ({selectedIds.size})
+                        <button
+                          type="button"
+                          className="grid w-8 place-items-center border-l border-white/20 transition hover:bg-emerald/90"
+                          aria-label="More transaction actions"
+                        >
+                          <ChevronDown className="h-3.5 w-3.5" />
                         </button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuSub>
-                          <DropdownMenuSubTrigger>Set category</DropdownMenuSubTrigger>
-                          <DropdownMenuSubContent>
-                            {Object.entries(groupCatsBySection(selectedCats.categories || [])).map(([section, cats]) => (
-                              <React.Fragment key={section}>
-                                <DropdownMenuLabel className="text-xs text-muted-foreground font-semibold uppercase tracking-wider px-2 py-1">{section}</DropdownMenuLabel>
-                                {cats.map(c => (
-                                  <DropdownMenuItem key={c.name} onClick={() => bulkCategory(c.name)}>{c.name}</DropdownMenuItem>
-                                ))}
-                              </React.Fragment>
-                            ))}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => { setNewCategoryName(""); setNewCategoryModal(true); }}>
-                              ➕ Add custom category
-                            </DropdownMenuItem>
-                          </DropdownMenuSubContent>
-                        </DropdownMenuSub>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => bulkApprove(false)}>
-                          <CheckCircle2 className="h-4 w-4 mr-2" /> Approve selected
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={openAdd}>
+                          <Plus className="mr-2 h-4 w-4" /> Add transaction
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => bulkApprove(true)}>
-                          <Star className="h-4 w-4 mr-2" /> Approve high confidence
+                        <DropdownMenuItem onClick={() => setCompareOpen(true)}>
+                          <BarChart3 className="mr-2 h-4 w-4" /> Compare periods
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={exportCsv}>
+                          <Download className="mr-2 h-4 w-4" /> Export CSV
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={bulkDelete} className="text-ruby">
-                          <Trash2 className="h-4 w-4 mr-2" /> Delete {selectedIds.size}
+                        <DropdownMenuItem onClick={() => openAssistant({ prompt: "Help me understand my recent transactions" })}>
+                          <Sparkles className="mr-2 h-4 w-4" /> Ask Penni
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="grid h-9 w-9 place-items-center rounded-full border border-border bg-card text-muted-foreground transition hover:text-foreground"
+                        aria-label="Transaction options"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setCompareOpen(true)}>
+                        <BarChart3 className="mr-2 h-4 w-4" /> Compare periods
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={exportCsv}>
+                        <Download className="mr-2 h-4 w-4" /> Export CSV
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setShowPie(true)}>
+                        <PieChartIcon className="mr-2 h-4 w-4" /> Spend breakdown
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => openAssistant({ prompt: "Help me understand my recent transactions" })}>
+                        <Sparkles className="mr-2 h-4 w-4" /> Ask Penni
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setActiveTab("maaser")}>
+                        <Star className="mr-2 h-4 w-4" /> Maaser ledger
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
               )}
             </div>
+          </div>
 
-            {/* Right: Action buttons */}
-            <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:shrink-0">
-              {/* Search bar (inline in header) */}
-              {showSearch && (
-                <div className="relative group/search w-full sm:w-auto">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none transition-transform duration-200 group-focus-within/search:scale-110" />
-                  <input ref={searchRef} value={searchInput} onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
-                    placeholder="Search..."
-                    className="w-full sm:w-44 h-8 pl-8 pr-8 rounded-full bg-secondary/40 border border-transparent text-xs placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring/30 focus:outline-none transition-all" />
-                  {filters.search && <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"><X className="h-3.5 w-3.5" /></button>}
+          {activeTab === "ledger" && (
+            <>
+              <div className="grid gap-[16px] px-0 sm:grid-cols-3 xl:px-[14px] 2xl:grid-cols-[276px_276px_minmax(0,1fr)]">
+                <div className="surface rounded-[16px] p-3.5">
+                  <div className="grid grid-cols-[38px_minmax(0,1fr)_90px] items-center gap-3">
+                    <span className="grid h-[38px] w-[38px] place-items-center rounded-full bg-emerald/10 text-emerald">
+                      <TrendingUp className="h-[18px] w-[18px]" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[10.5px] text-muted-foreground">Income</p>
+                      <p className="money-tabular mt-0.5 truncate text-[23px] font-semibold leading-none tracking-[-0.03em]">{formatCurrency(monthTotals.income || incomeTotal)}</p>
+                      {incomeDelta !== null ? (
+                        <p className={`mt-1.5 text-[10px] font-medium ${incomeDelta >= 0 ? "text-emerald" : "text-ruby"}`}>
+                          {incomeDelta >= 0 ? "â†‘" : "â†“"} {Math.abs(incomeDelta)}% vs {previousMonthName?.slice(0, 3)}
+                        </p>
+                      ) : null}
+                    </div>
+                    <Sparkline values={sparklines.income} height={38} stroke="hsl(var(--emerald))" />
+                  </div>
                 </div>
-              )}
+                <div className="surface rounded-[16px] p-3.5">
+                  <div className="grid grid-cols-[38px_minmax(0,1fr)_90px] items-center gap-3">
+                    <span className="grid h-[38px] w-[38px] place-items-center rounded-full bg-ruby/10 text-ruby">
+                      <TrendingDown className="h-[18px] w-[18px]" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[10.5px] text-muted-foreground">Expenses</p>
+                      <p className="money-tabular mt-0.5 truncate text-[23px] font-semibold leading-none tracking-[-0.03em]">{formatCurrency(monthTotals.expenses || expenseTotal)}</p>
+                      {expenseDelta !== null ? (
+                        <p className={`mt-1.5 text-[10px] font-medium ${expenseDelta > 0 ? "text-ruby" : "text-emerald"}`}>
+                          {expenseDelta > 0 ? "â†‘" : "â†“"} {Math.abs(expenseDelta)}% vs {previousMonthName?.slice(0, 3)}
+                        </p>
+                      ) : null}
+                    </div>
+                    <Sparkline values={sparklines.expenses} height={38} stroke="hsl(var(--ruby))" />
+                  </div>
+                </div>
+                <div className="surface rounded-[16px] p-3.5">
+                  <div className="grid grid-cols-[38px_minmax(0,1fr)_90px] items-center gap-3">
+                    <span className="grid h-[38px] w-[38px] place-items-center rounded-full bg-secondary text-muted-foreground">
+                      <Calculator className="h-[18px] w-[18px]" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[10.5px] text-muted-foreground">Net</p>
+                      <p className={`money-tabular mt-0.5 truncate text-[23px] font-semibold leading-none tracking-[-0.03em] ${monthTotals.net >= 0 ? "text-emerald" : "text-ruby"}`}>
+                        {formatCurrency(monthTotals.net || netTotal, { signed: true })}
+                      </p>
+                      <p className="mt-1.5 text-[10px] text-muted-foreground">{monthLabel}</p>
+                    </div>
+                    <Sparkline values={sparklines.net} height={38} stroke={monthTotals.net >= 0 ? "hsl(var(--emerald))" : "hsl(var(--ruby))"} />
+                  </div>
+                </div>
+              </div>
 
-              {/* Search toggle */}
-              <button
-                onClick={() => setShowSearch((s) => !s)}
-                className={`h-8 w-8 shrink-0 rounded-full grid place-items-center transition-all duration-200 ${
-                  showSearch || filters.search
-                    ? "bg-emerald text-white shadow-sm"
-                    : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
-                }`}
-                aria-label="Search"
-              >
-                <Search className="h-3.5 w-3.5" />
-              </button>
-
-              {/* Sort + order (desktop) */}
-              <div className="hidden sm:flex items-center gap-0.5">
-                <select value={filters.sort} onChange={(e) => setFilter("sort", e.target.value)}
-                  className="h-8 px-2 rounded-lg bg-secondary/50 border border-border/50 text-[11px] font-medium focus:outline-none focus:border-ring">
-                  <option value="date">Date</option>
-                  <option value="amount">Amount</option>
-                  <option value="description">Description</option>
+              <div className="flex flex-wrap items-center gap-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setShowSearch((visible) => !visible)}
+                  className={`mr-2 grid h-9 w-10 shrink-0 place-items-center rounded-[9px] border transition ${
+                    showSearch || filters.search
+                      ? "border-emerald/30 bg-emerald/10 text-emerald"
+                      : "border-border bg-card text-muted-foreground hover:text-foreground"
+                  }`}
+                  aria-label="Search transactions"
+                >
+                  <Search className="h-3.5 w-3.5" />
+                </button>
+                {showSearch ? (
+                  <div className="relative w-full sm:w-48">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      ref={searchRef}
+                      value={searchInput}
+                      onChange={(event) => { setSearchInput(event.target.value); debouncedSetSearch(event.target.value); }}
+                      placeholder="Search transactions..."
+                      className="h-9 w-full rounded-[9px] border border-border bg-card pl-8 pr-8 text-[11.5px] outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10"
+                    />
+                    {filters.search ? (
+                      <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="Clear search">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="inline-flex h-9 w-[179px] shrink-0 items-center gap-1.5 rounded-[9px] border border-border bg-card px-2.5 text-[11px] font-medium text-foreground transition hover:bg-secondary/50">
+                      <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <span className="truncate">{rangeLabel}</span>
+                      <ChevronDown className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem onClick={() => applyGregorianMonth(fmtMonth(new Date().getFullYear(), String(new Date().getMonth() + 1)))}>This month</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => applyGregorianMonth(addMonth(fmtMonth(new Date().getFullYear(), String(new Date().getMonth() + 1)), -1))}>Last month</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => applyGregorianMonth(addMonth(fmtMonth(new Date().getFullYear(), String(new Date().getMonth() + 1)), -2))}>Two months ago</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { setMonth(fmtMonth(new Date().getFullYear(), "01")); setFilters((previous) => ({ ...previous, date_from: `${new Date().getFullYear()}-01-01`, date_to: `${new Date().getFullYear()}-12-31` })); }}>This year</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <select value={filters.account_id} onChange={(event) => toggleFilter("account_id", event.target.value)} className="h-9 w-[105px] shrink-0 rounded-[9px] border border-border bg-card px-2 text-[11px] font-medium outline-none focus:border-emerald/40">
+                  <option value="">All Accounts</option>
+                  {accounts.map((account) => <option key={account.account_id} value={account.account_id}>{account.name}</option>)}
                 </select>
-                <button onClick={() => setFilter("order", filters.order === "desc" ? "asc" : "desc")}
-                  className="h-8 w-7 grid place-items-center rounded-lg bg-secondary/50 border border-border/50 hover:bg-secondary/80 transition-colors">
-                  {filters.order === "desc" ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronUp className="h-3 w-3 text-muted-foreground" />}
+                <CategoryCombobox
+                  value={filters.category}
+                  onChange={(value) => toggleFilter("category", value)}
+                  categories={selectedCats.categories || selectedCats}
+                  placeholder="All Categories"
+                  className="h-9 w-[112px] shrink-0 rounded-[9px] border border-border bg-card px-2 text-[11px] font-medium text-foreground"
+                  allowClear
+                  onCategoryCreated={loadCats}
+                />
+                <select value={filters.tx_type} onChange={(event) => { toggleFilter("tx_type", event.target.value); setLedgerTab(event.target.value === "expense" ? "expenses" : event.target.value === "income" ? "income" : event.target.value === "transfer" ? "transfers" : "all"); }} className="h-9 w-[86px] shrink-0 rounded-[9px] border border-border bg-card px-2 text-[11px] font-medium outline-none focus:border-emerald/40">
+                  <option value="">All Types</option>
+                  <option value="income">Income</option>
+                  <option value="expense">Expense</option>
+                  <option value="transfer">Transfer</option>
+                </select>
+                <select value={filters.approval_status} onChange={(event) => { toggleFilter("approval_status", event.target.value); setLedgerTab(event.target.value === "unapproved" ? "unapproved" : "all"); }} className="h-9 w-[101px] shrink-0 rounded-[9px] border border-border bg-card px-2 text-[11px] font-medium outline-none focus:border-emerald/40">
+                  <option value="">All Statuses</option>
+                  <option value="approved">Approved</option>
+                  <option value="unapproved">Unapproved</option>
+                  <option value="failed">Failed</option>
+                </select>
+                <input
+                  value={filters.merchant}
+                  onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, merchant: event.target.value })); }}
+                  placeholder="All Merchants"
+                  className="h-9 w-[100px] shrink-0 rounded-[9px] border border-border bg-card px-2 text-[11px] outline-none transition focus:border-emerald/40"
+                />
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <button className={`grid h-9 w-8 shrink-0 place-items-center rounded-[9px] border transition ${
+                      activeFilters.length > 0
+                        ? "border-emerald/30 bg-emerald/10 text-emerald"
+                        : "border-border bg-card text-muted-foreground hover:text-foreground"
+                    }`} aria-label="Filters">
+                      <Filter className="h-3.5 w-3.5" />
+                    </button>
+                  </SheetTrigger>
+                  <SheetContent side="right" className="w-full sm:max-w-md">
+                    <SheetHeader>
+                      <SheetTitle>Filters</SheetTitle>
+                      <SheetDescription className="text-xs sm:text-sm">Refine your transaction list</SheetDescription>
+                    </SheetHeader>
+                    <div className="mt-4 space-y-4 sm:mt-6 sm:space-y-5">
+                      <div className="flex items-center gap-2 sm:hidden">
+                        <select value={filters.sort} onChange={(event) => setFilter("sort", event.target.value)} className="h-10 flex-1 rounded-xl border border-transparent bg-secondary/50 px-3 text-sm outline-none focus:border-ring">
+                          <option value="date">Sort by date</option>
+                          <option value="amount">Sort by amount</option>
+                          <option value="description">Sort by description</option>
+                        </select>
+                        <button onClick={() => setFilter("order", filters.order === "desc" ? "asc" : "desc")} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-transparent bg-secondary/50 transition-colors hover:bg-secondary/80" aria-label="Toggle sort order">
+                          {filters.order === "desc" ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronUp className="h-4 w-4 text-muted-foreground" />}
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                        <select value={filters.source} onChange={(event) => toggleFilter("source", event.target.value)} className="h-10 rounded-xl border border-transparent bg-secondary/50 px-4 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30">
+                          <option value="">All sources</option>
+                          {Object.entries(SOURCE_LABELS).map(([key, value]) => <option key={key} value={key}>{value}</option>)}
+                        </select>
+                        <Input type="number" min="0" step="0.01" placeholder="Min Â£" value={filters.amount_min} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, amount_min: event.target.value })); }} className="h-10 text-sm" />
+                        <Input type="number" min="0" step="0.01" placeholder="Max Â£" value={filters.amount_max} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, amount_max: event.target.value })); }} className="h-10 text-sm" />
+                        <Input type="date" value={filters.date_from} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, date_from: event.target.value })); }} className="h-10 text-sm" />
+                        <Input type="date" value={filters.date_to} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, date_to: event.target.value })); }} className="h-10 text-sm" />
+                      </div>
+                      <div className="space-y-3 border-t border-border pt-4">
+                        <p className="text-xs font-medium text-muted-foreground">AI search</p>
+                        <div className="flex items-center gap-2">
+                          <Input value={aiQuery} onChange={(event) => setAiQuery(event.target.value)} placeholder="e.g. 'grocery spending last month'" className="h-10 flex-1 text-sm" onKeyDown={(event) => event.key === "Enter" && runAiSearch()} />
+                          <Button onClick={runAiSearch} disabled={aiLoading || !aiQuery.trim()} variant="outlinePill" size="pillSm">
+                            {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                            Search
+                          </Button>
+                        </div>
+                        {aiResults ? (
+                          <div className="rounded-xl border border-emerald/30 bg-emerald/5 p-3 text-sm">
+                            <p className="mb-1 font-medium text-emerald">AI results for &ldquo;{aiResults.query}&rdquo; ({aiResults.total} matches)</p>
+                            <button onClick={() => { setAiResults(null); setAiQuery(""); }} className="text-xs text-muted-foreground hover:text-foreground">Clear</button>
+                          </div>
+                        ) : null}
+                      </div>
+                      {activeFilters.length > 0 && total > 0 ? (
+                        <div className="flex items-center justify-between border-t border-border pt-4">
+                          <p className="text-xs text-muted-foreground">{total} transaction{total !== 1 ? "s" : ""} match current filters</p>
+                          <button onClick={clearAllMatching} className="rounded-full border border-ruby/40 px-3 py-1.5 text-xs text-ruby transition-colors hover:bg-ruby/5">
+                            <Trash2 className="mr-1 inline h-3 w-3" /> Delete all {total}
+                          </button>
+                        </div>
+                      ) : null}
+                      <div className="flex justify-end border-t border-border pt-4">
+                        <button onClick={clearAllFilters} className="text-sm text-muted-foreground hover:text-foreground">Clear all filters</button>
+                      </div>
+                    </div>
+                  </SheetContent>
+                </Sheet>
+                <button onClick={clearAllFilters} className="ml-1.5 h-9 w-[87px] shrink-0 rounded-[9px] border border-border bg-card px-3 text-[11px] font-medium text-muted-foreground transition hover:text-foreground">
+                  Reset
                 </button>
               </div>
 
-              {/* Filter */}
-              <Sheet>
-                <SheetTrigger asChild>
-                  <button className={`h-8 px-3 shrink-0 rounded-full text-xs font-medium transition-all duration-200 inline-flex items-center ${
-                    activeFilters.length > 0
-                      ? "bg-emerald/10 text-emerald border border-emerald/20"
-                      : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
-                  }`} aria-label="Filters">
-                    <Filter className="h-3 w-3" />
-                    <span className="ml-1 hidden min-[360px]:inline">Filters</span>
-                    {activeFilters.length > 0 && <span className="ml-1">{activeFilters.length}</span>}
-                  </button>
-                </SheetTrigger>
-              <SheetContent side="right" className="w-full sm:max-w-md">
-                <SheetHeader>
-                  <SheetTitle>Filters</SheetTitle>
-                  <SheetDescription className="text-xs sm:text-sm">Refine your transaction list</SheetDescription>
-                </SheetHeader>
-                <div className="mt-4 sm:mt-6 space-y-4 sm:space-y-5">
-                  <div className="flex items-center gap-2 sm:hidden">
-                    <select value={filters.sort} onChange={(e) => setFilter("sort", e.target.value)}
-                      className="h-10 flex-1 px-3 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:outline-none">
-                      <option value="date">Sort by date</option>
-                      <option value="amount">Sort by amount</option>
-                      <option value="description">Sort by description</option>
-                    </select>
-                    <button onClick={() => setFilter("order", filters.order === "desc" ? "asc" : "desc")}
-                      className="h-10 w-10 shrink-0 grid place-items-center rounded-xl bg-secondary/50 border border-transparent hover:bg-secondary/80 transition-colors" aria-label="Toggle sort order">
-                      {filters.order === "desc" ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronUp className="h-4 w-4 text-muted-foreground" />}
+              {activeFilters.filter((chip) => chip.key !== "date_from" && chip.key !== "date_to").length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {activeFilters.filter((chip) => chip.key !== "date_from" && chip.key !== "date_to").map((chip) => (
+                    <span key={chip.key} className="inline-flex items-center gap-1 rounded-full border border-emerald/20 bg-emerald/10 px-2 py-0.5 text-[10px] text-emerald">
+                      {chip.label}
+                      <button onClick={() => { setFilter(chip.key, ""); setOffset(0); }} className="hover:text-emerald/80" aria-label={`Remove ${chip.label} filter`}><X className="h-2.5 w-2.5" /></button>
+                    </span>
+                  ))}
+                  <button onClick={clearAllFilters} className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground">Clear</button>
+                </div>
+              ) : null}
+
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pt-[8px]">
+                <div className="flex min-w-0 items-center gap-4 overflow-x-auto xl:pl-[14px]">
+                  {[
+                    { key: "all", label: "All Transactions", count: tabCounts.all },
+                    { key: "expenses", label: "Expenses", count: tabCounts.expenses },
+                    { key: "income", label: "Income", count: tabCounts.income },
+                    { key: "transfers", label: "Transfers", count: tabCounts.transfers },
+                    { key: "unapproved", label: "Unapproved", count: tabCounts.unapproved },
+                  ].map((tab) => (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => selectLedgerTab(tab.key)}
+                      className={`-mb-px inline-flex h-10 shrink-0 items-center gap-1.5 border-b-2 text-[12px] transition ${
+                        ledgerTab === tab.key
+                          ? "border-emerald font-semibold text-foreground"
+                          : "border-transparent text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {tab.label}
+                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${ledgerTab === tab.key ? "bg-emerald/10 text-emerald" : "bg-secondary text-muted-foreground"}`}>{tab.count}</span>
                     </button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                    <select value={filters.tx_type} onChange={(e) => toggleFilter("tx_type", e.target.value)} className="h-10 px-4 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors">
-                      <option value="">All types</option><option value="income">Income</option><option value="expense">Expense</option>
-                    </select>
-                    <select value={filters.source} onChange={(e) => toggleFilter("source", e.target.value)} className="h-10 px-4 rounded-xl bg-secondary/50 border border-transparent text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors">
-                      <option value="">All sources</option>
-                      {Object.entries(SOURCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                    </select>
-                    <CategoryCombobox
-                      value={filters.category}
-                      onChange={(val) => toggleFilter("category", val)}
-                      categories={selectedCats.categories || selectedCats}
-                      placeholder="All categories"
-                      allowClear
-                      onCategoryCreated={loadCats}
-                    />
-                    <Input type="number" min="0" step="0.01" placeholder="Min £" value={filters.amount_min}
-                      onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_min: e.target.value })); }}
-                      className="text-sm h-10" />
-                    <Input type="number" min="0" step="0.01" placeholder="Max £" value={filters.amount_max}
-                      onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_max: e.target.value })); }}
-                      className="text-sm h-10" />
-                    <Input type="date" value={filters.date_from} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_from: e.target.value })); }} className="text-sm h-10" />
-                    <Input type="date" value={filters.date_to} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_to: e.target.value })); }} className="text-sm h-10" />
-                  </div>
-
-                  <div className="border-t border-border pt-4 space-y-3">
-                    <p className="text-xs font-medium text-muted-foreground">AI search</p>
-                    <div className="flex items-center gap-2">
-                      <Input value={aiQuery} onChange={(e) => setAiQuery(e.target.value)}
-                        placeholder="e.g. 'grocery spending last month'"
-                        className="flex-1 text-sm h-10" onKeyDown={(e) => e.key === "Enter" && runAiSearch()} />
-                      <Button onClick={runAiSearch} disabled={aiLoading || !aiQuery.trim()} variant="outlinePill" size="pillSm">
-                        {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                        Search
-                      </Button>
-                    </div>
-                    {aiResults && (
-                      <div className="rounded-xl border border-emerald/30 bg-emerald/5 p-3 text-sm">
-                        <p className="font-medium text-emerald mb-1">AI results for &ldquo;{aiResults.query}&rdquo; ({aiResults.total} matches)</p>
-                        <button onClick={() => { setAiResults(null); setAiQuery(""); }} className="text-xs text-muted-foreground hover:text-foreground">Clear</button>
-                      </div>
-                    )}
-                  </div>
-
-                  {(filters.source || filters.category || filters.tx_type || filters.search) && total > 0 && (
-                    <div className="border-t border-border pt-4 flex items-center justify-between">
-                      <p className="text-xs text-muted-foreground">
-                        {total} transaction{total !== 1 ? "s" : ""} match current filters
-                      </p>
-                      <button onClick={clearAllMatching}
-                        className="text-xs px-3 py-1.5 rounded-full border border-ruby/40 text-ruby hover:bg-ruby/5 transition-colors">
-                        <Trash2 className="h-3 w-3 inline mr-1" />
-                        Delete all {total}
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="border-t border-border pt-4 flex justify-end">
-                    <button onClick={clearAllFilters} className="text-sm text-muted-foreground hover:text-foreground">
-                      Clear all filters
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 pb-1 xl:pr-[10px]">
+                  <select value={filters.sort} onChange={(event) => setFilter("sort", event.target.value)} className="h-8 rounded-[8px] border border-border bg-card px-2 text-[11px] font-medium outline-none">
+                    <option value="date">Sort: Date (newest)</option>
+                    <option value="amount">Sort: Amount</option>
+                    <option value="description">Sort: Description</option>
+                  </select>
+                  <div className="flex overflow-hidden rounded-[8px] border border-border bg-card">
+                    <button onClick={() => setViewMode("list")} className={`grid h-8 w-8 place-items-center transition ${viewMode === "list" ? "bg-emerald/10 text-emerald" : "text-muted-foreground hover:text-foreground"}`} aria-label="List view">
+                      <List className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={() => setViewMode("grid")} className={`grid h-8 w-8 place-items-center border-l border-border transition ${viewMode === "grid" ? "bg-emerald/10 text-emerald" : "text-muted-foreground hover:text-foreground"}`} aria-label="Grid view">
+                      <LayoutGrid className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
-              </SheetContent>
-            </Sheet>
-
-            <button onClick={openAdd} className="h-8 px-3.5 rounded-full bg-emerald text-white text-xs font-medium hover:bg-emerald/90 active:scale-95 transition-all duration-200 shadow-sm" data-testid="add-transaction">
-              <Plus className="h-3 w-3 mr-1 inline" /> Add
-            </button>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="h-8 w-8 rounded-full grid place-items-center text-muted-foreground hover:bg-secondary/60 hover:text-foreground transition-all duration-200">
-                  <MoreHorizontal className="h-3.5 w-3.5" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => setCompareOpen(true)}>
-                  <BarChart3 className="h-4 w-4 mr-2" /> Compare periods
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={exportCsv}>
-                  <Download className="h-4 w-4 mr-2" /> Export CSV
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-
-        {/* Active filter chips (except date range, handled by month strip) */}
-        {activeFilters.filter(c => c.key !== "date_from" && c.key !== "date_to").length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-3">
-            {activeFilters.filter(c => c.key !== "date_from" && c.key !== "date_to").map((chip) => (
-              <span key={chip.key} className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald/10 text-emerald border border-emerald/20">
-                {chip.label}
-                <button onClick={() => { setFilter(chip.key, ""); setOffset(0); }} className="hover:text-emerald/80"><X className="h-2.5 w-2.5" /></button>
-              </span>
-            ))}
-            <button onClick={clearAllFilters} className="text-[10px] px-2 py-0.5 rounded-full border border-border text-muted-foreground hover:text-foreground">Clear</button>
-          </div>
-        )}
-        </div>
-      </Surface>
+              </div>
+            </>
+          )}
 
       {/* Spend breakdown pie chart */}
-      {categorySpend.length > 0 && (
+      {showPie && categorySpend.length > 0 && (
         <div className="rounded-xl border border-border/50 bg-card/40 p-3 backdrop-blur-sm sm:rounded-2xl sm:p-5">
           <button onClick={() => setShowPie(!showPie)} className="flex items-center justify-between w-full text-left">
             <h3 className="flex items-center gap-2 text-[13px] font-semibold text-foreground sm:text-sm">
               <span className="grid h-5 w-5 place-items-center rounded-md bg-muted/70 sm:h-6 sm:w-6"><PieChartIcon className="h-3 w-3 text-muted-foreground/80" /></span>
-              Spend breakdown <span className="hidden text-xs font-normal text-muted-foreground min-[360px]:inline">· {monthLabel}</span>
+              Spend breakdown <span className="hidden text-xs font-normal text-muted-foreground min-[360px]:inline">Â· {monthLabel}</span>
             </h3>
             <div className="flex items-center gap-2">
               <span className="hidden text-xs text-muted-foreground min-[360px]:inline">{categorySpend.length} categories</span>
@@ -1459,33 +2011,20 @@ const Transactions = React.memo(function Transactions() {
             </div>
           </button>
           {showPie && (
-            <React.Suspense fallback={<div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">Loading chart…</div>}>
+            <React.Suspense fallback={<div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">Loading chartâ€¦</div>}>
               <CategoryPieChart data={categorySpend} />
             </React.Suspense>
           )}
         </div>
       )}
 
-      {/* ─── Tabs ─── */}
-      <div className="flex gap-1 border-b border-border">
-        {[
-          { key: "ledger", label: "Ledger", icon: BarChart3 },
-          { key: "maaser", label: "Maaser", icon: Star },
-        ].map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-            className={`inline-flex items-center gap-1.5 text-xs px-3 py-2 -mb-px border-b-2 transition-colors capitalize ${
-              activeTab === tab.key ? "border-emerald text-foreground font-medium" : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}>
-            <tab.icon className="h-3.5 w-3.5" />
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* â”€â”€â”€ Tabs â”€â”€â”€ */}
 
-      {/* ───── Ledger tab ───── */}
+
+      {/* â”€â”€â”€â”€â”€ Ledger tab â”€â”€â”€â”€â”€ */}
       {activeTab === "ledger" && <>
         {/* Transaction table */}
-        <div className="rounded-xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden">
+        <div className="surface overflow-hidden rounded-[14px] p-0">
           {loading ? (
             <SkeletonTable rows={8} className="p-3" />
           ) : (aiResults?.transactions || txs).length === 0 ? (
@@ -1495,16 +2034,6 @@ const Transactions = React.memo(function Transactions() {
             />
           ) : (
             <>
-              {/* Desktop keyboard shortcut hints */}
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 text-[10px] text-muted-foreground/60 border-b border-border">
-                <span><kbd className="px-1 rounded bg-secondary font-mono text-[9px]">j</kbd><kbd className="px-1 rounded bg-secondary font-mono text-[9px]">k</kbd> navigate</span>
-                <span><kbd className="px-1 rounded bg-secondary font-mono text-[9px]">n</kbd> new</span>
-                <span><kbd className="px-1 rounded bg-secondary font-mono text-[9px]">b</kbd> bulk</span>
-                <span><kbd className="px-1 rounded bg-secondary font-mono text-[9px]">/</kbd> search</span>
-                <span><kbd className="px-1 rounded bg-secondary font-mono text-[9px]">[</kbd><kbd className="px-1 rounded bg-secondary font-mono text-[9px]">]</kbd> pages</span>
-                <span><kbd className="px-1 rounded bg-secondary font-mono text-[9px]">⌘⌫</kbd> delete</span>
-                <span className="ml-auto text-muted-foreground/40">{currentPage}/{totalPages}</span>
-              </div>
               {/* Mobile list */}
               <div className="block sm:hidden">
                 {mobileDateGroups ? (
@@ -1528,7 +2057,7 @@ const Transactions = React.memo(function Transactions() {
                             setSwipedId={setSwipedId}
                             onToggleSelect={toggleSelect}
                             onEdit={openEdit}
-                            onInspect={setInspectTx}
+                            onInspect={openInspector}
                             onDelete={del}
                             onApprove={approveTx}
                             onClassify={classifySavedTx}
@@ -1551,7 +2080,7 @@ const Transactions = React.memo(function Transactions() {
                         setSwipedId={setSwipedId}
                         onToggleSelect={toggleSelect}
                         onEdit={openEdit}
-                            onInspect={setInspectTx}
+                            onInspect={openInspector}
                         onDelete={del}
                         onApprove={approveTx}
                         onClassify={classifySavedTx}
@@ -1564,37 +2093,74 @@ const Transactions = React.memo(function Transactions() {
                   </div>
                 )}
               </div>
-              {/* Desktop table */}
-              <div className="hidden sm:block overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead><tr className="text-left text-[11px] text-muted-foreground border-b border-border">
-                    <th className="px-3 py-2.5 w-10">
-                      <input type="checkbox" checked={allDisplayedSelected} onChange={toggleSelectAll}
-                        className="h-3.5 w-3.5 rounded border-border accent-emerald cursor-pointer" />
-                    </th>
-                    <th className="px-4 py-2.5">Date</th><th className="px-4 py-2.5">Description</th><th className="px-4 py-2.5">Category</th><th className="px-4 py-2.5 text-right">Amount</th><th className="px-4 py-2.5 w-10"></th>
-                  </tr></thead>
-                  <tbody>
-                    {(aiResults?.transactions || txs).map((t, idx) => (
-                      <TransactionRow key={t.transaction_id} t={t}
-                        isSelected={selectedIds.has(t.transaction_id)}
-                        isFocused={focusedIndex === idx}
-                        onToggleSelect={toggleSelect} onEdit={openEdit}
-                            onInspect={setInspectTx} onDelete={del}
-                        onApprove={approveTx}
-                        onClassify={classifySavedTx}
-                        onSplit={splitTx}
-                        onPairTransfer={pairTransfer}
-                        onUnpairTransfer={unpairTransfer}
-                        onSetFocus={() => setFocusedIndex(idx)} />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              {viewMode === "grid" ? (
+                <div className="hidden gap-3 p-3 sm:grid sm:grid-cols-2 xl:grid-cols-2">
+                  {(aiResults?.transactions || txs).map((transaction) => {
+                    const account = accountsById[transaction.account_id];
+                    const negative = Number(transaction.amount) < 0;
+                    return (
+                      <button
+                        key={transaction.transaction_id}
+                        type="button"
+                        onClick={() => openInspector(transaction)}
+                        className={`rounded-xl border p-3 text-left transition hover:border-emerald/30 hover:bg-emerald/[0.03] ${selectedIds.has(transaction.transaction_id) ? "border-emerald/30 bg-emerald/5" : "border-border bg-card"}`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate text-[12.5px] font-medium">{transaction.description}</p>
+                            <p className="mt-0.5 truncate text-[10.5px] text-muted-foreground">{transaction.merchant || transaction.normalized_merchant || transaction.source_label}</p>
+                          </div>
+                          <span className={`money-tabular shrink-0 text-[12px] font-semibold ${negative ? "text-ruby" : "text-emerald"}`}>{formatCurrency(transaction.amount, { signed: true })}</span>
+                        </div>
+                        <div className="mt-3 flex items-center justify-between gap-2">
+              <CategoryBadge category={transaction.category || "uncategorized"} size="sm" truncate showIcon={false} />
+                          <span className="truncate text-[10.5px] text-muted-foreground">{account?.name || transaction.source_label || "Manual"}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="hidden overflow-x-auto sm:block">
+                  <table className="w-full table-fixed text-sm">
+                    <thead>
+                      <tr className="border-b border-border text-left text-[11px] font-medium text-muted-foreground">
+                        <th className="w-[40px] px-2.5 py-2.5">
+                          <input type="checkbox" checked={allDisplayedSelected} onChange={toggleSelectAll}
+                            className="mx-auto block h-3.5 w-3.5 cursor-pointer rounded border-border accent-emerald" aria-label="Select all transactions" />
+                        </th>
+                        <th className="w-[111px] px-2 py-2.5">Date</th>
+                        <th className="px-3 py-2.5">Description</th>
+                        <th className="w-[135px] px-2 py-2.5">Category</th>
+                        <th className="w-[148px] px-2 py-2.5">Account</th>
+                        <th className="w-[98px] px-2 py-2.5 text-right">Amount</th>
+                        <th className="w-[123px] px-2 py-2.5">Status</th>
+                        <th className="w-[57px] px-1 py-2.5"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(aiResults?.transactions || txs).map((t, idx) => (
+                        <TransactionRow key={t.transaction_id} t={t}
+                          account={accountsById[t.account_id]}
+                          isSelected={selectedIds.has(t.transaction_id)}
+                          isFocused={focusedIndex === idx}
+                          onToggleSelect={toggleSelect} onEdit={openEdit}
+                          onInspect={openInspector} onDelete={del}
+                          onApprove={approveTx}
+                          onClassify={classifySavedTx}
+                          onSplit={splitTx}
+                          onPairTransfer={pairTransfer}
+                          onUnpairTransfer={unpairTransfer}
+                          onSetFocus={() => setFocusedIndex(idx)} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
               {!aiResults && totalPages > 1 && (
                 <div className="px-4 py-3 border-t border-border flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Showing {offset + 1}–{Math.min(offset + limit, total)} of {total}</span>
+                  <span className="text-muted-foreground">Showing {offset + 1}â€“{Math.min(offset + limit, total)} of {total}</span>
                   <div className="flex items-center gap-1.5">
                     <button onClick={() => setOffset(Math.max(0, offset - limit))} disabled={offset === 0}
                       className="h-7 w-7 rounded-lg grid place-items-center border border-border hover:bg-secondary disabled:opacity-30 text-muted-foreground" aria-label="Previous page">
@@ -1613,7 +2179,88 @@ const Transactions = React.memo(function Transactions() {
         </div>
       </>}
 
-      {/* ───── Maaser tab ───── */}
+        {activeTab === "ledger" && someSelected ? (
+          <div className="surface sticky bottom-[14px] z-20 flex min-h-[56px] flex-wrap items-center gap-2 rounded-[12px] px-4 py-2.5 shadow-[0_18px_40px_-18px_hsl(var(--foreground)/0.28)]">
+            <span className="mr-auto text-[11.5px] font-medium">
+              {selectedIds.size} transaction{selectedIds.size !== 1 ? "s" : ""} selected
+            </span>
+            <span className="mr-3 hidden text-[11.5px] text-muted-foreground sm:inline">
+              Total: <span className={`money-tabular font-semibold ${selectedTotal < 0 ? "text-ruby" : "text-emerald"}`}>{formatCurrency(selectedTotal, { signed: true })}</span>
+            </span>
+            <button onClick={() => bulkApprove(false)} className="inline-flex h-[34px] items-center gap-1.5 rounded-[8px] bg-emerald px-3 text-[11px] font-semibold text-white transition hover:bg-emerald/90">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Approve
+            </button>
+            <button onClick={() => selectedTransactions[0] && openEdit(selectedTransactions[0])} className="inline-flex h-[34px] items-center gap-1.5 rounded-[8px] border border-border bg-card px-3 text-[11px] font-medium transition hover:bg-secondary/60">
+              <Pencil className="h-3.5 w-3.5" /> Edit
+            </button>
+            <button onClick={duplicateSelected} className="inline-flex h-[34px] items-center gap-1.5 rounded-[8px] border border-border bg-card px-3 text-[11px] font-medium transition hover:bg-secondary/60">
+              <Copy className="h-3.5 w-3.5" /> Duplicate
+            </button>
+            <button onClick={bulkDelete} className="inline-flex h-[34px] items-center gap-1.5 rounded-[8px] bg-ruby px-3 text-[11px] font-semibold text-white transition hover:bg-ruby/90">
+              <Trash2 className="h-3.5 w-3.5" /> Delete
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="inline-flex h-[34px] items-center gap-1.5 rounded-[8px] border border-border bg-card px-3 text-[11px] font-medium transition hover:bg-secondary/60">
+                  More <MoreHorizontal className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>Set category</DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    {Object.entries(groupCatsBySection(selectedCats.categories || [])).map(([section, categories]) => (
+                      <React.Fragment key={section}>
+                        <DropdownMenuLabel className="px-2 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{section}</DropdownMenuLabel>
+                        {categories.map((category) => (
+                          <DropdownMenuItem key={category.name} onClick={() => bulkCategory(category.name)}>{category.name}</DropdownMenuItem>
+                        ))}
+                      </React.Fragment>
+                    ))}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => { setNewCategoryName(""); setNewCategoryModal(true); }}>
+                      <Plus className="mr-2 h-4 w-4" /> Add custom category
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuItem onClick={() => bulkApprove(true)}>
+                  <Star className="mr-2 h-4 w-4" /> Approve high confidence
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSelectedIds(new Set())}>Clear selection</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        ) : null}
+        </div>
+        {activeTab === "ledger" && inspectorOpen ? (
+          <aside className="sticky top-20 hidden xl:block">
+            <TransactionInspectorPanel
+              transaction={panelTransaction}
+              account={panelTransaction ? accountsById[panelTransaction.account_id] : null}
+              similarTransactions={panelTransaction ? (aiResults?.transactions || txs).filter((transaction) => (
+                transaction.transaction_id !== panelTransaction.transaction_id &&
+                (transaction.normalized_merchant || transaction.merchant || "").toLowerCase() === (panelTransaction.normalized_merchant || panelTransaction.merchant || "").toLowerCase()
+              )).slice(0, 3) : []}
+              onClose={() => { setInspectorOpen(false); setInspectTx(null); }}
+              onEdit={(transaction) => { setInspectorOpen(false); setInspectTx(null); openEdit(transaction); }}
+              onDelete={(id) => { setInspectorOpen(false); setInspectTx(null); del(id); }}
+              onApprove={approveTx}
+              onClassify={classifySavedTx}
+              onSplit={splitTx}
+              onPairTransfer={pairTransfer}
+              onUnpairTransfer={unpairTransfer}
+              onInspect={openInspector}
+              onAsk={(transaction) => {
+                setInspectorOpen(false);
+                setInspectTx(null);
+                openAssistant({ prompt: `Explain this transaction: ${transaction.description || transaction.merchant || "transaction"} for ${formatCurrency(transaction.amount)} on ${transaction.date}.` });
+              }}
+            />
+          </aside>
+        ) : null}
+      </div>
+
+      {/* â”€â”€â”€â”€â”€ Maaser tab â”€â”€â”€â”€â”€ */}
       {activeTab === "maaser" && <>
         {/* Summary Stats */}
         {maaserLoading ? (
@@ -1705,8 +2352,8 @@ const Transactions = React.memo(function Transactions() {
             const extraCharity = maaserTzedakahTxs.filter(t => !txIds.has(t.transaction_id));
             const all = [
               ...maaserLedger.map(e => ({ ...e, _type: "ledger" })),
-              ...extraIncome.map(t => ({ _type: "income", entry_id: `inc_${t.transaction_id}`, date: t.date, income_description: t.description || t.merchant || "—", income_category: t.category, income_amount: t.amount, maaser_due: 0, maaser_paid: 0, status: "income", transaction_id: t.transaction_id })),
-              ...extraCharity.map(t => ({ _type: "charity", entry_id: `tzd_${t.transaction_id}`, date: t.date, income_description: t.description || t.merchant || "—", income_category: t.category || t.merchant || "Tzedakah", income_amount: 0, maaser_due: 0, maaser_paid: Math.abs(t.amount), status: "given", transaction_id: t.transaction_id, paid_to: t.merchant || "Tzedakah" })),
+              ...extraIncome.map(t => ({ _type: "income", entry_id: `inc_${t.transaction_id}`, date: t.date, income_description: t.description || t.merchant || "â€”", income_category: t.category, income_amount: t.amount, maaser_due: 0, maaser_paid: 0, status: "income", transaction_id: t.transaction_id })),
+              ...extraCharity.map(t => ({ _type: "charity", entry_id: `tzd_${t.transaction_id}`, date: t.date, income_description: t.description || t.merchant || "â€”", income_category: t.category || t.merchant || "Tzedakah", income_amount: 0, maaser_due: 0, maaser_paid: Math.abs(t.amount), status: "given", transaction_id: t.transaction_id, paid_to: t.merchant || "Tzedakah" })),
             ].sort((a, b) => {
               const da = a.date || a.income_date || "";
               const db = b.date || b.income_date || "";
@@ -1819,7 +2466,7 @@ const Transactions = React.memo(function Transactions() {
               </div>
               <div className="space-y-4">
                 <div>
-                  <label className="label-overline">Amount (£)</label>
+                  <label className="label-overline">Amount (Â£)</label>
                   <Input type="number" step="0.01" value={maaserEditAmount}
                     onChange={(e) => setMaaserEditAmount(e.target.value)} className="mt-1 w-full" />
                 </div>
@@ -1852,7 +2499,7 @@ const Transactions = React.memo(function Transactions() {
               </div>
               <div className="space-y-4">
                 <div>
-                  <label className="label-overline">Amount (£)</label>
+                  <label className="label-overline">Amount (Â£)</label>
                   <Input type="number" step="0.01" value={maaserGiveAmount}
                     onChange={(e) => setMaaserGiveAmount(e.target.value)} className="mt-1 w-full" />
                 </div>
@@ -2163,7 +2810,7 @@ function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, o
           <div className="min-w-0 flex-1 pt-0.5">
             <p
               className="truncate text-[13px] font-medium leading-5 text-foreground"
-              title={t.normalized_merchant && t.normalized_merchant !== t.description ? `${t.description} · ${t.normalized_merchant}` : t.description}
+              title={t.normalized_merchant && t.normalized_merchant !== t.description ? `${t.description} Â· ${t.normalized_merchant}` : t.description}
             >
               {t.description}
             </p>
@@ -2191,7 +2838,7 @@ function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, o
           </div>
           <div className="flex shrink-0 flex-col items-end justify-between self-stretch pl-0.5">
             <span className={`whitespace-nowrap text-[13px] font-semibold leading-5 tabular-nums ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}>
-              {t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}
+              {t.amount > 0 ? "+" : ""}Â£{Math.abs(t.amount).toFixed(2)}
             </span>
             <DropdownMenu>
               <DropdownMenuTrigger className="-mb-1 -mr-1 grid h-10 w-10 place-items-center rounded-xl text-muted-foreground transition-transform hover:bg-secondary/50 hover:text-foreground active:scale-95" aria-label="Transaction actions">
@@ -2244,3 +2891,4 @@ function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, o
 }
 
 export default Transactions;
+
