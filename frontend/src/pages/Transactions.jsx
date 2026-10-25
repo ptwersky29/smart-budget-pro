@@ -1702,42 +1702,23 @@ const Transactions = React.memo(function Transactions() {
                       <ChevronRight className="h-3.5 w-3.5" />
                     </button>
                   </div>
-                  <div className="inline-flex h-[36px] items-stretch overflow-hidden rounded-[10px] bg-emerald text-white shadow-[0_6px_16px_hsl(var(--emerald)/0.18)]">
-                    <button
-                      type="button"
-                      onClick={openAdd}
-                      data-testid="add-transaction"
-                      className="inline-flex min-w-[160px] items-center justify-center gap-1.5 px-3.5 text-[12px] font-semibold transition hover:bg-emerald/90"
-                    >
-                      <Plus className="h-3.5 w-3.5" /> Add transaction
-                    </button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          type="button"
-                          className="grid w-8 place-items-center border-l border-white/20 transition hover:bg-emerald/90"
-                          aria-label="More transaction actions"
-                        >
-                          <ChevronDown className="h-3.5 w-3.5" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={openAdd}>
-                          <Plus className="mr-2 h-4 w-4" /> Add transaction
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setCompareOpen(true)}>
-                          <BarChart3 className="mr-2 h-4 w-4" /> Compare periods
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={exportCsv}>
-                          <Download className="mr-2 h-4 w-4" /> Export CSV
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => openAssistant({ prompt: "Help me understand my recent transactions" })}>
-                          <Sparkles className="mr-2 h-4 w-4" /> Ask Penni
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCompareOpen(true)}
+                    className="inline-flex h-[36px] items-center justify-center gap-1.5 rounded-[10px] border border-border bg-card px-3 text-[12px] font-medium text-foreground transition hover:bg-secondary/70 shadow-[0_1px_2px_hsl(var(--foreground)/0.03)] active:scale-[0.98]"
+                  >
+                    <BarChart3 className="h-3.5 w-3.5 text-topaz" />
+                    <span>Compare</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openAdd}
+                    data-testid="add-transaction"
+                    className="inline-flex h-[36px] items-center justify-center gap-1.5 rounded-[10px] bg-emerald px-3.5 text-[12px] font-semibold text-white shadow-[0_4px_12px_hsl(var(--emerald)/0.25)] transition hover:bg-emerald/90 active:scale-[0.98]"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Add transaction</span>
+                  </button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button
