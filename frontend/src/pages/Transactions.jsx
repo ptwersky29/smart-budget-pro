@@ -1230,6 +1230,11 @@ const Transactions = React.memo(function Transactions() {
     });
   }, []);
 
+  const selectTransactionRow = useCallback((transaction) => {
+    setSelectedIds(new Set([transaction.transaction_id]));
+    openInspector(transaction);
+  }, [openInspector]);
+
   const toggleSelectAll = useCallback(() => {
     if (allDisplayedSelected) {
       setSelectedIds(new Set());
@@ -1661,7 +1666,7 @@ const Transactions = React.memo(function Transactions() {
   return (
     <div className="page-stack pb-4" data-testid="transactions-root">
 
-      <div className={`grid items-start gap-4 ${activeTab === "ledger" && inspectorOpen ? "xl:grid-cols-[minmax(0,1fr)_304px]" : ""}`}>
+      <div className={`grid items-start gap-4 ${activeTab === "ledger" && inspectorOpen ? "xl:grid-cols-[minmax(0,1fr)_328px]" : ""}`}>
         <div className="min-w-0 space-y-4">
           <div className="flex flex-col gap-4 pl-0 lg:flex-row lg:items-start lg:justify-between xl:pl-[14px]">
             <div className="min-w-0">
@@ -2019,9 +2024,9 @@ const Transactions = React.memo(function Transactions() {
                     </div>
                   </SheetContent>
                 </Sheet>
-                {hasRefinements ? <button onClick={clearAllFilters} className="ml-1.5 h-9 w-[87px] shrink-0 rounded-[9px] border border-border bg-card px-3 text-[11px] font-medium text-muted-foreground transition hover:text-foreground">
+                <button onClick={clearAllFilters} className="ml-1.5 h-9 w-[87px] shrink-0 rounded-[9px] border border-border bg-card px-3 text-[11px] font-medium text-muted-foreground transition hover:text-foreground">
                   Reset
-                </button> : null}
+                </button>
               </div>
 
               {activeFilters.filter((chip) => chip.key !== "date_from" && chip.key !== "date_to").length > 0 ? (
@@ -2186,7 +2191,7 @@ const Transactions = React.memo(function Transactions() {
                       <button
                         key={transaction.transaction_id}
                         type="button"
-                        onClick={() => openInspector(transaction)}
+                        onClick={() => selectTransactionRow(transaction)}
                         className={`rounded-xl border p-3 text-left transition hover:border-emerald/30 hover:bg-emerald/[0.03] ${selectedIds.has(transaction.transaction_id) ? "border-emerald/30 bg-emerald/5" : "border-border bg-card"}`}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -2228,7 +2233,7 @@ const Transactions = React.memo(function Transactions() {
                           account={accountsById[t.account_id]}
                           isSelected={selectedIds.has(t.transaction_id)}
                           isFocused={focusedIndex === idx}
-                          onToggleSelect={toggleSelect} onEdit={openEdit}
+                          onToggleSelect={toggleSelect} onSelectRow={selectTransactionRow} onEdit={openEdit}
                           onInspect={openInspector} onDelete={del}
                           onApprove={approveTx}
                           onClassify={classifySavedTx}
@@ -2317,7 +2322,7 @@ const Transactions = React.memo(function Transactions() {
         ) : null}
         </div>
         {activeTab === "ledger" && inspectorOpen ? (
-          <aside className="sticky top-20 hidden xl:block">
+          <aside className="sticky top-20 hidden xl:block xl:w-[328px]">
             <TransactionInspectorPanel
               transaction={panelTransaction}
               account={panelTransaction ? accountsById[panelTransaction.account_id] : null}
