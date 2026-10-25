@@ -63,7 +63,7 @@ function addMonth(mm, delta) {
   return fmtMonth(d.getFullYear(), String(d.getMonth() + 1));
 }
 
-const fmt = (n) => `Â£${Number(n || 0).toFixed(2)}`;
+const fmt = (n) => `\u00A3${Number(n || 0).toFixed(2)}`;
 const PIE_COLORS = ["#30a46c", "#e8a838", "#60a5fa", "#a78bfa", "#f472b6", "#fb923c", "#34d399", "#818cf8", "#f87171", "#2dd4bf", "#fbbf24", "#e879f9"];
 
 function transactionDate(value) {
@@ -97,6 +97,22 @@ function groupCatsBySection(cats) {
     groups[section].push(c);
   }
   return groups;
+}
+
+function useMediaQuery(query) {
+  const [matches, setMatches] = useState(() => (
+    typeof window !== "undefined" && window.matchMedia(query).matches
+  ));
+
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const updateMatches = () => setMatches(media.matches);
+    updateMatches();
+    media.addEventListener("change", updateMatches);
+    return () => media.removeEventListener("change", updateMatches);
+  }, [query]);
+
+  return matches;
 }
 
 function TransactionActionPanel({ open, title, description, onClose, children, footer, className = "max-w-md" }) {
@@ -149,14 +165,15 @@ function InspectorRow({ icon: Icon, label, children }) {
 }
 
 function TransactionInspector({ transaction, onClose, onEdit, onDelete, onApprove, onClassify, onSplit, onPairTransfer, onUnpairTransfer, onAsk }) {
-  if (!transaction) return null;
+  const isDesktop = useMediaQuery("(min-width: 1280px)");
+  if (!transaction || isDesktop) return null;
   const income = Number(transaction.amount) > 0;
   const unapproved = transaction.approval_status === "unapproved" || transaction.category_approval_status === "unapproved";
   const failed = transaction.approval_status === "failed";
 
   return (
     <Sheet open={Boolean(transaction)} onOpenChange={(next) => (next ? null : onClose())}>
-      <SheetContent side="right" className="flex w-full flex-col overflow-y-auto p-0 sm:max-w-[430px] xl:hidden">
+      <SheetContent side="right" overlayClassName="xl:hidden" className="flex w-full flex-col overflow-y-auto p-0 sm:max-w-[430px] xl:hidden">
         <div className="border-b border-border/60 px-5 pb-5 pr-14 pt-6">
           <div className="flex items-center gap-3">
             <span className={`grid h-11 w-11 place-items-center rounded-2xl ${income ? "bg-emerald/10 text-emerald" : "bg-secondary text-muted-foreground"}`}>
@@ -964,7 +981,7 @@ const Transactions = React.memo(function Transactions() {
       if (Number.isNaN(date.getTime())) return value;
       return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
     };
-    return `${format(filters.date_from)} â€“ ${format(filters.date_to)}`;
+    return `${format(filters.date_from)} \u2013 ${format(filters.date_to)}`;
   }, [filters.date_from, filters.date_to, monthLabel]);
 
   // Set initial date filters to current month if no date params in URL
@@ -1405,7 +1422,16 @@ const Transactions = React.memo(function Transactions() {
 
   const bulkApprove = useCallback(async (highConfidenceOnly = false) => {
     try {
-      const ids = selectedIds.size ? Array.from(selectedIds) : allDisplayed.map(t => t.transaction_id);
+      const candidates = selectedIds.size
+        ? allDisplayed.filter((transaction) => selectedIds.has(transaction.transaction_id))
+        : allDisplayed;
+      const ids = candidates
+        .filter((transaction) => transaction.approval_status === "unapproved" || transaction.category_approval_status === "unapproved")
+        .map((transaction) => transaction.transaction_id);
+      if (ids.length === 0) {
+        toast.info("No selected transactions need approval");
+        return;
+      }
       const { data } = await api.post("/transactions/bulk-approve", {
         transaction_ids: ids,
         high_confidence_only: highConfidenceOnly,
@@ -1591,6 +1617,9 @@ const Transactions = React.memo(function Transactions() {
 
   const selectedTransactions = (aiResults?.transactions || txs).filter((transaction) => selectedIds.has(transaction.transaction_id));
   const selectedTotal = selectedTransactions.reduce((sum, transaction) => sum + (Number(transaction.amount) || 0), 0);
+  const selectedUnapprovedCount = selectedTransactions.filter((transaction) => (
+    transaction.approval_status === "unapproved" || transaction.category_approval_status === "unapproved"
+  )).length;
 
   const mobileRows = aiResults?.transactions || txs;
   const panelTransaction = inspectTx || txs[0] || null;
@@ -1658,16 +1687,16 @@ const Transactions = React.memo(function Transactions() {
                     <button
                       type="button"
                       onClick={() => applyGregorianMonth(addMonth(month, -1))}
-                      className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                      className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-foreground"
                       aria-label="Previous month"
                     >
-                      <CalendarDays className="h-3.5 w-3.5" />
+                      <ChevronLeft className="h-3.5 w-3.5" />
                     </button>
-                    <span className="min-w-[104px] px-1 text-center text-[12px] font-medium">{monthLabel}</span>
+                    <span className="min-w-[112px] px-1 text-center text-[12px] font-medium">{monthLabel}</span>
                     <button
                       type="button"
                       onClick={() => applyGregorianMonth(addMonth(month, 1))}
-                      className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                      className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-foreground"
                       aria-label="Next month"
                     >
                       <ChevronRight className="h-3.5 w-3.5" />
@@ -1747,7 +1776,7 @@ const Transactions = React.memo(function Transactions() {
             <>
               <div className="grid gap-[16px] px-0 sm:grid-cols-3 xl:px-[14px] 2xl:grid-cols-[276px_276px_minmax(0,1fr)]">
                 <div className="surface rounded-[16px] p-3.5">
-                  <div className="grid grid-cols-[38px_minmax(0,1fr)] items-center gap-3 2xl:grid-cols-[38px_minmax(0,1fr)_90px]">
+                    <div className="grid min-h-[58px] grid-cols-[38px_minmax(0,1fr)] items-center gap-3 2xl:grid-cols-[38px_minmax(0,1fr)_90px]">
                     <span className="grid h-[38px] w-[38px] place-items-center rounded-full bg-emerald/10 text-emerald">
                       <TrendingUp className="h-[18px] w-[18px]" />
                     </span>
@@ -1756,7 +1785,7 @@ const Transactions = React.memo(function Transactions() {
                       <p className="money-tabular mt-0.5 truncate text-[23px] font-semibold leading-none tracking-[-0.03em]">{formatCurrency(monthTotals.income || incomeTotal)}</p>
                       {incomeDelta !== null ? (
                         <p className={`mt-1.5 text-[10px] font-medium ${incomeDelta >= 0 ? "text-emerald" : "text-ruby"}`}>
-                          {incomeDelta >= 0 ? "â†‘" : "â†“"} {Math.abs(incomeDelta)}% vs {previousMonthName?.slice(0, 3)}
+                          {incomeDelta >= 0 ? "\u2191" : "\u2193"} {Math.abs(incomeDelta)}% vs {previousMonthName?.slice(0, 3)}
                         </p>
                       ) : null}
                     </div>
@@ -1764,7 +1793,7 @@ const Transactions = React.memo(function Transactions() {
                   </div>
                 </div>
                 <div className="surface rounded-[16px] p-3.5">
-                  <div className="grid grid-cols-[38px_minmax(0,1fr)] items-center gap-3 2xl:grid-cols-[38px_minmax(0,1fr)_90px]">
+                    <div className="grid min-h-[58px] grid-cols-[38px_minmax(0,1fr)] items-center gap-3 2xl:grid-cols-[38px_minmax(0,1fr)_90px]">
                     <span className="grid h-[38px] w-[38px] place-items-center rounded-full bg-ruby/10 text-ruby">
                       <TrendingDown className="h-[18px] w-[18px]" />
                     </span>
@@ -1773,7 +1802,7 @@ const Transactions = React.memo(function Transactions() {
                       <p className="money-tabular mt-0.5 truncate text-[23px] font-semibold leading-none tracking-[-0.03em]">{formatCurrency(monthTotals.expenses || expenseTotal)}</p>
                       {expenseDelta !== null ? (
                         <p className={`mt-1.5 text-[10px] font-medium ${expenseDelta > 0 ? "text-ruby" : "text-emerald"}`}>
-                          {expenseDelta > 0 ? "â†‘" : "â†“"} {Math.abs(expenseDelta)}% vs {previousMonthName?.slice(0, 3)}
+                          {expenseDelta > 0 ? "\u2191" : "\u2193"} {Math.abs(expenseDelta)}% vs {previousMonthName?.slice(0, 3)}
                         </p>
                       ) : null}
                     </div>
@@ -1781,7 +1810,7 @@ const Transactions = React.memo(function Transactions() {
                   </div>
                 </div>
                 <div className="surface rounded-[16px] p-3.5">
-                  <div className="grid grid-cols-[38px_minmax(0,1fr)] items-center gap-3 2xl:grid-cols-[38px_minmax(0,1fr)_90px]">
+                    <div className="grid min-h-[58px] grid-cols-[38px_minmax(0,1fr)] items-center gap-3 2xl:grid-cols-[38px_minmax(0,1fr)_90px]">
                     <span className="grid h-[38px] w-[38px] place-items-center rounded-full bg-secondary text-muted-foreground">
                       <Calculator className="h-[18px] w-[18px]" />
                     </span>
@@ -1829,7 +1858,7 @@ const Transactions = React.memo(function Transactions() {
                 ) : null}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="inline-flex h-9 w-[179px] shrink-0 items-center gap-1.5 rounded-[9px] border border-border bg-card px-2.5 text-[11px] font-medium text-foreground transition hover:bg-secondary/50">
+                    <button className="inline-flex h-9 w-[218px] shrink-0 items-center gap-1.5 rounded-[9px] border border-border bg-card px-2.5 text-[11px] font-medium text-foreground transition hover:bg-secondary/50">
                       <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                       <span className="truncate">{rangeLabel}</span>
                       <ChevronDown className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" />
@@ -1851,7 +1880,7 @@ const Transactions = React.memo(function Transactions() {
                   onChange={(value) => toggleFilter("category", value)}
                   categories={selectedCats.categories || selectedCats}
                   placeholder="All Categories"
-                  className="hidden h-9 w-[112px] shrink-0 rounded-[9px] border border-border bg-card px-2 text-[11px] font-medium text-foreground min-[1700px]:block"
+                  className="hidden h-9 w-[112px] shrink-0 rounded-[9px] border border-border bg-card px-2 text-[11px] font-medium text-foreground min-[1700px]:flex"
                   allowClear
                   onCategoryCreated={loadCats}
                 />
@@ -2222,10 +2251,10 @@ const Transactions = React.memo(function Transactions() {
             <span className="mr-3 hidden text-[11.5px] text-muted-foreground sm:inline">
               Total: <span className={`money-tabular font-semibold ${selectedTotal < 0 ? "text-ruby" : "text-emerald"}`}>{formatCurrency(selectedTotal, { signed: true })}</span>
             </span>
-            <button onClick={() => bulkApprove(false)} className="inline-flex h-[34px] items-center gap-1.5 rounded-[8px] bg-emerald px-3 text-[11px] font-semibold text-white transition hover:bg-emerald/90">
-              <CheckCircle2 className="h-3.5 w-3.5" /> Approve
+            <button onClick={() => bulkApprove(false)} disabled={selectedUnapprovedCount === 0} className="inline-flex h-[34px] items-center gap-1.5 rounded-[8px] bg-emerald px-3 text-[11px] font-semibold text-white transition hover:bg-emerald/90 disabled:cursor-not-allowed disabled:opacity-45" aria-label={selectedUnapprovedCount === 0 ? "No selected transactions need approval" : `Approve ${selectedUnapprovedCount} selected transaction${selectedUnapprovedCount === 1 ? "" : "s"}`}>
+              <CheckCircle2 className="h-3.5 w-3.5" /> Approve{selectedUnapprovedCount > 0 ? ` ${selectedUnapprovedCount}` : ""}
             </button>
-            <button onClick={() => selectedTransactions[0] && openEdit(selectedTransactions[0])} className="inline-flex h-[34px] items-center gap-1.5 rounded-[8px] border border-border bg-card px-3 text-[11px] font-medium transition hover:bg-secondary/60">
+            <button onClick={() => selectedTransactions[0] && openEdit(selectedTransactions[0])} disabled={selectedTransactions.length !== 1} className="inline-flex h-[34px] items-center gap-1.5 rounded-[8px] border border-border bg-card px-3 text-[11px] font-medium transition hover:bg-secondary/60 disabled:cursor-not-allowed disabled:opacity-45" aria-label={selectedTransactions.length === 1 ? "Edit selected transaction" : "Select one transaction to edit"}>
               <Pencil className="h-3.5 w-3.5" /> Edit
             </button>
             <button onClick={duplicateSelected} className="inline-flex h-[34px] items-center gap-1.5 rounded-[8px] border border-border bg-card px-3 text-[11px] font-medium transition hover:bg-secondary/60">

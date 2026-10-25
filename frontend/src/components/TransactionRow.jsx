@@ -87,7 +87,7 @@ const TransactionRow = React.memo(
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <tr
-            className={`border-b border-border last:border-0 transition-colors ${
+            className={`cursor-pointer border-b border-border last:border-0 transition-colors ${
               isSelected
                 ? "bg-emerald/5"
                 : isFocused
@@ -96,17 +96,21 @@ const TransactionRow = React.memo(
             } ${isFocused ? "ring-1 ring-inset ring-topaz/30" : ""}`}
             onClick={(event) => {
               onSetFocus?.();
-              if (event.target.closest("button, input, a, [role='menuitem'], [data-radix-collection-item]")) return;
-              onInspect?.(t);
+              if (event.target.closest("button, input, label, a, [role='menuitem'], [data-radix-collection-item]")) return;
+              onToggleSelect?.(t.transaction_id);
             }}
             onDoubleClick={() => onEdit?.(t)}
           >
             <td className="px-2.5 py-2">
-              <label className="flex min-h-[30px] min-w-[24px] cursor-pointer items-center justify-center">
+              <label
+                className="flex min-h-[30px] min-w-[24px] cursor-pointer items-center justify-center"
+                onClick={(event) => event.stopPropagation()}
+              >
                 <input
                   type="checkbox"
                   checked={isSelected}
                   onChange={() => onToggleSelect(t.transaction_id)}
+                  onClick={(event) => event.stopPropagation()}
                   className="h-3.5 w-3.5 rounded border-border accent-emerald"
                   aria-label={`Select ${description}`}
                 />
