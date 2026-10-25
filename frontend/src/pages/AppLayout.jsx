@@ -172,6 +172,13 @@ export default function AppLayout() {
           collapsed ? "w-[4.75rem]" : "w-[242px]"
         }`}
       >
+        {!collapsed ? (
+          <div className="absolute left-5 top-5 z-10 flex items-center gap-1.5" aria-hidden="true">
+            <span className="h-3 w-3 rounded-full bg-[#ff5f57]" />
+            <span className="h-3 w-3 rounded-full bg-[#febc2e]" />
+            <span className="h-3 w-3 rounded-full bg-[#28c840]" />
+          </div>
+        ) : null}
         <div className={`shrink-0 ${collapsed ? "flex h-16 items-center justify-center px-2" : "flex items-start justify-between px-6 pb-5 pt-[50px]"}`}>
           <Link to="/dashboard" className="flex min-w-0 items-center gap-3" data-testid="sidebar-logo">
             <Logo size={collapsed ? "sm" : "sidebar"} />

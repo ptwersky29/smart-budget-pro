@@ -90,7 +90,7 @@ const TransactionRow = React.memo(
           <tr
             className={`cursor-pointer border-b border-border last:border-0 transition-colors ${
               isSelected
-                ? "bg-emerald/5"
+                ? "bg-emerald/[0.10]"
                 : isFocused
                   ? "bg-topaz/5"
                   : "hover:bg-secondary/30"
@@ -150,14 +150,14 @@ const TransactionRow = React.memo(
                   category={t.category || "uncategorized"}
                   size="sm"
                   truncate
-                  showIcon={false}
+                  showIcon
                 />
                 {t.is_split ? <span className="shrink-0 rounded-full bg-violet/10 px-1.5 py-0.5 text-[9px] font-medium text-violet">Split</span> : null}
               </div>
             </td>
             <td className="px-1 py-2">
               <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-foreground">
-                {brandLogo ? <img src={brandLogo} alt="" className="h-4 w-4 shrink-0 rounded-full object-contain" /> : <Wallet className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                {brandLogo ? <img src={brandLogo} alt="" className="h-5 w-5 shrink-0 rounded-full object-contain" /> : <Wallet className="h-4 w-4 shrink-0 text-muted-foreground" />}
                 <span className="truncate">{accountName}</span>
               </span>
             </td>

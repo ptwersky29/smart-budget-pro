@@ -1550,6 +1550,11 @@ const Transactions = React.memo(function Transactions() {
   const netTotal = incomeTotal - expenseTotal;
   const [showSearch, setShowSearch] = useState(false);
 
+  const revealSearch = useCallback(() => {
+    setShowSearch(true);
+    window.requestAnimationFrame(() => searchRef.current?.focus());
+  }, []);
+
   const accountsById = useMemo(
     () => Object.fromEntries(accounts.map((account) => [account.account_id, account])),
     [accounts],
@@ -1664,7 +1669,7 @@ const Transactions = React.memo(function Transactions() {
   }, [txs, aiResults]);
 
   return (
-    <div className="page-stack pb-4" data-testid="transactions-root">
+    <div className="transactions-reference page-stack pb-4" data-testid="transactions-root">
 
       <div className={`grid items-start gap-4 ${activeTab === "ledger" && inspectorOpen ? "xl:grid-cols-[minmax(0,1fr)_328px]" : ""}`}>
         <div className="min-w-0 space-y-4">
@@ -1783,7 +1788,7 @@ const Transactions = React.memo(function Transactions() {
             <>
               <div className="grid gap-[16px] px-0 sm:grid-cols-3 xl:px-[14px] 2xl:grid-cols-[276px_276px_minmax(0,1fr)]">
                 <div className="surface rounded-[16px] p-3.5">
-                    <div className="grid min-h-[58px] grid-cols-[38px_minmax(0,1fr)] items-center gap-3 2xl:grid-cols-[38px_minmax(0,1fr)_90px]">
+                    <div className="grid min-h-[58px] grid-cols-[38px_minmax(0,1fr)] items-center gap-3 xl:grid-cols-[38px_minmax(0,1fr)_78px]">
                     <span className="grid h-[38px] w-[38px] place-items-center rounded-full bg-emerald/10 text-emerald">
                       <TrendingUp className="h-[18px] w-[18px]" />
                     </span>
@@ -1796,11 +1801,11 @@ const Transactions = React.memo(function Transactions() {
                         </p>
                       ) : null}
                     </div>
-                    <div className="hidden 2xl:block"><Sparkline values={sparklines.income} height={38} stroke="hsl(var(--emerald))" /></div>
+                    <div className="hidden xl:block"><Sparkline values={sparklines.income} height={38} stroke="hsl(var(--emerald))" /></div>
                   </div>
                 </div>
                 <div className="surface rounded-[16px] p-3.5">
-                    <div className="grid min-h-[58px] grid-cols-[38px_minmax(0,1fr)] items-center gap-3 2xl:grid-cols-[38px_minmax(0,1fr)_90px]">
+                    <div className="grid min-h-[58px] grid-cols-[38px_minmax(0,1fr)] items-center gap-3 xl:grid-cols-[38px_minmax(0,1fr)_78px]">
                     <span className="grid h-[38px] w-[38px] place-items-center rounded-full bg-ruby/10 text-ruby">
                       <TrendingDown className="h-[18px] w-[18px]" />
                     </span>
@@ -1813,11 +1818,11 @@ const Transactions = React.memo(function Transactions() {
                         </p>
                       ) : null}
                     </div>
-                    <div className="hidden 2xl:block"><Sparkline values={sparklines.expenses} height={38} stroke="hsl(var(--ruby))" /></div>
+                    <div className="hidden xl:block"><Sparkline values={sparklines.expenses} height={38} stroke="hsl(var(--ruby))" /></div>
                   </div>
                 </div>
                 <div className="surface rounded-[16px] p-3.5">
-                    <div className="grid min-h-[58px] grid-cols-[38px_minmax(0,1fr)] items-center gap-3 2xl:grid-cols-[38px_minmax(0,1fr)_90px]">
+                    <div className="grid min-h-[58px] grid-cols-[38px_minmax(0,1fr)] items-center gap-3 xl:grid-cols-[38px_minmax(0,1fr)_78px]">
                     <span className="grid h-[38px] w-[38px] place-items-center rounded-full bg-secondary text-muted-foreground">
                       <Calculator className="h-[18px] w-[18px]" />
                     </span>
@@ -1828,14 +1833,15 @@ const Transactions = React.memo(function Transactions() {
                       </p>
                       <p className="mt-1.5 text-[10px] text-muted-foreground">{monthLabel}</p>
                     </div>
-                    <div className="hidden 2xl:block"><Sparkline values={sparklines.net} height={38} stroke={monthTotals.net >= 0 ? "hsl(var(--emerald))" : "hsl(var(--ruby))"} /></div>
+                    <div className="hidden xl:block"><Sparkline values={sparklines.net} height={38} stroke={monthTotals.net >= 0 ? "hsl(var(--emerald))" : "hsl(var(--ruby))"} /></div>
                   </div>
                 </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
                 {/* Inline search – always visible */}
-                <div className="relative min-w-[150px] flex-1 sm:max-w-[200px]">
+                {showSearch || filters.search ? (
+                <div className="relative w-[190px] shrink-0">
                   <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                   <input
                     ref={searchRef}
@@ -1850,6 +1856,11 @@ const Transactions = React.memo(function Transactions() {
                     </button>
                   ) : null}
                 </div>
+                ) : (
+                  <button type="button" onClick={revealSearch} className="grid h-9 w-9 shrink-0 place-items-center rounded-[9px] border border-border bg-card text-muted-foreground transition hover:bg-secondary/50 hover:text-foreground" aria-label="Search transactions">
+                    <Search className="h-3.5 w-3.5" />
+                  </button>
+                )}
 
                 {/* Date range */}
                 <DropdownMenu>
@@ -1874,7 +1885,7 @@ const Transactions = React.memo(function Transactions() {
                   onChange={(event) => toggleFilter("account_id", event.target.value)}
                   className={`h-9 shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.account_id ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
                 >
-                  <option value="">Account</option>
+                  <option value="">All Accounts</option>
                   {accounts.map((account) => <option key={account.account_id} value={account.account_id}>{account.name}</option>)}
                 </select>
 
@@ -1883,7 +1894,7 @@ const Transactions = React.memo(function Transactions() {
                   value={filters.category}
                   onChange={(value) => toggleFilter("category", value)}
                   categories={selectedCats.categories || selectedCats}
-                  placeholder="Category"
+                  placeholder="All Categories"
                   className={`h-9 shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium text-foreground transition ${filters.category ? "border-emerald/30 bg-emerald/5" : "border-border"}`}
                   allowClear
                   onCategoryCreated={loadCats}
@@ -1895,7 +1906,7 @@ const Transactions = React.memo(function Transactions() {
                   onChange={(event) => { toggleFilter("tx_type", event.target.value); setLedgerTab(event.target.value === "expense" ? "expenses" : event.target.value === "income" ? "income" : event.target.value === "transfer" ? "transfers" : "all"); }}
                   className={`h-9 shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.tx_type ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
                 >
-                  <option value="">Type</option>
+                  <option value="">All Types</option>
                   <option value="income">Income</option>
                   <option value="expense">Expense</option>
                   <option value="transfer">Transfer</option>
@@ -1907,7 +1918,7 @@ const Transactions = React.memo(function Transactions() {
                   onChange={(event) => { toggleFilter("approval_status", event.target.value); setLedgerTab(event.target.value === "unapproved" ? "unapproved" : "all"); }}
                   className={`h-9 shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.approval_status ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
                 >
-                  <option value="">Status</option>
+                  <option value="">All Statuses</option>
                   <option value="approved">Approved</option>
                   <option value="unapproved">Unapproved</option>
                   <option value="failed">Failed</option>
@@ -1918,7 +1929,7 @@ const Transactions = React.memo(function Transactions() {
                   <input
                     value={filters.merchant}
                     onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, merchant: event.target.value })); }}
-                    placeholder="Merchant"
+                    placeholder="All Merchants"
                     className={`h-9 w-[110px] rounded-[9px] border bg-card px-2.5 pr-7 text-[11px] outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.merchant ? "border-emerald/30 bg-emerald/5" : "border-border"}`}
                   />
                   {filters.merchant ? (
