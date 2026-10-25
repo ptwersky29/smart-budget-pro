@@ -97,7 +97,7 @@ const TransactionRow = React.memo(
             onClick={(event) => {
               onSetFocus?.();
               if (event.target.closest("button, input, label, a, [role='menuitem'], [data-radix-collection-item]")) return;
-              onToggleSelect?.(t.transaction_id);
+              onInspect?.(t);
             }}
             onDoubleClick={() => onEdit?.(t)}
           >
