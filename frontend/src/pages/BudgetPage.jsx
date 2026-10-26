@@ -289,7 +289,7 @@ const EventGroupCard = React.memo(({ group, setConfirmDelete, fetchData }) => {
 
 const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
   monthControl, summary, everyday, atRiskCount, budgetTableRows, budgetView, setBudgetView,
-  categorySpend, recentTransactions, onAdd, onRefresh, onCopyPrevious, openBudgetTransactions,
+  categorySpend, recentTransactions, onAdd, onRefresh, onCopyPrevious, onViewAll, openBudgetTransactions,
   startEdit,
 }) {
   const statCards = [
@@ -306,7 +306,10 @@ const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
   ];
 
   return (
-    <div className="budget-workspace hidden xl:flex xl:flex-col">
+    <div className="budget-workspace hidden xl:flex xl:flex-col" onClick={(event) => {
+      const label = event.target instanceof Element ? event.target.closest("span")?.textContent : "";
+      if (label?.includes("View all")) onViewAll?.();
+    }}>
       <div className="mb-4 flex items-start justify-between gap-6 px-[14px]">
         <div><h1 className="text-[30px] font-semibold leading-none tracking-[-0.045em]">Budgets</h1><p className="mt-2 text-[13px] text-muted-foreground">Track your spending, set budgets and stay in control.</p></div>
         <div className="flex items-center gap-2">{monthControl}<button type="button" onClick={onAdd} className="inline-flex h-9 items-center gap-2 rounded-[10px] bg-emerald px-4 text-[12px] font-semibold text-white shadow-[0_6px_16px_hsl(var(--emerald)/0.18)]"><Plus className="h-3.5 w-3.5" /> Add budget</button><DropdownMenu><DropdownMenuTrigger asChild><button className="grid h-9 w-9 place-items-center rounded-[10px] border border-border bg-card text-muted-foreground"><MoreHorizontal className="h-4 w-4" /></button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={onCopyPrevious}><Copy className="mr-2 h-4 w-4" /> Copy previous month</DropdownMenuItem><DropdownMenuItem onClick={onRefresh}><RefreshCw className="mr-2 h-4 w-4" /> Refresh</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
@@ -818,6 +821,7 @@ export default React.memo(function BudgetPage() {
         onAdd={() => openAddBudget("everyday")}
         onRefresh={fetchData}
         onCopyPrevious={handleCopyPreviousMonth}
+        onViewAll={() => window.location.assign(`/transactions?date_from=${month}-01&date_to=${month}-${String(daysInMonth).padStart(2, "0")}`)}
         openBudgetTransactions={openBudgetTransactions}
         startEdit={startEdit}
       />
