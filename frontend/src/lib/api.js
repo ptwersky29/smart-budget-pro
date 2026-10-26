@@ -14,6 +14,44 @@ export const api = axios.create({
   withCredentials: true,
 });
 
+const OFFLINE_CACHE_KEY = "penni.offline-api-cache.v1";
+const OFFLINE_CACHE_LIMIT = 80;
+
+function offlineCacheKey(url, params) {
+  return `${url || ""}::${JSON.stringify(params || {})}`;
+}
+
+function readOfflineCache() {
+  try {
+    return JSON.parse(localStorage.getItem(OFFLINE_CACHE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function writeOfflineCache(entries) {
+  try {
+    const sorted = Object.entries(entries)
+      .sort(([, a], [, b]) => (b.savedAt || 0) - (a.savedAt || 0))
+      .slice(0, OFFLINE_CACHE_LIMIT);
+    localStorage.setItem(OFFLINE_CACHE_KEY, JSON.stringify(Object.fromEntries(sorted)));
+  } catch {
+    // Offline caching is best-effort; quota limits must not interrupt the app.
+  }
+}
+
+function cacheOfflineResponse(config, data) {
+  if (config?.method?.toLowerCase() !== "get" || !config?.url) return;
+  const entries = readOfflineCache();
+  entries[offlineCacheKey(config.url, config.params)] = { data, savedAt: Date.now() };
+  writeOfflineCache(entries);
+}
+
+function getOfflineResponse(config) {
+  const entry = readOfflineCache()[offlineCacheKey(config?.url, config?.params)];
+  return entry?.data ?? null;
+}
+
 let _csrfToken = null;
 // One refresh request for all simultaneous 401 responses. Refresh tokens rotate.
 let refreshPromise = null;
@@ -46,6 +84,7 @@ api.interceptors.request.use(async (config) => {
 api.interceptors.response.use(
   (response) => {
     const method = response.config?.method?.toLowerCase();
+    cacheOfflineResponse(response.config, response.data);
     if (method && !SAFE_METHODS.has(method)) {
       cacheInvalidate(response.config.url);
     }
@@ -54,6 +93,18 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config || {};
     const requestUrl = String(originalRequest.url || "");
+    if (!error?.response && originalRequest.method?.toLowerCase() === "get") {
+      const cachedData = getOfflineResponse(originalRequest);
+      if (cachedData !== null) {
+        return {
+          data: cachedData,
+          status: 200,
+          statusText: "Offline cache",
+          headers: { "x-penni-offline": "true" },
+          config: originalRequest,
+        };
+      }
+    }
     if (
       error?.response?.status === 401 &&
       !originalRequest._retry &&
