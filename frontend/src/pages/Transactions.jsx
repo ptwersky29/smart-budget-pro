@@ -1231,7 +1231,6 @@ const Transactions = React.memo(function Transactions() {
   }, []);
 
   const selectTransactionRow = useCallback((transaction) => {
-    setSelectedIds(new Set([transaction.transaction_id]));
     openInspector(transaction);
   }, [openInspector]);
 
