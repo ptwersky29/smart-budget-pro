@@ -49,7 +49,98 @@ function cacheOfflineResponse(config, data) {
 
 function getOfflineResponse(config) {
   const entry = readOfflineCache()[offlineCacheKey(config?.url, config?.params)];
-  return entry?.data ?? null;
+  return entry?.data ?? offlineDemoResponse(config);
+}
+
+function offlineDemoResponse(config) {
+  const url = String(config?.url || "").split("?")[0];
+  const today = new Date();
+  const isoDate = (daysAgo) => {
+    const date = new Date(today);
+    date.setDate(date.getDate() - daysAgo);
+    return date.toISOString();
+  };
+  const transactions = [
+    ["demo-1", "Salary", 3200, "income", 1],
+    ["demo-2", "Tesco Express", -42.5, "grocery", 2],
+    ["demo-3", "TfL Travel", -7.2, "public_transport", 3],
+    ["demo-4", "Octopus Energy", -85.4, "utilities", 5],
+    ["demo-5", "Coffee Corner", -4.8, "takeaway", 6],
+    ["demo-6", "Netflix", -10.99, "entertainment", 9],
+  ].map(([transaction_id, description, amount, category, daysAgo]) => ({
+    transaction_id,
+    description,
+    merchant_name: description,
+    normalized_merchant: description,
+    amount,
+    category,
+    date: isoDate(daysAgo),
+    account_id: "demo-current",
+    account_name: "Penni Demo Account",
+    currency: "GBP",
+    approval_status: "approved",
+    pending: false,
+    source: "offline-demo",
+  }));
+  const accounts = [{
+    account_id: "demo-current",
+    account_name: "Penni Demo Account",
+    name: "Penni Demo Account",
+    account_type: "current",
+    type: "current",
+    balance: 1842.61,
+    currency: "GBP",
+    provider: "manual",
+    is_offline: true,
+    color: "#10b981",
+    institution: "Penni",
+  }];
+  const budgets = [
+    ["Grocery", 320, 198.4],
+    ["Public Transport", 120, 64.2],
+    ["Utilities", 180, 85.4],
+    ["Eating Out", 140, 96.8],
+  ].map(([category, limit, spent], index) => ({
+    budget_id: `demo-budget-${index}`,
+    category,
+    limit,
+    spent,
+    remaining: limit - spent,
+    progress_pct: Math.round((spent / limit) * 100),
+    budget_type: "everyday",
+    month: today.toISOString().slice(0, 7),
+  }));
+
+  if (url === "/dashboard/overview") {
+    return {
+      balance: 1842.61,
+      truelayer_balance: 1842.61,
+      accounts,
+      income: 3200,
+      spend: 249.49,
+      savings_rate: 92.2,
+      health_score: 92,
+      categories: [
+        { name: "Grocery", value: 198.4 },
+        { name: "Eating Out", value: 96.8 },
+        { name: "Utilities", value: 85.4 },
+        { name: "Public Transport", value: 64.2 },
+      ],
+      monthly_flow: [{ month: today.toISOString().slice(0, 7), income: 3200, spend: 249.49 }],
+      recent: transactions,
+      needs_review_count: 0,
+      source_breakdown: [{ source: "offline-demo", count: transactions.length }],
+    };
+  }
+  if (url === "/transactions") return { transactions, total: transactions.length, offset: 0, limit: 100 };
+  if (url === "/budgets") return { budgets, event_groups: {} };
+  if (url === "/accounts") return { accounts };
+  if (url === "/categories") return { categories: budgets.map((budget) => ({ name: budget.category })) };
+  if (url === "/budget-system/alerts") return { alerts: [] };
+  if (url === "/budget-system/upcoming") return { upcoming: [] };
+  if (url === "/budgets/insights") return { insights: [] };
+  if (url === "/truelayer/connections") return { connections: [], total_transactions: transactions.length };
+  return null;
 }
 
 let _csrfToken = null;
