@@ -165,10 +165,10 @@ export default function AppLayout() {
   };
 
   return (
-    <div className="app-shell relative flex min-h-screen text-foreground lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden">
+    <div className="app-shell relative flex min-h-screen text-foreground lg:h-[100dvh] lg:min-h-0 lg:gap-2 lg:overflow-hidden lg:p-2">
       <aside
         data-tour="sidebar"
-        className={`sticky top-0 z-40 hidden h-screen shrink-0 flex-col overflow-hidden border-r border-border/45 bg-[linear-gradient(180deg,hsl(150_30%_98%)_0%,hsl(150_18%_94%)_100%)] transition-[width] duration-300 lg:flex dark:bg-[hsl(160_16%_8%)] ${
+        className={`sticky top-0 z-40 hidden h-screen shrink-0 flex-col overflow-hidden border-r border-border/45 bg-[linear-gradient(180deg,hsl(150_30%_98%)_0%,hsl(150_18%_94%)_100%)] transition-[width] duration-300 lg:top-2 lg:h-[calc(100dvh-1rem)] lg:rounded-[1.75rem] lg:border lg:border-border/55 lg:shadow-[0_18px_42px_-34px_hsl(var(--foreground)/0.42)] lg:flex dark:bg-[hsl(160_16%_8%)] ${
           collapsed ? "w-[4.75rem]" : "w-[242px]"
         }`}
       >
@@ -295,7 +295,7 @@ export default function AppLayout() {
         </div>
       </aside>
 
-      <div className="relative min-w-0 flex-1 lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden">
+      <div className="relative min-w-0 flex-1 lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden lg:rounded-[1.75rem] lg:border lg:border-border/55 lg:bg-background/75 lg:shadow-[0_18px_42px_-34px_hsl(var(--foreground)/0.42)]">
         <header data-tour="route-header" className="sticky top-0 z-30 border-b border-border/50 bg-background/95 lg:shrink-0">
           {routeLoading ? (
             <div className="absolute left-0 right-0 top-0 z-50 h-0.5 overflow-hidden">
