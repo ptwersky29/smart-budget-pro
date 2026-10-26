@@ -420,12 +420,6 @@ export default React.memo(function BudgetPage() {
   const isCurrentMonth = month === fmtMonth(now.getFullYear(), now.getMonth() + 1);
   const daysInMonth = useMemo(() => getDaysInMonth(new Date(year, mNum - 1)), [year, mNum]);
 
-  const monthLabelWithDot = (
-    <span className="inline-flex items-center gap-1.5">
-      {isCurrentMonth && <span className="h-2 w-2 rounded-full bg-emerald animate-pulse shrink-0" />}
-      {monthLabel}
-    </span>
-  );
   const currentDay = isCurrentMonth ? getDate(now) : daysInMonth;
   const monthElapsedPct = daysInMonth ? currentDay / daysInMonth : 1;
 
@@ -812,7 +806,7 @@ export default React.memo(function BudgetPage() {
     <div className="page-stack pb-4">
 
       <BudgetReferenceDesktop
-        monthControl={<MonthPicker label={monthLabelWithDot} onPrev={() => setMonth(addMonth(month, -1))} onNext={() => setMonth(addMonth(month, 1))} onToday={() => setMonth(fmtMonth(now.getFullYear(), now.getMonth() + 1))} isToday={isCurrentMonth} />}
+        monthControl={<MonthPicker label={monthLabel} onPrev={() => setMonth(addMonth(month, -1))} onNext={() => setMonth(addMonth(month, 1))} onToday={() => setMonth(fmtMonth(now.getFullYear(), now.getMonth() + 1))} isToday={isCurrentMonth} />}
         summary={summary}
         everyday={everyday}
         atRiskCount={atRiskCount}
@@ -850,7 +844,7 @@ export default React.memo(function BudgetPage() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
                 <MonthPicker
-                  label={monthLabelWithDot}
+                  label={monthLabel}
                   onPrev={() => setMonth(addMonth(month, -1))}
                   onNext={() => setMonth(addMonth(month, 1))}
                   onToday={() => setMonth(fmtMonth(now.getFullYear(), now.getMonth() + 1))}
