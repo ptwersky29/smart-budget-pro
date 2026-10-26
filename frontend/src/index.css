@@ -296,6 +296,40 @@ body {
   scroll-behavior: auto;
   -webkit-overflow-scrolling: touch;
 }
+@media (min-width: 1280px) {
+  .budget-workspace {
+    height: calc(100dvh - 7.75rem);
+    min-height: 40rem;
+    overflow: hidden;
+  }
+  .budget-workspace > .grid > div:first-child {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+  }
+  .budget-workspace > .grid > div:first-child > div:nth-child(2) {
+    min-height: 15rem;
+    flex: 1 1 auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  .budget-workspace > .grid > div:first-child > div:nth-child(2) thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: hsl(var(--card));
+  }
+  .budget-workspace > .grid > div:first-child > div:nth-child(3) {
+    max-height: 10.75rem;
+    flex: 0 0 auto;
+    overflow-y: auto;
+  }
+  .budget-workspace > .grid > aside {
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+  }
+}
 .section-title {
   font-size: 1rem;
   line-height: 1.3;
