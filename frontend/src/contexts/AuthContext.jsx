@@ -3,6 +3,21 @@ import { api } from "../lib/api";
 import { setToken, clearTokens, isTokenExpired } from "../lib/storage";
 
 const AuthCtx = createContext(null);
+const OFFLINE_PROFILE_KEY = "penni.offline-profile.v1";
+
+function readOfflineProfile() {
+  try {
+    return JSON.parse(localStorage.getItem(OFFLINE_PROFILE_KEY) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function saveOfflineProfile(profile) {
+  if (!profile) return;
+  const { access_token, refresh_token, ...safeProfile } = profile;
+  localStorage.setItem(OFFLINE_PROFILE_KEY, JSON.stringify(safeProfile));
+}
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -31,9 +46,12 @@ export const AuthProvider = ({ children }) => {
   const checkAuth = useCallback(async () => {
     try {
       const { data } = await api.get("/auth/me");
-      setUser(stripTokens(data));
+      const profile = stripTokens(data);
+      saveOfflineProfile(profile);
+      setUser(profile);
     } catch {
-      setUser(false);
+      const offlineProfile = readOfflineProfile();
+      setUser(offlineProfile ? { ...offlineProfile, isOffline: true } : false);
     } finally {
       setLoading(false);
     }
@@ -48,7 +66,9 @@ export const AuthProvider = ({ children }) => {
     const { data } = await api.post("/auth/login", { email, password, remember_me: rememberMe });
     if (data?.access_token) setToken("access_token", data.access_token, rememberMe);
     if (data?.refresh_token) setToken("refresh_token", data.refresh_token, rememberMe);
-    setUser(stripTokens(data));
+    const profile = stripTokens(data);
+    saveOfflineProfile(profile);
+    setUser(profile);
     return data;
   }, [stripTokens]);
 
@@ -56,19 +76,35 @@ export const AuthProvider = ({ children }) => {
     const { data } = await api.post("/auth/register", payload);
     if (data?.access_token) setToken("access_token", data.access_token, true);
     if (data?.refresh_token) setToken("refresh_token", data.refresh_token, true);
-    setUser(stripTokens(data));
+    const profile = stripTokens(data);
+    saveOfflineProfile(profile);
+    setUser(profile);
     return data;
   }, [stripTokens]);
+
+  const continueOffline = useCallback(() => {
+    const savedProfile = readOfflineProfile();
+    const offlineProfile = savedProfile || {
+      id: "offline-local",
+      name: "Offline workspace",
+      email: "",
+      onboarded: true,
+    };
+    saveOfflineProfile(offlineProfile);
+    setUser({ ...offlineProfile, isOffline: true });
+    return offlineProfile;
+  }, []);
 
   const logout = useCallback(async () => {
     try { await api.post("/auth/logout"); } catch { /* server logout best-effort */ }
     clearTokens();
+    localStorage.removeItem(OFFLINE_PROFILE_KEY);
     setUser(false);
   }, []);
 
   const value = React.useMemo(
-    () => ({ user, setUser, loading, login, register, logout, refresh: checkAuth }),
-    [user, loading, login, register, logout, checkAuth]
+    () => ({ user, setUser, loading, login, register, logout, continueOffline, refresh: checkAuth }),
+    [user, loading, login, register, logout, continueOffline, checkAuth]
   );
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;

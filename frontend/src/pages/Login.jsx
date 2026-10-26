@@ -3,14 +3,14 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { api, BACKEND_URL, formatApiError } from "../lib/api";
 import { toast } from "sonner";
-import { Loader2, ShieldCheck, Eye, EyeOff } from "lucide-react";
+import { Loader2, ShieldCheck, Eye, EyeOff, WifiOff } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import AuthVisual from "../components/AuthVisual";
 import Logo from "../components/Logo";
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, continueOffline } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
@@ -62,6 +62,12 @@ export default function Login() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const onContinueOffline = () => {
+    continueOffline();
+    toast.info("Offline mode is active. Local data will sync when you sign in online.");
+    navigate("/dashboard");
   };
 
   return (
@@ -160,6 +166,21 @@ export default function Login() {
                 <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
               </div>
             </div>
+
+            <Button
+              type="button"
+              variant="outlinePill"
+              size="pill"
+              className="w-full"
+              onClick={onContinueOffline}
+              data-testid="login-offline"
+            >
+              <WifiOff className="h-4 w-4" />
+              Continue offline
+            </Button>
+            <p className="-mt-2 text-center text-xs text-muted-foreground">
+              Opens data saved on this device. Sign in online later to sync your cloud account.
+            </p>
 
             {/* Google */}
             <Button variant="outlinePill" size="pill" className="w-full" asChild>
