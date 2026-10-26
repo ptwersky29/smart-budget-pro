@@ -1837,7 +1837,7 @@ const Transactions = React.memo(function Transactions() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 xl:grid xl:grid-cols-[36px_176px_110px_118px_86px_96px_104px_32px_76px] xl:gap-2">
+              <div className={`flex flex-wrap items-center gap-2 2xl:grid 2xl:gap-2 ${showSearch || filters.search ? "2xl:grid-cols-[190px_176px_110px_118px_86px_96px_104px_32px_76px]" : "2xl:grid-cols-[36px_176px_110px_118px_86px_96px_104px_32px_76px]"}`}>
                 {/* Inline search – always visible */}
                 {showSearch || filters.search ? (
                 <div className="relative w-[190px] shrink-0">
