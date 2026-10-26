@@ -77,7 +77,7 @@ export default function AppLayout() {
     if (prevPath.current !== location.pathname) {
       setRouteLoading(true);
       prevPath.current = location.pathname;
-      const timer = setTimeout(() => setRouteLoading(false), 400);
+      const timer = setTimeout(() => setRouteLoading(false), 160);
       return () => clearTimeout(timer);
     }
   }, [location.pathname]);
@@ -296,7 +296,7 @@ export default function AppLayout() {
       </aside>
 
       <div className="relative min-w-0 flex-1 lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden">
-        <header data-tour="route-header" className="sticky top-0 z-30 border-b border-border/50 bg-background/80 backdrop-blur-md lg:shrink-0">
+        <header data-tour="route-header" className="sticky top-0 z-30 border-b border-border/50 bg-background/95 lg:shrink-0">
           {routeLoading ? (
             <div className="absolute left-0 right-0 top-0 z-50 h-0.5 overflow-hidden">
               <div className={`h-full bg-emerald ${noAnim ? "" : "animate-[routeProgress_0.4s_ease-out_forwards]"}`} />
@@ -396,7 +396,7 @@ export default function AppLayout() {
           </div>
         </header>
 
-        <main data-tour="main-content" className="mx-auto w-full max-w-[1440px] px-3 pb-24 pt-3 sm:px-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:pl-[10px] lg:pr-[9px] lg:pb-[14px] lg:pt-[21px]">
+        <main data-tour="main-content" className="app-main-scroll mx-auto w-full max-w-[1440px] px-3 pb-24 pt-3 sm:px-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:pl-[10px] lg:pr-[9px] lg:pb-[14px] lg:pt-[21px]">
           <div key={location.pathname} className={noAnim ? "" : "page-in"}>
             <Outlet />
           </div>
