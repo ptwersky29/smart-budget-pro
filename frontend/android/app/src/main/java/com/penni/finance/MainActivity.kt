@@ -10,120 +10,46 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AccountBalanceWallet
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Analytics
-import androidx.compose.material.icons.outlined.ReceiptLong
-import androidx.compose.material.icons.outlined.Savings
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.util.UUID
 
-private val Green = Color(0xFF00A86B)
-private val Ink = Color(0xFF0E1B35)
-private val Mint = Color(0xFFE9FBF3)
-private val Red = Color(0xFFE5484D)
+private val Green=Color(0xFF00A86B); private val Ink=Color(0xFF0E1B35); private val Red=Color(0xFFE5484D); private val Muted=Color(0xFF64748B)
+data class Transaction(val id:String=UUID.randomUUID().toString(),val name:String,val category:String,val amount:Double)
+data class Budget(val id:String=UUID.randomUUID().toString(),val name:String,val spent:Double,val limit:Double)
+private fun money(n:Double)="£"+"%.2f".format(kotlin.math.abs(n))
+private val demoTransactions=listOf(Transaction("salary","Salary","Income",3200.0),Transaction("tesco","Tesco Express","Grocery",-42.5),Transaction("tfl","TfL Travel","Public transport",-7.2),Transaction("energy","Octopus Energy","Utilities",-85.4),Transaction("coffee","Coffee Corner","Eating out",-4.8),Transaction("netflix","Netflix","Entertainment",-10.99))
+private val demoBudgets=listOf(Budget("grocery","Grocery",198.4,320.0),Budget("transport","Public transport",64.2,120.0),Budget("utilities","Utilities",85.4,180.0),Budget("eating","Eating out",96.8,140.0))
 
-data class NativeTransaction(val merchant: String, val category: String, val amount: Double, val daysAgo: Int)
-data class NativeBudget(val name: String, val spent: Double, val limit: Double)
-
-class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent { PenniNativeApp() }
-    }
+class MainActivity:ComponentActivity(){override fun onCreate(state:Bundle?){super.onCreate(state);setContent{PenniApp()}}}
+@Composable private fun PenniApp(){
+ var page by rememberSaveable{mutableStateOf("Welcome")}
+ val tx=remember{mutableStateListOf<Transaction>().apply{addAll(demoTransactions)}}
+ val budgets=remember{mutableStateListOf<Budget>().apply{addAll(demoBudgets)}}
+ MaterialTheme(colorScheme=lightColorScheme(primary=Green,background=Color(0xFFF7FAF9),onBackground=Ink)){Surface(Modifier.fillMaxSize()){if(page=="Welcome")Welcome{page="Home"}else Shell(page,{page=it},tx,budgets)}}
 }
-
-@Composable
-private fun PenniNativeApp() {
-    var signedIn by remember { mutableStateOf(false) }
-    var screen by remember { mutableStateOf("Home") }
-    MaterialTheme(colorScheme = lightColorScheme(primary = Green, background = Color(0xFFF7FAF9), onBackground = Ink)) {
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            if (!signedIn) NativeWelcome(onContinue = { signedIn = true })
-            else NativeWorkspace(screen = screen, onScreen = { screen = it })
-        }
-    }
-}
-
-@Composable
-private fun NativeWelcome(onContinue: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(28.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(Modifier.size(76.dp).background(Green, RoundedCornerShape(24.dp)), contentAlignment = Alignment.Center) {
-            Text("P", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
-        }
-        Spacer(Modifier.height(26.dp))
-        Text("Welcome to Penni", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = Ink)
-        Text("Your money, clear and calm.", color = Color(0xFF607087), modifier = Modifier.padding(top = 8.dp))
-        Spacer(Modifier.height(42.dp))
-        Button(onClick = onContinue, modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(16.dp)) {
-            Text("Continue with demo data", fontWeight = FontWeight.SemiBold)
-        }
-        Text("Native offline workspace • Cloud sync available when connected", color = Color(0xFF718096), fontSize = 12.sp, modifier = Modifier.padding(top = 16.dp))
-    }
-}
-
-@Composable
-private fun NativeWorkspace(screen: String, onScreen: (String) -> Unit) {
-    val items = listOf("Home", "Accounts", "Transactions", "Budgets", "More")
-    Scaffold(
-        bottomBar = {
-            NavigationBar(containerColor = Color.White) {
-                items.forEach { item ->
-                    val icon = when (item) {
-                        "Home" -> Icons.Outlined.AccountBalanceWallet
-                        "Accounts" -> Icons.Outlined.Savings
-                        "Transactions" -> Icons.Outlined.ReceiptLong
-                        "Budgets" -> Icons.Outlined.Analytics
-                        else -> Icons.Outlined.Add
-                    }
-                    NavigationBarItem(selected = screen == item, onClick = { onScreen(item) }, icon = { Icon(icon, item) }, label = { Text(item) })
-                }
-            }
-        }
-    ) { padding ->
-        when (screen) {
-            "Home" -> HomeScreen(Modifier.padding(padding))
-            "Accounts" -> AccountsScreen(Modifier.padding(padding))
-            "Transactions" -> TransactionsScreen(Modifier.padding(padding))
-            "Budgets" -> BudgetsScreen(Modifier.padding(padding))
-            else -> MoreScreen(Modifier.padding(padding))
-        }
-    }
-}
-
-@Composable
-private fun HomeScreen(modifier: Modifier) {
-    LazyColumn(modifier = modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { Text("Good afternoon", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Ink) }
-        item { Text("Your offline demo workspace", color = Color(0xFF64748B)) }
-        item { BalanceCard() }
-        item { Text("This month", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink) }
-        item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { MetricCard("Income", "£3,200", Green, Modifier.weight(1f)); MetricCard("Spent", "£249", Red, Modifier.weight(1f)) } }
-        item { Text("Recent transactions", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink) }
-        items(sampleTransactions.take(4)) { TransactionRow(it) }
-    }
-}
-
-@Composable private fun BalanceCard() { Card(colors = CardDefaults.cardColors(containerColor = Green), shape = RoundedCornerShape(24.dp)) { Column(Modifier.fillMaxWidth().padding(24.dp)) { Text("Total balance", color = Color.White.copy(alpha = .8f)); Text("£1,842.61", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp)); Text("Offline demo account", color = Color.White.copy(alpha = .8f), modifier = Modifier.padding(top = 12.dp)) } } }
-@Composable private fun MetricCard(label: String, value: String, color: Color, modifier: Modifier) { Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(18.dp)) { Column(Modifier.padding(16.dp)) { Text(label, color = Color(0xFF64748B), fontSize = 12.sp); Text(value, color = color, fontWeight = FontWeight.Bold, fontSize = 22.sp, modifier = Modifier.padding(top = 6.dp)) } } }
-@Composable private fun AccountsScreen(modifier: Modifier) { ScreenHeader("Accounts", modifier) { AccountCard("Penni Demo Account", "Current account", "£1,842.61") } }
-@Composable private fun TransactionsScreen(modifier: Modifier) { ScreenHeader("Transactions", modifier) { sampleTransactions.forEach { TransactionRow(it) } } }
-@Composable private fun BudgetsScreen(modifier: Modifier) { ScreenHeader("Budgets", modifier) { sampleBudgets.forEach { BudgetRow(it) } } }
-@Composable private fun MoreScreen(modifier: Modifier) { ScreenHeader("More", modifier) { listOf("Insights", "Settings", "Help & support").forEach { Text(it, modifier = Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(14.dp)).padding(18.dp), color = Ink) } } }
-@Composable private fun ScreenHeader(title: String, modifier: Modifier, content: @Composable ColumnScope.() -> Unit) { Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) { Text(title, fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Ink); content() } }
-@Composable private fun AccountCard(name: String, type: String, balance: String) { Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(18.dp)) { Row(Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.SpaceBetween) { Column { Text(name, fontWeight = FontWeight.SemiBold); Text(type, color = Color(0xFF64748B), fontSize = 13.sp) }; Text(balance, color = Green, fontWeight = FontWeight.Bold, fontSize = 20.sp) } } }
-@Composable private fun TransactionRow(tx: NativeTransaction) { Row(Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(16.dp)).padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Column { Text(tx.merchant, fontWeight = FontWeight.SemiBold, color = Ink); Text(tx.category.replaceFirstChar { it.uppercase() }, color = Color(0xFF64748B), fontSize = 12.sp) }; Text(if (tx.amount >= 0) "+£%.2f".format(tx.amount) else "-£%.2f".format(-tx.amount), color = if (tx.amount >= 0) Green else Red, fontWeight = FontWeight.Bold) } }
-@Composable private fun BudgetRow(budget: NativeBudget) { val progress = (budget.spent / budget.limit).toFloat(); Column(Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(16.dp)).padding(16.dp)) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(budget.name, fontWeight = FontWeight.SemiBold); Text("£%.0f / £%.0f".format(budget.spent, budget.limit), color = Color(0xFF64748B), fontSize = 13.sp) }; LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().padding(top = 12.dp), color = if (progress > .8f) Red else Green, trackColor = Mint) } }
-
-private val sampleTransactions = listOf(NativeTransaction("Salary", "income", 3200.0, 1), NativeTransaction("Tesco Express", "grocery", -42.50, 2), NativeTransaction("TfL Travel", "public transport", -7.20, 3), NativeTransaction("Octopus Energy", "utilities", -85.40, 5), NativeTransaction("Coffee Corner", "eating out", -4.80, 6), NativeTransaction("Netflix", "entertainment", -10.99, 9))
-private val sampleBudgets = listOf(NativeBudget("Grocery", 198.40, 320.0), NativeBudget("Public Transport", 64.20, 120.0), NativeBudget("Utilities", 85.40, 180.0), NativeBudget("Eating Out", 96.80, 140.0))
+@Composable private fun Welcome(next:()->Unit)=Column(Modifier.fillMaxSize().padding(28.dp),Arrangement.Center,Alignment.CenterHorizontally){Box(Modifier.size(76.dp).background(Green,RoundedCornerShape(24.dp)),contentAlignment=Alignment.Center){Text("P",color=Color.White,fontSize=34.sp,fontWeight=FontWeight.Bold)};Spacer(Modifier.height(24.dp));Text("Welcome to Penni",fontSize=30.sp,fontWeight=FontWeight.Bold,color=Ink);Text("Native offline finance workspace",color=Muted);Spacer(Modifier.height(34.dp));Button(next,Modifier.fillMaxWidth().height(54.dp)){Text("Continue with demo data")}}
+@Composable private fun Shell(page:String,navigate:(String)->Unit,tx:MutableList<Transaction>,budgets:MutableList<Budget>){
+ val tabs=listOf("Home","Accounts","Transactions","Budgets","More")
+ Scaffold(bottomBar={NavigationBar{tabs.forEach{tab->NavigationBarItem(selected=page==tab,onClick={navigate(tab)},icon={Icon(when(tab){"Home"->Icons.Outlined.Home;"Accounts"->Icons.Outlined.AccountBalance;"Transactions"->Icons.Outlined.ReceiptLong;"Budgets"->Icons.Outlined.Analytics;else->Icons.Outlined.MoreHoriz},tab)},label={Text(tab)})}}}){pad->when(page){"Home"->Home(Modifier.padding(pad),tx,budgets,navigate);"Accounts"->Accounts(Modifier.padding(pad));"Transactions"->Transactions(Modifier.padding(pad),tx);"Budgets"->Budgets(Modifier.padding(pad),budgets);"More"->More(Modifier.padding(pad),navigate);else->Feature(Modifier.padding(pad),page,tx,budgets,navigate)}}}
+@Composable private fun Home(m:Modifier,tx:List<Transaction>,b:List<Budget>,go:(String)->Unit){val income=tx.filter{it.amount>0}.sumOf{it.amount};val spent=-tx.filter{it.amount<0}.sumOf{it.amount};LazyColumn(m.fillMaxSize().padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){item{Text("Good afternoon",fontSize=28.sp,fontWeight=FontWeight.Bold,color=Ink)};item{Card(colors=CardDefaults.cardColors(containerColor=Green),shape=RoundedCornerShape(24.dp)){Column(Modifier.fillMaxWidth().padding(22.dp)){Text("Total balance",color=Color.White);Text(money(1842.61),color=Color.White,fontSize=30.sp,fontWeight=FontWeight.Bold)}}};item{Row(horizontalArrangement=Arrangement.spacedBy(12.dp)){Metric("Income",money(income),Modifier.weight(1f));Metric("Spent",money(spent),Modifier.weight(1f))}};item{Title("Recent transactions"){go("Transactions")}};items(tx.take(4),key={it.id}){TxRow(it,{})};item{Title("Budgets"){go("Budgets")}};items(b.take(3),key={it.id}){BudgetRow(it,{})}}}
+@Composable private fun Metric(k:String,v:String,m:Modifier)=Card(m,colors=CardDefaults.cardColors(containerColor=Color.White)){Column(Modifier.padding(16.dp)){Text(k,color=Muted,fontSize=12.sp);Text(v,fontSize=20.sp,fontWeight=FontWeight.Bold,color=Ink)}}
+@Composable private fun Title(v:String,action:()->Unit)=Row(Modifier.fillMaxWidth(),Arrangement.SpaceBetween){Text(v,fontSize=18.sp,fontWeight=FontWeight.Bold);Text("View all",color=Green,modifier=Modifier.clickable{action()})}
+@Composable private fun Accounts(m:Modifier)=LazyColumn(m.fillMaxSize().padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){item{Text("Accounts",fontSize=28.sp,fontWeight=FontWeight.Bold)};item{Card(colors=CardDefaults.cardColors(containerColor=Color.White)){Row(Modifier.fillMaxWidth().padding(18.dp),Arrangement.SpaceBetween){Column{Text("Penni Demo Account",fontWeight=FontWeight.SemiBold);Text("Current account",color=Muted)};Text(money(1842.61),color=Green,fontWeight=FontWeight.Bold,fontSize=20.sp)}}};item{Text("Add and manage accounts with the native + button in the next update.",color=Muted)}}
+@Composable private fun Transactions(m:Modifier,tx:MutableList<Transaction>){var detail by remember{mutableStateOf<Transaction?>(null)};var selected by remember{mutableStateOf<String?>(null)};var add by remember{mutableStateOf(false)};Box(m.fillMaxSize()){LazyColumn(Modifier.fillMaxSize().padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){item{Text("Transactions",fontSize=28.sp,fontWeight=FontWeight.Bold)};selected?.let{item{Row(Modifier.fillMaxWidth().background(Color(0xFFE9FBF3)).padding(10.dp),Arrangement.SpaceBetween){Text("1 transaction selected");TextButton({tx.removeAll{it.id==selected};selected=null}){Text("Delete",color=Red)}}}};items(tx,key={it.id}){x->TxRow(x,{detail=x},selected==x.id){selected=if(it)x.id else null}}};FloatingActionButton({add=true},Modifier.align(Alignment.BottomEnd).padding(22.dp),containerColor=Green){Icon(Icons.Outlined.Add,"Add",tint=Color.White)}};if(add)TransactionForm({tx.add(it);add=false},{add=false});detail?.let{x->TransactionDetail(x,{detail=null},{tx.removeAll{it.id==x.id};detail=null})}}
+@Composable private fun Budgets(m:Modifier,b:MutableList<Budget>){var edit by remember{mutableStateOf<Budget?>(null)};var add by remember{mutableStateOf(false)};Box(m.fillMaxSize()){LazyColumn(Modifier.fillMaxSize().padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){item{Text("Budgets",fontSize=28.sp,fontWeight=FontWeight.Bold)};items(b,key={it.id}){x->BudgetRow(x){edit=x}}};FloatingActionButton({add=true},Modifier.align(Alignment.BottomEnd).padding(22.dp),containerColor=Green){Icon(Icons.Outlined.Add,"Add",tint=Color.White)}};if(add)BudgetForm({b.add(it);add=false},{add=false});edit?.let{x->BudgetForm({n->b[b.indexOfFirst{it.id==n.id}]=n;edit=null},{edit=null},x)}}
+@Composable private fun More(m:Modifier,go:(String)->Unit){val pages=listOf("Reports","Subscriptions","Statements","Investments","Categories","Connections","Jewish finance","UK tools","Settings","Help & support");LazyColumn(m.fillMaxSize().padding(20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{Text("More",fontSize=28.sp,fontWeight=FontWeight.Bold)};item{Text("Every module opens as a native screen.",color=Muted)};items(pages){x->Row(Modifier.fillMaxWidth().background(Color.White,RoundedCornerShape(14.dp)).clickable{go(x)}.padding(18.dp),Arrangement.SpaceBetween){Text(x);Text("›",color=Green,fontSize=24.sp)}}}}
+@Composable private fun Feature(m:Modifier,name:String,tx:List<Transaction>,b:List<Budget>,go:(String)->Unit)=LazyColumn(m.fillMaxSize().padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){item{Row(verticalAlignment=Alignment.CenterVertically){IconButton({go("More")}){Icon(Icons.Outlined.ArrowBack,"Back")};Text(name,fontSize=28.sp,fontWeight=FontWeight.Bold)}};when(name){"Reports"->{item{Metric("Spending",money(-tx.filter{it.amount<0}.sumOf{it.amount}),Modifier.fillMaxWidth())};item{Metric("Active budgets",b.size.toString(),Modifier.fillMaxWidth())}};"Categories"->items((b.map{it.name}+tx.map{it.category}).distinct()){Metric(it,"Native category",Modifier.fillMaxWidth())};else->item{Card(colors=CardDefaults.cardColors(containerColor=Color.White)){Column(Modifier.padding(18.dp)){Text(name,fontWeight=FontWeight.Bold);Text("Native module",color=Green);Text("This page is a Compose screen, not a browser page. It is ready for the matching secure service connection.",color=Muted)}}}}}
+@Composable private fun TxRow(x:Transaction,open:()->Unit,checked:Boolean?=null,mark:((Boolean)->Unit)?=null)=Row(Modifier.fillMaxWidth().background(Color.White,RoundedCornerShape(16.dp)).clickable{open()}.padding(15.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)){if(checked!=null&&mark!=null)Checkbox(checked,mark);Column(Modifier.weight(1f)){Text(x.name,fontWeight=FontWeight.SemiBold);Text(x.category,color=Muted,fontSize=12.sp)};Text(if(x.amount>=0) "+"+money(x.amount) else "-"+money(x.amount),color=if(x.amount>=0)Green else Red,fontWeight=FontWeight.Bold)}
+@Composable private fun BudgetRow(x:Budget,open:()->Unit){val p=(x.spent/x.limit).coerceIn(0.0,1.0).toFloat();Column(Modifier.fillMaxWidth().background(Color.White,RoundedCornerShape(16.dp)).clickable{open()}.padding(16.dp)){Row(Modifier.fillMaxWidth(),Arrangement.SpaceBetween){Text(x.name,fontWeight=FontWeight.SemiBold);Text(money(x.spent)+" / "+money(x.limit),color=Muted)};LinearProgressIndicator(progress={p},modifier=Modifier.fillMaxWidth().padding(top=10.dp),color=if(p>.8f)Red else Green)}}
+@Composable private fun TransactionDetail(x:Transaction,close:()->Unit,delete:()->Unit)=AlertDialog(close,title={Text(x.name)},text={Column{Text(x.category,color=Muted);Text(if(x.amount>=0) "+"+money(x.amount) else "-"+money(x.amount),fontSize=24.sp,fontWeight=FontWeight.Bold)}},confirmButton={TextButton(close){Text("Close")}},dismissButton={TextButton(delete){Text("Delete",color=Red)}})
+@Composable private fun TransactionForm(save:(Transaction)->Unit,close:()->Unit){var name by remember{mutableStateOf("")};var category by remember{mutableStateOf("Grocery")};var amount by remember{mutableStateOf("")};AlertDialog(close,title={Text("Add transaction")},text={Column{OutlinedTextField(name,{name=it},label={Text("Description")});OutlinedTextField(category,{category=it},label={Text("Category")});OutlinedTextField(amount,{amount=it},label={Text("Amount (+ income, - expense)")})}},confirmButton={Button(onClick={ val value=amount.toDoubleOrNull(); if(value!=null) save(Transaction(name=name,category=category,amount=value)) },enabled=name.isNotBlank()&&amount.toDoubleOrNull()!=null){Text("Save")}},dismissButton={TextButton(close){Text("Cancel")}})}
+@Composable private fun BudgetForm(save:(Budget)->Unit,close:()->Unit,old:Budget?=null){var name by remember{mutableStateOf(old?.name?:"")};var limit by remember{mutableStateOf(old?.limit?.toString()?:"")};var spent by remember{mutableStateOf(old?.spent?.toString()?:"0")};AlertDialog(close,title={Text("Budget")},text={Column{OutlinedTextField(name,{name=it},label={Text("Category")});OutlinedTextField(limit,{limit=it},label={Text("Monthly limit")});OutlinedTextField(spent,{spent=it},label={Text("Spent so far")})}},confirmButton={Button(onClick={val l=limit.toDoubleOrNull();val s=spent.toDoubleOrNull();if(l!=null&&s!=null)save(Budget(old?.id?:UUID.randomUUID().toString(),name,s,l))},enabled=name.isNotBlank()&&limit.toDoubleOrNull()!=null&&spent.toDoubleOrNull()!=null){Text("Save")}},dismissButton={TextButton(close){Text("Cancel")}})}
