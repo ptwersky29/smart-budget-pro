@@ -335,7 +335,7 @@ export default function AccountsPage() {
   const connecting = status === "connecting" || status === "redirecting";
 
   return (
-    <div className="page-stack pb-4">
+    <div className="accounts-workspace page-stack pb-4">
       <PageHeader
         eyebrow="Accounts & Import"
         title="Accounts"
@@ -388,6 +388,7 @@ export default function AccountsPage() {
         </div>
       ) : null}
 
+      <div className="accounts-panels subtle-scroll">
       {loading && accounts.length === 0 ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((item) => (
@@ -465,6 +466,8 @@ export default function AccountsPage() {
           </div>
         </Surface>
       ) : null}
+
+      </div>
 
       <AccountFormModal
         open={showCreateModal}

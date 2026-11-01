@@ -31,6 +31,7 @@ import {
 
 const ProductTour = lazy(() => import("../components/ProductTour"));
 const SIDEBAR_KEY = "penni.sidebar.collapsed";
+const FIXED_WORKSPACE_ROUTES = new Set(["/dashboard", "/accounts", "/transactions", "/budgets"]);
 
 function isActivePath(pathname, to) {
   if (to === "/dashboard") return pathname === "/dashboard";
@@ -42,6 +43,7 @@ export default function AppLayout() {
   const { settings } = useSettings();
   const { openAssistant } = useAssistant();
   const location = useLocation();
+  const workspaceRoute = FIXED_WORKSPACE_ROUTES.has(location.pathname);
   const navigate = useNavigate();
   const { setTheme, resolvedTheme } = useTheme();
   const noAnim = settings.preferences?.dashboard?.animations === false || settings.preferences?.accessibility?.reduce_motion === true;
@@ -396,8 +398,8 @@ export default function AppLayout() {
           </div>
         </header>
 
-        <main data-tour="main-content" className="app-main-scroll mx-auto w-full max-w-[1440px] px-3 pb-24 pt-3 sm:px-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:pl-[10px] lg:pr-[9px] lg:pb-[14px] lg:pt-[21px]">
-          <div key={location.pathname} className={noAnim ? "" : "page-in"}>
+        <main data-tour="main-content" className={`app-main-scroll mx-auto w-full max-w-[1440px] px-3 pb-24 pt-3 sm:px-4 lg:min-h-0 lg:flex-1 lg:pl-[10px] lg:pr-[9px] lg:pb-[14px] lg:pt-[21px] ${workspaceRoute ? "workspace-main lg:overflow-hidden" : "lg:overflow-y-auto lg:overscroll-contain"}`}>
+          <div key={location.pathname} className={[noAnim ? "" : "page-in", workspaceRoute ? "workspace-route-view" : ""].filter(Boolean).join(" ")}>
             <Outlet />
           </div>
         </main>

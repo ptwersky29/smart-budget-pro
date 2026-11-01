@@ -304,7 +304,7 @@ function TransactionInspectorPanel({
     : null;
 
   return (
-    <div className="surface flex h-[calc(100vh-94px)] min-h-[540px] flex-col overflow-hidden rounded-[14px]">
+    <div className="surface flex h-[calc(100vh-94px)] min-h-[540px] flex-col overflow-hidden rounded-[14px] xl:h-full xl:min-h-0">
       <div className="subtle-scroll flex-1 overflow-y-auto">
         <div className="relative p-4 pb-3">
           <button
@@ -1668,10 +1668,10 @@ const Transactions = React.memo(function Transactions() {
   }, [txs, aiResults]);
 
   return (
-    <div className="transactions-reference page-stack pb-4" data-testid="transactions-root">
+    <div className={`transactions-reference page-stack pb-4 ${activeTab === "ledger" ? "transactions-ledger" : "transactions-other"}`} data-testid="transactions-root">
 
-      <div className={`grid items-start gap-4 ${activeTab === "ledger" && inspectorOpen ? "xl:grid-cols-[minmax(0,1fr)_328px]" : ""}`}>
-        <div className="min-w-0 space-y-4">
+      <div className={`grid min-h-0 items-start gap-4 lg:items-stretch ${activeTab === "ledger" && inspectorOpen ? "xl:grid-cols-[minmax(0,1fr)_328px]" : ""}`}>
+        <div className="transactions-primary min-w-0 space-y-4 lg:flex lg:min-h-0 lg:flex-col lg:gap-3 lg:space-y-0">
           <div className="flex flex-col gap-4 pl-0 lg:flex-row lg:items-start lg:justify-between xl:pl-[14px]">
             <div className="min-w-0">
               <h1 className="text-[30px] font-semibold leading-none tracking-[-0.045em]">
@@ -2121,7 +2121,7 @@ const Transactions = React.memo(function Transactions() {
       {/* â”€â”€â”€â”€â”€ Ledger tab â”€â”€â”€â”€â”€ */}
       {activeTab === "ledger" && <>
         {/* Transaction table */}
-        <div className="surface overflow-hidden rounded-[14px] p-0">
+        <div className="transaction-ledger-panel surface overflow-hidden rounded-[14px] p-0 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
           {loading ? (
             <SkeletonTable rows={8} className="p-3" />
           ) : (aiResults?.transactions || txs).length === 0 ? (
@@ -2220,7 +2220,7 @@ const Transactions = React.memo(function Transactions() {
                   })}
                 </div>
               ) : (
-                <div className="hidden overflow-x-auto sm:block">
+                <div className="transaction-table-scroll hidden min-h-0 overflow-x-auto sm:block lg:flex-1 lg:overflow-auto">
                   <table className="w-full table-fixed text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-[11px] font-medium text-muted-foreground">
@@ -2332,7 +2332,7 @@ const Transactions = React.memo(function Transactions() {
         ) : null}
         </div>
         {activeTab === "ledger" && inspectorOpen ? (
-          <aside className="sticky top-20 hidden xl:block xl:w-[328px]">
+          <aside className="transaction-inspector-area sticky top-20 hidden xl:block xl:h-full xl:min-h-0 xl:w-[328px] xl:self-stretch">
             <TransactionInspectorPanel
               transaction={panelTransaction}
               account={panelTransaction ? accountsById[panelTransaction.account_id] : null}

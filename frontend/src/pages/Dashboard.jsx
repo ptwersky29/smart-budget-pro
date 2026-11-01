@@ -382,7 +382,7 @@ export default function Dashboard() {
         ) : null}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_288px]">
+      <div className="dashboard-panels grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_288px]">
         <div className="space-y-4">
           <Surface className="overflow-hidden">
             <SurfaceHeader
