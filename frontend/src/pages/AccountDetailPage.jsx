@@ -4,7 +4,7 @@ import { api, formatApiError } from "../lib/api";
 import { getDisplayName } from "../lib/utils";
 import { CURRENCY_SYMBOL } from "../data/constants";
 import { getBankLogoOrFallback, pickBankInstitution } from "../data/bankLogos";
-import { ArrowLeft, Wallet, PiggyBank, Lock, Pencil, Trash2, Loader2, Receipt, CreditCard, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Search, X, Filter, Plus, Upload, FileText, AlertCircle, RefreshCcw } from "lucide-react";
+import { ArrowLeft, Wallet, PiggyBank, Lock, Pencil, Trash2, Loader2, Receipt, CreditCard, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Search, X, Filter, Plus, Upload, FileText, AlertCircle, RefreshCcw, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { MetricCard, SectionCard, EmptyState } from "../components/ui/layout";
 import { SkeletonTable } from "../components/ui/Skeleton";
@@ -15,7 +15,7 @@ import CategoryCombobox from "../components/CategoryCombobox";
 import AccountFormModal from "../components/AccountFormModal";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import TransactionForm from "../components/TransactionForm";
-import TransactionRow from "../components/TransactionRow";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu";
 import { withUndo } from "../lib/undo";
 import { useCategories } from "../contexts/CategoriesContext";
 
@@ -294,17 +294,17 @@ export default function AccountDetailPage() {
   const balanceFmt = Number(account.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
-    <div className="space-y-6">
+    <div className="account-detail-workspace page-stack pb-4">
       <button onClick={() => navigate("/accounts")}
         className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
         <ArrowLeft className="h-3.5 w-3.5" /> All Accounts
       </button>
 
       {/* Hero card */}
-      <div className={`relative overflow-hidden rounded-[1.75rem] border border-border/60 bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-xl shadow-card ${isSavings ? "ring-1 ring-violet/10" : ""}`}>
+      <div className={`account-detail-hero relative overflow-hidden rounded-[1.75rem] border border-border/60 bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-xl shadow-card ${isSavings ? "ring-1 ring-violet/10" : ""}`}>
         <div className="absolute top-0 right-0 w-48 h-48 rounded-full blur-3xl pointer-events-none" style={{ background: `${account.color || "#059669"}15` }} />
 
-        <div className="relative p-6 sm:p-8">
+        <div className="relative p-4 sm:p-5">
           <div className="flex items-start gap-5">
             {/* Logo */}
             {account.image ? (
@@ -380,17 +380,17 @@ export default function AccountDetailPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="account-detail-stats grid grid-cols-2 gap-2 sm:grid-cols-4">
         <MetricCard label="Balance" value={`${CURRENCY_SYMBOL}${balanceFmt}`} icon={Wallet} tone="emerald" />
         <MetricCard label="Transactions" value={totalTx.toLocaleString()} icon={Receipt} />
         <MetricCard label="Type" value={meta.label} icon={Icon} />
         <MetricCard label="Currency" value={account.currency} icon={CreditCard} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
+      <div className="account-detail-main grid min-h-0 min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_260px] 2xl:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="account-detail-primary min-h-0 min-w-0">
           {/* Transactions */}
-          <SectionCard eyebrow="Transactions" title={`${totalTx} transaction${totalTx !== 1 ? "s" : ""}`}>
+          <SectionCard eyebrow="Transactions" title={`${totalTx} transaction${totalTx !== 1 ? "s" : ""}`} className="account-detail-transaction-section" contentClassName="account-detail-transaction-content">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 pb-4">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
             <span>Income <strong className="text-emerald font-medium tabular-nums">{CURRENCY_SYMBOL}{incomeTotal.toFixed(2)}</strong></span>
@@ -466,7 +466,7 @@ export default function AccountDetailPage() {
           </div>
         )}
 
-        <div className="rounded-xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden">
+        <div className="account-detail-table-panel rounded-xl border border-border bg-card/90 backdrop-blur-xl shadow-card overflow-hidden">
           {txLoading ? <SkeletonTable rows={6} className="p-3" />
           : txs.length === 0 ? (
             <div className="p-6">
@@ -475,27 +475,32 @@ export default function AccountDetailPage() {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-[11px] text-muted-foreground border-b border-border">
-                      <th className="px-3 py-2.5 w-10"></th>
-                      <th className="px-4 py-2.5">Date</th>
-                      <th className="px-4 py-2.5">Description</th>
-                      <th className="px-4 py-2.5">Category</th>
-                      <th className="px-4 py-2.5 text-right">Amount</th>
-                      <th className="px-4 py-2.5 w-10"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {txs.map((t, idx) => (
-                      <TransactionRow key={t.transaction_id} t={t}
-                        isSelected={false} isFocused={false}
-                        onToggleSelect={() => {}} onEdit={openEditTx} onDelete={deleteTx}
-                        onSetFocus={() => {}} />
-                    ))}
-                  </tbody>
-                </table>
+              <div className="account-detail-list subtle-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain" role="list" aria-label="Account transactions">
+                {txs.map((t) => {
+                  const amount = Number(t.amount) || 0;
+                  const description = t.description || t.merchant || "Transaction";
+                  const dateLabel = t.date ? new Date(`${String(t.date).slice(0, 10)}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "No date";
+                  return (
+                    <div role="listitem" key={t.transaction_id} className="flex min-w-0 items-center gap-2 border-b border-border/60 px-3 py-3 last:border-0 hover:bg-secondary/25">
+                      <button type="button" onClick={() => openEditTx(t)} className="min-w-0 flex-1 text-left" title={`Edit ${description}`}>
+                        <span className="block break-words text-[12px] font-semibold leading-snug">{description}</span>
+                        <span className="mt-1 block break-words text-[10px] leading-snug text-muted-foreground">{dateLabel} · {t.category || "Uncategorised"}{t.pending ? " · Pending" : ""}</span>
+                      </button>
+                      <span className={`money-tabular max-w-[38%] shrink-0 break-all text-right text-[12px] font-semibold ${amount < 0 ? "text-ruby" : "text-emerald"}`}>
+                        {amount > 0 ? "+" : amount < 0 ? "−" : ""}{CURRENCY_SYMBOL}{Math.abs(amount).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button type="button" aria-label={`Actions for ${description}`} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"><MoreHorizontal className="h-4 w-4" /></button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditTx(t)}><Pencil className="mr-2 h-4 w-4" /> Edit transaction</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => deleteTx(t.transaction_id)} className="text-ruby"><Trash2 className="mr-2 h-4 w-4" /> Delete transaction</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  );
+                })}
               </div>
 
               {totalPages > 1 && (
@@ -519,7 +524,7 @@ export default function AccountDetailPage() {
         </div>
       </SectionCard>
         </div>
-        <div className="flex flex-col gap-6">
+        <div className="account-detail-side flex min-h-0 min-w-0 flex-col gap-4 subtle-scroll">
           {/* Statement Upload */}
           <SectionCard eyebrow="Manual import" title="Upload a statement" contentClassName="p-0">
             <div
