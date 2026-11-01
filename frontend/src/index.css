@@ -563,6 +563,11 @@ html { font-size: calc(var(--fs-base, 0.875rem) * var(--fs-multiplier, 1)); }
     padding-bottom: 0;
     gap: 0.75rem;
   }
+  .account-detail-workspace > button,
+  .account-detail-workspace > .account-detail-hero,
+  .account-detail-workspace > .account-detail-stats {
+    flex-shrink: 0;
+  }
   .account-detail-workspace > .account-detail-main {
     min-height: 0;
     flex: 1 1 auto;
