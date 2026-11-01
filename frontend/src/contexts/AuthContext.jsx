@@ -1,12 +1,13 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { api } from "../lib/api";
-import { setToken, clearTokens, isTokenExpired } from "../lib/storage";
+import { setToken, clearTokens } from "../lib/storage";
 
 const AuthCtx = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [authUnavailable, setAuthUnavailable] = useState(false);
 
   const stripTokens = useCallback((payload) => {
     if (!payload) return payload;
@@ -29,11 +30,19 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const checkAuth = useCallback(async () => {
+    setLoading(true);
+    setAuthUnavailable(false);
     try {
       const { data } = await api.get("/auth/me");
       setUser(stripTokens(data));
-    } catch {
-      setUser(false);
+    } catch (error) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        setUser(false);
+      } else {
+        // Render cold starts / network outages must not impersonate a logout.
+        setAuthUnavailable(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -49,6 +58,7 @@ export const AuthProvider = ({ children }) => {
     if (data?.access_token) setToken("access_token", data.access_token, rememberMe);
     if (data?.refresh_token) setToken("refresh_token", data.refresh_token, rememberMe);
     setUser(stripTokens(data));
+    setAuthUnavailable(false);
     return data;
   }, [stripTokens]);
 
@@ -64,11 +74,12 @@ export const AuthProvider = ({ children }) => {
     try { await api.post("/auth/logout"); } catch { /* server logout best-effort */ }
     clearTokens();
     setUser(false);
+    setAuthUnavailable(false);
   }, []);
 
   const value = React.useMemo(
-    () => ({ user, setUser, loading, login, register, logout, refresh: checkAuth }),
-    [user, loading, login, register, logout, checkAuth]
+    () => ({ user, setUser, loading, authUnavailable, login, register, logout, refresh: checkAuth }),
+    [user, loading, authUnavailable, login, register, logout, checkAuth]
   );
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
