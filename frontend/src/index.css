@@ -604,9 +604,13 @@ html { font-size: calc(var(--fs-base, 0.875rem) * var(--fs-multiplier, 1)); }
     overflow-x: hidden;
     overflow-y: auto;
   }
-  .account-detail-workspace .account-detail-side {
+  .account-detail-workspace .account-detail-inspector {
     min-height: 0;
-    overflow-y: auto;
+    overflow: hidden;
+  }
+  .account-detail-workspace .account-detail-inspector > .surface {
+    height: 100%;
+    min-height: 0;
   }
 
   .accounts-workspace > .accounts-panels {
@@ -664,6 +668,14 @@ html { font-size: calc(var(--fs-base, 0.875rem) * var(--fs-multiplier, 1)); }
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
+  }
+}
+/* Keep the account ledger accessible on smaller displays as a single contained list. */
+@media (max-width: 1023px) {
+  .account-detail-workspace .account-detail-list {
+    max-height: min(60dvh, 550px);
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 }
 @media (min-width: 1280px) {
