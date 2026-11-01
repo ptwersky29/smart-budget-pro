@@ -550,6 +550,60 @@ html { font-size: calc(var(--fs-base, 0.875rem) * var(--fs-multiplier, 1)); }
     overflow: hidden;
     padding-bottom: 0;
   }
+  /* Keep full-height balance and account cards from being compressed by flexbox. */
+  .accounts-workspace > .accounts-panels > * {
+    flex-shrink: 0;
+  }
+
+  /* Individual account screens keep the overview in place and scroll the ledger independently. */
+  .account-detail-workspace {
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+    padding-bottom: 0;
+    gap: 0.75rem;
+  }
+  .account-detail-workspace > .account-detail-main {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+  .account-detail-workspace .account-detail-primary,
+  .account-detail-workspace .account-detail-transaction-section {
+    display: flex;
+    min-height: 0;
+    min-width: 0;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .account-detail-workspace .account-detail-transaction-section {
+    flex: 1 1 auto;
+  }
+  .account-detail-workspace .account-detail-transaction-content {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    flex-direction: column;
+    padding: 0.75rem;
+  }
+  .account-detail-workspace .account-detail-table-panel {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .account-detail-workspace .account-detail-list {
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  .account-detail-workspace .account-detail-side {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
   .accounts-workspace > .accounts-panels {
     display: flex;
     flex: 1 1 auto;
@@ -665,6 +719,24 @@ html { font-size: calc(var(--fs-base, 0.875rem) * var(--fs-multiplier, 1)); }
   .transactions-ledger .transaction-inspector-area {
     height: auto;
     overflow: visible;
+  }
+  .account-detail-workspace {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+  .account-detail-workspace > .account-detail-main {
+    flex: none;
+    overflow: visible;
+  }
+  .account-detail-workspace .account-detail-primary,
+  .account-detail-workspace .account-detail-transaction-section {
+    height: auto;
+    overflow: visible;
+  }
+  .account-detail-workspace .account-detail-list {
+    max-height: 55vh;
+    overflow-y: auto;
   }
   .budgets-route > .budget-workspace {
     height: auto;
