@@ -350,20 +350,20 @@ export default function AccountDetailPage() {
       <div className={`account-detail-hero relative overflow-hidden rounded-[1.75rem] border border-border/60 bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-xl shadow-card ${isSavings ? "ring-1 ring-violet/10" : ""}`}>
         <div className="absolute top-0 right-0 w-48 h-48 rounded-full blur-3xl pointer-events-none" style={{ background: `${account.color || "#059669"}15` }} />
 
-        <div className="relative p-4 sm:p-5">
-          <div className="flex items-start gap-5">
+        <div className="relative p-4 sm:p-5 lg:flex lg:flex-wrap lg:items-center lg:gap-x-6 lg:gap-y-2">
+          <div className="flex min-w-0 items-start gap-3 lg:flex-1">
             {/* Logo */}
             {account.image ? (
-              <div className="shrink-0 h-16 w-16 rounded-full overflow-hidden ring-4 ring-white dark:ring-gray-800 shadow-md">
-                <img src={account.image} alt={account.name} className="h-16 w-16 object-cover" />
+              <div className="shrink-0 h-12 w-12 rounded-full overflow-hidden ring-4 ring-white dark:ring-gray-800 shadow-md">
+                <img src={account.image} alt={account.name} className="h-12 w-12 object-cover" />
               </div>
             ) : bankLogoUrl ? (
-              <div className="shrink-0 h-16 w-16 rounded-full overflow-hidden ring-4 ring-white dark:ring-gray-800 shadow-md bg-white dark:bg-secondary/40 flex items-center justify-center p-2">
+              <div className="shrink-0 h-12 w-12 rounded-full overflow-hidden ring-4 ring-white dark:ring-gray-800 shadow-md bg-white dark:bg-secondary/40 flex items-center justify-center p-2">
                 <img src={bankLogoUrl} alt={dispName} className="h-full w-full object-contain"
-                  onError={(e) => { e.target.onerror = null; e.target.style.display = "none"; e.target.parentElement.className = "shrink-0 h-16 w-16 rounded-full flex items-center justify-center text-xl font-bold text-white shadow-md ring-4 ring-white dark:ring-gray-800"; e.target.parentElement.style.background = account.color || "#059669"; e.target.parentElement.innerText = initials; }} />
+                  onError={(e) => { e.target.onerror = null; e.target.style.display = "none"; e.target.parentElement.className = "shrink-0 h-12 w-12 rounded-full flex items-center justify-center text-xl font-bold text-white shadow-md ring-4 ring-white dark:ring-gray-800"; e.target.parentElement.style.background = account.color || "#059669"; e.target.parentElement.innerText = initials; }} />
               </div>
             ) : (
-              <div className="shrink-0 h-16 w-16 rounded-full flex items-center justify-center text-xl font-bold text-white shadow-md ring-4 ring-white dark:ring-gray-800"
+              <div className="shrink-0 h-12 w-12 rounded-full flex items-center justify-center text-xl font-bold text-white shadow-md ring-4 ring-white dark:ring-gray-800"
                 style={{ background: account.color || "#059669" }}>
                 {initials}
               </div>
@@ -382,12 +382,12 @@ export default function AccountDetailPage() {
                 )}
               </div>
 
-              <div className="mt-3 flex items-end gap-4">
+              <div className="mt-2 flex flex-wrap items-end gap-4">
                 <div>
                   <p className="text-xs text-muted-foreground mb-0.5">
                     {isSavings ? "Saved" : "Available Balance"}
                   </p>
-                  <p className={`text-3xl sm:text-4xl font-bold tracking-tight ${isSavings ? "text-violet" : ""}`}>
+                  <p className={`text-2xl sm:text-3xl font-bold tracking-tight ${isSavings ? "text-violet" : ""}`}>
                     {CURRENCY_SYMBOL}{balanceFmt}
                   </p>
                 </div>
@@ -401,9 +401,12 @@ export default function AccountDetailPage() {
           </div>
 
           {/* Action buttons */}
-          <div className="mt-5 flex items-center gap-2 flex-wrap">
+          <div className="mt-3 flex flex-wrap items-center gap-2 lg:mt-0">
             <Button onClick={() => { closeTxForm(); setTxFormOpen(true); loadAccounts(); }} variant="outlinePill" size="pillSm" className="bg-emerald text-white hover:bg-emerald/90 border-emerald/30">
               <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Transaction
+            </Button>
+            <Button onClick={() => setUploadOpen(true)} variant="outlinePill" size="pillSm">
+              <Upload className="mr-1.5 h-3.5 w-3.5" /> Import statement
             </Button>
             <Button onClick={() => setShowEdit(true)} variant="outlinePill" size="pillSm">
               <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
@@ -414,7 +417,7 @@ export default function AccountDetailPage() {
           </div>
 
           {needsReconnect && (
-            <div className="mt-3 rounded-xl border border-ruby/40 bg-ruby/5 p-3 flex items-center gap-3">
+            <div className="mt-3 w-full rounded-xl border border-ruby/40 bg-ruby/5 p-3 flex items-center gap-3">
               <AlertCircle className="h-4 w-4 text-ruby shrink-0" />
               <p className="text-xs text-ruby flex-1">This bank connection has expired. Reconnect it to resume syncing transactions.</p>
               <Button onClick={reconnectConn} variant="danger" size="pillSm">
@@ -426,14 +429,7 @@ export default function AccountDetailPage() {
       </div>
 
       {/* Stats */}
-      <div className="account-detail-stats grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <MetricCard label="Balance" value={`${CURRENCY_SYMBOL}${balanceFmt}`} icon={Wallet} tone="emerald" />
-        <MetricCard label="Transactions" value={totalTx.toLocaleString()} icon={Receipt} />
-        <MetricCard label="Type" value={meta.label} icon={Icon} />
-        <MetricCard label="Currency" value={account.currency} icon={CreditCard} />
-      </div>
-
-      <div className="account-detail-main grid min-h-0 min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_260px] 2xl:grid-cols-[minmax(0,1fr)_300px]">
+      <div className={`account-detail-main grid min-h-0 min-w-0 grid-cols-1 gap-4 ${inspectedTransaction && wideLayout ? "lg:grid-cols-[minmax(0,1fr)_328px]" : ""}`}>
         <div className="account-detail-primary min-h-0 min-w-0">
           {/* Transactions */}
           <SectionCard eyebrow="Transactions" title={`${totalTx} transaction${totalTx !== 1 ? "s" : ""}`} className="account-detail-transaction-section" contentClassName="account-detail-transaction-content">
@@ -521,56 +517,89 @@ export default function AccountDetailPage() {
             </div>
           ) : (
             <>
-              <div className="account-detail-list subtle-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain" role="list" aria-label="Account transactions">
+
+              <div ref={scrollRef} className="account-detail-list subtle-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain" role="list" aria-label="Account transactions">
                 {txs.map((t) => {
                   const amount = Number(t.amount) || 0;
                   const description = t.description || t.merchant || "Transaction";
                   const dateLabel = t.date ? new Date(`${String(t.date).slice(0, 10)}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "No date";
+                  const merchant = t.merchant || t.normalized_merchant;
+                  const status = t.approval_status === "failed" ? "Failed" : t.pending ? "Pending" : (t.approval_status === "unapproved" || t.category_approval_status === "unapproved") ? "Unapproved" : "Approved";
+                  const detail = [merchant && merchant.toLowerCase() !== description.toLowerCase() ? merchant : null, t.category || "Uncategorised", t.source_label || t.source].filter(Boolean).join(" · ");
                   return (
-                    <div role="listitem" key={t.transaction_id} className="flex min-w-0 items-center gap-2 border-b border-border/60 px-3 py-3 last:border-0 hover:bg-secondary/25">
-                      <button type="button" onClick={() => openEditTx(t)} className="min-w-0 flex-1 text-left" title={`Edit ${description}`}>
-                        <span className="block break-words text-[12px] font-semibold leading-snug">{description}</span>
-                        <span className="mt-1 block break-words text-[10px] leading-snug text-muted-foreground">{dateLabel} · {t.category || "Uncategorised"}{t.pending ? " · Pending" : ""}</span>
+                    <div role="listitem" key={t.transaction_id} className={`flex min-w-0 items-center gap-2 border-b border-border/60 px-3 py-3 last:border-0 hover:bg-secondary/25 ${inspectedTransaction?.transaction_id === t.transaction_id ? "bg-emerald/10" : ""}`}>
+                      <button type="button" onClick={() => setInspectedTransaction(t)} className="flex min-w-0 flex-1 items-start gap-2.5 text-left" aria-label={`View details for ${description}`}>
+                        <span className="hidden w-[78px] shrink-0 pt-0.5 text-[10.5px] text-muted-foreground sm:block">{dateLabel}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block break-words text-[12px] font-semibold leading-snug">{description}</span>
+                          <span className="mt-1 block break-words text-[10.5px] leading-snug text-muted-foreground">{detail}</span>
+                          <span className="mt-1 block text-[10px] text-muted-foreground sm:hidden">{dateLabel}</span>
+                        </span>
                       </button>
-                      <span className={`money-tabular max-w-[38%] shrink-0 break-all text-right text-[12px] font-semibold ${amount < 0 ? "text-ruby" : "text-emerald"}`}>
-                        {amount > 0 ? "+" : amount < 0 ? "−" : ""}{CURRENCY_SYMBOL}{Math.abs(amount).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      <span className="flex max-w-[39%] shrink-0 flex-col items-end gap-1">
+                        <span className={`money-tabular break-all text-right text-[12px] font-semibold ${amount < 0 ? "text-ruby" : "text-emerald"}`}>
+                          {amount > 0 ? "+" : amount < 0 ? "−" : ""}{CURRENCY_SYMBOL}{Math.abs(amount).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">{status}</span>
                       </span>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button type="button" aria-label={`Actions for ${description}`} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"><MoreHorizontal className="h-4 w-4" /></button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setInspectedTransaction(t)}><Receipt className="mr-2 h-4 w-4" /> View details</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openEditTx(t)}><Pencil className="mr-2 h-4 w-4" /> Edit transaction</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => deleteTx(t.transaction_id)} className="text-ruby"><Trash2 className="mr-2 h-4 w-4" /> Delete transaction</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setInspectedTransaction(null); deleteTx(t.transaction_id); }} className="text-ruby"><Trash2 className="mr-2 h-4 w-4" /> Delete transaction</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
                   );
                 })}
+                <div ref={loadMoreRef} className="py-3 text-center text-[11px] text-muted-foreground" aria-live="polite">
+                  {loadingMore ? "Loading more transactions…" : txs.length < totalTx ? "More transactions will load as you scroll" : `All ${txs.length.toLocaleString()} transactions shown`}
+                </div>
               </div>
 
-              {totalPages > 1 && (
-                <div className="px-4 py-3 border-t border-border flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Showing {offset + 1}–{Math.min(offset + limit, totalTx)} of {totalTx}</span>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => setOffset(Math.max(0, offset - limit))} disabled={offset === 0}
-                      className="h-7 w-7 rounded-lg grid place-items-center border border-border hover:bg-secondary disabled:opacity-30">
-                      <ChevronLeft className="h-3.5 w-3.5" />
-                    </button>
-                    <span className="text-muted-foreground min-w-[3rem] text-center">{currentPage} / {totalPages}</span>
-                    <button onClick={() => setOffset(Math.min((totalPages - 1) * limit, offset + limit))} disabled={offset + limit >= totalTx}
-                      className="h-7 w-7 rounded-lg grid place-items-center border border-border hover:bg-secondary disabled:opacity-30">
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              )}
             </>
           )}
         </div>
       </SectionCard>
         </div>
-        <div className="account-detail-side flex min-h-0 min-w-0 flex-col gap-4 subtle-scroll">
+
+        {inspectedTransaction && wideLayout ? (
+          <aside className="account-detail-inspector min-h-0 min-w-0 overflow-hidden">
+            <TransactionInspectorPanel
+              key={inspectedTransaction.transaction_id}
+              transaction={inspectedTransaction}
+              account={account}
+              similarTransactions={txs.filter((tx) => tx.transaction_id !== inspectedTransaction.transaction_id && (tx.normalized_merchant || tx.merchant || "").toLowerCase() === (inspectedTransaction.normalized_merchant || inspectedTransaction.merchant || "").toLowerCase()).slice(0, 3)}
+              onClose={() => setInspectedTransaction(null)}
+              onEdit={(tx) => openEditTx(tx)}
+              onDelete={(id) => { setInspectedTransaction(null); deleteTx(id); }}
+              onInspect={setInspectedTransaction}
+            />
+          </aside>
+        ) : null}
+      </div>
+
+      <Sheet open={Boolean(inspectedTransaction) && !wideLayout} onOpenChange={(open) => { if (!open) setInspectedTransaction(null); }}>
+        <SheetContent side="right" className="w-full p-0 sm:max-w-md">
+          <TransactionInspectorPanel
+            key={inspectedTransaction?.transaction_id || "empty"}
+            transaction={inspectedTransaction}
+            account={account}
+            onClose={() => setInspectedTransaction(null)}
+            onEdit={(tx) => { setInspectedTransaction(null); openEditTx(tx); }}
+            onDelete={(id) => { setInspectedTransaction(null); deleteTx(id); }}
+            onInspect={setInspectedTransaction}
+          />
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={uploadOpen} onOpenChange={setUploadOpen}>
+        <SheetContent side="right" className="w-full overflow-y-auto p-4 sm:max-w-lg">
+          <SheetHeader><SheetTitle>Import statement</SheetTitle></SheetHeader>
+          <div className="mt-5">
           {/* Statement Upload */}
           <SectionCard eyebrow="Manual import" title="Upload a statement" contentClassName="p-0">
             <div
@@ -612,8 +641,10 @@ export default function AccountDetailPage() {
               </div>
             )}
           </SectionCard>
-        </div>
-      </div>
+
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <AccountFormModal open={showEdit} onClose={() => setShowEdit(false)} onCreated={() => { loadAccount(); setShowEdit(false); }} editAccount={account} />
 
