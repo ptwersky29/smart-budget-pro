@@ -368,6 +368,7 @@ export default function AccountsPage() {
         }
       />
 
+      <div className="accounts-panels subtle-scroll" aria-label="Accounts overview and account lists">
       <BalanceHero
         accounts={accounts}
         loading={loading && accounts.length === 0}
@@ -388,7 +389,6 @@ export default function AccountsPage() {
         </div>
       ) : null}
 
-      <div className="accounts-panels subtle-scroll">
       {loading && accounts.length === 0 ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((item) => (
