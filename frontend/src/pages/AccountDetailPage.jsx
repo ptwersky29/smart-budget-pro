@@ -15,6 +15,7 @@ import CategoryCombobox from "../components/CategoryCombobox";
 import AccountFormModal from "../components/AccountFormModal";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import TransactionForm from "../components/TransactionForm";
+import TransactionInspectorPanel from "../components/TransactionInspectorPanel";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu";
 import { withUndo } from "../lib/undo";
 import { useCategories } from "../contexts/CategoriesContext";
@@ -93,7 +94,22 @@ export default function AccountDetailPage() {
   const defaultFilters = useMemo(() => ({ search: "", category: "", tx_type: "", date_from: "", date_to: "", amount_min: "", amount_max: "", sort: "date", order: "desc" }), []);
   const [filters, setFilters] = useState(defaultFilters);
   const [offset, setOffset] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [inspectedTransaction, setInspectedTransaction] = useState(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [wideLayout, setWideLayout] = useState(() => typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches);
+  const requestRef = useRef(0);
+  const scrollRef = useRef(null);
+  const loadMoreRef = useRef(null);
   const limit = 100;
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1024px)");
+    const update = () => setWideLayout(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
   const debounceRef = React.useRef(null);
 
   const setFilter = useCallback((key, value) => { setOffset(0); setFilters((prev) => ({ ...prev, [key]: value })); }, []);
@@ -142,10 +158,13 @@ export default function AccountDetailPage() {
     } catch { toast.error("Could not load statement history"); }
   }, [accountId]);
 
+
   const loadTransactions = useCallback(async () => {
     const targetId = account?.account_id || accountId;
     if (!targetId) return;
-    setTxLoading(true);
+    const requestId = ++requestRef.current;
+    if (offset === 0) setTxLoading(true);
+    else setLoadingMore(true);
     try {
       const params = { account_id: targetId, limit, sort: filters.sort, order: filters.order, offset };
       if (filters.search) params.search = filters.search;
@@ -156,16 +175,45 @@ export default function AccountDetailPage() {
       if (filters.amount_min && !isNaN(filters.amount_min)) params.amount_min = parseFloat(filters.amount_min);
       if (filters.amount_max && !isNaN(filters.amount_max)) params.amount_max = parseFloat(filters.amount_max);
       const { data } = await api.get("/transactions", { params });
-      setTxs(data.transactions);
-      setTotalTx(data.total);
-      setIncomeTotal(data.income_total || 0);
-      setExpenseTotal(data.expense_total || 0);
-    } catch { toast.error("Could not load transactions"); }
-    finally { setTxLoading(false); }
+      if (requestId !== requestRef.current) return;
+      const incoming = data.transactions || [];
+      setTxs((previous) => {
+        if (offset === 0) return incoming;
+        const seen = new Set(previous.map((tx) => tx.transaction_id));
+        return [...previous, ...incoming.filter((tx) => !seen.has(tx.transaction_id))];
+      });
+      setTotalTx(Number(data.total || 0));
+      setIncomeTotal(Number(data.income_total || 0));
+      setExpenseTotal(Number(data.expense_total || 0));
+    } catch {
+      if (requestId === requestRef.current) toast.error("Could not load transactions");
+    } finally {
+      if (requestId === requestRef.current) {
+        setTxLoading(false);
+        setLoadingMore(false);
+      }
+    }
   }, [account?.account_id, accountId, filters, offset]);
 
   useEffect(() => { loadAccount(); loadHistory(); loadTlConn(); }, [loadAccount, loadHistory, loadTlConn]);
   useEffect(() => { if (account) loadTransactions(); }, [account?.account_id, loadTransactions]);
+
+  // Load the next batch into the same list as the user approaches its bottom.
+  useEffect(() => {
+    const trigger = loadMoreRef.current;
+    const scrollArea = scrollRef.current;
+    if (!trigger || !scrollArea || txLoading || loadingMore || txs.length >= totalTx) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) setOffset(txs.length);
+    }, { root: scrollArea, rootMargin: "180px" });
+    observer.observe(trigger);
+    return () => observer.disconnect();
+  }, [txs.length, totalTx, txLoading, loadingMore]);
+
+  const refreshTransactions = useCallback(async () => {
+    if (offset !== 0) setOffset(0);
+    else await loadTransactions();
+  }, [offset, loadTransactions]);
 
   const openEditTx = useCallback((t) => {
     setEditingTxId(t.transaction_id);
@@ -190,13 +238,13 @@ export default function AccountDetailPage() {
       action: () => api.delete(`/transactions/${txId}`),
       undo: async () => {
         if (old) { await api.post("/transactions", old); }
-        await loadTransactions();
+        await refreshTransactions();
       },
-      onError: () => { if (old) setTxs(prev => [...prev, old]); loadTransactions(); },
+      onError: () => { if (old) setTxs(prev => [...prev, old]); refreshTransactions(); },
       successMsg: "Transaction deleted",
       errorMsg: "Could not delete",
     });
-  }, [loadTransactions]);
+  }, [refreshTransactions]);
 
   const handleAddTransaction = useCallback(async (e) => {
     e.preventDefault();
@@ -212,9 +260,9 @@ export default function AccountDetailPage() {
         action: () => api.patch(`/transactions/${editingTxId}`, payload),
         undo: async () => {
           if (old) { await api.patch(`/transactions/${editingTxId}`, { description: old.description, amount: old.amount, category: old.category || undefined, is_income: old.is_income, account_id: old.account_id || undefined }); }
-          await loadTransactions();
+          await refreshTransactions();
         },
-        onError: () => { if (old) setTxs(prev => prev.map(t => t.transaction_id === editingTxId ? old : t)); loadTransactions(); },
+        onError: () => { if (old) setTxs(prev => prev.map(t => t.transaction_id === editingTxId ? old : t)); refreshTransactions(); },
         successMsg: "Transaction updated",
         errorMsg: "Could not update",
       });
@@ -224,7 +272,7 @@ export default function AccountDetailPage() {
         await api.post("/transactions", payload);
         toast.success("Transaction added");
         closeTxForm();
-        await loadTransactions();
+        await refreshTransactions();
       } catch (e) {
         toast.error(formatApiError(e?.response?.data?.detail) || "Could not add transaction");
       }
@@ -259,8 +307,6 @@ export default function AccountDetailPage() {
     }
   };
 
-  const totalPages = Math.ceil(totalTx / limit);
-  const currentPage = Math.floor(offset / limit) + 1;
   const meta = ACCOUNT_TYPE_META[account?.type] || ACCOUNT_TYPE_META.current;
   const Icon = meta.icon;
   const dispName = getDisplayName(account);
