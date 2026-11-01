@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { parseISO, isBefore, getDaysInMonth, getDate, format } from "date-fns";
 import {
   RefreshCw, Wallet, ShoppingCart, Calendar, Plus, Pencil, Trash2,
@@ -290,7 +291,7 @@ const EventGroupCard = React.memo(({ group, setConfirmDelete, fetchData }) => {
 const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
   monthControl, summary, everyday, atRiskCount, budgetTableRows, budgetView, setBudgetView,
   categorySpend, recentTransactions, onAdd, onRefresh, onCopyPrevious, onViewAll, openBudgetTransactions,
-  startEdit,
+  startEdit, onManageCategories, onViewReports, onAlerts,
 }) {
   const statCards = [
     { label: "Total Budgeted", value: `£${summary.totalPlanned.toFixed(2)}`, note: `${summary.count} categories`, icon: Target, tone: "emerald" },
@@ -320,13 +321,14 @@ const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
           <div className="surface overflow-hidden rounded-[16px]"><table className="w-full text-left"><thead><tr className="border-b border-border text-[11px] font-medium text-muted-foreground"><th className="px-4 py-3">Category</th><th className="px-3 py-3 text-right">Spent</th><th className="px-3 py-3 text-right">Budget</th><th className="w-[180px] px-3 py-3">Progress</th><th className="px-3 py-3">Status</th><th className="w-[42px]" /></tr></thead><tbody>{budgetTableRows.map((budget) => { const pct = Number(budget.progress_pct) || 0; const risk = pct >= 80; const over = pct >= 100; const Icon = CATEGORY_ICONS[budget.category.toLowerCase().trim()] || Target; return <tr key={budget.budget_id} onClick={() => openBudgetTransactions(budget)} className="cursor-pointer border-b border-border/70 last:border-0 hover:bg-secondary/30"><td className="px-4 py-2.5"><span className="flex items-center gap-2.5"><span className={`grid h-8 w-8 place-items-center rounded-xl ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}><Icon className="h-4 w-4" /></span><span className="text-[12px] font-medium capitalize">{budget.category}</span></span></td><td className="money-tabular px-3 py-2.5 text-right text-[12px]">£{Number(budget.spent || 0).toFixed(2)}</td><td className="money-tabular px-3 py-2.5 text-right text-[12px] text-muted-foreground">£{Number(budget.limit || 0).toFixed(2)}</td><td className="px-3 py-2.5"><div className="flex items-center gap-2"><div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary"><div className={`h-full rounded-full ${over ? "bg-ruby" : risk ? "bg-gradient-to-r from-topaz to-ruby/70" : "bg-gradient-to-r from-emerald to-sky"}`} style={{ width: `${Math.min(100, pct)}%` }} /></div><span className="w-7 text-right text-[10px] text-muted-foreground">{Math.round(pct)}%</span></div></td><td className="px-3 py-2.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-medium ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}>{over ? "Exceeded" : risk ? "At risk" : "On track"}</span></td><td className="px-3 py-2.5"><button onClick={(event) => { event.stopPropagation(); startEdit(budget); }} className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-secondary"><MoreHorizontal className="h-4 w-4" /></button></td></tr>; })}</tbody></table>{budgetTableRows.length === 0 ? <div className="py-10 text-center text-sm text-muted-foreground">No budgets in this view.</div> : null}</div>
           <div className="surface mt-4 overflow-hidden rounded-[16px]"><div className="flex items-center justify-between border-b border-border px-4 py-3"><p className="text-[13px] font-semibold">Recent Budget Activity</p><span className="text-[11px] font-medium text-emerald">View all <ArrowUpRight className="inline h-3 w-3" /></span></div><table className="w-full text-left"><thead className="text-[10.5px] text-muted-foreground"><tr><th className="px-4 py-2">Date</th><th className="px-3 py-2">Category</th><th className="px-3 py-2">Description</th><th className="px-4 py-2 text-right">Amount</th></tr></thead><tbody>{recentTransactions.map((tx) => <tr key={tx.transaction_id} className="border-t border-border/60 text-[11px]"><td className="px-4 py-2 text-muted-foreground">{tx.date ? format(new Date(tx.date), "d MMM yyyy") : "—"}</td><td className="px-3 py-2 capitalize">{tx.category || "Uncategorised"}</td><td className="max-w-[240px] truncate px-3 py-2">{tx.description || tx.merchant || "Transaction"}</td><td className={`money-tabular px-4 py-2 text-right font-medium ${Number(tx.amount) < 0 ? "text-ruby" : "text-emerald"}`}>{Number(tx.amount) < 0 ? "-" : "+"}£{Math.abs(Number(tx.amount) || 0).toFixed(2)}</td></tr>)}</tbody></table></div>
         </div>
-        <aside className="space-y-4"><div className="surface rounded-[16px] p-4"><div className="flex items-center justify-between"><h2 className="text-[15px] font-semibold">Spending by Category</h2><span className="rounded-lg bg-secondary px-2.5 py-1 text-[10px] text-muted-foreground">This Month</span></div>{categorySpend.length ? <CategoryPieChart data={categorySpend.slice(0, 7)} /> : <div className="py-16 text-center text-sm text-muted-foreground">No category spending this month.</div>}</div><div className="surface rounded-[16px] p-4"><div className="flex items-center justify-between"><h2 className="text-[15px] font-semibold">Monthly Trend</h2><span className="text-[10px] text-muted-foreground">Budget vs spent</span></div><div className="mt-6 flex h-[112px] items-end justify-between gap-3">{budgetTableRows.slice(0, 6).map((budget) => { const limit = Math.max(Number(budget.limit) || 0, 1); const spent = Number(budget.spent) || 0; return <div key={budget.budget_id} className="flex min-w-0 flex-1 flex-col items-center gap-1"><div className="flex h-[88px] items-end gap-1"><span className="w-3 rounded-t bg-sky" style={{ height: `${Math.max(5, Math.min(100, spent / limit * 100))}%` }} /><span className="w-3 rounded-t bg-secondary" style={{ height: "100%" }} /></div><span className="max-w-full truncate text-[9px] text-muted-foreground">{budget.category}</span></div>; })}</div><div className="mt-3 flex justify-end gap-3 text-[10px] text-muted-foreground"><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-sky" />Spent</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-secondary" />Budget</span></div></div><div className="surface rounded-[16px] p-4"><h2 className="text-[15px] font-semibold">Quick Actions</h2><div className="mt-3 grid grid-cols-2 gap-2">{[{ label: "Add Budget", sub: "Create a new budget", icon: Plus, tone: "emerald", action: onAdd }, { label: "Manage Categories", sub: "Edit spending categories", icon: FolderCog, tone: "topaz", action: () => window.location.assign("/settings") }, { label: "View Reports", sub: "Detailed analysis", icon: BarChart3, tone: "violet", action: () => window.location.assign("/reports") }, { label: "Set Alerts", sub: "Notifications near limits", icon: Bell, tone: "ruby", action: () => {} }].map(({ label, sub, icon: Icon, tone, action }) => <button key={label} type="button" onClick={action} className="rounded-xl border border-border/70 p-3 text-left hover:border-emerald/30 hover:bg-secondary/30"><span className={`mb-2 grid h-8 w-8 place-items-center rounded-xl ${tone === "topaz" ? "bg-topaz/10 text-topaz" : tone === "ruby" ? "bg-ruby/10 text-ruby" : tone === "violet" ? "bg-violet/10 text-violet" : "bg-emerald/10 text-emerald"}`}><Icon className="h-4 w-4" /></span><span className="block text-[11px] font-semibold">{label}</span><span className="mt-0.5 block text-[9.5px] text-muted-foreground">{sub}</span></button>)}</div></div></aside>
+        <aside className="space-y-4"><div className="surface rounded-[16px] p-4"><div className="flex items-center justify-between"><h2 className="text-[15px] font-semibold">Spending by Category</h2><span className="rounded-lg bg-secondary px-2.5 py-1 text-[10px] text-muted-foreground">This Month</span></div>{categorySpend.length ? <CategoryPieChart data={categorySpend.slice(0, 7)} /> : <div className="py-16 text-center text-sm text-muted-foreground">No category spending this month.</div>}</div><div className="surface rounded-[16px] p-4"><div className="flex items-center justify-between"><h2 className="text-[15px] font-semibold">Monthly Trend</h2><span className="text-[10px] text-muted-foreground">Budget vs spent</span></div><div className="mt-6 flex h-[112px] items-end justify-between gap-3">{budgetTableRows.slice(0, 6).map((budget) => { const limit = Math.max(Number(budget.limit) || 0, 1); const spent = Number(budget.spent) || 0; return <div key={budget.budget_id} className="flex min-w-0 flex-1 flex-col items-center gap-1"><div className="flex h-[88px] items-end gap-1"><span className="w-3 rounded-t bg-sky" style={{ height: `${Math.max(5, Math.min(100, spent / limit * 100))}%` }} /><span className="w-3 rounded-t bg-secondary" style={{ height: "100%" }} /></div><span className="max-w-full truncate text-[9px] text-muted-foreground">{budget.category}</span></div>; })}</div><div className="mt-3 flex justify-end gap-3 text-[10px] text-muted-foreground"><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-sky" />Spent</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-secondary" />Budget</span></div></div><div className="surface rounded-[16px] p-4"><h2 className="text-[15px] font-semibold">Quick Actions</h2><div className="mt-3 grid grid-cols-2 gap-2">{[{ label: "Add Budget", sub: "Create a new budget", icon: Plus, tone: "emerald", action: onAdd }, { label: "Manage Categories", sub: "Edit spending categories", icon: FolderCog, tone: "topaz", action: onManageCategories }, { label: "View Reports", sub: "Detailed analysis", icon: BarChart3, tone: "violet", action: onViewReports }, { label: "Set Alerts", sub: "Notifications near limits", icon: Bell, tone: "ruby", action: onAlerts }].map(({ label, sub, icon: Icon, tone, action }) => <button key={label} type="button" onClick={action} className="rounded-xl border border-border/70 p-3 text-left hover:border-emerald/30 hover:bg-secondary/30"><span className={`mb-2 grid h-8 w-8 place-items-center rounded-xl ${tone === "topaz" ? "bg-topaz/10 text-topaz" : tone === "ruby" ? "bg-ruby/10 text-ruby" : tone === "violet" ? "bg-violet/10 text-violet" : "bg-emerald/10 text-emerald"}`}><Icon className="h-4 w-4" /></span><span className="block text-[11px] font-semibold">{label}</span><span className="mt-0.5 block text-[9.5px] text-muted-foreground">{sub}</span></button>)}</div></div></aside>
       </div>
     </div>
   );
 });
 
 export default React.memo(function BudgetPage() {
+  const navigate = useNavigate();
   useEffect(() => { document.title = "Budgets | Penni"; }, []);
   const [now, setNow] = useState(new Date());
   useEffect(() => {
@@ -806,7 +808,7 @@ export default React.memo(function BudgetPage() {
   };
 
   return (
-    <div className="page-stack pb-4">
+    <div className="budgets-route page-stack pb-4">
 
       <BudgetReferenceDesktop
         monthControl={<MonthPicker label={monthLabel} onPrev={() => setMonth(addMonth(month, -1))} onNext={() => setMonth(addMonth(month, 1))} onToday={() => setMonth(fmtMonth(now.getFullYear(), now.getMonth() + 1))} isToday={isCurrentMonth} />}
@@ -821,7 +823,10 @@ export default React.memo(function BudgetPage() {
         onAdd={() => openAddBudget("everyday")}
         onRefresh={fetchData}
         onCopyPrevious={handleCopyPreviousMonth}
-        onViewAll={() => window.location.assign(`/transactions?date_from=${month}-01&date_to=${month}-${String(daysInMonth).padStart(2, "0")}`)}
+        onViewAll={() => navigate(`/transactions?date_from=${month}-01&date_to=${month}-${String(daysInMonth).padStart(2, "0")}`)}
+        onManageCategories={() => navigate("/settings/categories")}
+        onViewReports={() => navigate("/reports")}
+        onAlerts={() => navigate("/settings")}
         openBudgetTransactions={openBudgetTransactions}
         startEdit={startEdit}
       />
@@ -1451,6 +1456,30 @@ export default React.memo(function BudgetPage() {
           </div>
         </div>
       )}
+
+
+      {/* Keep budget editing available in the desktop workspace, where cards are hidden. */}
+      <Sheet open={Boolean(editingId)} onOpenChange={(open) => { if (!open) cancelEdit(); }}>
+        <SheetContent side="right" className="w-full sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>Edit budget</SheetTitle>
+          </SheetHeader>
+          <form className="mt-6 space-y-5" onSubmit={(event) => { event.preventDefault(); if (editingId) handleUpdate(editingId); }}>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium" htmlFor="budget-edit-category">Category</label>
+              <Input id="budget-edit-category" value={form.category} onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))} required />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium" htmlFor="budget-edit-limit">Monthly limit (£)</label>
+              <Input id="budget-edit-limit" type="number" min="0" step="0.01" value={form.limit} onChange={(event) => setForm((prev) => ({ ...prev, limit: event.target.value }))} required />
+            </div>
+            <div className="flex justify-end gap-2 border-t border-border pt-4">
+              <Button type="button" variant="outlinePill" onClick={cancelEdit}>Cancel</Button>
+              <Button type="submit" variant="primary">Save changes</Button>
+            </div>
+          </form>
+        </SheetContent>
+      </Sheet>
 
       <ConfirmModal
         open={!!confirmDelete}

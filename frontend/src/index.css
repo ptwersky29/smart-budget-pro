@@ -511,3 +511,163 @@ html { font-size: calc(var(--fs-base, 0.875rem) * var(--fs-multiplier, 1)); }
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
 }
+
+
+/*
+ * Penni desktop workspace layout (Dashboard, Accounts, Transactions, Budgets).
+ * The application shell stays fixed; scrolling belongs to content panels.
+ * Mobile remains a regular vertically scrollable document.
+ */
+@media (min-width: 1024px) {
+  .workspace-main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .workspace-route-view {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+  }
+  .workspace-route-view > .page-stack {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .dashboard-reference {
+    overflow: hidden;
+  }
+  .dashboard-reference > .dashboard-panels {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .accounts-workspace {
+    overflow: hidden;
+    padding-bottom: 0;
+  }
+  .accounts-workspace > .accounts-panels {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 1.25rem;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0.15rem 0.2rem 0.5rem 0;
+  }
+
+  .transactions-ledger {
+    overflow: hidden;
+    padding-bottom: 0;
+  }
+  .transactions-ledger > .grid {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    align-items: stretch;
+  }
+  .transactions-ledger .transactions-primary {
+    min-height: 0;
+    overflow: hidden;
+  }
+  .transactions-ledger .transaction-ledger-panel {
+    min-height: 0;
+  }
+  .transactions-ledger .transaction-table-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+  .transactions-ledger .transaction-table-scroll thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: hsl(var(--card));
+  }
+  .transactions-ledger .transaction-inspector-area {
+    position: static;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .transactions-other {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .budgets-route {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+@media (min-width: 1280px) {
+  .dashboard-reference > .dashboard-panels {
+    overflow: hidden;
+  }
+  .dashboard-reference > .dashboard-panels > div {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    padding-right: 0.2rem;
+  }
+  .budgets-route {
+    overflow: hidden;
+    padding-bottom: 0;
+  }
+  .budgets-route > .budget-workspace {
+    height: 100%;
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+}
+
+/* At short desktop heights or large browser zoom, preserve access to every control. */
+@media (min-width: 1024px) and (max-height: 690px) {
+  .workspace-main {
+    overflow-y: auto !important;
+  }
+  .workspace-route-view,
+  .workspace-route-view > .page-stack {
+    height: auto;
+    min-height: 100%;
+  }
+  .dashboard-reference,
+  .accounts-workspace,
+  .transactions-ledger,
+  .budgets-route {
+    overflow: visible;
+  }
+  .dashboard-reference > .dashboard-panels,
+  .accounts-workspace > .accounts-panels,
+  .transactions-ledger > .grid {
+    flex: none;
+    overflow: visible;
+  }
+  .dashboard-reference > .dashboard-panels > div,
+  .transactions-ledger .transactions-primary {
+    overflow: visible;
+  }
+  .transactions-ledger .transaction-ledger-panel {
+    flex: none;
+  }
+  .transactions-ledger .transaction-table-scroll {
+    max-height: 55vh;
+    overflow: auto;
+  }
+  .transactions-ledger .transaction-inspector-area {
+    height: auto;
+    overflow: visible;
+  }
+  .budgets-route > .budget-workspace {
+    height: auto;
+    min-height: 40rem;
+  }
+}
