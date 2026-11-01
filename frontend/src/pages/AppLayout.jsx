@@ -43,7 +43,7 @@ export default function AppLayout() {
   const { settings } = useSettings();
   const { openAssistant } = useAssistant();
   const location = useLocation();
-  const workspaceRoute = FIXED_WORKSPACE_ROUTES.has(location.pathname);
+  const workspaceRoute = FIXED_WORKSPACE_ROUTES.has(location.pathname) || /^\/accounts\/[^/]+$/.test(location.pathname);
   const navigate = useNavigate();
   const { setTheme, resolvedTheme } = useTheme();
   const noAnim = settings.preferences?.dashboard?.animations === false || settings.preferences?.accessibility?.reduce_motion === true;
