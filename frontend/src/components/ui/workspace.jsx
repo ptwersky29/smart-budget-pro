@@ -69,3 +69,14 @@ export function WorkspaceBlank({ title, description, action, error = false }) {
     {action && <div className="mt-2">{action}</div>}
   </div>;
 }
+
+export function WorkspaceSkeleton({ rows = 6 }) {
+  return <div role="status" aria-label="Loading data" className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-4 animate-pulse">
+    {Array.from({ length: rows }, (_,i)=><div key={i} className="flex items-center gap-3">
+      <span className="h-9 w-9 shrink-0 rounded-lg bg-secondary" />
+      <div className="flex-1 space-y-2"><div className="h-2.5 w-[45%] rounded bg-secondary"/><div className="h-2 w-[30%] rounded bg-secondary/70"/></div>
+      <span className="h-2.5 w-16 rounded bg-secondary"/>
+    </div>)}
+    <span className="sr-only">Loading…</span>
+  </div>;
+}
