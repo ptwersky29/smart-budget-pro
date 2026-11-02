@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useActions } from "../contexts/ActionContext";
 import {
   AlertCircle,
   ArrowRight,
@@ -85,7 +86,7 @@ function AccountLogo({ account, size = "md" }) {
   );
 }
 
-function AccountCard({ account, connection }) {
+function AccountCard({ account, connection, onSelect }) {
   const meta = ACCOUNT_TYPE_META[account.type] || ACCOUNT_TYPE_META.current;
   const Icon = meta.icon;
   const isSavings = account.type === "savings";
@@ -96,6 +97,7 @@ function AccountCard({ account, connection }) {
   return (
     <Link
       to={`/accounts/${account.account_id}`}
+      onClick={onSelect ? event => { event.preventDefault(); onSelect(account); } : undefined}
       className="surface surface-hover group relative flex flex-col overflow-hidden p-4"
     >
       <span className="absolute inset-y-4 left-0 w-[3px] rounded-r-full" style={{ background: account.color || "#2f9e73" }} />
@@ -214,6 +216,7 @@ function BalanceHero({ accounts, loading, connections, totalTx, onConnect, conne
 }
 
 export default function AccountsPage() {
+  const { openAction } = useActions();
   useEffect(() => {
     document.title = "Accounts & Import | Penni";
   }, []);
@@ -443,7 +446,7 @@ export default function AccountsPage() {
           />
           <div className="mt-3 grid grid-cols-1 gap-3 border-t border-border/50 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-3">
             {currentAccounts.map((account) => (
-              <AccountCard key={account.account_id} account={account} connection={connByAccountId[account.account_id]} />
+              <AccountCard key={account.account_id} account={account} connection={connByAccountId[account.account_id]} onSelect={selected => openAction("account-info", { accountId: selected.account_id, account: selected })} />
             ))}
             <Link
               to="/connections"
