@@ -2,6 +2,7 @@
 import io
 import csv
 import json
+import math
 import uuid
 import logging
 from datetime import datetime, timezone
@@ -495,6 +496,9 @@ def build_router() -> APIRouter:
             if len(text.strip()) < 20:
                 raise HTTPException(400, "Could not extract any text from the file")
 
+            if len(text) > MAX_CHARS_TO_AI:
+                raise HTTPException(422, "Statement is too long for safe extraction; split it into smaller files. No transactions were imported.")
+
             parsed = {}
             try:
                 parsed = await _ai_parse_statement(text, session, user["user_id"])
@@ -503,8 +507,13 @@ def build_router() -> APIRouter:
                 raise HTTPException(500, f"AI parsing failed: {str(e)[:200]}")
 
             txs = parsed.get("transactions", []) or []
+            if not isinstance(txs, list):
+                raise HTTPException(422, "Statement parser returned an invalid transaction list")
+            if len(txs) > 200:
+                raise HTTPException(422, "Statement contains more than 200 extracted transactions. Split it into smaller files; no transactions were imported.")
             clean = []
-            for t in txs[:200]:
+            invalid_rows = []
+            for row_index, t in enumerate(txs, start=1):
                 try:
                     tx = _fix_sign({
                         "date": str(t.get("date", ""))[:10],
@@ -515,9 +524,21 @@ def build_router() -> APIRouter:
                         "is_income": bool(t.get("is_income")),
                         "confidence": float(t.get("confidence", 0.5)),
                     })
+                    if not tx["date"] or not tx["description"].strip():
+                        raise ValueError("Missing transaction date or description")
+                    datetime.fromisoformat(tx["date"])
+                    if not math.isfinite(tx["amount"]):
+                        raise ValueError("Invalid amount")
                     clean.append(tx)
-                except Exception:
-                    continue
+                except (TypeError, ValueError, OverflowError, KeyError, AttributeError) as exc:
+                    invalid_rows.append(row_index)
+                    logger.warning("Statement parser produced invalid row %s: %s", row_index, type(exc).__name__)
+            if invalid_rows:
+                raise HTTPException(422, {
+                    "message": "Statement contains invalid transactions; nothing was imported.",
+                    "invalid_count": len(invalid_rows),
+                    "invalid_rows": invalid_rows[:25],
+                })
 
             uncat = [t for t in clean if t["category"] == "uncategorized"]
             if uncat:
@@ -629,16 +650,32 @@ def build_router() -> APIRouter:
             target_account = account_id or rec.account_id
             if not target_account:
                 raise HTTPException(400, "Select an account before saving")
-            if account_id:
-                rec.account_id = account_id
-
-            now = datetime.now(timezone.utc)
+            # Every selected account must belong to this user, even when
+            # imported rows carry their own account_id overrides.
             txs_data = (rec.data or {}).get("transactions", [])
             if transactions_json:
                 try:
                     txs_data = json.loads(transactions_json)
                 except json.JSONDecodeError:
                     raise HTTPException(400, "Invalid transactions JSON")
+            if not isinstance(txs_data, list) or len(txs_data) > 200:
+                raise HTTPException(400, "Statement must contain at most 200 transactions")
+            account_ids = {target_account}
+            for row in txs_data:
+                if not isinstance(row, dict):
+                    raise HTTPException(400, "Invalid transaction row")
+                account_ids.add(row.get("account_id") or target_account)
+            owned = await session.execute(select(BankAccount.account_id).where(
+                BankAccount.user_id == user["user_id"],
+                BankAccount.account_id.in_(account_ids),
+            ))
+            owned_ids = set(owned.scalars().all())
+            if account_ids != owned_ids:
+                raise HTTPException(400, "A statement account was not found or does not belong to you")
+            if account_id:
+                rec.account_id = account_id
+
+            now = datetime.now(timezone.utc)
             docs = []
             for t in txs_data:
                 tx = Transaction(
@@ -705,7 +742,7 @@ def build_router() -> APIRouter:
                     "is_transfer": t.get("tx_type") == "transfer" or t.get("is_transfer", False),
                     "tx_type": t.get("tx_type") or ("transfer" if t.get("is_transfer") else "expense"),
                     "exclude_from_maaser": False, "transfer_pair_id": None,
-                    "approval_status": "unapproved",
+                    "approval_status": "approved",
                 })
             rec.status = "final"
             await session.commit()

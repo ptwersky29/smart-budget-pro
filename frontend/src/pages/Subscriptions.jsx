@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
 import { withUndo } from "../lib/undo";
+import ConfirmModal from "../components/ui/ConfirmModal";
 import { Loader2, Plus, Trash2, Pencil, RefreshCcw, Sparkles, Bell, ChevronDown, RefreshCw } from "lucide-react";
 import { EmptyState, PageToolbar, SectionCard } from "../components/ui/layout";
 import { PageHeader, Surface } from "../components/ui/page";
@@ -27,6 +28,7 @@ export default function Subscriptions() {
   const [detected, setDetected] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [detecting, setDetecting] = useState(false);
@@ -119,20 +121,20 @@ export default function Subscriptions() {
     }
   };
 
-  const del = async (id) => {
-    const sub = subsRef.current.find(s => s.subscription_id === id);
-    if (!sub) return;
-    setSubs(prev => prev.filter(s => s.subscription_id !== id));
-    withUndo({
-      action: () => api.delete(`/subscriptions/${id}`),
-      undo: async () => {
-        setSubs(prev => [...prev, sub]);
-        await api.post("/subscriptions", { name: sub.name, amount: Math.abs(sub.amount), category: sub.category, frequency: sub.frequency, merchant: sub.merchant, notes: sub.notes });
-      },
-      onError: () => setSubs(prev => [...prev, sub]),
-      successMsg: "Subscription deleted",
-      errorMsg: "Could not delete",
-    });
+  const del = (id) => setPendingDeleteId(id);
+  const confirmSubscriptionDelete = async () => {
+    const id = pendingDeleteId;
+    setPendingDeleteId(null);
+    if (!id) return;
+    try {
+      await api.delete(`/subscriptions/${id}`);
+      setSubs(prev => prev.filter(sub => sub.subscription_id !== id));
+      toast.success("Subscription permanently deleted");
+      await load();
+    } catch (error) {
+      toast.error(formatApiError(error) || "Could not delete subscription");
+      await load();
+    }
   };
 
   const monthlyTotal = useMemo(() => {
@@ -346,6 +348,14 @@ export default function Subscriptions() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={Boolean(pendingDeleteId)}
+        title="Permanently delete subscription?"
+        message="This subscription cannot be restored with Undo after deletion."
+        confirmLabel="Delete permanently"
+        onConfirm={confirmSubscriptionDelete}
+        onCancel={() => setPendingDeleteId(null)}
+      />
     </div>
   );
 }

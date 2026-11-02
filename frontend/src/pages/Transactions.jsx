@@ -1,7 +1,7 @@
 import { WorkspaceHeader, WorkspaceMetrics, WorkspaceMetric, WorkspaceTabs, WorkspaceViewToggle, WorkspaceBlank, WorkspaceSkeleton } from "../components/ui/workspace";
 import PenniSelect from "../components/PenniSelect";
-﻿import { createPortal } from "react-dom";
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
 import { Plus, Trash2, Loader2, Pencil, Search, Sparkles, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, BarChart3, Star, Receipt, Download, MoreHorizontal, RefreshCw, CheckCircle2, PieChart as PieChartIcon, ArrowDownLeft, ArrowUpRight, CalendarDays, Tag, Wallet, StickyNote, Building2, Scissors, Link2, Link2Off, AlertTriangle, Calculator, TrendingUp, TrendingDown, LayoutGrid, List, Copy, ArrowLeft } from "lucide-react";
@@ -996,7 +996,12 @@ const Transactions = React.memo(function Transactions() {
   useKeyboardShortcut({ key: "Backspace", meta: true }, () => {
     if (selectedIds.size > 0 && !open) {
       showConfirm("Delete transactions", `Delete ${selectedIds.size} selected transactions?`, async () => {
-        try { await withUndo({ action: api.post("/transactions/bulk-delete", { transaction_ids: Array.from(selectedIds) }), undo: api.post("/transactions/undo-bulk-delete", { transaction_ids: Array.from(selectedIds) }), successMsg: `Deleted ${selectedIds.size} transactions`, errorMsg: "Delete failed", undoLabel: "Undo" }); setSelectedIds(new Set()); await load(); } catch { toast.error("Delete failed"); }
+        try {
+          const { data } = await api.post("/transactions/bulk-delete", { transaction_ids: Array.from(selectedIds) });
+          toast.success(`Permanently deleted ${data.deleted} transactions`);
+          setSelectedIds(new Set());
+          await load();
+        } catch (e) { toast.error(formatApiError(e) || "Delete failed"); }
       });
     }
   }, { enabled: !open });
@@ -1033,14 +1038,22 @@ const Transactions = React.memo(function Transactions() {
   const bulkCategory = useCallback(async (cat) => {
     if (!cat || selectedIds.size === 0) return;
     const ids = Array.from(selectedIds);
-    withUndo({
-      action: () => api.post("/transactions/bulk-category", { transaction_ids: ids, category: cat }),
-      undo: async () => { await api.post("/transactions/bulk-category", { transaction_ids: ids, category: "" }); await load(); },
+    let originalCategories = null;
+    await withUndo({
+      action: async () => {
+        const { data } = await api.post("/transactions/bulk-category", { transaction_ids: ids, category: cat });
+        originalCategories = data.previous_categories || {};
+        await load();
+      },
+      undo: async () => {
+        if (!originalCategories || !Object.keys(originalCategories).length) return;
+        await api.post("/transactions/bulk-category-restore", { categories: originalCategories });
+        await load();
+      },
       successMsg: `${ids.length} transaction${ids.length > 1 ? "s" : ""} categorised`,
-      errorMsg: "Could not update categories",
+      errorMsg: "Could not update or restore categories",
     });
     setSelectedIds(new Set());
-    await load();
   }, [selectedIds, load]);
 
   const bulkDelete = useCallback(async () => {
@@ -1093,6 +1106,10 @@ const Transactions = React.memo(function Transactions() {
         try {
           const body = {};
           if (filters.source) body.source = filters.source;
+          if (filters.merchant) body.merchant = filters.merchant;
+          if (filters.approval_status) body.approval_status = filters.approval_status;
+          if (filters.pending) body.pending = filters.pending;
+          body.expected_count = total;
           if (filters.category) body.category = filters.category;
           if (filters.tx_type) body.tx_type = filters.tx_type;
           if (filters.search) body.search = filters.search;
@@ -1114,21 +1131,21 @@ const Transactions = React.memo(function Transactions() {
 
   const txsRef = useRef(txs);
   txsRef.current = txs;
-  const del = useCallback(async (id) => {
+  const del = useCallback((id) => {
     const tx = txsRef.current.find(t => t.transaction_id === id);
     if (!tx) return;
-    setTxs(prev => prev.filter(t => t.transaction_id !== id));
-    withUndo({
-      action: () => api.delete(`/transactions/${id}`),
-      undo: async () => {
-        setTxs(prev => [...prev, tx]);
-        await api.post("/transactions", tx);
-      },
-      onError: () => setTxs(prev => [...prev, tx]),
-      successMsg: "Transaction deleted",
-      errorMsg: "Could not delete",
+    showConfirm("Permanently delete transaction?", "This permanently deletes the transaction and its links. It cannot be undone.", async () => {
+      try {
+        await api.delete(`/transactions/${id}`);
+        setTxs(prev => prev.filter(t => t.transaction_id !== id));
+        toast.success("Transaction permanently deleted");
+        await load();
+      } catch (e) {
+        toast.error(formatApiError(e) || "Could not delete transaction");
+        await load();
+      }
     });
-  }, []);
+  }, [showConfirm, load]);
 
   const approveTx = useCallback(async (t, categoryOverride) => {
     const category = categoryOverride || t.ai_selected_category || t.category || "uncategorized";

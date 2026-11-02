@@ -309,7 +309,6 @@ export default function AccountsPage() {
       next.delete("reason");
       setSearchParams(next, { replace: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, setSearchParams]);
 
   const connect = async () => {
