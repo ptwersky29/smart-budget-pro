@@ -164,6 +164,11 @@ export default function Dashboard() {
   useEffect(() => {
     loadAll();
   }, [loadAll, categoriesVersion]);
+  useEffect(() => {
+    const onChanged = () => loadAll({ silent: true });
+    window.addEventListener("penni:data-changed", onChanged);
+    return () => window.removeEventListener("penni:data-changed", onChanged);
+  }, [loadAll]);
 
   const accounts = overview?.accounts || [];
   const categories = useMemo(
