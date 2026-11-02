@@ -191,11 +191,11 @@ export default function Dashboard() {
       overview?.balance ??
       0,
   );
-  const currencies = Array.from(new Set(accounts.map(account => account.currency || "GBP")));
+  const currencies = Array.from(new Set(accounts.map(account => account.balance_currency || account.currency || "GBP")));
   const mixedCurrencies = currencies.length > 1;
   const balanceLabel = mixedCurrencies ? "Multiple currencies" : formatCurrency(balance);
   const currencyDetail = mixedCurrencies
-    ? currencies.map(currency => `${currency}: ${accounts.filter(a => (a.currency || "GBP") === currency)
+    ? currencies.map(currency => `${currency}: ${accounts.filter(a => (a.balance_currency || a.currency || "GBP") === currency)
         .reduce((total, a) => total + (Number(a.balance) || 0), 0).toFixed(2)}`).join(" · ")
     : `${accounts.length} ${accounts.length === 1 ? "account" : "accounts"} connected`;
   const trendValues = monthlyFlow.map((month) => Number(month.income) - Number(month.spend));
