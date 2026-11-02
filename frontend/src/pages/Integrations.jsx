@@ -7,6 +7,7 @@ import {
   CreditCard, Calendar, MessageSquare, TrendingUp, ArrowRight, Building2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useActions } from "../contexts/ActionContext";
 import { Button } from "../components/ui/button";
 import ConfirmModal from "../components/ui/ConfirmModal";
 
@@ -19,6 +20,7 @@ const PROVIDERS = [
 export default function Integrations({ embedded }) {
   useEffect(() => { if (!embedded) document.title = "Integrations | Penni"; }, [embedded]);
   const navigate = useNavigate();
+  const { openAction } = useActions();
 
   // Twilio (per-user)
   const [tw, setTw] = useState(null);
@@ -181,7 +183,8 @@ export default function Integrations({ embedded }) {
                 status="configured"
                 statusLabel="Open"
                 href="/accounts"
-                navigate={navigate}>
+                navigate={navigate}
+                onSelect={() => openAction("bank-connect")}>
         <p className="text-sm text-muted-foreground">One-click bank connection. No client IDs or secrets needed — just authenticate with your bank. Transactions sync automatically.</p>
       </LinkCard>
 
@@ -300,7 +303,7 @@ const TestResult = ({ ok, text }) => (
   </div>
 );
 
-const LinkCard = ({ icon: Icon, title, subtitle, status, statusLabel, href, navigate, children }) => {
+const LinkCard = ({ icon: Icon, title, subtitle, status, statusLabel, href, navigate, onSelect, children }) => {
   const badge = {
     configured: { label: statusLabel || "Configured", color: "bg-emerald/10 text-emerald", Icon: CheckCircle2 },
     not_configured: { label: statusLabel || "Not configured", color: "bg-topaz/10 text-topaz", Icon: ShieldCheck },
@@ -308,7 +311,7 @@ const LinkCard = ({ icon: Icon, title, subtitle, status, statusLabel, href, navi
     info: { label: statusLabel || "Loading…", color: "bg-secondary text-muted-foreground", Icon: ShieldCheck },
   }[status] || { label: statusLabel || status, color: "bg-secondary text-muted-foreground", Icon: AlertCircle };
   return (
-    <div className="rounded-2xl border border-border bg-card p-6 cursor-pointer hover:border-emerald/50 transition-colors" onClick={() => navigate(href)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(href); } }} role="button" tabIndex={0}>
+    <div className="rounded-2xl border border-border bg-card p-6 cursor-pointer hover:border-emerald/50 transition-colors" onClick={() => onSelect ? onSelect() : navigate(href)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect ? onSelect() : navigate(href); } }} role="button" tabIndex={0}>
       <div className="flex items-center gap-3 mb-1">
         <div className="w-10 h-10 rounded-xl bg-secondary grid place-items-center"><Icon className="h-5 w-5 text-emerald" /></div>
         <div className="flex-1">
