@@ -1,7 +1,6 @@
 import PenniSelect from "../components/PenniSelect";
 import { useActions } from "../contexts/ActionContext";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { parseISO, isBefore, getDaysInMonth, getDate, format } from "date-fns";
 import {
   RefreshCw, Wallet, ShoppingCart, Calendar, Plus, Pencil, Trash2,
@@ -430,7 +429,6 @@ const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
 
 export default React.memo(function BudgetPage() {
   const { openAction } = useActions();
-  const navigate = useNavigate();
   useEffect(() => { document.title = "Budgets | Penni"; }, []);
   const [now, setNow] = useState(new Date());
   useEffect(() => {
