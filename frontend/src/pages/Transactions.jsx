@@ -1,4 +1,4 @@
-import { WorkspaceHeader, WorkspaceMetrics, WorkspaceMetric, WorkspaceTabs, WorkspaceViewToggle } from "../components/ui/workspace";
+import { WorkspaceHeader, WorkspaceMetrics, WorkspaceMetric, WorkspaceTabs, WorkspaceViewToggle, WorkspaceBlank, WorkspaceSkeleton } from "../components/ui/workspace";
 import PenniSelect from "../components/PenniSelect";
 ﻿import { createPortal } from "react-dom";
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1303,7 +1303,7 @@ const Transactions = React.memo(function Transactions() {
       (transaction.category_approval_status || "approved") === "approved"
     ));
     return {
-      all: monthRows.length || total,
+      all: monthRows.length,
       expenses: monthRows.filter((transaction) => Number(transaction.amount) < 0 && !transaction.is_transfer).length,
       income: monthRows.filter((transaction) => Number(transaction.amount) > 0 && !transaction.is_transfer).length,
       transfers: monthRows.filter((transaction) => transaction.is_transfer).length,
@@ -1797,14 +1797,12 @@ const Transactions = React.memo(function Transactions() {
       {/* â”€â”€â”€â”€â”€ Ledger tab â”€â”€â”€â”€â”€ */}
       {activeTab === "ledger" && <>
         {/* Transaction table */}
-        <div className="transaction-ledger-panel surface overflow-hidden rounded-[14px] p-0 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+        <div className="workspace-table-panel transaction-ledger-panel surface overflow-hidden rounded-[14px] p-0 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
           {loading ? (
-            <SkeletonTable rows={8} className="p-3" />
+            <WorkspaceSkeleton rows={8} />
           ) : (aiResults?.transactions || txs).length === 0 ? (
-            <EmptyState icon={Receipt}
-              title={filters.search || filters.category || aiResults ? "No matching transactions" : "No transactions yet"}
-              description="Try different filters or add your first transaction."
-            />
+            <WorkspaceBlank title={filters.search || filters.category || aiResults ? "No matching transactions" : "No transactions yet"}
+              description="Try different filters or add your first transaction." />
           ) : (
             <>
               {/* Mobile list */}
@@ -1897,7 +1895,7 @@ const Transactions = React.memo(function Transactions() {
                 </div>
               ) : (
                 <div className="transaction-table-scroll hidden min-h-0 overflow-x-auto sm:block lg:flex-1 lg:overflow-auto">
-                  <table className="w-full table-fixed text-sm">
+                  <table className="workspace-table w-full table-fixed text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-[11px] font-medium text-muted-foreground">
                         <th className="w-[40px] px-2.5 py-2.5">
