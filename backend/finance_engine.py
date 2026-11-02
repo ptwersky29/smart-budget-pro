@@ -418,6 +418,16 @@ class SplitIn(BaseModel):
     splits: list[dict]  # [{amount: float, category: str, description: str}]
 
 
+class CreateSplitTransactionIn(BaseModel):
+    transaction: TransactionIn
+    splits: list[dict]
+
+
+class CreatePairedTransferIn(BaseModel):
+    transaction: TransactionIn
+    counterparty_transaction_id: str
+
+
 class ApproveCategoryIn(BaseModel):
     category: Optional[str] = None
     suggestion_index: Optional[int] = None
@@ -2180,6 +2190,137 @@ Output ONLY valid JSON, no markdown, no explanation:
                 doc["maaser_accrued"] = accrued
             _invalidate_finance_caches(user["user_id"])
             return doc
+
+    @router.post("/transactions/create-with-splits")
+    async def create_transaction_with_splits(
+        payload: CreateSplitTransactionIn,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
+        """Create transaction and its categorization in a single DB commit."""
+        from decimal import Decimal, InvalidOperation
+        tx_input = payload.transaction
+        if len(payload.splits) < 2 or len(payload.splits) > 30:
+            raise HTTPException(400, "A split requires 2 to 30 category lines")
+        try:
+            total_cents = sum(
+                int((Decimal(str(line["amount"])) * 100).quantize(Decimal("1")))
+                for line in payload.splits
+            )
+            parent_cents = int((Decimal(str(abs(tx_input.amount))) * 100).quantize(Decimal("1")))
+        except (InvalidOperation, TypeError, ValueError, KeyError) as exc:
+            raise HTTPException(400, "Invalid split amount") from exc
+        if (parent_cents <= 0 or total_cents != parent_cents or
+                any(not line.get("category") or float(line["amount"]) <= 0
+                    for line in payload.splits)):
+            raise HTTPException(400, "Split categories must be valid and amounts must sum to the transaction")
+        if tx_input.is_transfer:
+            raise HTTPException(400, "Transfers cannot be split")
+        sm = request.app.state.db
+        async with sm() as session:
+            acct = (await session.execute(select(BankAccount).where(
+                BankAccount.user_id == user["user_id"],
+                BankAccount.account_id == tx_input.account_id,
+            ))).scalar_one_or_none()
+            if not acct:
+                raise HTTPException(400, "Account not found")
+            from statements import resolve_category as _rc
+            desc = sanitize_input(tx_input.description or "", max_len=500)
+            merchant = sanitize_input(tx_input.merchant or "", max_len=255)
+            signed = round(abs(tx_input.amount) * (1 if tx_input.is_income else -1), 2)
+            tx = Transaction(
+                transaction_id=f"tx_{uuid.uuid4().hex[:12]}",
+                user_id=user["user_id"], account_id=acct.account_id,
+                amount=signed, currency=tx_input.currency,
+                description=desc, merchant_name=merchant or None,
+                normalized_merchant=normalize_merchant(merchant or desc),
+                category=_rc(tx_input.category or "uncategorized"),
+                date=datetime.fromisoformat(tx_input.date) if tx_input.date else datetime.now(timezone.utc),
+                balance_type=tx_input.balance_type if tx_input.balance_type in ("available", "savings") else "available",
+                notes=tx_input.notes, tags=tx_input.tags, source="manual",
+                approval_status="approved", category_approval_status="approved",
+                approved_at=datetime.now(timezone.utc),
+            )
+            session.add(tx)
+            for item in payload.splits:
+                session.add(SplitTransaction(
+                    split_id=f"spl_{uuid.uuid4().hex[:12]}",
+                    parent_transaction_id=tx.transaction_id,
+                    user_id=user["user_id"],
+                    amount=round(float(item["amount"]), 2),
+                    category=_rc(item["category"]),
+                    description=item.get("description"),
+                ))
+            await _adjust_account_balance(session, user["user_id"], acct.account_id, signed)
+            await session.commit()
+            await session.refresh(tx)
+            doc = _tx_to_dict(tx)
+            await maaser.maybe_accrue(session, user["user_id"], doc)
+            _invalidate_finance_caches(user["user_id"])
+            return doc
+
+    @router.post("/transactions/create-and-pair")
+    async def create_transaction_and_pair(
+        payload: CreatePairedTransferIn,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
+        """Only save a new transfer after a valid opposite transaction is selected."""
+        tx_input = payload.transaction
+        sm = request.app.state.db
+        async with sm() as session:
+            counterparty = (await session.execute(select(Transaction).where(
+                Transaction.transaction_id == payload.counterparty_transaction_id,
+                Transaction.user_id == user["user_id"],
+            ))).scalar_one_or_none()
+            acct = (await session.execute(select(BankAccount).where(
+                BankAccount.account_id == tx_input.account_id,
+                BankAccount.user_id == user["user_id"],
+            ))).scalar_one_or_none()
+            if not counterparty or not acct:
+                raise HTTPException(404, "Account or counterparty transaction not found")
+            signed = round(abs(tx_input.amount) * (1 if tx_input.is_income else -1), 2)
+            if counterparty.transfer_pair_id or counterparty.account_id == acct.account_id:
+                raise HTTPException(400, "Choose an unpaired transaction in another account")
+            if signed * float(counterparty.amount or 0) >= 0:
+                raise HTTPException(400, "Transfer must have opposite debit and credit sides")
+            if round(abs(signed) * 100) != round(abs(float(counterparty.amount)) * 100):
+                raise HTTPException(400, "Transfer amounts must match")
+            if (tx_input.currency or "GBP") != (counterparty.currency or "GBP"):
+                raise HTTPException(400, "Transfer currencies must match")
+            from statements import resolve_category as _rc
+            desc = sanitize_input(tx_input.description or "", max_len=500)
+            merchant = sanitize_input(tx_input.merchant or "", max_len=255)
+            pair_id = f"trp_{uuid.uuid4().hex[:12]}"
+            created = Transaction(
+                transaction_id=f"tx_{uuid.uuid4().hex[:12]}",
+                user_id=user["user_id"], account_id=acct.account_id,
+                amount=signed, currency=tx_input.currency,
+                description=desc, merchant_name=merchant or None,
+                normalized_merchant=normalize_merchant(merchant or desc),
+                category=_rc(tx_input.category or "transfer"),
+                date=datetime.fromisoformat(tx_input.date) if tx_input.date else datetime.now(timezone.utc),
+                balance_type=tx_input.balance_type if tx_input.balance_type in ("available", "savings") else "available",
+                notes=tx_input.notes, source="manual",
+                tx_type="transfer", transfer_pair_id=pair_id,
+                exclude_from_maaser=True, approval_status="approved",
+                category_approval_status="approved",
+                approved_at=datetime.now(timezone.utc),
+            )
+            counterparty.transfer_pair_id = pair_id
+            counterparty.tx_type = "transfer"
+            counterparty.exclude_from_maaser = True
+            counterparty.category_approval_status = "approved"
+            session.add(created)
+            session.add(TransactionTransferPair(
+                transfer_pair_id=pair_id, user_id=user["user_id"],
+                outgoing_transaction_id=created.transaction_id if signed < 0 else counterparty.transaction_id,
+                incoming_transaction_id=created.transaction_id if signed > 0 else counterparty.transaction_id,
+            ))
+            await _adjust_account_balance(session, user["user_id"], acct.account_id, signed)
+            await session.commit()
+            _invalidate_finance_caches(user["user_id"])
+            return _tx_to_dict(created)
 
     @router.patch("/transactions/{tx_id}")
     async def update_transaction(
