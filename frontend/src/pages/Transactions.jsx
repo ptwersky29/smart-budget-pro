@@ -1,4 +1,4 @@
-import { WorkspaceMetrics, WorkspaceMetric, WorkspaceTabs, WorkspaceViewToggle } from "../components/ui/workspace";
+import { WorkspaceHeader, WorkspaceMetrics, WorkspaceMetric, WorkspaceTabs, WorkspaceViewToggle } from "../components/ui/workspace";
 import PenniSelect from "../components/PenniSelect";
 ﻿import { createPortal } from "react-dom";
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1410,19 +1410,14 @@ const Transactions = React.memo(function Transactions() {
 
       <div className={`grid min-h-0 items-start gap-4 lg:items-stretch ${activeTab === "ledger" && inspectorOpen ? "xl:grid-cols-[minmax(0,1fr)_328px]" : ""}`}>
         <div className="transactions-primary min-w-0 space-y-4 lg:flex lg:min-h-0 lg:flex-col lg:gap-3 lg:space-y-0">
-          <div className="flex flex-col gap-4 pl-0 lg:flex-row lg:items-start lg:justify-between xl:pl-[14px]">
-            <div className="min-w-0">
-              <h1 className="text-[30px] font-semibold leading-none tracking-[-0.045em]">
-                {activeTab === "maaser" ? "Maaser" : "Transactions"}
-              </h1>
-              <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
-                {activeTab === "maaser"
-                  ? "Track your giving, review the audit trail and keep your obligation up to date."
-                  : "View, search and manage all your income, expenses and transfers."}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 lg:mt-2">
-              {activeTab === "maaser" ? (
+          <div className="shrink-0 xl:pl-[14px]">
+            <WorkspaceHeader
+              title={activeTab === "maaser" ? "Maaser" : "Transactions"}
+              description={activeTab === "maaser"
+                ? "Track your giving, review the audit trail and keep your obligation up to date."
+                : "View, search and manage all your income, expenses and transfers."}
+              actions={<>
+                {activeTab === "maaser" ? (
                 <button
                   type="button"
                   onClick={() => setActiveTab("ledger")}
@@ -1518,7 +1513,8 @@ const Transactions = React.memo(function Transactions() {
                   </DropdownMenu>
                 </>
               )}
-            </div>
+              </>}
+            />
           </div>
 
           {activeTab === "ledger" && (
