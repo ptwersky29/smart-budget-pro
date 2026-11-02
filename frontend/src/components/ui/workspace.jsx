@@ -17,7 +17,7 @@ export function WorkspaceHeader({ title, description, actions }) {
 
 export function WorkspaceMetrics({ children, columns = 3 }) {
   return (
-    <div className={`workspace-metrics grid shrink-0 gap-3 sm:grid-cols-2 ${columns === 4 ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}>
+    <div className={`workspace-metrics grid shrink-0 grid-cols-2 gap-3 ${columns === 4 ? "lg:grid-cols-4" : "md:grid-cols-3"}`}>
       {children}
     </div>
   );
