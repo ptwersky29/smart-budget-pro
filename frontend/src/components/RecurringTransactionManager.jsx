@@ -1,3 +1,4 @@
+import PenniSelect from "./PenniSelect";
 import React, { useEffect, useState, useCallback } from "react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
@@ -269,7 +270,7 @@ export default function RecurringTransactionManager() {
                 </div>
                 <div>
                   <label className="label-overline">Frequency *</label>
-                  <select
+                  <PenniSelect
                     value={form.frequency}
                     onChange={(e) => setForm({ ...form, frequency: e.target.value })}
                     className="h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors w-full"
@@ -277,7 +278,7 @@ export default function RecurringTransactionManager() {
                     {FREQUENCIES.map((f) => (
                       <option key={f.value} value={f.value}>{f.label}</option>
                     ))}
-                  </select>
+                  </PenniSelect>
                 </div>
               </div>
 
