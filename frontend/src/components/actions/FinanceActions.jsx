@@ -100,14 +100,18 @@ export function AccountActionPreview({ accountId, account: initialAccount, onAdd
   </div>;
 }
 
-export function ReportsActionPreview() {
+export function ReportsActionPreview({ initialMonth }) {
+  const [month, setMonth] = useState(initialMonth || monthNow());
   const [data,setData]=useState(null);
   const [error,setError]=useState("");
-  useEffect(()=>{let active=true;Promise.all([api.get("/dashboard/overview"),api.get("/analytics/spending-by-category")]).then(([a,b])=>{if(active)setData({overview:a.data,categories:b.data.categories||[]})}).catch(()=>{if(active)setError("Could not load reports")});return()=>{active=false}},[]);
+  useEffect(()=>{let active=true;setError("");setData(null);
+    const year=Number(month.slice(0,4)), monthNum=Number(month.slice(5));
+    const params={date_from:`${month}-01`,date_to:`${month}-${String(new Date(year,monthNum,0).getDate()).padStart(2,"0")}`};
+    Promise.all([api.get("/dashboard/overview",{params}),api.get("/analytics/spending-by-category",{params})]).then(([a,b])=>{if(active)setData({overview:a.data,categories:b.data.categories||[]})}).catch(()=>{if(active)setError("Could not load reports")});return()=>{active=false}},[month]);
   if(error)return <p role="alert" className="p-4 text-sm text-ruby">{error}</p>;
   if(!data)return <p className="py-10 text-center text-sm text-muted-foreground">Loading reports…</p>;
   const o=data.overview;
-  return <div className="space-y-3"><div className="grid grid-cols-2 gap-3">
+  return <div className="space-y-3"><label className="flex items-center gap-3 text-sm">Report month <input type="month" value={month} onChange={event=>setMonth(event.target.value)} className="h-9 rounded-lg border border-border bg-card px-2"/></label><div className="grid grid-cols-2 gap-3">
     {[["Income",o.income],["Spending",o.spend??o.spending],["Balance",o.balance],["Savings rate",null]].map(([label,value])=><div key={label} className="rounded-xl border border-border p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-lg font-semibold">{value==null?`${Number(o.savings_rate)||0}%`:formatCurrency(Number(value)||0)}</p></div>)}
   </div><h3 className="pt-2 text-sm font-semibold">Spending by category</h3><div className="divide-y divide-border rounded-xl border border-border">{data.categories.slice(0,12).map((c,i)=><div key={c.category||i} className="flex justify-between gap-3 p-3 text-xs"><span className="capitalize">{c.category||c.name}</span><span className="font-semibold">{formatCurrency(Number(c.amount??c.total??c.value)||0)}</span></div>)}{!data.categories.length&&<p className="p-4 text-xs text-muted-foreground">No spending data available</p>}</div></div>;
 }
