@@ -5,7 +5,8 @@ test("joins class names", () => {
 });
 
 test("handles conditional classes via clsx", () => {
-  expect(cn("base", false && "hidden", true && "visible")).toBe("base visible");
+  const options = { hidden: false, visible: true };
+  expect(cn("base", options.hidden && "hidden", options.visible && "visible")).toBe("base visible");
 });
 
 test("handles undefined and null values", () => {
