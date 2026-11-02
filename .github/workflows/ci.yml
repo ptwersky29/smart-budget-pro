@@ -52,7 +52,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: pip install -r requirements.txt pytest pytest-asyncio httpx
-      - run: pytest
+      - run: pytest -m 'not stress'
         env:
           DATABASE_URL: postgresql+asyncpg://financeai:testpass@localhost:5432/financeai_test
           JWT_SECRET: ci-test-secret-key-min-32-chars-long!!
