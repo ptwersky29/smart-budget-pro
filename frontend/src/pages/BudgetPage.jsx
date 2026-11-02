@@ -608,7 +608,7 @@ export default React.memo(function BudgetPage() {
 
   const sectionsForDisplay = useMemo(() => {
     const groups = {};
-    filteredEveryday.forEach((b) => {
+    budgetTableRows.forEach((b) => {
       const sec = sectionForCategory[b.category] || "Other";
       if (!groups[sec]) groups[sec] = [];
       groups[sec].push(b);
@@ -620,7 +620,7 @@ export default React.memo(function BudgetPage() {
     });
     Object.entries(groups).forEach(([sec, items]) => { ordered[sec] = items; });
     return ordered;
-  }, [filteredEveryday, sectionForCategory, categoryHierarchy]);
+  }, [budgetTableRows, sectionForCategory, categoryHierarchy]);
 
   const unbudgetedCategories = useMemo(() => {
     if (!categorySpend.length) return [];
@@ -966,127 +966,47 @@ export default React.memo(function BudgetPage() {
 
       <div className="xl:hidden">
 
-      <PageHeader
-        eyebrow="Planning"
+      <WorkspaceHeader
         title="Budgets"
-        description="Set simple limits, follow your pace and keep everyday spending easy to understand."
+        description="Track your spending, set budgets and stay in control."
+        actions={<>
+          <MonthPicker label={monthLabel} onPrev={() => setMonth(addMonth(month, -1))} onNext={() => setMonth(addMonth(month, 1))}
+            onToday={() => setMonth(fmtMonth(now.getFullYear(), now.getMonth() + 1))} isToday={isCurrentMonth} />
+          <Button variant="primary" size="sm" onClick={() => openAddBudget("everyday")}><Plus className="mr-1 h-4 w-4" /> Add budget</Button>
+          <DropdownMenu><DropdownMenuTrigger asChild><button type="button" aria-label="More budget actions" className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-card"><MoreHorizontal className="h-4 w-4" /></button></DropdownMenuTrigger>
+            <DropdownMenuContent align="end"><DropdownMenuItem onClick={handleCopyPreviousMonth}>Copy previous month</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSeedDefaults}>Load defaults</DropdownMenuItem><DropdownMenuItem onClick={fetchData}>Refresh</DropdownMenuItem></DropdownMenuContent>
+          </DropdownMenu>
+        </>}
       />
-
-      {/* Budget summary */}
-      <div className="surface p-4 sm:p-5">
-        <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
-          {/* Large progress ring with subtle shadow */}
-          <div className="relative shrink-0 drop-shadow-[0_0_8px_rgba(48,164,108,0.4)]">
-            <ProgressRing pct={summary.totalPlanned ? (summary.totalSpent / summary.totalPlanned) * 100 : 0} size={80} stroke={5}
-              color={summary.overCount > 0 ? "#e5484d" : summary.totalSpent > summary.totalPlanned * 0.8 ? "#e8a838" : "#30a46c"} />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-lg font-bold tabular-nums">{summary.totalPlanned ? Math.round((summary.totalSpent / summary.totalPlanned) * 100) : 0}%</span>
-            </div>
-          </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2">
-                <MonthPicker
-                  label={monthLabel}
-                  onPrev={() => setMonth(addMonth(month, -1))}
-                  onNext={() => setMonth(addMonth(month, 1))}
-                  onToday={() => setMonth(fmtMonth(now.getFullYear(), now.getMonth() + 1))}
-                  isToday={isCurrentMonth}
-                />
-              </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-              <span className="text-muted-foreground">Budgeted <strong className="text-foreground">£{summary.totalPlanned.toLocaleString()}</strong></span>
-              <span className="text-muted-foreground">Spent <strong className={summary.overCount > 0 ? "text-ruby" : "text-emerald"}>£{summary.totalSpent.toLocaleString()}</strong></span>
-              {summary.totalPlanned > 0 && (
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  summary.overCount > 0 ? "bg-ruby/10 text-ruby" :
-                  summary.totalSpent > summary.totalPlanned * 0.8 ? "bg-topaz/10 text-topaz" :
-                  "bg-emerald/10 text-emerald"
-                }`}>
-                  {summary.overCount > 0 ? `${summary.overCount} over budget` :
-                   summary.totalSpent > summary.totalPlanned * 0.8 ? "Nearing limit" : "On track"}
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:shrink-0">
-            <div className="relative w-full sm:w-40 lg:w-48 group/search order-first sm:order-none">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none transition-transform duration-200 group-focus-within/search:scale-110" />
-              <input type="search" placeholder="Search budgets..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} aria-label="Search budgets"
-                className="w-full h-8 pl-8 pr-3 rounded-full bg-secondary/40 border border-transparent text-xs placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring/30 focus:outline-none transition-all" />
-            </div>
-            <PenniSelect value={sortOption} onChange={(e) => { setSortOption(e.target.value); setSortOrder("desc"); }} aria-label="Sort budgets"
-              className="sm:hidden h-8 flex-1 basis-0 min-w-0 px-2 rounded-full bg-secondary/50 border border-border/50 text-[11px] font-medium focus:outline-none focus:border-ring">
-              <option value="progress">Progress</option>
-              <option value="name">Name</option>
-              <option value="limit">Limit</option>
-              <option value="spent">Spent</option>
-              <option value="remaining">Remaining</option>
-            </PenniSelect>
-            <button onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")} aria-label="Toggle sort order"
-              className="sm:hidden h-8 w-8 shrink-0 grid place-items-center rounded-full bg-secondary/50 border border-border/50 hover:bg-secondary/80 transition-colors">
-              {sortOrder === "desc" ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronUp className="h-3 w-3 text-muted-foreground" />}
-            </button>
-            <div className="hidden sm:flex flex-wrap gap-1.5">
-              {["progress", "name", "limit", "spent", "remaining"].map((opt) => (
-                <button key={opt} onClick={() => {
-                  if (sortOption === opt) setSortOrder(sortOrder === "desc" ? "asc" : "desc");
-                  else { setSortOption(opt); setSortOrder("desc"); }
-                }}
-                  className={`h-7 px-3 rounded-full text-[11px] font-medium border transition-all duration-200 ${sortOption === opt
-                    ? "bg-emerald/10 text-emerald border-emerald/20"
-                    : "bg-card/80 text-muted-foreground border-border/50 hover:bg-secondary/60 hover:text-foreground"}`}>
-                  {opt.charAt(0).toUpperCase() + opt.slice(1)}
-                  {sortOption === opt && (sortOrder === "desc" ? " ↓" : " ↑")}
-                </button>
-              ))}
-            </div>
-            <Button variant="primary" size="sm" onClick={() => openAddBudget("everyday")} aria-label="Add budget">
-              <Plus className="h-3.5 w-3.5" /> <span className="hidden min-[360px]:inline">Add</span>
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="h-8 w-8 rounded-full grid place-items-center text-muted-foreground hover:bg-secondary/60 hover:text-foreground transition-all duration-200">
-                  <MoreHorizontal className="h-3.5 w-3.5" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={handleCopyPreviousMonth} disabled={copying}>
-                  <Copy className={`h-4 w-4 mr-2 ${copying ? "animate-pulse" : ""}`} /> {copying ? "Copying..." : "Copy Previous"}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleSeedDefaults} disabled={seeding || loading}>
-                  <Download className={`h-4 w-4 mr-2 ${seeding ? "animate-pulse" : ""}`} /> {seeding ? "Loading..." : "Load Defaults"}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={fetchData} disabled={loading}>
-                  <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Refresh
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
+      <WorkspaceMetrics columns={4}>
+        <WorkspaceMetric label="Total Budgeted" value={`£${summary.totalPlanned.toFixed(2)}`} note={`${summary.count} categories`} icon={Target} />
+        <WorkspaceMetric label="Total Spent" value={`£${summary.totalSpent.toFixed(2)}`} note={summary.totalPlanned ? `${Math.round(summary.totalSpent/summary.totalPlanned*100)}% of budget` : "No budget set"} icon={TrendingDown} tone="ruby" progress={summary.totalPlanned ? summary.totalSpent/summary.totalPlanned*100 : 0} />
+        <WorkspaceMetric label={summary.totalRemaining < 0 ? "Over budget" : "Remaining"} value={`£${Math.abs(summary.totalRemaining).toFixed(2)}`} note={summary.totalPlanned ? "Across your budgets" : "No budget set"} icon={PiggyBank} tone={summary.totalRemaining < 0 ? "ruby" : "emerald"} />
+        <WorkspaceMetric label="At Risk" value={String(atRiskCount)} note={atRiskCount ? "Categories over 80% spent" : "All budgets on track"} icon={AlertCircle} tone="topaz" />
+      </WorkspaceMetrics>
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <label className="relative min-w-[160px] flex-1">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"/>
+          <input type="search" placeholder="Search budgets..." value={searchQuery} onChange={(e)=>setSearchQuery(e.target.value)}
+            aria-label="Search budgets" className="h-9 w-full rounded-[9px] border border-border bg-card pl-8 pr-3 text-xs outline-none focus:border-emerald/40" />
+        </label>
+        <PenniSelect value={sortOption} onChange={(e)=>setSortOption(e.target.value)} aria-label="Sort budgets" className="h-9 min-w-[112px] rounded-[9px] border border-border bg-card px-3 text-xs">
+          <option value="progress">Progress</option><option value="name">Name</option>
+          <option value="limit">Budget</option><option value="spent">Spent</option><option value="remaining">Remaining</option>
+        </PenniSelect>
+        <button type="button" onClick={()=>setSortOrder(sortOrder==="desc"?"asc":"desc")} aria-label="Reverse budget sort" className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-card">
+          {sortOrder==="desc" ? <ChevronDown className="h-4 w-4"/> : <ChevronUp className="h-4 w-4"/>}
+        </button>
       </div>
-
-      {/* Quick stats row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 relative z-10 fade-up">
-        <div className="surface surface-hover p-4 sm:p-5">
-          <div className="mx-auto mb-2 grid h-9 w-9 place-items-center rounded-xl bg-emerald/10 text-emerald"><Wallet className="h-4 w-4" /></div>
-          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Budgets</p>
-          <p className="text-2xl sm:text-3xl font-bold tracking-tight tabular-nums">{summary.count}</p>
-        </div>
-        <div className="surface surface-hover p-4 sm:p-5">
-          <div className="mx-auto mb-2 grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary"><Target className="h-4 w-4" /></div>
-          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Budgeted</p>
-          <p className="text-2xl sm:text-3xl font-bold tracking-tight tabular-nums">£{summary.totalPlanned.toLocaleString()}</p>
-        </div>
-        <div className="surface surface-hover p-4 sm:p-5">
-          <div className="mx-auto mb-2 grid h-9 w-9 place-items-center rounded-xl bg-ruby/10 text-ruby"><TrendingDown className="h-4 w-4" /></div>
-          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Spent</p>
-          <p className={`text-2xl sm:text-3xl font-bold tracking-tight tabular-nums ${summary.overCount > 0 ? "text-ruby" : "text-emerald"}`}>£{summary.totalSpent.toLocaleString()}</p>
-        </div>
-        <div className={`surface surface-hover p-4 sm:p-5 ${summary.totalRemaining < 0 ? "border-ruby/30" : ""}`}>
-          <div className={`mx-auto mb-2 grid h-9 w-9 place-items-center rounded-xl ${summary.totalRemaining < 0 ? "bg-ruby/10 text-ruby" : "bg-emerald/10 text-emerald"}`}><PiggyBank className="h-4 w-4" /></div>
-          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Remaining</p>
-          <p className={`text-2xl sm:text-3xl font-bold tracking-tight tabular-nums ${summary.totalRemaining < 0 ? "text-ruby" : "text-emerald"}`}>£{Math.abs(summary.totalRemaining).toLocaleString()}</p>
-        </div>
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <WorkspaceTabs tabs={[
+          {key:"all",label:"All Categories",count:everyday.length},
+          {key:"track",label:"On Track",count:everyday.filter(b=>(Number(b.progress_pct)||0)<80).length},
+          {key:"risk",label:"At Risk",count:atRiskCount},
+          {key:"exceeded",label:"Exceeded",count:summary.overCount},
+        ]} active={budgetView} onChange={setBudgetView} label="Budget status"/>
+        <WorkspaceViewToggle value={displayMode} onChange={setDisplayMode} label="Budget view"/>
       </div>
 
       {/* Loading */}
@@ -1193,7 +1113,7 @@ export default React.memo(function BudgetPage() {
                     £{totalRemaining >= 0 ? `${totalRemaining} left` : `${Math.abs(totalRemaining)} over`}
                   </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className={`grid gap-3 ${displayMode === "list" ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"}`}>
                   {items.map((b, idx) => <div key={b.budget_id} className={`fade-up delay-${Math.min(idx, 5)}`}><BudgetCard budget={b} isCurrentMonth={isCurrentMonth} currentDay={currentDay} monthElapsedPct={monthElapsedPct} daysInMonth={daysInMonth} startEdit={startEdit} bulkSelected={bulkSelected} setBulkSelected={setBulkSelected} setConfirmDelete={setConfirmDelete} openBudgetTransactions={openBudgetTransactions} /></div>)}
                   <button onClick={() => openAddBudget("everyday")}
                     className="rounded-xl border-2 border-dashed border-border/40 hover:border-emerald/40 hover:bg-emerald/5 hover:text-emerald hover:scale-[1.02] active:scale-[0.98] text-muted-foreground/50 transition-all duration-200 flex flex-col items-center justify-center p-3 w-full group/add">
