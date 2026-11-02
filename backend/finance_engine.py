@@ -2246,11 +2246,9 @@ Output ONLY valid JSON, no markdown, no explanation:
 
                 tx.category = _rc(payload.category)
                 category_changed = True
-            else:
             if payload.date is not None:
                 new_date = datetime.fromisoformat(payload.date)
                 tx.date = new_date
-            else:
             if payload.notes is not None:
                 tx.notes = payload.notes
             if payload.tags is not None:
