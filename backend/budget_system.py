@@ -1702,8 +1702,8 @@ def build_router() -> APIRouter:
             if payload.event_date:
                 try:
                     event_date = datetime.fromisoformat(payload.event_date)
-                except Exception as exc:
-                    logger.warning("Optional operation failed at backend/budget_system.py:1705 (%s)", type(exc).__name__)
+                except (TypeError, ValueError) as exc:
+                    raise HTTPException(422, "Invalid event date: use YYYY-MM-DD") from exc
 
             occ = BudgetOccasion(
                 user_id=user["user_id"],
@@ -1753,8 +1753,8 @@ def build_router() -> APIRouter:
             if payload.event_date:
                 try:
                     occ.event_date = datetime.fromisoformat(payload.event_date)
-                except Exception as exc:
-                    logger.warning("Optional operation failed at backend/budget_system.py:1756 (%s)", type(exc).__name__)
+                except (TypeError, ValueError) as exc:
+                    raise HTTPException(422, "Invalid event date: use YYYY-MM-DD") from exc
             occ.estimated_amount = payload.estimated_amount or 0
 
             cat_result = await session.execute(
@@ -1851,8 +1851,8 @@ def build_router() -> APIRouter:
             if payload.event_date:
                 try:
                     event_date = datetime.fromisoformat(payload.event_date)
-                except Exception as exc:
-                    logger.warning("Optional operation failed at backend/budget_system.py:1854 (%s)", type(exc).__name__)
+                except (TypeError, ValueError) as exc:
+                    raise HTTPException(422, "Invalid event date: use YYYY-MM-DD") from exc
 
             occ = BudgetOccasion(
                 user_id=user["user_id"],
@@ -1903,8 +1903,8 @@ def build_router() -> APIRouter:
             if payload.event_date:
                 try:
                     occ.event_date = datetime.fromisoformat(payload.event_date)
-                except Exception as exc:
-                    logger.warning("Optional operation failed at backend/budget_system.py:1906 (%s)", type(exc).__name__)
+                except (TypeError, ValueError) as exc:
+                    raise HTTPException(422, "Invalid event date: use YYYY-MM-DD") from exc
             occ.estimated_amount = payload.estimated_amount or 0
             if payload.notes is not None:
                 occ.notes = payload.notes
