@@ -1,3 +1,4 @@
+import PenniSelect from "../components/PenniSelect";
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { Calendar, Sunrise, MapPin } from "lucide-react";
@@ -65,10 +66,10 @@ export default function Jewish() {
             <div className="flex items-center gap-2"><Sunrise className="h-4 w-4 text-topaz" /><p className="label-overline">Zmanim today</p></div>
             <div className="flex items-center gap-2">
               <MapPin className="h-3 w-3 text-muted-foreground"/>
-              <select data-testid="zmanim-city" value={city} onChange={(e) => { setCity(e.target.value); localStorage.setItem("zmanim_city", e.target.value); }}
+              <PenniSelect data-testid="zmanim-city" value={city} onChange={(e) => { setCity(e.target.value); localStorage.setItem("zmanim_city", e.target.value); }}
                       className="h-10 px-4 rounded-full bg-secondary/50 border border-transparent focus:border-ring focus:outline-none text-xs capitalize">
                 {CITIES.map(c => <option key={c} value={c}>{titleCase(c)}</option>)}
-              </select>
+              </PenniSelect>
             </div>
           </div>
           {zmanim ? (
