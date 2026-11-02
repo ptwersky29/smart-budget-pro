@@ -363,9 +363,64 @@ const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
               {budgetTableRows.length === 0 ? <WorkspaceBlank title="No budgets in this view" description="Try another filter or create a budget." /> : null}
             </div>
           )}
-          <div className="surface max-h-[165px] shrink-0 overflow-y-auto rounded-[16px]"><div className="flex items-center justify-between border-b border-border px-4 py-3"><p className="text-[13px] font-semibold">Recent Budget Activity</p><button type="button" onClick={onViewAll} className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald hover:underline">View all <ArrowUpRight className="h-3 w-3" /></button></div><table className="w-full text-left"><thead className="text-[10.5px] text-muted-foreground"><tr><th className="px-4 py-2">Date</th><th className="px-3 py-2">Category</th><th className="px-3 py-2">Description</th><th className="px-4 py-2 text-right">Amount</th></tr></thead><tbody>{recentTransactions.map((tx) => <tr key={tx.transaction_id} className="border-t border-border/60 text-[11px]"><td className="px-4 py-2 text-muted-foreground">{tx.date ? format(new Date(tx.date), "d MMM yyyy") : "—"}</td><td className="px-3 py-2 capitalize">{tx.category || "Uncategorised"}</td><td className="max-w-[240px] truncate px-3 py-2">{tx.description || tx.merchant || "Transaction"}</td><td className={`money-tabular px-4 py-2 text-right font-medium ${Number(tx.amount) < 0 ? "text-ruby" : "text-emerald"}`}>{Number(tx.amount) < 0 ? "-" : "+"}£{Math.abs(Number(tx.amount) || 0).toFixed(2)}</td></tr>)}</tbody></table></div>
+
         </div>
-        <aside className="space-y-4"><div className="surface rounded-[16px] p-4"><div className="flex items-center justify-between"><h2 className="text-[15px] font-semibold">Spending by Category</h2><span className="rounded-lg bg-secondary px-2.5 py-1 text-[10px] text-muted-foreground">This Month</span></div>{categorySpend.length ? <CategoryPieChart data={categorySpend.slice(0, 7)} /> : <div className="py-16 text-center text-sm text-muted-foreground">No category spending this month.</div>}</div><div className="surface rounded-[16px] p-4"><div className="flex items-center justify-between"><h2 className="text-[15px] font-semibold">Monthly Trend</h2><span className="text-[10px] text-muted-foreground">Budget vs spent</span></div><div className="mt-6 flex h-[112px] items-end justify-between gap-3">{budgetTableRows.slice(0, 6).map((budget) => { const limit = Math.max(Number(budget.limit) || 0, 1); const spent = Number(budget.spent) || 0; return <div key={budget.budget_id} className="flex min-w-0 flex-1 flex-col items-center gap-1"><div className="flex h-[88px] items-end gap-1"><span className="w-3 rounded-t bg-sky" style={{ height: `${Math.max(5, Math.min(100, spent / limit * 100))}%` }} /><span className="w-3 rounded-t bg-secondary" style={{ height: "100%" }} /></div><span className="max-w-full truncate text-[9px] text-muted-foreground">{budget.category}</span></div>; })}</div><div className="mt-3 flex justify-end gap-3 text-[10px] text-muted-foreground"><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-sky" />Spent</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-secondary" />Budget</span></div></div><div className="surface rounded-[16px] p-4"><h2 className="text-[15px] font-semibold">Quick Actions</h2><div className="mt-3 grid grid-cols-2 gap-2">{[{ label: "Add Budget", sub: "Create a new budget", icon: Plus, tone: "emerald", action: onAdd }, { label: "Manage Categories", sub: "Edit spending categories", icon: FolderCog, tone: "topaz", action: onManageCategories }, { label: "View Reports", sub: "Detailed analysis", icon: BarChart3, tone: "violet", action: onViewReports }, { label: "Set Alerts", sub: "Notifications near limits", icon: Bell, tone: "ruby", action: onAlerts }].map(({ label, sub, icon: Icon, tone, action }) => <button key={label} type="button" onClick={action} className="rounded-xl border border-border/70 p-3 text-left hover:border-emerald/30 hover:bg-secondary/30"><span className={`mb-2 grid h-8 w-8 place-items-center rounded-xl ${tone === "topaz" ? "bg-topaz/10 text-topaz" : tone === "ruby" ? "bg-ruby/10 text-ruby" : tone === "violet" ? "bg-violet/10 text-violet" : "bg-emerald/10 text-emerald"}`}><Icon className="h-4 w-4" /></span><span className="block text-[11px] font-semibold">{label}</span><span className="mt-0.5 block text-[9.5px] text-muted-foreground">{sub}</span></button>)}</div></div></aside>
+        <aside className="budget-insights-sidebar subtle-scroll min-h-0 min-w-0 space-y-3 overflow-y-auto overscroll-contain pb-2 pr-1">
+          {unbudgetedCategories?.length > 0 && <section className="surface rounded-[16px] p-4">
+            <h2 className="text-[14px] font-semibold">Unbudgeted spending</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Spending in categories without a budget</p>
+            <div className="mt-3 space-y-1">
+              {unbudgetedCategories.map(category => <div key={category.name} className="flex items-center justify-between gap-2 rounded-lg border border-border/60 px-2 py-2 text-xs">
+                <span className="min-w-0 truncate capitalize">{category.name} · £{Number(category.value||0).toFixed(2)}</span>
+                <button type="button" onClick={() => onAdd(category.name)} className="shrink-0 rounded-lg bg-emerald/10 px-2 py-1.5 font-semibold text-emerald" aria-label={`Create budget for ${category.name}`}>Add budget</button>
+              </div>)}
+            </div>
+          </section>}
+          <section className="surface rounded-[16px] p-4">
+            <div className="flex items-center justify-between gap-2"><h2 className="text-[14px] font-semibold">Spending by Category</h2><span className="rounded-lg bg-secondary px-2.5 py-1 text-[10px] text-muted-foreground">This month</span></div>
+            {categorySpend.length ? <CategoryPieChart data={categorySpend.slice(0, 7)} /> : <WorkspaceBlank title="No category spending" description="Spending will appear here as transactions are added." />}
+          </section>
+          <section className="surface rounded-[16px] p-4">
+            <div className="flex items-center justify-between gap-2"><h2 className="text-[14px] font-semibold">Monthly Trend</h2><span className="text-[10px] text-muted-foreground">Last 6 months</span></div>
+            {monthlyTrend?.length ? <>
+              <div className="mt-5 flex h-[120px] items-end gap-2" role="img" aria-label="Monthly budget versus spending for the last six months">
+                {monthlyTrend.map(point => {
+                  const peak = Math.max(1,...monthlyTrend.flatMap(item => [item.budgeted,item.spent]));
+                  return <div key={point.month} className="flex min-w-0 flex-1 flex-col items-center gap-2">
+                    <div className="flex h-[92px] w-full items-end justify-center gap-1">
+                      <div className="w-[35%] min-w-[4px] rounded-t bg-emerald/75" style={{height:`${Math.max(point.budgeted ? 3 : 0,point.budgeted/peak*100)}%`}} title={`Budget ${point.month}: £${point.budgeted.toFixed(2)}`} />
+                      <div className="w-[35%] min-w-[4px] rounded-t bg-topaz/80" style={{height:`${Math.max(point.spent ? 3 : 0,point.spent/peak*100)}%`}} title={`Spent ${point.month}: £${point.spent.toFixed(2)}`} />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">{point.label}</span>
+                  </div>;
+                })}
+              </div>
+              <div className="mt-2 flex justify-center gap-4 text-[10px] text-muted-foreground"><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald/75" />Budget</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-topaz/80" />Spent</span></div>
+            </> : <WorkspaceBlank title="Trend unavailable" description="Historical monthly budget figures could not be loaded." />}
+          </section>
+          <section className="surface rounded-[16px] p-4">
+            <div className="mb-2 flex items-center justify-between gap-3"><h2 className="text-[14px] font-semibold">Recent Budget Activity</h2><button type="button" onClick={onViewAll} className="text-xs font-semibold text-emerald hover:underline">View all</button></div>
+            {recentTransactions.length ? <div className="divide-y divide-border/70">
+              {recentTransactions.map(tx => <div key={tx.transaction_id} className="flex items-center justify-between gap-2 py-2 text-xs"><div className="min-w-0"><p className="truncate font-medium">{tx.description||tx.merchant||"Transaction"}</p><p className="text-[10px] text-muted-foreground">{tx.date?.slice(0,10)||"No date"} · {tx.category||"Uncategorised"}</p></div><span className={`money-tabular shrink-0 text-xs font-semibold ${Number(tx.amount)<0?"text-ruby":"text-emerald"}`}>{Number(tx.amount)<0?"−":"+"}£{Math.abs(Number(tx.amount)||0).toFixed(2)}</span></div>)}
+            </div> : <p className="py-4 text-center text-xs text-muted-foreground">No recent activity.</p>}
+          </section>
+          {Object.values(eventGroups || {}).length > 0 && <section className="surface rounded-[16px] p-3">
+            <h2 className="mb-2 px-1 text-[14px] font-semibold">Event budgets</h2>
+            <div className="space-y-2">{Object.values(eventGroups).map(group => <EventGroupCard key={group.event_group_id} group={group} setConfirmDelete={onDeleteEvent} fetchData={onRetry} />)}</div>
+          </section>}
+          {insights?.length > 0 && <section className="surface rounded-[16px] p-4">
+            <h2 className="mb-1 text-[14px] font-semibold">Penni Coach</h2><p className="mb-3 text-xs text-muted-foreground">Budget suggestions based on your spending</p>
+            <div className="space-y-2">{insights.map(insight => <div key={insight.category} className="rounded-lg border border-border/70 p-3 text-xs">
+              <p className="font-semibold capitalize">{insight.category}</p><p className="mt-1 text-muted-foreground">{insight.reason}</p>
+              {insight.current_budget !== insight.suggested_budget && <button type="button" disabled={applyingInsight===insight.category} onClick={() => onApplyInsight(insight)} className="mt-2 rounded-lg bg-emerald/10 px-2.5 py-1.5 font-semibold text-emerald disabled:opacity-50">{applyingInsight===insight.category?"Updating…":`Update to £${insight.suggested_budget}`}</button>}
+            </div>)}</div>
+          </section>}
+          <section className="surface rounded-[16px] p-4"><h2 className="text-[14px] font-semibold">Quick Actions</h2>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {[{label:"Add Budget",icon:Plus,action:()=>onAdd()}, {label:"Manage Categories",icon:FolderCog,action:onManageCategories}, {label:"View Reports",icon:BarChart3,action:onViewReports},{label:"Set Alerts",icon:Bell,action:onAlerts}].map(({label,icon:Icon,action})=><button key={label} onClick={action} className="flex flex-col items-start gap-2 rounded-xl border border-border/70 p-3 text-left text-[11px] font-medium hover:bg-secondary/40"><Icon className="h-4 w-4 text-emerald" />{label}</button>)}
+            </div>
+          </section>
+        </aside>
       </div>
     </div>
   );
