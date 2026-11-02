@@ -1,3 +1,4 @@
+import PenniSelect from "../components/PenniSelect";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
@@ -331,9 +332,9 @@ export default function Subscriptions() {
               <Input required type="number" step="0.01" placeholder="Amount (£)" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="w-full" />
               <Input placeholder="Merchant (optional)" value={form.merchant} onChange={(e) => setForm({ ...form, merchant: e.target.value })} className="w-full" />
               <div className="grid grid-cols-2 gap-2">
-                <select value={form.frequency} onChange={(e) => setForm({ ...form, frequency: e.target.value })} className="h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors w-full">
+                <PenniSelect value={form.frequency} onChange={(e) => setForm({ ...form, frequency: e.target.value })} className="h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors w-full">
                   <option value="monthly">Monthly</option><option value="yearly">Yearly</option><option value="weekly">Weekly</option>
-                </select>
+                </PenniSelect>
                 <Input placeholder="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full" />
               </div>
               <textarea placeholder="Notes (optional)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full rounded-xl bg-secondary/50 border border-transparent px-4 py-3 text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors resize-none" rows={2} />
