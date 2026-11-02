@@ -4137,6 +4137,10 @@ Output ONLY valid JSON, no markdown, no explanation:
                 )
             )
             bank_accounts = acct_result.scalars().all()
+            account_balance_breakdown = defaultdict(float)
+            for account in bank_accounts:
+                account_balance_breakdown[account.currency or "GBP"] += float(account.balance or 0)
+            multi_currency = len(account_balance_breakdown) > 1
             truelayer_balance = (
                 sum(float(a.balance or 0) for a in bank_accounts) or 0
             )
@@ -4190,6 +4194,11 @@ Output ONLY valid JSON, no markdown, no explanation:
                 "balance": round(balance, 2),
                 "truelayer_balance": round(truelayer_balance, 2),
                 "accounts": accounts,
+                "multi_currency": multi_currency,
+                "account_balance_breakdown": {
+                    currency: round(value, 2)
+                    for currency, value in account_balance_breakdown.items()
+                },
                 "income": round(income, 2),
                 "spend": round(spend, 2),
                 "savings_rate": round(savings_rate, 1),
