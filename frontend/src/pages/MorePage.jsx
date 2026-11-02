@@ -110,9 +110,9 @@ export default function MorePage() {
           </Surface>
 
           <Section title="Money & planning">
-            <SettingRow to="/reports" onSelect={() => openAction("reports")} icon={BarChart3} title="Reports" description="Understand cash flow, categories and trends" />
+            <SettingRow to="/reports" icon={BarChart3} title="Reports" description="Understand cash flow, categories and trends" />
             <SettingRow to="/subscriptions" icon={RefreshCcw} title="Subscriptions" description="Recurring payments and renewals" />
-            <SettingRow to="/statements" onSelect={() => openAction("statement-import")} icon={FileText} title="Statements" description="Upload and reconcile bank statements" />
+            <SettingRow to="/statements" icon={FileText} title="Statements" description="Upload and reconcile bank statements" />
             <SettingRow to="/investments" icon={TrendingUp} title="Investments" description="Projections and long-term planning" />
           </Section>
 
