@@ -1,3 +1,4 @@
+import PenniSelect from "../components/PenniSelect";
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, Area, AreaChart } from "recharts";
@@ -122,9 +123,9 @@ export default function Investments() {
       <form onSubmit={run} className="rounded-2xl border border-border bg-card p-4 sm:p-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 items-end">
         <div>
           <label className="label-overline">Symbol</label>
-          <select data-testid="inv-symbol" value={form.symbol} onChange={(e)=>setForm({...form, symbol:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none">
+          <PenniSelect data-testid="inv-symbol" value={form.symbol} onChange={(e)=>setForm({...form, symbol:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none">
             {SYMBOLS.map(s=><option key={s}>{s}</option>)}
-          </select>
+          </PenniSelect>
         </div>
         <div>
           <label className="label-overline">Initial (£)</label>
