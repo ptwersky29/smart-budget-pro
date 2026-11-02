@@ -191,6 +191,13 @@ export default function Dashboard() {
       overview?.balance ??
       0,
   );
+  const currencies = Array.from(new Set(accounts.map(account => account.currency || "GBP")));
+  const mixedCurrencies = currencies.length > 1;
+  const balanceLabel = mixedCurrencies ? "Multiple currencies" : formatCurrency(balance);
+  const currencyDetail = mixedCurrencies
+    ? currencies.map(currency => `${currency}: ${accounts.filter(a => (a.currency || "GBP") === currency)
+        .reduce((total, a) => total + (Number(a.balance) || 0), 0).toFixed(2)}`).join(" · ")
+    : `${accounts.length} ${accounts.length === 1 ? "account" : "accounts"} connected`;
   const trendValues = monthlyFlow.map((month) => Number(month.income) - Number(month.spend));
   const topAlerts = (Array.isArray(alerts) ? alerts : []).slice(0, 2);
   const topUpcoming = (Array.isArray(upcoming) ? upcoming : []).slice(0, 4);
@@ -348,8 +355,8 @@ export default function Dashboard() {
         {showWidget("net_worth") ? (
           <StatCard
             label="Total balance"
-            value={formatCurrency(balance)}
-            detail={`${accounts.length} ${accounts.length === 1 ? "account" : "accounts"} connected`}
+            value={balanceLabel}
+            detail={currencyDetail}
             icon={Wallet}
             tone="emerald"
             delta={monthlyFlow.length ? `${monthLabel(monthlyFlow[monthlyFlow.length - 1]?.month)} net` : null}
