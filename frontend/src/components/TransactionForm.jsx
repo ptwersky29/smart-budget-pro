@@ -34,6 +34,7 @@ export default function TransactionForm({
   selectedCats,
   onClose,
   onSubmit,
+  saving = false,
   onClassify,
   classifying,
   classification,
@@ -615,10 +616,11 @@ export default function TransactionForm({
             variant="primary"
             size="sm"
             data-testid="tx-submit"
+            disabled={saving}
             onClick={onSubmit}
             className="text-xs font-semibold px-4"
           >
-            {editingId ? "Save changes" : "Add transaction"}
+            {saving ? "Saving…" : editingId ? "Save changes" : "Add transaction"}
           </Button>
         </div>
       </div>

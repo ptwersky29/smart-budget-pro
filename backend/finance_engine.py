@@ -2188,11 +2188,6 @@ Output ONLY valid JSON, no markdown, no explanation:
         request: Request,
         user: dict = Depends(get_current_user),
     ):
-        import json as _json
-        raw = await request.body()
-        print(f"[DEBUG_PATCH] Received PATCH /transactions/{tx_id}")
-        print(f"[DEBUG_PATCH] Raw body: {raw.decode()}")
-        print(f"[DEBUG_PATCH] Parsed payload dict: {payload.model_dump()}")
 
         sm = request.app.state.db
         async with sm() as session:
@@ -2206,7 +2201,6 @@ Output ONLY valid JSON, no markdown, no explanation:
             if not tx:
                 raise HTTPException(404, "Not found")
 
-            print(f"[DEBUG_PATCH] Before update: category={tx.category!r} date={tx.date!r} amount={tx.amount!r} description={tx.description!r}")
 
             old_amount = float(tx.amount or 0)
             old_account_id = tx.account_id
@@ -2222,7 +2216,6 @@ Output ONLY valid JSON, no markdown, no explanation:
                 if not acct_result.scalar_one_or_none():
                     raise HTTPException(400, f"Account '{payload.account_id}' not found")
                 tx.account_id = payload.account_id
-                print(f"[DEBUG_PATCH] Updated account_id to {tx.account_id}")
 
             if payload.amount is not None:
                 if payload.is_income is None:
@@ -2234,7 +2227,6 @@ Output ONLY valid JSON, no markdown, no explanation:
                         else -abs(payload.amount),
                         2,
                     )
-                print(f"[DEBUG_PATCH] Updated amount to {tx.amount}")
             elif payload.is_income is not None:
                 tx.amount = round(
                     abs(float(tx.amount or 0))
@@ -2242,14 +2234,11 @@ Output ONLY valid JSON, no markdown, no explanation:
                     else -abs(float(tx.amount or 0)),
                     2,
                 )
-                print(f"[DEBUG_PATCH] Updated amount (via is_income toggling) to {tx.amount}")
             if payload.description is not None:
                 tx.description = sanitize_input(payload.description, max_len=500)
-                print(f"[DEBUG_PATCH] Updated description to {tx.description!r}")
             if payload.merchant is not None:
                 tx.merchant_name = sanitize_input(payload.merchant, max_len=255)
                 tx.normalized_merchant = normalize_merchant(payload.merchant)
-                print(f"[DEBUG_PATCH] Updated merchant to {tx.merchant_name!r}")
             category_changed = False
             old_category = tx.category
             if payload.category is not None and payload.category != tx.category:
@@ -2257,15 +2246,9 @@ Output ONLY valid JSON, no markdown, no explanation:
 
                 tx.category = _rc(payload.category)
                 category_changed = True
-                print(f"[DEBUG_PATCH] Updated category from {old_category!r} to {tx.category!r}")
-            else:
-                print(f"[DEBUG_PATCH] Category NOT updated: payload.category={payload.category!r} tx.category={tx.category!r}")
             if payload.date is not None:
                 new_date = datetime.fromisoformat(payload.date)
-                print(f"[DEBUG_PATCH] Updated date from {tx.date!r} to {new_date!r}")
                 tx.date = new_date
-            else:
-                print(f"[DEBUG_PATCH] Date NOT updated: payload.date is None, keeping {tx.date!r}")
             if payload.notes is not None:
                 tx.notes = payload.notes
             if payload.tags is not None:
@@ -2318,16 +2301,12 @@ Output ONLY valid JSON, no markdown, no explanation:
                     session, user["user_id"], new_account_id, new_amount
                 )
 
-            print(f"[DEBUG_PATCH] Before commit: category={tx.category!r} date={tx.date!r} amount={tx.amount!r}")
 
             await session.commit()
-            print(f"[DEBUG_PATCH] Commit done, checking session.dirty: {session.dirty}")
 
             await session.refresh(tx)
-            print(f"[DEBUG_PATCH] After refresh: category={tx.category!r} date={tx.date!r} amount={tx.amount!r}")
 
             doc = _tx_to_dict(tx)
-            print(f"[DEBUG_PATCH] Returning doc: {doc}")
             await maaser.maybe_accrue(session, user["user_id"], doc)
             _invalidate_finance_caches(user["user_id"])
             return doc
@@ -2531,6 +2510,12 @@ Output ONLY valid JSON, no markdown, no explanation:
                     400,
                     "A transfer pair needs one outgoing expense and one incoming income",
                 )
+            if round(abs(float(outgoing.amount)) * 100) != round(abs(float(incoming.amount)) * 100):
+                raise HTTPException(400, "Transfer amounts must be equal")
+            if (outgoing.currency or "GBP") != (incoming.currency or "GBP"):
+                raise HTTPException(400, "Transfer accounts must use the same currency")
+            if outgoing.account_id == incoming.account_id:
+                raise HTTPException(400, "A transfer must move between two different accounts")
             if outgoing.transfer_pair_id or incoming.transfer_pair_id:
                 raise HTTPException(400, "One of these transactions is already paired")
             pair_id = f"trp_{uuid.uuid4().hex[:12]}"
@@ -3937,10 +3922,12 @@ Output ONLY valid JSON, no markdown, no explanation:
 
     @router.get("/dashboard/overview")
     async def dashboard_overview(
-        request: Request, user: dict = Depends(get_current_user)
+        request: Request, user: dict = Depends(get_current_user),
+        date_from: str = Query(None), date_to: str = Query(None),
     ):
         uid = user["user_id"]
-        cached = _query_cache.get(f"dash:{uid}")
+        custom_range = bool(date_from or date_to)
+        cached = None if custom_range else _query_cache.get(f"dash:{uid}")
         if cached:
             return cached
         sm = request.app.state.db
@@ -3955,10 +3942,18 @@ Output ONLY valid JSON, no markdown, no explanation:
 
             now = datetime.now(timezone.utc)
             month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            try:
+                period_start = datetime.fromisoformat(date_from).replace(tzinfo=timezone.utc) if date_from else month_start
+                period_end = (datetime.fromisoformat(date_to).replace(tzinfo=timezone.utc) + timedelta(days=1)) if date_to else None
+                if period_end is not None and period_end <= period_start:
+                    raise ValueError("End date must be on or after start date")
+            except ValueError as exc:
+                raise HTTPException(400, f"Invalid report date range: {exc}") from exc
             lines = await _effective_transaction_lines(session, uid)
             balance = sum(float(line["amount"] or 0) for line in lines)
             month_lines = [
-                line for line in lines if line["date"] and line["date"] >= month_start
+                line for line in lines if line["date"] and line["date"] >= period_start
+                and (period_end is None or line["date"] < period_end)
             ]
             income = sum(line["amount"] for line in month_lines if line["amount"] > 0)
             spend = sum(-line["amount"] for line in month_lines if line["amount"] < 0)
@@ -4070,7 +4065,8 @@ Output ONLY valid JSON, no markdown, no explanation:
                     for k, v in sorted(sources.items(), key=lambda x: -x[1])
                 ],
             }
-            _query_cache.set(f"dash:{uid}", payload)
+            if not custom_range:
+                _query_cache.set(f"dash:{uid}", payload)
             return payload
 
     # ── Budgets ──────────────────────────────────────────────────────

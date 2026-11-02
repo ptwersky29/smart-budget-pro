@@ -5,7 +5,7 @@ import json
 import math
 import uuid
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 from fastapi import APIRouter, Request, Depends, UploadFile, File, HTTPException, Form
 from pydantic import BaseModel
@@ -630,6 +630,7 @@ def build_router() -> APIRouter:
     async def save_all(statement_id: str, request: Request,
                        account_id: str = Form(None),
                        transactions_json: str = Form(None),
+                       allow_duplicates: bool = Form(False),
                        user: dict = Depends(get_current_user)):
         sm = request.app.state.db
         async with sm() as session:
@@ -672,6 +673,44 @@ def build_router() -> APIRouter:
             owned_ids = set(owned.scalars().all())
             if account_ids != owned_ids:
                 raise HTTPException(400, "A statement account was not found or does not belong to you")
+            # Keep repeated statement imports from silently duplicating existing
+            # bank-synced or previously imported transactions. Exact matches may
+            # legitimately occur; permit a separately acknowledged override.
+            def fingerprint(account, date_value, amount, description):
+                parsed_date = datetime.fromisoformat(str(date_value).replace("Z", "+00:00"))
+                return (account, parsed_date.date().isoformat(),
+                        round(float(amount), 2), " ".join(str(description or "").casefold().split()))
+
+            try:
+                incoming_keys = [fingerprint(
+                    row.get("account_id") or target_account,
+                    row.get("date") or datetime.now(timezone.utc).isoformat(),
+                    row["amount"], row.get("description"),
+                ) for row in txs_data]
+            except (ValueError, TypeError, KeyError) as exc:
+                raise HTTPException(400, "Invalid statement transaction date or amount") from exc
+            duplicate_rows = []
+            if incoming_keys:
+                earliest = min(key[1] for key in incoming_keys)
+                latest = max(key[1] for key in incoming_keys)
+                result = await session.execute(select(Transaction).where(
+                    Transaction.user_id == user["user_id"],
+                    Transaction.account_id.in_(account_ids),
+                    Transaction.date >= datetime.fromisoformat(earliest),
+                    Transaction.date < datetime.fromisoformat(latest) + timedelta(days=1),
+                ))
+                existing = {fingerprint(tx.account_id, tx.date.isoformat(),
+                                        tx.amount, tx.description)
+                            for tx in result.scalars().all()}
+                duplicate_rows = [index + 1 for index, key in enumerate(incoming_keys)
+                                  if key in existing]
+            if duplicate_rows and not allow_duplicates:
+                raise HTTPException(409, detail={
+                    "code": "duplicate_statement_transactions",
+                    "message": "Possible duplicates were found in your existing transactions. Review the statement before importing again.",
+                    "count": len(duplicate_rows),
+                    "rows": duplicate_rows[:25],
+                })
             if account_id:
                 rec.account_id = account_id
 

@@ -44,6 +44,13 @@ def build_router() -> APIRouter:
             async def _scalar(q):
                 return (await session.execute(q)).scalar() or 0
 
+            async def _run_serial(*queries):
+                # SQLAlchemy AsyncSession must never execute concurrent operations.
+                results = []
+                for query in queries:
+                    results.append(await query)
+                return results
+
             (
                 total_users,
                 active_user_ids,
@@ -64,7 +71,7 @@ def build_router() -> APIRouter:
                 sms_failed,
                 sms_tx_count,
                 top_merchants_result,
-            ) = await asyncio.gather(
+            ) = await _run_serial(
                 _scalar(select(func.count()).select_from(User)),
                 session.execute(
                     select(AuditLog.user_id).where(

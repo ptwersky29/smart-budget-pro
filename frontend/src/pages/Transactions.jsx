@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
+import { fetchAllTransactions } from "../lib/transactionsQuery";
 import { Plus, Trash2, Loader2, Pencil, Search, Sparkles, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, BarChart3, Star, Receipt, Download, MoreHorizontal, RefreshCw, CheckCircle2, PieChart as PieChartIcon, ArrowDownLeft, ArrowUpRight, CalendarDays, Tag, Wallet, StickyNote, Building2, Scissors, Link2, Link2Off, AlertTriangle, Calculator, TrendingUp, TrendingDown, LayoutGrid, List, Copy, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "../components/ui/layout";
@@ -366,19 +367,19 @@ const Transactions = React.memo(function Transactions() {
   const CHARITY_CATEGORIES = ["maaser_tzedakah", "charity", "other_charity"];
   const refreshMaaser = useCallback(async () => {
     try {
-      const charityReqs = CHARITY_CATEGORIES.map(c => api.get("/transactions", { params: { category: c, limit: 200 } }));
+      const charityReqs = CHARITY_CATEGORIES.map(c => fetchAllTransactions({ category: c }));
       const [s, sum, lg, incRes, ...tzdResArr] = await Promise.all([
         api.get("/jewish/maaser/settings"),
         api.get("/jewish/maaser/summary"),
         api.get("/jewish/maaser/ledger?include_tx=true&limit=500"),
-        api.get("/transactions", { params: { tx_type: "income", limit: 200 } }),
+        fetchAllTransactions({ tx_type: "income" }),
         ...charityReqs,
       ]);
       setMaaserCfg(s.data || { enabled: false, percent: 10 });
       setMaaserSum(sum.data || null);
       setMaaserLedger(lg.data?.entries || []);
-      setMaaserIncomeTxs((incRes.data?.transactions || []).filter(t => !t.is_transfer && !t.exclude_from_maaser));
-      const allCharityTxs = tzdResArr.flatMap(r => r.data?.transactions || []);
+      setMaaserIncomeTxs(incRes.filter(t => !t.is_transfer && !t.exclude_from_maaser));
+      const allCharityTxs = tzdResArr.flatMap(rows => rows);
       setMaaserTzedakahTxs(allCharityTxs);
     } catch {}
   }, []);
@@ -389,19 +390,19 @@ const Transactions = React.memo(function Transactions() {
     setMaaserIncomeTxsLoading(true);
     setMaaserTzedakahTxsLoading(true);
     try {
-      const charityReqs = CHARITY_CATEGORIES.map(c => api.get("/transactions", { params: { category: c, limit: 200 } }));
+      const charityReqs = CHARITY_CATEGORIES.map(c => fetchAllTransactions({ category: c }));
       const [s, sum, lg, incRes, ...tzdResArr] = await Promise.all([
         api.get("/jewish/maaser/settings"),
         api.get("/jewish/maaser/summary"),
         api.get("/jewish/maaser/ledger?include_tx=true&limit=500"),
-        api.get("/transactions", { params: { tx_type: "income", limit: 200 } }),
+        fetchAllTransactions({ tx_type: "income" }),
         ...charityReqs,
       ]);
       setMaaserCfg(s.data || { enabled: false, percent: 10 });
       setMaaserSum(sum.data || null);
       setMaaserLedger(lg.data?.entries || []);
-      setMaaserIncomeTxs((incRes.data?.transactions || []).filter(t => !t.is_transfer && !t.exclude_from_maaser));
-      const allCharityTxs = tzdResArr.flatMap(r => r.data?.transactions || []);
+      setMaaserIncomeTxs(incRes.filter(t => !t.is_transfer && !t.exclude_from_maaser));
+      const allCharityTxs = tzdResArr.flatMap(rows => rows);
       setMaaserTzedakahTxs(allCharityTxs);
     } catch {}
     finally {
@@ -683,15 +684,15 @@ const Transactions = React.memo(function Transactions() {
     const previous = addMonth(month, -1);
     const [previousYear, previousMonthNumber] = previous.split("-").map(Number);
     const previousLastDay = new Date(previousYear, previousMonthNumber, 0).getDate();
-    const params = { limit: 1000, sort: "date", order: "desc" };
+    const params = { sort: "date", order: "desc" };
     Promise.all([
-      api.get("/transactions", { params: { ...params, date_from: from, date_to: to } }),
-      api.get("/transactions", { params: { ...params, date_from: `${previous}-01`, date_to: `${previous}-${String(previousLastDay).padStart(2, "0")}` } }),
+      fetchAllTransactions({ ...params, date_from: from, date_to: to }),
+      fetchAllTransactions({ ...params, date_from: `${previous}-01`, date_to: `${previous}-${String(previousLastDay).padStart(2, "0")}` }),
     ])
-      .then(([currentResponse, previousResponse]) => {
+      .then(([currentRows, previousRows]) => {
         if (cancelled) return;
-        setMonthRows(currentResponse.data?.transactions || []);
-        setPreviousMonthRows(previousResponse.data?.transactions || []);
+        setMonthRows(currentRows);
+        setPreviousMonthRows(previousRows);
       })
       .catch(() => {
         if (cancelled) return;
@@ -745,8 +746,8 @@ const Transactions = React.memo(function Transactions() {
     if (filters.category) chips.push({ key: "category", label: filters.category });
     if (filters.merchant) chips.push({ key: "merchant", label: filters.merchant });
     if (filters.account_id) chips.push({ key: "account_id", label: accounts.find((account) => account.account_id === filters.account_id)?.name || "Account" });
-    if (filters.amount_min) chips.push({ key: "amount_min", label: `â‰¥ ${formatCurrency(filters.amount_min)}` });
-    if (filters.amount_max) chips.push({ key: "amount_max", label: `â‰¤ ${formatCurrency(filters.amount_max)}` });
+    if (filters.amount_min) chips.push({ key: "amount_min", label: `≥ ${formatCurrency(filters.amount_min)}` });
+    if (filters.amount_max) chips.push({ key: "amount_max", label: `≤ ${formatCurrency(filters.amount_max)}` });
     if (filters.date_from) chips.push({ key: "date_from", label: `From ${filters.date_from}` });
     if (filters.date_to) chips.push({ key: "date_to", label: `To ${filters.date_to}` });
     return chips;
@@ -1073,28 +1074,27 @@ const Transactions = React.memo(function Transactions() {
   }, [selectedIds, load, showConfirm]);
 
   const duplicateSelected = useCallback(async () => {
-    const rows = (aiResults?.transactions || txs).filter((transaction) => selectedIds.has(transaction.transaction_id));
-    if (rows.length === 0) return;
-    try {
-      await Promise.all(rows.map((transaction) => api.post("/transactions", {
-        amount: transaction.amount,
-        currency: transaction.currency || "GBP",
-        description: transaction.description || transaction.merchant || "Transaction",
-        merchant: transaction.merchant || undefined,
-        category: transaction.category || undefined,
-        date: today(),
-        account_id: transaction.account_id,
-        is_income: Number(transaction.amount) > 0,
-        is_transfer: Boolean(transaction.is_transfer),
-        notes: transaction.notes || undefined,
-        source: "manual",
-      })));
-      toast.success(`Duplicated ${rows.length} transaction${rows.length > 1 ? "s" : ""}`);
-      setSelectedIds(new Set());
-      await load();
-    } catch (error) {
-      toast.error(formatApiError(error?.response?.data?.detail) || "Could not duplicate transactions");
-    }
+    const rows = (aiResults?.transactions || txs).filter(tx => selectedIds.has(tx.transaction_id));
+    if (!rows.length) return;
+    const results = await Promise.allSettled(rows.map(transaction => api.post("/transactions", {
+      amount: transaction.amount,
+      currency: transaction.currency || "GBP",
+      description: transaction.description || transaction.merchant || "Transaction",
+      merchant: transaction.merchant || undefined,
+      category: transaction.category || undefined,
+      date: today(),
+      account_id: transaction.account_id,
+      is_income: Number(transaction.amount) > 0,
+      is_transfer: Boolean(transaction.is_transfer),
+      notes: transaction.notes || undefined,
+      source: "manual",
+    })));
+    const failedIds = rows.filter((_, index) => results[index].status === "rejected").map(tx => tx.transaction_id);
+    const succeeded = rows.length - failedIds.length;
+    setSelectedIds(new Set(failedIds));
+    if (succeeded) toast.success(`Duplicated ${succeeded} transaction${succeeded !== 1 ? "s" : ""}`);
+    if (failedIds.length) toast.error(`${failedIds.length} could not be duplicated; only failed rows remain selected for retry.`);
+    await load();
   }, [aiResults, load, selectedIds, txs]);
 
   const clearAllMatching = useCallback(async () => {

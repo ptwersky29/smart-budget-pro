@@ -15,6 +15,8 @@ export const api = axios.create({
 });
 
 let _csrfToken = null;
+// One refresh request for all simultaneous 401 responses. Refresh tokens rotate.
+let refreshPromise = null;
 
 async function _ensureCsrf() {
   if (_csrfToken) return _csrfToken;
@@ -56,7 +58,6 @@ api.interceptors.response.use(
       error?.response?.status === 401 &&
       !originalRequest._retry &&
       !requestUrl.includes("/auth/refresh") &&
-      !requestUrl.includes("/auth/me") &&
       !requestUrl.includes("/auth/login") &&
       !requestUrl.includes("/auth/register") &&
       !requestUrl.includes("/auth/forgot-password") &&
@@ -66,30 +67,35 @@ api.interceptors.response.use(
       !requestUrl.includes("/gdpr/")
     ) {
       originalRequest._retry = true;
+      const hadCredentials = Boolean(getToken("access_token") || getToken("refresh_token"));
       try {
-        const storedRt = getToken("refresh_token");
-        const csrf = await _ensureCsrf();
-        const refreshHeaders = {
-          ...(storedRt ? { Authorization: `Bearer ${storedRt}` } : {}),
-          ...(csrf ? { "X-CSRF-Token": csrf } : {}),
-        };
-        const refreshResponse = await axios.post(`${API}/auth/refresh`, {}, {
-          withCredentials: true,
-          headers: refreshHeaders,
-        });
-        if (refreshResponse?.data?.access_token) {
-          setToken("access_token", refreshResponse.data.access_token, true);
+        if (!refreshPromise) {
+          refreshPromise = (async () => {
+            const storedRt = getToken("refresh_token");
+            const csrf = await _ensureCsrf();
+            const refreshHeaders = {
+              ...(storedRt ? { Authorization: `Bearer ${storedRt}` } : {}),
+              ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+            };
+            const response = await axios.post(`${API}/auth/refresh`, {}, {
+              withCredentials: true, headers: refreshHeaders,
+            });
+            if (response?.data?.access_token) {
+              setToken("access_token", response.data.access_token, true);
+            }
+            if (response?.data?.refresh_token) {
+              setToken("refresh_token", response.data.refresh_token, true);
+            }
+            return response;
+          })().finally(() => { refreshPromise = null; });
         }
-        if (refreshResponse?.data?.refresh_token) {
-          setToken("refresh_token", refreshResponse.data.refresh_token, true);
-        }
+        await refreshPromise;
         return api(originalRequest);
       } catch (refreshError) {
-        const status = refreshError?.response?.status;
-        console.warn("[auth] refresh failed", status, refreshError?.response?.data);
+        console.warn("[auth] session refresh failed", refreshError?.response?.status);
         clearTokens();
-        // Redirect to login so the user isn't stuck in a zombie authenticated state
-        if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+        if (hadCredentials && typeof window !== "undefined" &&
+            !window.location.pathname.startsWith("/login")) {
           window.location.assign("/login?expired=1");
         }
       }

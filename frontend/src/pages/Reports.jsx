@@ -57,7 +57,7 @@ export default function Reports() {
       try {
         setLoadError(false);
         const [overview, spend] = await Promise.all([
-          api.get("/dashboard/overview"),
+          api.get("/dashboard/overview", { params: { date_from: dateFrom, date_to: dateTo } }),
           api.get("/analytics/spending-by-category", {
             params: { date_from: dateFrom, date_to: dateTo },
           }),
