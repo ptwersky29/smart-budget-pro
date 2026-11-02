@@ -5,7 +5,7 @@ import base64
 import hashlib
 import secrets
 import logging
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
@@ -23,31 +23,51 @@ def _require_jwt_secret() -> str:
     return val
 
 
-def _get_encryption_key() -> bytes:
-    secret = _require_jwt_secret()
-    raw = secret.encode() if isinstance(secret, str) else secret
+def _derive_encryption_key(secret: str) -> bytes:
+    """Preserve the legacy KDF for previously encrypted values."""
+    raw = secret.encode()
     salt = hashlib.sha256(os.environ.get("FRONTEND_URL", "financeai").encode()).digest()[:16]
     kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=600000)
     return base64.urlsafe_b64encode(kdf.derive(raw))
 
 
-_fernet = Fernet(_get_encryption_key())
+def _encryption_keyring() -> list[Fernet]:
+    """Use a stable, independent data key. Legacy JWT ciphertext remains readable.
+
+    ENCRYPTION_KEY must be kept when JWT_SECRET rotates.
+    ENCRYPTION_PREVIOUS_KEYS is a comma-separated history of earlier data keys;
+    do not remove those keys until ciphertext has been explicitly migrated.
+    """
+    current = os.environ.get("ENCRYPTION_KEY") or _require_jwt_secret()
+    previous = [
+        value.strip() for value in os.environ.get("ENCRYPTION_PREVIOUS_KEYS", "").split(",")
+        if value.strip()
+    ]
+    legacy = _require_jwt_secret()
+    secrets_to_try = list(dict.fromkeys([current, *previous, legacy]))
+    if any(len(value) < 32 for value in secrets_to_try):
+        raise RuntimeError("Data encryption keys must contain at least 32 characters")
+    return [Fernet(_derive_encryption_key(secret)) for secret in secrets_to_try]
 
 
 def encrypt_value(plaintext: str) -> str:
     if not plaintext:
         return ""
-    return _fernet.encrypt(plaintext.encode()).decode()
+    return _encryption_keyring()[0].encrypt(plaintext.encode()).decode()
 
 
 def decrypt_value(ciphertext: str) -> str:
     if not ciphertext:
         return ""
-    try:
-        return _fernet.decrypt(ciphertext.encode()).decode()
-    except Exception as e:
-        logger.error("Decryption failed: %s", e)
-        return ""
+    for fernet in _encryption_keyring():
+        try:
+            return fernet.decrypt(ciphertext.encode()).decode()
+        except InvalidToken:
+            continue
+    # An empty string looks like a legitimate missing credential and can cause
+    # further destructive changes. Surface the failure without logging secrets.
+    logger.error("Could not decrypt stored data: no configured data key matches")
+    raise ValueError("Stored encrypted data cannot be decrypted; check encryption key rotation settings")
 
 
 def hash_email(email: str) -> str:
