@@ -152,9 +152,13 @@ export default function Dashboard() {
         setLoadError(message);
         if (silent) toast.error(message || "Could not refresh dashboard");
       }
-      if (bd.status === "fulfilled") setBudgets(bd.value.data.budgets || []);
-      if (al.status === "fulfilled") setAlerts(al.value.data.alerts || al.value.data || []);
-      if (up.status === "fulfilled") setUpcoming(up.value.data.upcoming || up.value.data || []);
+      setBudgets(bd.status === "fulfilled" ? (bd.value.data.budgets || []) : []);
+      setAlerts(al.status === "fulfilled" ? (al.value.data.alerts || al.value.data || []) : []);
+      setUpcoming(up.status === "fulfilled" ? (up.value.data.upcoming || up.value.data || []) : []);
+      const failed = [["Budgets", bd], ["Alerts", al], ["Upcoming expenses", up]]
+        .filter(([, result]) => result.status !== "fulfilled")
+        .map(([name]) => name);
+      if (failed.length) toast.error(`Could not load ${failed.join(", ")}. Their cards have been cleared; retry refresh.`);
     } finally {
       setLoading(false);
       setRefreshing(false);
