@@ -199,6 +199,11 @@ export default function AccountDetailPage() {
   }, [account?.account_id, accountId, filters, offset]);
 
   useEffect(() => { loadAccount(); loadHistory(); loadTlConn(); }, [loadAccount, loadHistory, loadTlConn]);
+  useEffect(() => {
+    const refresh = () => { loadAccount(); loadTransactions(); loadHistory(); };
+    window.addEventListener("penni:data-changed", refresh);
+    return () => window.removeEventListener("penni:data-changed", refresh);
+  }, [loadAccount, loadTransactions, loadHistory]);
   useEffect(() => { if (account) loadTransactions(); }, [account?.account_id, loadTransactions]);
 
   // Load the next batch into the same list as the user approaches its bottom.
