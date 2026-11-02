@@ -58,8 +58,8 @@ def _get_zman_times(
         try:
             t = time_at_elevation(observer, angle, dt, tzinfo=tz, direction=direction)
             times[key] = t.strftime("%H:%M")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Optional operation failed at backend/hebcal.py:61 (%s)", type(exc).__name__)
 
     # Derived times using sha'ot zmaniyot
     times["sunrise"] = sunrise.strftime("%H:%M")
