@@ -216,8 +216,8 @@ async def _learn_category_rule(session, user_id: str, tx, category: str) -> None
                     last_used_at=datetime.now(timezone.utc),
                 )
             )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Optional operation failed at backend/finance_engine.py:219 (%s)", type(exc).__name__)
 
 
 async def _lookup_category_rule(session, user_id: str, tx) -> str | None:
@@ -926,8 +926,8 @@ async def _suggest_categories_for_tx(
                         "merchant": merchant_key,
                     }
                 )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Optional operation failed at backend/finance_engine.py:929 (%s)", type(exc).__name__)
 
     fast = smart_categorize(f"{desc} {merchant or ''}")
     if fast and fast != "uncategorized" and fast in active:
@@ -1871,8 +1871,8 @@ Output ONLY valid JSON, no markdown, no explanation:
                         cost,
                         endpoint="ai_search",
                     )
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Optional operation failed at backend/finance_engine.py:1874 (%s)", type(exc).__name__)
                 try:
                     parsed = (
                         parse_json(filter_resp)
@@ -1882,8 +1882,8 @@ Output ONLY valid JSON, no markdown, no explanation:
                     if isinstance(parsed, dict):
                         filters = parsed
                         llm_used = True
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Optional operation failed at backend/finance_engine.py:1885 (%s)", type(exc).__name__)
             except Exception as e:
                 logger.warning(f"AI search LLM failed, using regex fallback: {e}")
 
@@ -1908,8 +1908,8 @@ Output ONLY valid JSON, no markdown, no explanation:
             if df and df != "null":
                 try:
                     stmt = stmt.where(Transaction.date >= datetime.fromisoformat(df))
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Optional operation failed at backend/finance_engine.py:1911 (%s)", type(exc).__name__)
             dto = filters.get("date_to")
             if dto and dto != "null":
                 try:
@@ -1917,8 +1917,8 @@ Output ONLY valid JSON, no markdown, no explanation:
                         Transaction.date
                         <= datetime.fromisoformat(dto) + timedelta(days=1)
                     )
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Optional operation failed at backend/finance_engine.py:1920 (%s)", type(exc).__name__)
             amin = filters.get("amount_min")
             if amin is not None and amin != "null":
                 try:
@@ -1928,14 +1928,14 @@ Output ONLY valid JSON, no markdown, no explanation:
                         stmt = stmt.where(func.abs(Transaction.amount) <= v)
                     else:
                         stmt = stmt.where(func.abs(Transaction.amount) >= v)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Optional operation failed at backend/finance_engine.py:1931 (%s)", type(exc).__name__)
             amax = filters.get("amount_max")
             if amax is not None and amax != "null":
                 try:
                     stmt = stmt.where(func.abs(Transaction.amount) <= abs(float(amax)))
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Optional operation failed at backend/finance_engine.py:1937 (%s)", type(exc).__name__)
             keywords = filters.get("merchant_keywords") or []
             if isinstance(keywords, list) and keywords:
                 from sqlalchemy import or_ as _or
@@ -2063,8 +2063,8 @@ Output ONLY valid JSON, no markdown, no explanation:
                         Transaction.date >= prev_from,
                         Transaction.date <= prev_to + timedelta(days=1),
                     )
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Optional operation failed at backend/finance_engine.py:2066 (%s)", type(exc).__name__)
                 prev_result = await session.execute(prev_stmt)
                 prev_txs = [_tx_to_dict(t) for t in prev_result.scalars().all()]
                 prev_income = sum(t["amount"] for t in prev_txs if t["amount"] > 0)
