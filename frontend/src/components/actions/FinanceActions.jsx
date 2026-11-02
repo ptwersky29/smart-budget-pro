@@ -24,6 +24,8 @@ export function BudgetActionForm({ budget, category, month, categories, onSaved 
     setCategoryName(budget?.category || category || "");
     setAmount(budget?.limit == null ? "" : String(budget.limit));
     setType(budget?.budget_type === "event" ? "event" : "everyday");
+    setEventName(budget?.event_group_name || "");
+    setEventDate(budget?.event_date?.slice(0, 10) || "");
   }, [budget, category]);
   const submit = async e => {
     e.preventDefault();
@@ -32,7 +34,7 @@ export function BudgetActionForm({ budget, category, month, categories, onSaved 
     setSaving(true);
     try {
       if (budget?.budget_id) {
-        await api.patch(`/budgets/${budget.budget_id}`, { category: categoryName.toLowerCase().trim(), limit: Number(amount), ...(type==="event" ? {event_date: eventDate || null} : {}) });
+        await api.patch(`/budgets/${budget.budget_id}`, { category: categoryName.toLowerCase().trim(), limit: Number(amount), ...(type==="event" ? {event_date: eventDate || null, event_group_id: budget.event_group_id || undefined, event_group_name: eventName || budget.event_group_name || undefined} : {}) });
       } else {
         await api.post("/budgets", {
           category: categoryName.toLowerCase().trim(), limit: Number(amount), period: "monthly", budget_type: type,
@@ -49,7 +51,7 @@ export function BudgetActionForm({ budget, category, month, categories, onSaved 
       <button type="button" onClick={()=>setType("everyday")} className={`flex-1 rounded-lg p-2 ${type==="everyday"?"bg-card text-foreground shadow-sm":"text-muted-foreground"}`}>Monthly</button>
       <button type="button" onClick={()=>setType("event")} className={`flex-1 rounded-lg p-2 ${type==="event"?"bg-card text-foreground shadow-sm":"text-muted-foreground"}`}>Event</button>
     </div>}
-    {type==="event" && !budget && <div><label className="mb-1.5 block text-xs font-medium">Event name</label><input required value={eventName} onChange={e=>setEventName(e.target.value)} placeholder="e.g. Pesach" className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"/></div>}
+    {type==="event" && <div><label className="mb-1.5 block text-xs font-medium">Event name</label><input required value={eventName} onChange={e=>setEventName(e.target.value)} placeholder="e.g. Pesach" className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"/></div>}
     {type==="event" && <div><label className="mb-1.5 block text-xs font-medium">Event date</label><input type="date" value={eventDate} onChange={e=>setEventDate(e.target.value)} className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"/></div>}
     <div><label className="mb-1.5 block text-xs font-medium">Category</label>
       <CategoryCombobox value={categoryName} onChange={setCategoryName} categories={categories} placeholder="Choose a category"/>
