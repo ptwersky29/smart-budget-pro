@@ -146,7 +146,7 @@ export default function GlobalActionHost() {
           <Button variant="outlinePill" className="w-full" onClick={() => openAction("account-new")}>Add account</Button>
         </div>}
         {type==="account-info" && <AccountActionPreview accountId={payload.accountId||payload.account?.account_id}
-          account={payload.account} onAddTransaction={accountId=>openAction("transaction-new",{accountId})}/>}
+          account={payload.account} onAddTransaction={accountId=>openAction("transaction-new",{accountId})} onClose={closeAction}/>}
         {type==="statement-import" && <StatementAction initialDraft={payload.draft} initialAccountId={payload.accountId}
           accounts={accounts} onSaved={()=>afterSave("transactions")}/>}
         {type==="categories" && <Suspense fallback={<p className="p-4 text-xs text-muted-foreground">Loading categories…</p>}><CategoryManager /></Suspense>}
