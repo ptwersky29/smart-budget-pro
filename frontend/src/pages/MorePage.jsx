@@ -21,14 +21,16 @@ import {
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useAssistant } from "../contexts/AssistantContext";
+import { useActions } from "../contexts/ActionContext";
 import { PageHeader, Surface, SurfaceHeader } from "../components/ui/page";
 import { Button } from "../components/ui/button";
 import { APP_NAME } from "../data/constants";
 
-function SettingRow({ to, icon: Icon, title, description, badge }) {
+function SettingRow({ to, icon: Icon, title, description, badge, onSelect }) {
   return (
     <Link
       to={to}
+      onClick={onSelect ? event => { event.preventDefault(); onSelect(); } : undefined}
       className="group flex items-center gap-3 border-b border-border/50 px-4 py-3 last:border-0 transition hover:bg-secondary/35 sm:px-5"
     >
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-secondary/70 text-muted-foreground transition group-hover:bg-emerald/10 group-hover:text-emerald">
@@ -62,6 +64,7 @@ function Section({ title, children }) {
 export default function MorePage() {
   const { user } = useAuth();
   const { openAssistant } = useAssistant();
+  const { openAction } = useActions();
   const initials = (user?.name?.[0] || user?.email?.[0] || "P").toUpperCase();
   const plan = user?.tier || "free";
 
@@ -107,9 +110,9 @@ export default function MorePage() {
           </Surface>
 
           <Section title="Money & planning">
-            <SettingRow to="/reports" icon={BarChart3} title="Reports" description="Understand cash flow, categories and trends" />
+            <SettingRow to="/reports" onSelect={() => openAction("reports")} icon={BarChart3} title="Reports" description="Understand cash flow, categories and trends" />
             <SettingRow to="/subscriptions" icon={RefreshCcw} title="Subscriptions" description="Recurring payments and renewals" />
-            <SettingRow to="/statements" icon={FileText} title="Statements" description="Upload and reconcile bank statements" />
+            <SettingRow to="/statements" onSelect={() => openAction("statement-import")} icon={FileText} title="Statements" description="Upload and reconcile bank statements" />
             <SettingRow to="/investments" icon={TrendingUp} title="Investments" description="Projections and long-term planning" />
           </Section>
 
@@ -122,12 +125,12 @@ export default function MorePage() {
             <SettingRow to="/connections" icon={Link2} title="Bank connections" description="Manage Open Banking links and sync" />
             <SettingRow to="/integrations" icon={Sparkles} title="Integrations" description="AI providers, messaging and more" />
             <SettingRow to="/sms" icon={MessageSquare} title="SMS import" description="Turn bank texts into transactions" />
-            <SettingRow to="/accounts" icon={Upload} title="Import" description="Accounts, CSV and statement files" />
+            <SettingRow to="/accounts" onSelect={() => openAction("statement-import")} icon={Upload} title="Import" description="Accounts, CSV and statement files" />
           </Section>
 
           <Section title="Account">
             <SettingRow to="/settings" icon={Settings2} title="Settings" description="Profile, security, AI and preferences" />
-            <SettingRow to="/settings/categories" icon={Tags} title="Categories" description="Names, colours and spending labels" />
+            <SettingRow to="/settings/categories" onSelect={() => openAction("categories")} icon={Tags} title="Categories" description="Names, colours and spending labels" />
             <SettingRow to="/pricing" icon={CreditCard} title="Plan & billing" description="Compare plans and manage billing" />
             {user?.role === "admin" ? (
               <SettingRow to="/admin" icon={Shield} title="Admin panel" description="Users, feature flags and system settings" />
