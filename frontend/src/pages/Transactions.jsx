@@ -1,3 +1,4 @@
+import { WorkspaceMetrics, WorkspaceMetric, WorkspaceTabs, WorkspaceViewToggle } from "../components/ui/workspace";
 import PenniSelect from "../components/PenniSelect";
 ﻿import { createPortal } from "react-dom";
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1522,56 +1523,17 @@ const Transactions = React.memo(function Transactions() {
 
           {activeTab === "ledger" && (
             <>
-              <div className="grid gap-[16px] px-0 sm:grid-cols-3 xl:px-[14px] 2xl:grid-cols-[276px_276px_minmax(0,1fr)]">
-                <div className="surface rounded-[16px] p-3.5">
-                    <div className="grid min-h-[58px] grid-cols-[38px_minmax(0,1fr)] items-center gap-3 xl:grid-cols-[38px_minmax(0,1fr)_78px]">
-                    <span className="grid h-[38px] w-[38px] place-items-center rounded-full bg-emerald/10 text-emerald">
-                      <TrendingUp className="h-[18px] w-[18px]" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-[10.5px] text-muted-foreground">Income</p>
-                      <p className="money-tabular mt-0.5 truncate text-[23px] font-semibold leading-none tracking-[-0.03em]">{formatCurrency(monthTotals.income || incomeTotal)}</p>
-                      {incomeDelta !== null ? (
-                        <p className={`mt-1.5 text-[10px] font-medium ${incomeDelta >= 0 ? "text-emerald" : "text-ruby"}`}>
-                          {incomeDelta >= 0 ? "\u2191" : "\u2193"} {Math.abs(incomeDelta)}% vs {previousMonthName?.slice(0, 3)}
-                        </p>
-                      ) : null}
-                    </div>
-                    <div className="hidden xl:block"><Sparkline values={sparklines.income} height={38} stroke="hsl(var(--emerald))" /></div>
-                  </div>
-                </div>
-                <div className="surface rounded-[16px] p-3.5">
-                    <div className="grid min-h-[58px] grid-cols-[38px_minmax(0,1fr)] items-center gap-3 xl:grid-cols-[38px_minmax(0,1fr)_78px]">
-                    <span className="grid h-[38px] w-[38px] place-items-center rounded-full bg-ruby/10 text-ruby">
-                      <TrendingDown className="h-[18px] w-[18px]" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-[10.5px] text-muted-foreground">Expenses</p>
-                      <p className="money-tabular mt-0.5 truncate text-[23px] font-semibold leading-none tracking-[-0.03em]">{formatCurrency(monthTotals.expenses || expenseTotal)}</p>
-                      {expenseDelta !== null ? (
-                        <p className={`mt-1.5 text-[10px] font-medium ${expenseDelta > 0 ? "text-ruby" : "text-emerald"}`}>
-                          {expenseDelta > 0 ? "\u2191" : "\u2193"} {Math.abs(expenseDelta)}% vs {previousMonthName?.slice(0, 3)}
-                        </p>
-                      ) : null}
-                    </div>
-                    <div className="hidden xl:block"><Sparkline values={sparklines.expenses} height={38} stroke="hsl(var(--ruby))" /></div>
-                  </div>
-                </div>
-                <div className="surface rounded-[16px] p-3.5">
-                    <div className="grid min-h-[58px] grid-cols-[38px_minmax(0,1fr)] items-center gap-3 xl:grid-cols-[38px_minmax(0,1fr)_78px]">
-                    <span className="grid h-[38px] w-[38px] place-items-center rounded-full bg-secondary text-muted-foreground">
-                      <Calculator className="h-[18px] w-[18px]" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-[10.5px] text-muted-foreground">Net</p>
-                      <p className={`money-tabular mt-0.5 truncate text-[23px] font-semibold leading-none tracking-[-0.03em] ${monthTotals.net >= 0 ? "text-emerald" : "text-ruby"}`}>
-                        {formatCurrency(monthTotals.net || netTotal, { signed: true })}
-                      </p>
-                      <p className="mt-1.5 text-[10px] text-muted-foreground">{monthLabel}</p>
-                    </div>
-                    <div className="hidden xl:block"><Sparkline values={sparklines.net} height={38} stroke={monthTotals.net >= 0 ? "hsl(var(--emerald))" : "hsl(var(--ruby))"} /></div>
-                  </div>
-                </div>
+              <div className="xl:px-[14px]">
+                <WorkspaceMetrics columns={3}>
+                  <WorkspaceMetric label="Income" value={formatCurrency(monthTotals.income ?? incomeTotal)}
+                    icon={TrendingUp} tone="emerald"
+                    note={incomeDelta === null ? monthLabel : `${incomeDelta >= 0 ? "↑" : "↓"} ${Math.abs(incomeDelta)}% vs ${previousMonthName?.slice(0,3)}`} />
+                  <WorkspaceMetric label="Expenses" value={formatCurrency(monthTotals.expenses ?? expenseTotal)}
+                    icon={TrendingDown} tone="ruby"
+                    note={expenseDelta === null ? monthLabel : `${expenseDelta >= 0 ? "↑" : "↓"} ${Math.abs(expenseDelta)}% vs ${previousMonthName?.slice(0,3)}`} />
+                  <WorkspaceMetric label="Net" value={formatCurrency(monthTotals.net ?? netTotal, { signed: true })}
+                    icon={Calculator} tone={monthTotals.net >= 0 ? "emerald" : "ruby"} note={monthLabel} />
+                </WorkspaceMetrics>
               </div>
 
               <div className={`flex flex-wrap items-center gap-2 2xl:grid 2xl:gap-2 ${showSearch || filters.search ? "2xl:grid-cols-[190px_176px_110px_118px_86px_96px_104px_32px_76px]" : "2xl:grid-cols-[36px_176px_110px_118px_86px_96px_104px_32px_76px]"}`}>
@@ -1789,43 +1751,24 @@ const Transactions = React.memo(function Transactions() {
               ) : null}
 
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pt-[8px]">
-                <div className="no-scrollbar flex min-h-[44px] min-w-0 flex-1 items-center gap-4 overflow-x-auto overflow-y-hidden whitespace-nowrap xl:pl-[14px]">
-                  {[
+                <WorkspaceTabs
+                  label="Transaction categories"
+                  tabs={[
                     { key: "all", label: "All Transactions", count: tabCounts.all },
                     { key: "expenses", label: "Expenses", count: tabCounts.expenses },
                     { key: "income", label: "Income", count: tabCounts.income },
                     { key: "transfers", label: "Transfers", count: tabCounts.transfers },
                     { key: "unapproved", label: "Unapproved", count: tabCounts.unapproved },
-                  ].map((tab) => (
-                    <button
-                      key={tab.key}
-                      type="button"
-                      onClick={() => selectLedgerTab(tab.key)}
-                      className={`inline-flex h-10 shrink-0 items-center gap-1.5 border-b-2 text-[12px] transition ${
-                        ledgerTab === tab.key
-                          ? "border-emerald font-semibold text-foreground"
-                          : "border-transparent text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {tab.label}
-                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${ledgerTab === tab.key ? "bg-emerald/10 text-emerald" : "bg-secondary text-muted-foreground"}`}>{tab.count}</span>
-                    </button>
-                  ))}
-                </div>
+                  ]}
+                  active={ledgerTab} onChange={selectLedgerTab} className="xl:pl-[14px]"
+                />
                 <div className="flex items-center gap-2 pb-1 xl:pr-[10px]">
                   <PenniSelect value={filters.sort} onChange={(event) => setFilter("sort", event.target.value)} className="h-8 rounded-[8px] border border-border bg-card px-2 text-[11px] font-medium outline-none">
                     <option value="date">Sort: Date (newest)</option>
                     <option value="amount">Sort: Amount</option>
                     <option value="description">Sort: Description</option>
                   </PenniSelect>
-                  <div className="flex overflow-hidden rounded-[8px] border border-border bg-card">
-                    <button onClick={() => setViewMode("list")} className={`grid h-8 w-8 place-items-center transition ${viewMode === "list" ? "bg-emerald/10 text-emerald" : "text-muted-foreground hover:text-foreground"}`} aria-label="List view">
-                      <List className="h-3.5 w-3.5" />
-                    </button>
-                    <button onClick={() => setViewMode("grid")} className={`grid h-8 w-8 place-items-center border-l border-border transition ${viewMode === "grid" ? "bg-emerald/10 text-emerald" : "text-muted-foreground hover:text-foreground"}`} aria-label="Grid view">
-                      <LayoutGrid className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
+                  <WorkspaceViewToggle value={viewMode} onChange={setViewMode} label="Transaction view" />
                 </div>
               </div>
             </>
