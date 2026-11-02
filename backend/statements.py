@@ -496,6 +496,9 @@ def build_router() -> APIRouter:
             if len(text.strip()) < 20:
                 raise HTTPException(400, "Could not extract any text from the file")
 
+            if len(text) > MAX_CHARS_TO_AI:
+                raise HTTPException(422, "Statement is too long for safe extraction; split it into smaller files. No transactions were imported.")
+
             parsed = {}
             try:
                 parsed = await _ai_parse_statement(text, session, user["user_id"])
