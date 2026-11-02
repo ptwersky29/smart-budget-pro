@@ -1150,9 +1150,17 @@ def build_router() -> APIRouter:
             elif pending == "false":
                 stmt = stmt.where(Transaction.pending == False)
             if tx_type == "income":
-                stmt = stmt.where(Transaction.amount > 0)
+                stmt = stmt.where(
+                    Transaction.amount > 0,
+                    or_(Transaction.tx_type.is_(None), Transaction.tx_type != "transfer"),
+                    Transaction.transfer_pair_id.is_(None),
+                )
             elif tx_type == "expense":
-                stmt = stmt.where(Transaction.amount < 0)
+                stmt = stmt.where(
+                    Transaction.amount < 0,
+                    or_(Transaction.tx_type.is_(None), Transaction.tx_type != "transfer"),
+                    Transaction.transfer_pair_id.is_(None),
+                )
             elif tx_type == "transfer":
                 stmt = stmt.where(
                     or_(
@@ -1165,7 +1173,7 @@ def build_router() -> APIRouter:
             if date_to:
                 stmt = stmt.where(
                     Transaction.date
-                    <= datetime.fromisoformat(date_to) + timedelta(days=1)
+                    < datetime.fromisoformat(date_to) + timedelta(days=1)
                 )
             if amount_min is not None:
                 stmt = stmt.where(abs(Transaction.amount) >= amount_min)
@@ -1253,9 +1261,22 @@ def build_router() -> APIRouter:
             elif pending == "false":
                 count_stmt = count_stmt.where(Transaction.pending == False)
             if tx_type == "income":
-                count_stmt = count_stmt.where(Transaction.amount > 0)
+                count_stmt = count_stmt.where(
+                    Transaction.amount > 0,
+                    or_(Transaction.tx_type.is_(None), Transaction.tx_type != "transfer"),
+                    Transaction.transfer_pair_id.is_(None),
+                )
             elif tx_type == "expense":
-                count_stmt = count_stmt.where(Transaction.amount < 0)
+                count_stmt = count_stmt.where(
+                    Transaction.amount < 0,
+                    or_(Transaction.tx_type.is_(None), Transaction.tx_type != "transfer"),
+                    Transaction.transfer_pair_id.is_(None),
+                )
+            elif tx_type == "transfer":
+                count_stmt = count_stmt.where(or_(
+                    Transaction.tx_type == "transfer",
+                    Transaction.transfer_pair_id.isnot(None),
+                ))
             if date_from:
                 count_stmt = count_stmt.where(
                     Transaction.date >= datetime.fromisoformat(date_from)
@@ -1263,7 +1284,7 @@ def build_router() -> APIRouter:
             if date_to:
                 count_stmt = count_stmt.where(
                     Transaction.date
-                    <= datetime.fromisoformat(date_to) + timedelta(days=1)
+                    < datetime.fromisoformat(date_to) + timedelta(days=1)
                 )
             if amount_min is not None:
                 count_stmt = count_stmt.where(abs(Transaction.amount) >= amount_min)
@@ -1306,7 +1327,8 @@ def build_router() -> APIRouter:
             else:
                 agg_stmt = agg_stmt.where(Transaction.approval_status == "approved")
             agg_stmt = agg_stmt.where(
-                or_(Transaction.tx_type.is_(None), Transaction.tx_type != "transfer")
+                or_(Transaction.tx_type.is_(None), Transaction.tx_type != "transfer"),
+                Transaction.transfer_pair_id.is_(None),
             )
             if pending == "true":
                 agg_stmt = agg_stmt.where(Transaction.pending == True)
@@ -1316,6 +1338,9 @@ def build_router() -> APIRouter:
                 agg_stmt = agg_stmt.where(Transaction.amount > 0)
             elif tx_type == "expense":
                 agg_stmt = agg_stmt.where(Transaction.amount < 0)
+            elif tx_type == "transfer":
+                # Totals intentionally exclude account-to-account transfers.
+                pass
             if date_from:
                 agg_stmt = agg_stmt.where(
                     Transaction.date >= datetime.fromisoformat(date_from)
@@ -1323,7 +1348,7 @@ def build_router() -> APIRouter:
             if date_to:
                 agg_stmt = agg_stmt.where(
                     Transaction.date
-                    <= datetime.fromisoformat(date_to) + timedelta(days=1)
+                    < datetime.fromisoformat(date_to) + timedelta(days=1)
                 )
             if amount_min is not None:
                 agg_stmt = agg_stmt.where(abs(Transaction.amount) >= amount_min)
@@ -2573,6 +2598,10 @@ Output ONLY valid JSON, no markdown, no explanation:
         amount_min: Optional[float] = None
         amount_max: Optional[float] = None
         account_id: Optional[str] = None
+        merchant: Optional[str] = None
+        approval_status: Optional[str] = None
+        pending: Optional[str] = None
+        expected_count: Optional[int] = None
 
     @router.post("/transactions/bulk-delete")
     async def bulk_delete(
@@ -2653,11 +2682,9 @@ Output ONLY valid JSON, no markdown, no explanation:
     async def undo_bulk_delete(
         payload: BulkUpdateIn, request: Request, user: dict = Depends(get_current_user)
     ):
-        return {
-            "ok": True,
-            "restored": 0,
-            "info": "Full undo requires soft-delete migration",
-        }
+        # The old endpoint silently claimed success while restoring nothing.
+        # Do not pretend permanent deletion is reversible before a durable archive exists.
+        raise HTTPException(501, "Bulk deletion cannot be undone. Re-import from your backup.")
 
     @router.post("/transactions/bulk-category")
     async def bulk_category(
@@ -2700,11 +2727,32 @@ Output ONLY valid JSON, no markdown, no explanation:
             if payload.category:
                 base = base.where(Transaction.category == payload.category)
             if payload.tx_type == "income":
-                base = base.where(Transaction.amount > 0)
+                base = base.where(Transaction.amount > 0,
+                    or_(Transaction.tx_type.is_(None), Transaction.tx_type != "transfer"),
+                    Transaction.transfer_pair_id.is_(None))
             elif payload.tx_type == "expense":
-                base = base.where(Transaction.amount < 0)
+                base = base.where(Transaction.amount < 0,
+                    or_(Transaction.tx_type.is_(None), Transaction.tx_type != "transfer"),
+                    Transaction.transfer_pair_id.is_(None))
+            elif payload.tx_type == "transfer":
+                base = base.where(or_(Transaction.tx_type == "transfer", Transaction.transfer_pair_id.isnot(None)))
+            if payload.merchant:
+                base = base.where(Transaction.merchant_name.ilike(f"%{payload.merchant}%"))
+            if payload.approval_status:
+                base = base.where(Transaction.approval_status == payload.approval_status)
+            if payload.pending == "true":
+                base = base.where(Transaction.pending.is_(True))
+            elif payload.pending == "false":
+                base = base.where(Transaction.pending.is_(False))
             if payload.search:
-                base = base.where(Transaction.description.ilike(f"%{payload.search}%"))
+                term = f"%{payload.search}%"
+                base = base.where(or_(
+                    Transaction.description.ilike(term),
+                    Transaction.merchant_name.ilike(term),
+                    Transaction.normalized_merchant.ilike(term),
+                    Transaction.notes.ilike(term),
+                    Transaction.category.ilike(term),
+                ))
             if payload.amount_min is not None:
                 base = base.where(func.abs(Transaction.amount) >= abs(payload.amount_min))
             if payload.amount_max is not None:
@@ -2725,6 +2773,9 @@ Output ONLY valid JSON, no markdown, no explanation:
                 base.with_only_columns(Transaction.transaction_id)
             )
             ids = [row[0] for row in ids_result.fetchall()]
+            if payload.expected_count is not None and len(ids) != payload.expected_count:
+                raise HTTPException(409,
+                    f"Matching transactions changed ({len(ids)} found, {payload.expected_count} expected). Refresh before deleting.")
             if ids:
                 tx_result = await session.execute(
                     select(Transaction).where(
@@ -3774,7 +3825,7 @@ Output ONLY valid JSON, no markdown, no explanation:
                     Transaction.user_id == user["user_id"],
                     Transaction.date >= datetime.fromisoformat(date_from),
                     Transaction.date
-                    <= datetime.fromisoformat(date_to) + timedelta(days=1),
+                    < datetime.fromisoformat(date_to) + timedelta(days=1),
                 )
                 if category:
                     stmt = stmt.where(Transaction.category == category)
