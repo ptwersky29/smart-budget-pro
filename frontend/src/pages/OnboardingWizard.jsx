@@ -85,6 +85,31 @@ function StepImport({ onDone }) {
 
 function StepTransaction({ onDone }) {
   const [form, setForm] = useState({ description: "", amount: "", is_income: false });
+  const [accounts, setAccounts] = useState([]);
+  const [accountId, setAccountId] = useState("");
+  const [creatingAccount, setCreatingAccount] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    api.get("/accounts").then(({data}) => {
+      if (!mounted) return;
+      const found = data.accounts || [];
+      setAccounts(found);
+      setAccountId(current => current || found[0]?.account_id || "");
+    }).catch(() => toast.error("Could not load your accounts"));
+    return () => { mounted = false; };
+  }, []);
+  const createCashAccount = async () => {
+    setCreatingAccount(true);
+    try {
+      const { data } = await api.post("/accounts", { name: "Cash", type: "cash", balance: 0, currency: "GBP" });
+      const account = { account_id: data.account_id, name: "Cash" };
+      setAccounts(current => [...current, account]);
+      setAccountId(data.account_id);
+      toast.success("Cash account created");
+    } catch (error) {
+      toast.error(formatApiError(error?.response?.data?.detail) || "Could not create account");
+    } finally { setCreatingAccount(false); }
+  };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState({});
 
@@ -93,6 +118,7 @@ function StepTransaction({ onDone }) {
     if (!form.description.trim()) e.description = "Description is required";
     if (!form.amount || isNaN(parseFloat(form.amount)) || parseFloat(form.amount) <= 0)
       e.amount = "Enter a valid amount";
+    if (!accountId) e.account = "Select or create an account first";
     return e;
   };
 
@@ -107,6 +133,8 @@ function StepTransaction({ onDone }) {
         description: form.description.trim(),
         amount: form.is_income ? amt : -amt,
         category: "uncategorized",
+        account_id: accountId,
+        is_income: form.is_income,
       });
       toast.success("Transaction added");
       onDone();
@@ -119,6 +147,16 @@ function StepTransaction({ onDone }) {
 
   return (
     <form onSubmit={submit} className="space-y-4 mt-6">
+      <div>
+        <label htmlFor="onboarding-account" className="label-overline">Account *</label>
+        {accounts.length > 0 ? <select id="onboarding-account" value={accountId} onChange={e=>setAccountId(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-border bg-card px-3 text-sm">
+          <option value="">Choose an account</option>
+          {accounts.map(a=><option key={a.account_id} value={a.account_id}>{a.name}</option>)}
+        </select> : <button type="button" onClick={createCashAccount} disabled={creatingAccount} className="mt-2 rounded-xl border border-emerald/40 px-4 py-3 text-sm text-emerald">
+          {creatingAccount ? "Creating Cash account…" : "Create a Cash account"}
+        </button>}
+        {error.account && <p role="alert" className="mt-1 text-xs text-ruby">{error.account}</p>}
+      </div>
       <div>
         <label className="label-overline">Description *</label>
         <Input
