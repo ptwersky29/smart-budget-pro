@@ -84,8 +84,22 @@ export default function GlobalActionHost() {
       merchant:transactionForm.merchant||undefined,notes:transactionForm.notes||undefined,
       is_income:!!transactionForm.is_income,is_transfer:!!transactionForm.is_transfer};
     try {
-      if (type==="transaction-edit" && item?.transaction_id) await api.patch(`/transactions/${item.transaction_id}`,body);
-      else await api.post("/transactions",body);
+      if (type==="transaction-edit" && item?.transaction_id) {
+        await api.patch(`/transactions/${item.transaction_id}`, {...body, exclude_from_maaser: !!transactionForm.exclude_from_maaser});
+      } else if (classification || transactionForm.budget_type) {
+        const suggestions = classification?.suggestions || [];
+        const chosenIndex = suggestions.findIndex(s=>s.category === transactionForm.category);
+        await api.post("/budget-system/approve", {
+          description:body.description?.trim() || "Transaction", amount:body.amount,
+          budget_type:transactionForm.budget_type || suggestions[0]?.budget_type || "day_to_day",
+          occasion:transactionForm.occasion || suggestions[0]?.occasion || "Monthly Living",
+          category:body.category || suggestions[0]?.category || "uncategorized", merchant:body.merchant || suggestions[0]?.merchant || "",
+          account_id:body.account_id, suggestion_id:classification?.suggestion_id || null,
+          suggestion_index:chosenIndex>=0 ? chosenIndex : null, save_as_recurring:saveAsRecurring
+        });
+      } else {
+        await api.post("/transactions", {...body, exclude_from_maaser: !!transactionForm.exclude_from_maaser});
+      }
       toast.success(type==="transaction-edit"?"Transaction updated":"Transaction added");
       afterSave("transactions");
     } catch(e){toast.error(formatApiError(e.response?.data?.detail)||"Could not save transaction");}
@@ -138,7 +152,7 @@ export default function GlobalActionHost() {
         {type==="categories" && <Suspense fallback={<p className="p-4 text-xs text-muted-foreground">Loading categories…</p>}><CategoryManager /></Suspense>}
         {type==="reports" && <ReportsActionPreview />}
         {type==="alerts" && <NotificationSettings />}
-        {type==="transaction-search" && <SearchTransactionsAction onInspect={transaction=>openAction("transaction-info",{transaction})}/>}
+        {type==="transaction-search" && <SearchTransactionsAction month={payload.month} onInspect={transaction=>openAction("transaction-info",{transaction})}/>}
         {type==="bank-connect" && <div className="space-y-4">
           <div className="rounded-xl border border-border bg-secondary/30 p-4"><Building2 className="h-6 w-6 text-emerald"/><p className="mt-3 text-sm font-semibold">Secure Open Banking connection</p>
             <p className="mt-1 text-xs text-muted-foreground">You will be taken to your bank's secure authorization screen, then returned to Penni.</p></div>
