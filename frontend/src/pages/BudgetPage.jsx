@@ -470,6 +470,7 @@ export default React.memo(function BudgetPage() {
   const [categoryHierarchy, setCategoryHierarchy] = useState({});
   const [categorySpend, setCategorySpend] = useState([]);
   const [recentTransactions, setRecentTransactions] = useState([]);
+  const [monthlyTrend, setMonthlyTrend] = useState([]);
   const [budgetView, setBudgetView] = useState("all");
   const [displayMode, setDisplayMode] = useState("list");
 
@@ -698,6 +699,19 @@ export default React.memo(function BudgetPage() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    let active = true;
+    // Build a real six-month history; categories in one month are not a time series.
+    const months = Array.from({ length: 6 }, (_, index) => addMonth(month, index - 5));
+    Promise.all(months.map(async key => {
+      try {
+        const { data } = await api.get("/budgets", { params: { month: key } });
+        const rows = (data.budgets || []).filter(b => (b.budget_type || "everyday") !== "event");
+        return { month: key, label: MONTH_NAMES[Number(key.slice(5))-1].slice(0,3), budgeted: rows.reduce((n,b)=>n+(Number(b.limit)||0),0), spent: rows.reduce((n,b)=>n+(Number(b.spent)||0),0) };
+      } catch { return null; }
+    })).then(rows => { if (active) setMonthlyTrend(rows.filter(Boolean)); });
+    return () => { active = false; };
+  }, [month]);
   useEffect(() => { fetchCategories(); }, []);
   useEffect(() => { fetchInsights(); }, []);
 
@@ -922,13 +936,30 @@ export default React.memo(function BudgetPage() {
         setDisplayMode={setDisplayMode}
         categorySpend={categorySpend}
         recentTransactions={recentTransactions}
-        onAdd={() => openAddBudget("everyday")}
+        onAdd={(category = "") => openAddBudget("everyday", category)}
         onRefresh={fetchData}
         onCopyPrevious={handleCopyPreviousMonth}
         onViewAll={() => navigate(`/transactions?date_from=${month}-01&date_to=${month}-${String(daysInMonth).padStart(2, "0")}`)}
         onManageCategories={() => navigate("/settings/categories")}
         onViewReports={() => navigate("/reports")}
         onAlerts={() => navigate("/settings")}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        sortOption={sortOption}
+        setSortOption={setSortOption}
+        sortOrder={sortOrder}
+        setSortOrder={setSortOrder}
+        loading={loading}
+        loadError={loadError}
+        onRetry={fetchData}
+        onSeedDefaults={handleSeedDefaults}
+        unbudgetedCategories={unbudgetedCategories}
+        eventGroups={eventGroups}
+        onDeleteEvent={setConfirmDelete}
+        monthlyTrend={monthlyTrend}
+        insights={insights}
+        onApplyInsight={handleApplyInsight}
+        applyingInsight={applyingInsight}
         openBudgetTransactions={openBudgetTransactions}
         startEdit={startEdit}
       />
