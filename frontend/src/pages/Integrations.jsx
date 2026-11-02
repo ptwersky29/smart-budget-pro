@@ -134,7 +134,7 @@ export default function Integrations({ embedded }) {
                   <p className="text-xs text-muted-foreground truncate">{p.provider} · {p.model}</p>
                 </div>
                 {p.is_default && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald/10 text-emerald">Default</span>}
-                <button onClick={()=>removeAi(p.provider_id)} data-testid={`ai-remove-${p.provider_id}`} className="p-2 text-muted-foreground hover:text-ruby"><Trash2 className="h-4 w-4"/></button>
+                <button onClick={()=>removeAi(p.provider_id)} aria-label={`Remove ${p.name || p.provider} provider`} data-testid={`ai-remove-${p.provider_id}`} className="p-2 text-muted-foreground hover:text-ruby"><Trash2 className="h-4 w-4"/></button>
               </div>
             ))}
           </div>
@@ -203,7 +203,7 @@ export default function Integrations({ embedded }) {
             <label className="label-overline">Webhook URL</label>
             <div className="flex gap-2">
               <input readOnly value={tw?.webhook_url || ""} className="flex-1 h-11 px-4 rounded-xl bg-secondary/30 text-xs font-mono" />
-              <button type="button" onClick={()=>copy(tw?.webhook_url)} data-testid="tw-copy-webhook" className="h-11 w-11 rounded-xl border border-border hover:bg-secondary grid place-items-center"><Copy className="h-4 w-4"/></button>
+              <button type="button" onClick={()=>copy(tw?.webhook_url)} aria-label="Copy Twilio webhook URL" data-testid="tw-copy-webhook" className="h-11 w-11 rounded-xl border border-border hover:bg-secondary grid place-items-center"><Copy className="h-4 w-4"/></button>
             </div>
             <p className="text-xs text-muted-foreground">Twilio Console → your number → A MESSAGE COMES IN → HTTP POST.</p>
           </div>
