@@ -1,3 +1,4 @@
+import PenniSelect from "../components/PenniSelect";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
@@ -153,7 +154,7 @@ export default function Statements() {
             </div>
             <div className="flex items-center gap-3">
               <div className="relative">
-                <select
+                <PenniSelect
                   value={selectedAccountId}
                   onChange={(e) => setSelectedAccountId(e.target.value)}
                   className="appearance-none bg-secondary/60 border border-border rounded-xl px-3 py-2 pr-8 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-emerald/40 cursor-pointer"
@@ -163,7 +164,7 @@ export default function Statements() {
                   {accounts.map((a) => (
                     <option key={a.account_id} value={a.account_id}>{getDisplayName(a)}</option>
                   ))}
-                </select>
+                </PenniSelect>
                 <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               </div>
               <Button onClick={saveAll} disabled={saving || !selectedAccountId} data-testid="save-all-button" variant="primary" size="pill">
