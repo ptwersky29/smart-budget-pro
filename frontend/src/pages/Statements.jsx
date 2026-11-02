@@ -1,6 +1,6 @@
 import PenniSelect from "../components/PenniSelect";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
 import { Upload, FileText, Loader2, Sparkles, CheckCircle2, Trash2, ArrowDownRight, ArrowUpRight, Save, ChevronDown, Building2, Pencil, X, Check } from "lucide-react";
@@ -19,7 +19,6 @@ function getDisplayName(a) {
 }
 
 export default function Statements() {
-  const navigate = useNavigate();
   const location = useLocation();
   useEffect(() => { document.title = "Statements | Penni"; }, []);
   const fileRef = useRef(null);
