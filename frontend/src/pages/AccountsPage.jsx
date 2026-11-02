@@ -260,6 +260,11 @@ export default function AccountsPage() {
     loadAccounts();
     loadConns();
   }, [loadAccounts, loadConns]);
+  useEffect(() => {
+    const refresh = () => { loadAccounts(); loadConns(); };
+    window.addEventListener("penni:data-changed", refresh);
+    return () => window.removeEventListener("penni:data-changed", refresh);
+  }, [loadAccounts, loadConns]);
 
   const doSync = useCallback(async () => {
     setSyncing(true);
