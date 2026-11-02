@@ -121,3 +121,69 @@ export function SearchTransactionsAction({ onInspect, month }) {
     </div>
   </div>;
 }
+
+export function SplitTransactionAction({ transaction, categories, onSaved }) {
+  const amount = Math.abs(Number(transaction?.amount)||0);
+  const [lines, setLines] = useState(() => [
+    { category: transaction?.category||"", amount: amount ? String((Math.round(amount*50)/100).toFixed(2)) : "", description:"" },
+    { category:"", amount: amount ? String((amount-Math.round(amount*50)/100).toFixed(2)) : "", description:"" },
+  ]);
+  const [busy,setBusy] = useState(false);
+  const setLine = (i,key,value) => setLines(prev=>prev.map((line,index)=>index===i?{...line,[key]:value}:line));
+  const total = lines.reduce((sum,line)=>sum+Math.abs(Number(line.amount)||0),0);
+  const save = async () => {
+    const splits=lines.map(line=>({category:line.category,amount:Math.abs(Number(line.amount)||0),description:line.description||transaction?.description||""}));
+    if(splits.length < 2 || splits.some(line=>!line.category || line.amount<=0)){toast.error("Add at least two valid categories and amounts");return}
+    if(Math.abs(total-amount)>0.01){toast.error("Split amounts must equal the original amount");return}
+    setBusy(true);
+    try{await api.put(`/transactions/${transaction.transaction_id}/splits`,{splits});toast.success("Transaction split saved");onSaved?.()}
+    catch(e){toast.error(formatApiError(e.response?.data?.detail)||"Could not save split")}
+    finally{setBusy(false)}
+  };
+  return <div className="space-y-4">
+    <p className="rounded-xl bg-secondary/50 p-3 text-xs">Split <strong>{formatCurrency(amount)}</strong> across two or more categories.</p>
+    {lines.map((line,i)=><div key={i} className="grid gap-2 rounded-xl border border-border p-3 sm:grid-cols-[minmax(0,1fr)_110px_28px]">
+      <CategoryCombobox value={line.category} onChange={value=>setLine(i,"category",value)} categories={categories} placeholder="Category"/>
+      <input aria-label={`Amount for split ${i+1}`} type="number" min="0" step="0.01" value={line.amount} onChange={e=>setLine(i,"amount",e.target.value)} className="h-10 rounded-xl border border-border bg-card px-2 text-xs"/>
+      <button type="button" aria-label={`Remove split ${i+1}`} disabled={lines.length<=2} onClick={()=>setLines(prev=>prev.filter((_,j)=>j!==i))} className="text-ruby disabled:opacity-30">×</button>
+      <input aria-label={`Description for split ${i+1}`} value={line.description} onChange={e=>setLine(i,"description",e.target.value)} placeholder="Optional note" className="h-9 rounded-lg border border-border bg-card px-2 text-xs sm:col-span-3"/>
+    </div>)}
+    <div className="flex items-center justify-between gap-3">
+      <Button variant="outlinePill" onClick={()=>setLines(prev=>[...prev,{category:"",amount:"",description:""}])}>Add line</Button>
+      <span className={`text-xs font-semibold ${Math.abs(total-amount)<0.01?"text-emerald":"text-ruby"}`}>Total: {formatCurrency(total)} / {formatCurrency(amount)}</span>
+    </div>
+    <Button variant="primary" className="w-full" disabled={busy||Math.abs(total-amount)>0.01} onClick={save}>{busy?"Saving…":"Save split"}</Button>
+  </div>;
+}
+
+export function PairTransferAction({ transaction, onSaved }) {
+  const [candidates,setCandidates] = useState([]);
+  const [selected,setSelected] = useState("");
+  const [busy,setBusy] = useState(false);
+  const [loading,setLoading] = useState(true);
+  useEffect(()=>{let active=true;api.get("/transactions",{params:{limit:500}})
+    .then(({data})=>{if(active)setCandidates((data.transactions||[]).filter(row=>
+      row.transaction_id!==transaction?.transaction_id && !row.transfer_pair_id && Number(row.amount||0)*Number(transaction?.amount||0)<0))})
+    .catch(()=>toast.error("Could not load potential matches")).finally(()=>{if(active)setLoading(false)});
+    return()=>{active=false};},[transaction?.transaction_id,transaction?.amount]);
+  const save=async()=>{
+    const candidate=candidates.find(c=>c.transaction_id===selected);
+    if(!candidate){toast.error("Choose the matching transaction");return}
+    const outgoing=Number(transaction.amount)<0?transaction.transaction_id:candidate.transaction_id;
+    const incoming=Number(transaction.amount)>0?transaction.transaction_id:candidate.transaction_id;
+    setBusy(true);try{await api.post("/transactions/transfer-pairs",{outgoing_transaction_id:outgoing,incoming_transaction_id:incoming});toast.success("Transfer paired");onSaved?.()}
+    catch(e){toast.error(formatApiError(e.response?.data?.detail)||"Could not pair transfer")}
+    finally{setBusy(false)}
+  };
+  return <div className="space-y-4">
+    <div className="rounded-xl bg-secondary/40 p-3 text-xs"><p className="font-semibold">{transaction?.description||"Transfer"}</p><p>{formatCurrency(Number(transaction?.amount)||0)}</p></div>
+    <div><label className="mb-1.5 block text-xs font-semibold">Matching opposite-side transaction</label>
+      <PenniSelect value={selected} onChange={e=>setSelected(e.target.value)} className="h-11 w-full rounded-xl border border-border bg-card px-3 text-xs" aria-label="Matching transaction">
+        <option value="">Select matching transaction</option>
+        {candidates.map(c=><option key={c.transaction_id} value={c.transaction_id}>{c.date} · {c.description||c.merchant||"Transaction"} · {formatCurrency(Number(c.amount)||0)}</option>)}
+      </PenniSelect>
+    </div>
+    {loading?<p className="text-xs text-muted-foreground">Looking for matches…</p>:!candidates.length?<p className="text-xs text-muted-foreground">No matching opposite-side transactions found. You can close and pair later from Transactions.</p>:null}
+    <Button variant="primary" className="w-full" disabled={busy||!selected} onClick={save}>{busy?"Pairing…":"Pair transfer"}</Button>
+  </div>;
+}
