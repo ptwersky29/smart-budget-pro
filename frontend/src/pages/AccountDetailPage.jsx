@@ -1,3 +1,4 @@
+import PenniSelect from "../components/PenniSelect";
 import React, { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
@@ -446,12 +447,12 @@ export default function AccountDetailPage() {
               <Search className="h-3.5 w-3.5" />
             </button>
 
-            <select value={filters.sort} onChange={(e) => setFilter("sort", e.target.value)}
+            <PenniSelect value={filters.sort} onChange={(e) => setFilter("sort", e.target.value)}
               className="h-8 px-2 rounded-lg bg-secondary/50 border border-border/50 text-[11px] font-medium focus:outline-none focus:border-ring">
               <option value="date">Date</option>
               <option value="amount">Amount</option>
               <option value="description">Description</option>
-            </select>
+            </PenniSelect>
             <button onClick={() => setFilter("order", filters.order === "desc" ? "asc" : "desc")}
               className="h-8 w-7 grid place-items-center rounded-lg bg-secondary/50 border border-border/50 hover:bg-secondary/80">
               {filters.order === "desc" ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
@@ -467,10 +468,10 @@ export default function AccountDetailPage() {
                 <SheetHeader><SheetTitle>Filters</SheetTitle><SheetDescription>Refine transactions for this account</SheetDescription></SheetHeader>
                 <div className="mt-6 space-y-4">
                   <div className="grid grid-cols-2 gap-3">
-                    <select value={filters.tx_type} onChange={(e) => setFilter("tx_type", e.target.value)}
+                    <PenniSelect value={filters.tx_type} onChange={(e) => setFilter("tx_type", e.target.value)}
                       className="h-10 px-4 rounded-xl bg-secondary/50 border border-transparent text-sm">
                       <option value="">All types</option><option value="income">Income</option><option value="expense">Expense</option>
-                    </select>
+                    </PenniSelect>
                     <CategoryCombobox value={filters.category} onChange={(val) => setFilter("category", val)}
                       categories={selectedCats} placeholder="All categories" allowClear />
                     <Input type="number" placeholder={`Min ${CURRENCY_SYMBOL}`} value={filters.amount_min} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_min: e.target.value })); }} className="text-sm h-10" />
