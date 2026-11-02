@@ -1,3 +1,4 @@
+import PenniSelect from "../components/PenniSelect";
 import React, { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
@@ -139,18 +140,18 @@ export default function Integrations({ embedded }) {
         <form onSubmit={saveAi} className="grid sm:grid-cols-2 gap-3">
           <div>
             <label className="label-overline">Provider</label>
-            <select data-testid="ai-provider" value={aiForm.provider}
+            <PenniSelect data-testid="ai-provider" value={aiForm.provider}
                     onChange={(e)=>{ const p = PROVIDERS.find(x=>x.value===e.target.value); setAiForm({...aiForm, provider:e.target.value, model: p?.models[0] || ""}); }}
                     className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none">
               {PROVIDERS.map((p)=><option key={p.value} value={p.value}>{p.label}</option>)}
-            </select>
+            </PenniSelect>
           </div>
           <div>
             <label className="label-overline">Model</label>
-            <select data-testid="ai-model" value={aiForm.model} onChange={(e)=>setAiForm({...aiForm, model:e.target.value})}
+            <PenniSelect data-testid="ai-model" value={aiForm.model} onChange={(e)=>setAiForm({...aiForm, model:e.target.value})}
                     className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none">
               {providerMeta.models.map((m)=><option key={m}>{m}</option>)}
-            </select>
+            </PenniSelect>
           </div>
           <Field testid="ai-name" label="Nickname (optional)" placeholder="My Claude key"
                  value={aiForm.name} onChange={(v)=>setAiForm({...aiForm, name:v})} />
