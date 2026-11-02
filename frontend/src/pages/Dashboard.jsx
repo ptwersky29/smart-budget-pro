@@ -322,7 +322,15 @@ export default function Dashboard() {
                 {alert.title || alert.message}
               </p>
               {alert.action_url ? (
-                <Link to={alert.action_url} className="shrink-0 text-[10.5px] font-semibold text-topaz">
+                <Link to={alert.action_url} onClick={event => {
+                  const destination = String(alert.action_url || "").split("?")[0];
+                  const action = destination.startsWith("/budgets") ? "budget-new"
+                    : destination.startsWith("/transactions") ? "transaction-search"
+                    : destination.startsWith("/accounts") ? "accounts-overview"
+                    : destination.startsWith("/reports") ? "reports"
+                    : destination.startsWith("/settings") ? "alerts" : null;
+                  if (action) { event.preventDefault(); openAction(action); }
+                }} className="shrink-0 text-[10.5px] font-semibold text-topaz">
                   Review
                 </Link>
               ) : null}
