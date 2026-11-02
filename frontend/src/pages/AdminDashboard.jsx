@@ -1,3 +1,4 @@
+import PenniSelect from "../components/PenniSelect";
 import React, { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
@@ -26,7 +27,7 @@ function UserRow({ u, busy, onToggleDisable, onSetRole, onSetTier, onDeleteUser 
         <td className="px-6 py-3 max-w-[200px] truncate font-medium">{u.email}</td>
         <td className="px-6 py-3 text-muted-foreground">{u.name || "—"}</td>
         <td className="px-6 py-3">
-          <select
+          <PenniSelect
             value={u.role}
             onChange={(e) => onSetRole(u.user_id, e.target.value)}
             disabled={busy[`role-${u.user_id}`]}
@@ -35,10 +36,10 @@ function UserRow({ u, busy, onToggleDisable, onSetRole, onSetTier, onDeleteUser 
           >
             <option value="user">user</option>
             <option value="admin">admin</option>
-          </select>
+          </PenniSelect>
         </td>
         <td className="px-6 py-3">
-          <select
+          <PenniSelect
             value={u.tier}
             onChange={(e) => onSetTier(u.user_id, e.target.value)}
             disabled={busy[`tier-${u.user_id}`]}
@@ -47,7 +48,7 @@ function UserRow({ u, busy, onToggleDisable, onSetRole, onSetTier, onDeleteUser 
           >
             <option value="free">free</option>
             <option value="premium">premium</option>
-          </select>
+          </PenniSelect>
         </td>
         <td className="px-6 py-3">
           {u.disabled ? (
@@ -303,7 +304,7 @@ export default function AdminDashboard() {
                 className="pl-9 w-full sm:w-48 text-sm"
               />
             </div>
-            <select
+            <PenniSelect
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
               className="h-11 shrink-0 rounded-xl bg-secondary/50 border border-transparent px-3 text-xs font-medium focus:border-ring focus:outline-none"
@@ -311,8 +312,8 @@ export default function AdminDashboard() {
               <option value="all">All roles</option>
               <option value="user">Users</option>
               <option value="admin">Admins</option>
-            </select>
-            <select
+            </PenniSelect>
+            <PenniSelect
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="h-11 shrink-0 rounded-xl bg-secondary/50 border border-transparent px-3 text-xs font-medium focus:border-ring focus:outline-none"
@@ -320,7 +321,7 @@ export default function AdminDashboard() {
               <option value="all">All status</option>
               <option value="active">Active</option>
               <option value="disabled">Disabled</option>
-            </select>
+            </PenniSelect>
           </div>
         }
       >
