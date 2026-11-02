@@ -1,3 +1,4 @@
+import PenniSelect from "./PenniSelect";
 import React, { useState, useRef } from "react";
 import { X, Upload, Wallet } from "lucide-react";
 import { api, formatApiError } from "../lib/api";
@@ -99,10 +100,10 @@ export default function AddManualAccountModal({ open, onClose, onCreated }) {
           {/* Type */}
           <div>
             <label className="label-overline text-muted-foreground mb-1.5 block">Account Type</label>
-            <select value={accountType} onChange={(e) => setAccountType(e.target.value)}
+            <PenniSelect value={accountType} onChange={(e) => setAccountType(e.target.value)}
               className="w-full h-10 px-3 rounded-xl bg-secondary/30 border border-border focus:border-emerald/50 focus:outline-none text-sm">
               {ACCOUNT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
+            </PenniSelect>
           </div>
 
           {/* Balance */}
