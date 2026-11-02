@@ -11,7 +11,7 @@ import TransactionInspectorPanel from "../TransactionInspectorPanel";
 import AccountFormModal from "../AccountFormModal";
 import NotificationSettings from "../settings/NotificationSettings";
 import StatementAction from "./StatementAction";
-import { BudgetActionForm, BudgetActionPreview, AccountActionPreview, ReportsActionPreview, SearchTransactionsAction } from "./FinanceActions";
+import { BudgetActionForm, BudgetActionPreview, AccountActionPreview, ReportsActionPreview, SearchTransactionsAction, SplitTransactionAction, PairTransferAction } from "./FinanceActions";
 
 const CategoryManager = lazy(() => import("../../pages/CategoryManager"));
 const today = () => new Date().toISOString().slice(0,10);
@@ -24,7 +24,7 @@ const PANEL_TITLES = {
   "transaction-info":"Transaction details", "budget-new":"Create budget", "budget-edit":"Edit budget",
   "budget-info":"Budget details", "account-info":"Account details", "statement-import":"Import statement",
   "categories":"Manage categories", "reports":"Spending report", "alerts":"Notification settings",
-  "transaction-search":"Search transactions", "bank-connect":"Connect bank", "accounts-overview":"All accounts"
+  "transaction-search":"Search transactions", "bank-connect":"Connect bank", "accounts-overview":"All accounts", "transaction-split":"Split transaction", "transaction-transfer":"Pair transfer"
 };
 
 export default function GlobalActionHost() {
@@ -84,8 +84,12 @@ export default function GlobalActionHost() {
       merchant:transactionForm.merchant||undefined,notes:transactionForm.notes||undefined,
       is_income:!!transactionForm.is_income,is_transfer:!!transactionForm.is_transfer};
     try {
+      let createdTransaction = null;
       if (type==="transaction-edit" && item?.transaction_id) {
         await api.patch(`/transactions/${item.transaction_id}`, {...body, exclude_from_maaser: !!transactionForm.exclude_from_maaser});
+      } else if (transactionForm.entry_mode === "split" || transactionForm.entry_mode === "transfer") {
+        const {data} = await api.post("/transactions", {...body, exclude_from_maaser: transactionForm.entry_mode === "transfer" || !!transactionForm.exclude_from_maaser});
+        createdTransaction = data;
       } else if (classification || transactionForm.budget_type) {
         const suggestions = classification?.suggestions || [];
         const chosenIndex = suggestions.findIndex(s=>s.category === transactionForm.category);
@@ -101,6 +105,11 @@ export default function GlobalActionHost() {
         await api.post("/transactions", {...body, exclude_from_maaser: !!transactionForm.exclude_from_maaser});
       }
       toast.success(type==="transaction-edit"?"Transaction updated":"Transaction added");
+      if (createdTransaction?.transaction_id && (transactionForm.entry_mode === "split" || transactionForm.entry_mode === "transfer")) {
+        changed("transactions");
+        openAction(transactionForm.entry_mode === "split" ? "transaction-split" : "transaction-transfer", {transaction:createdTransaction});
+        return;
+      }
       afterSave("transactions");
     } catch(e){toast.error(formatApiError(e.response?.data?.detail)||"Could not save transaction");}
   };
@@ -128,6 +137,8 @@ export default function GlobalActionHost() {
         <SheetDescription>Complete this action without leaving your current page.</SheetDescription>
       </SheetHeader>
       <div className="subtle-scroll min-h-0 flex-1 overflow-y-auto p-4 sm:p-5" key={active.key}>
+        {type==="transaction-split" && <SplitTransactionAction transaction={payload.transaction} categories={categories} onSaved={()=>afterSave("transactions")}/>}
+        {type==="transaction-transfer" && <PairTransferAction transaction={payload.transaction} onSaved={()=>afterSave("transactions")}/>}
         {type==="transaction-info" && <TransactionInspectorPanel transaction={item}
           account={accounts.find(a=>a.account_id===item?.account_id)}
           onClose={closeAction} onEdit={transaction=>openAction("transaction-edit",{transaction})}/>}
