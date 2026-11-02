@@ -776,3 +776,17 @@ html { font-size: calc(var(--fs-base, 0.875rem) * var(--fs-multiplier, 1)); }
     overflow-y: visible;
   }
 }
+
+/* Shared table and finance workspace visual contract. */
+.workspace-page-header { min-width: 0; }
+.workspace-metric { min-height: 92px; }
+.workspace-metric > .flex { min-width: 0; }
+.workspace-table-panel { border-radius: 16px; }
+.workspace-table { border-collapse: separate; border-spacing: 0; }
+.workspace-table thead th { position: sticky; top: 0; z-index: 3; background: hsl(var(--card)); color: hsl(var(--muted-foreground)); font-weight: 500; border-bottom: 1px solid hsl(var(--border)); }
+.workspace-table tbody tr { transition: background-color 140ms ease; }
+.workspace-table tbody tr:hover { background: hsl(var(--secondary) / 0.34); }
+.workspace-table td { vertical-align: middle; }
+@media (max-width: 1279px) {
+  .budgets-route { overflow-x: hidden; }
+}
