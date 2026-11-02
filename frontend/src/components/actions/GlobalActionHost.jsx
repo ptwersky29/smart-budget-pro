@@ -158,7 +158,7 @@ export default function GlobalActionHost() {
           {accounts.map(account => <button key={account.account_id} type="button" onClick={() => openAction("account-info", {accountId:account.account_id, account})}
             className="flex w-full items-center justify-between gap-3 rounded-xl border border-border p-3 text-left hover:bg-secondary/40">
             <span className="truncate text-sm font-medium">{account.name}</span>
-            <span className="shrink-0 text-sm font-semibold">£{Number(account.balance||0).toFixed(2)}</span>
+            <span className="shrink-0 text-sm font-semibold">{account.currency || "GBP"} {Number(account.balance||0).toFixed(2)}</span>
           </button>)}
           {!accounts.length && <p className="py-6 text-center text-xs text-muted-foreground">{accountLoading?"Loading accounts…":"No accounts yet"}</p>}
           <Button variant="outlinePill" className="w-full" onClick={() => openAction("account-new")}>Add account</Button>
@@ -168,7 +168,7 @@ export default function GlobalActionHost() {
         {type==="statement-import" && <StatementAction initialDraft={payload.draft} initialAccountId={payload.accountId}
           accounts={accounts} onSaved={()=>afterSave("transactions")}/>}
         {type==="categories" && <Suspense fallback={<p className="p-4 text-xs text-muted-foreground">Loading categories…</p>}><CategoryManager /></Suspense>}
-        {type==="reports" && <ReportsActionPreview />}
+        {type==="reports" && <ReportsActionPreview initialMonth={payload.month} />}
         {type==="alerts" && <NotificationSettings />}
         {type==="transaction-search" && <SearchTransactionsAction month={payload.month} onInspect={transaction=>openAction("transaction-info",{transaction})}/>}
         {type==="bank-connect" && <div className="space-y-4">
