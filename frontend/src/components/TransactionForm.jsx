@@ -1,3 +1,4 @@
+import PenniSelect from "./PenniSelect";
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -256,7 +257,7 @@ export default function TransactionForm({
                   No accounts found
                 </div>
               ) : (
-                <select
+                <PenniSelect
                   id="tx-account"
                   required
                   value={form.account_id}
@@ -273,7 +274,7 @@ export default function TransactionForm({
                       {a.name} ({formatCurrency(a.balance || 0)})
                     </option>
                   ))}
-                </select>
+                </PenniSelect>
               )}
             </div>
 
@@ -559,7 +560,7 @@ export default function TransactionForm({
 
               {showMore && (
                 <div className="mt-2 space-y-2 p-3 rounded-xl bg-secondary/20 border border-border animate-[fadeUp_0.2s_ease-out]">
-                  <select
+                  <PenniSelect
                     value={form.budget_type}
                     onChange={(e) =>
                       setForm({ ...form, budget_type: e.target.value })
@@ -572,7 +573,7 @@ export default function TransactionForm({
                         {t.replace(/_/g, " ")}
                       </option>
                     ))}
-                  </select>
+                  </PenniSelect>
                   <Input
                     placeholder="Occasion (e.g. Pesach 2026, Wedding)"
                     value={form.occasion}
