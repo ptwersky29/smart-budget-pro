@@ -200,7 +200,14 @@ export function SplitTransactionAction({ transaction, categories, onSaved }) {
     if(splits.length < 2 || splits.some(line=>!line.category || line.amount<=0)){toast.error("Add at least two valid categories and amounts");return}
     if(Math.abs(total-amount)>0.01){toast.error("Split amounts must equal the original amount");return}
     setBusy(true);
-    try{await api.put(`/transactions/${transaction.transaction_id}/splits`,{splits});toast.success("Transaction split saved");onSaved?.()}
+    try {
+      if (transaction.transaction_id) {
+        await api.put(`/transactions/${transaction.transaction_id}/splits`, {splits});
+      } else {
+        await api.post("/transactions/create-with-splits", {transaction, splits});
+      }
+      toast.success("Transaction split saved"); onSaved?.();
+    }
     catch(e){toast.error(formatApiError(e.response?.data?.detail)||"Could not save split")}
     finally{setBusy(false)}
   };
@@ -267,7 +274,14 @@ export function PairTransferAction({ transaction, onSaved }) {
     const incoming = Number(transaction.amount) > 0 ? transaction.transaction_id : candidate.transaction_id;
     setBusy(true);
     try {
-      await api.post("/transactions/transfer-pairs", { outgoing_transaction_id: outgoing, incoming_transaction_id: incoming });
+      if (transaction.transaction_id) {
+        await api.post("/transactions/transfer-pairs", { outgoing_transaction_id: outgoing, incoming_transaction_id: incoming });
+      } else {
+        await api.post("/transactions/create-and-pair", {
+          transaction: {...transaction, is_transfer: true},
+          counterparty_transaction_id: candidate.transaction_id,
+        });
+      }
       toast.success("Transfer paired");
       onSaved?.();
     } catch(error) { toast.error(formatApiError(error.response?.data?.detail) || "Could not pair transfer"); }
