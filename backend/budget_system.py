@@ -87,8 +87,8 @@ async def _track_usage(session, user_id: str, provider: str, model: str, pt: int
         u = AiUsage(user_id=user_id, provider=provider, prompt_tokens=pt, completion_tokens=ct, cost=cost, endpoint="budget_system")
         session.add(u)
         await session.commit()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Optional operation failed at backend/budget_system.py:90 (%s)", type(exc).__name__)
 
 
 
@@ -1235,8 +1235,8 @@ def build_router() -> APIRouter:
                     )
                     session.add(rec_tx)
                     await session.commit()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Optional operation failed at backend/budget_system.py:1238 (%s)", type(exc).__name__)
 
             return _tx_to_dict(tx)
 
@@ -1702,8 +1702,8 @@ def build_router() -> APIRouter:
             if payload.event_date:
                 try:
                     event_date = datetime.fromisoformat(payload.event_date)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Optional operation failed at backend/budget_system.py:1705 (%s)", type(exc).__name__)
 
             occ = BudgetOccasion(
                 user_id=user["user_id"],
@@ -1753,8 +1753,8 @@ def build_router() -> APIRouter:
             if payload.event_date:
                 try:
                     occ.event_date = datetime.fromisoformat(payload.event_date)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Optional operation failed at backend/budget_system.py:1756 (%s)", type(exc).__name__)
             occ.estimated_amount = payload.estimated_amount or 0
 
             cat_result = await session.execute(
@@ -1851,8 +1851,8 @@ def build_router() -> APIRouter:
             if payload.event_date:
                 try:
                     event_date = datetime.fromisoformat(payload.event_date)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Optional operation failed at backend/budget_system.py:1854 (%s)", type(exc).__name__)
 
             occ = BudgetOccasion(
                 user_id=user["user_id"],
@@ -1903,8 +1903,8 @@ def build_router() -> APIRouter:
             if payload.event_date:
                 try:
                     occ.event_date = datetime.fromisoformat(payload.event_date)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Optional operation failed at backend/budget_system.py:1906 (%s)", type(exc).__name__)
             occ.estimated_amount = payload.estimated_amount or 0
             if payload.notes is not None:
                 occ.notes = payload.notes
