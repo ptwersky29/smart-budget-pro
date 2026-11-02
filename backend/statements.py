@@ -442,8 +442,8 @@ async def _ai_categorise(description: str, merchant: str | None, amount: float, 
                     from datetime import datetime, timezone as _tz
                     rule.last_used_at = datetime.now(_tz.utc)
                     return rule.category
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Optional operation failed at backend/statements.py:445 (%s)", type(exc).__name__)
     prompt = CATEGORISE_PROMPT.format(
         description=description[:100],
         merchant=merchant or "unknown",
