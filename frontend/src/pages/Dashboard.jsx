@@ -192,7 +192,7 @@ export default function Dashboard() {
       0,
   );
   const currencies = Array.from(new Set(accounts.map(account => account.balance_currency || account.currency || "GBP")));
-  const mixedCurrencies = currencies.length > 1;
+  const mixedCurrencies = Boolean(overview?.multi_currency) || currencies.length > 1;
   const balanceLabel = mixedCurrencies ? "Multiple currencies" : formatCurrency(balance);
   const currencyDetail = mixedCurrencies
     ? currencies.map(currency => `${currency}: ${accounts.filter(a => (a.balance_currency || a.currency || "GBP") === currency)
@@ -368,7 +368,7 @@ export default function Dashboard() {
         {showWidget("income") ? (
           <StatCard
             label="Income"
-            value={formatCurrency(income)}
+            value={mixedCurrencies ? "—" : formatCurrency(income)}
             detail="This month"
             icon={ArrowDownLeft}
             tone="blue"
@@ -379,7 +379,7 @@ export default function Dashboard() {
         {showWidget("spending") ? (
           <StatCard
             label="Spending"
-            value={formatCurrency(spend)}
+            value={mixedCurrencies ? "—" : formatCurrency(spend)}
             detail={`${categories.length} ${categories.length === 1 ? "category" : "categories"}`}
             icon={ArrowUpRight}
             tone="ruby"
@@ -388,7 +388,7 @@ export default function Dashboard() {
         {showWidget("health_score") ? (
           <StatCard
             label="Net saved"
-            value={formatCurrency(savings)}
+            value={mixedCurrencies ? "—" : formatCurrency(savings)}
             detail={`${savingsRate}% of income`}
             icon={PiggyBank}
             tone="topaz"
