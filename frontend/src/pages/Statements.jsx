@@ -101,7 +101,7 @@ export default function Statements() {
       setEditingCell(null);
       setSelectedAccountId(accounts.length === 1 ? accounts[0].account_id : "");
       await loadHistory();
-      navigate("/transactions");
+      // Keep the current statement workspace open after saving.
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Save failed"); }
     finally { setSaving(false); }
   };
