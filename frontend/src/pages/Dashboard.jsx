@@ -56,7 +56,7 @@ function TransactionLine({ transaction, onSelect }) {
     <button
       type="button"
       onClick={() => onSelect(transaction)}
-      className="group flex items-center gap-3 px-4 py-2.5 transition hover:bg-secondary/35 sm:px-5"
+      className="group flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-secondary/35 sm:px-5"
     >
       <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl ${income ? "bg-emerald/10 text-emerald" : "bg-secondary text-muted-foreground"}`}>
         {income ? <ArrowDownLeft className="h-3.5 w-3.5" /> : <ArrowUpRight className="h-3.5 w-3.5" />}
@@ -165,7 +165,7 @@ export default function Dashboard() {
     loadAll();
   }, [loadAll, categoriesVersion]);
   useEffect(() => {
-    const onChanged = () => loadAll({ silent: true });
+    const onChanged = () => loadAll(true);
     window.addEventListener("penni:data-changed", onChanged);
     return () => window.removeEventListener("penni:data-changed", onChanged);
   }, [loadAll]);
@@ -385,9 +385,9 @@ export default function Dashboard() {
               title="Accounts"
               subtitle="Balances across your connected banks"
               actions={
-                <Link to="/accounts" className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald">
+                <button type="button" onClick={() => openAction("accounts-overview")} className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald">
                   View all <ChevronRight className="h-3.5 w-3.5" />
-                </Link>
+                </button>
               }
               compact
             />
