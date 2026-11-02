@@ -984,7 +984,11 @@ export default React.memo(function BudgetPage() {
           <Button variant="primary" size="sm" onClick={() => openAddBudget("everyday")}><Plus className="mr-1 h-4 w-4" /> Add budget</Button>
           <DropdownMenu><DropdownMenuTrigger asChild><button type="button" aria-label="More budget actions" className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-card"><MoreHorizontal className="h-4 w-4" /></button></DropdownMenuTrigger>
             <DropdownMenuContent align="end"><DropdownMenuItem onClick={handleCopyPreviousMonth}>Copy previous month</DropdownMenuItem>
-            <DropdownMenuItem onClick={handleSeedDefaults}>Load defaults</DropdownMenuItem><DropdownMenuItem onClick={fetchData}>Refresh</DropdownMenuItem></DropdownMenuContent>
+            <DropdownMenuItem onClick={handleSeedDefaults}>Load defaults</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => openAction("categories")}>Manage categories</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => openAction("reports", {month})}>View reports</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => openAction("alerts")}>Set alerts</DropdownMenuItem>
+            <DropdownMenuItem onClick={fetchData}>Refresh</DropdownMenuItem></DropdownMenuContent>
           </DropdownMenu>
         </>}
       />
