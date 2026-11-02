@@ -2692,6 +2692,15 @@ Output ONLY valid JSON, no markdown, no explanation:
     ):
         sm = request.app.state.db
         async with sm() as session:
+            originals = {}
+            if payload.category is not None:
+                original_result = await session.execute(
+                    select(Transaction.transaction_id, Transaction.category).where(
+                        Transaction.transaction_id.in_(payload.transaction_ids),
+                        Transaction.user_id == user["user_id"],
+                    )
+                )
+                originals = {tx_id: category for tx_id, category in original_result.all()}
             values = {}
             if payload.category is not None:
                 values["category"] = payload.category
@@ -2710,8 +2719,34 @@ Output ONLY valid JSON, no markdown, no explanation:
             _query_cache.delete_by_prefix(f"budgets:{user['user_id']}:")
             return {
                 "ok": True,
-                "updated": len(payload.transaction_ids) if values else 0,
+                "updated": len(originals) if values else 0,
+                "previous_categories": originals,
             }
+
+    class RestoreBulkCategoriesIn(BaseModel):
+        categories: dict[str, Optional[str]]
+
+    @router.post("/transactions/bulk-category-restore")
+    async def restore_bulk_categories(
+        payload: RestoreBulkCategoriesIn, request: Request,
+        user: dict = Depends(get_current_user),
+    ):
+        if not payload.categories or len(payload.categories) > 1000:
+            raise HTTPException(400, "Provide 1 to 1000 original transaction categories")
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(select(Transaction).where(
+                Transaction.user_id == user["user_id"],
+                Transaction.transaction_id.in_(payload.categories.keys()),
+            ))
+            rows = result.scalars().all()
+            if len(rows) != len(payload.categories):
+                raise HTTPException(409, "Transactions changed or missing; refresh before restoring")
+            for tx in rows:
+                tx.category = payload.categories[tx.transaction_id]
+            await session.commit()
+        _invalidate_finance_caches(user["user_id"])
+        return {"ok": True, "restored": len(rows)}
 
     @router.post("/transactions/clear")
     async def clear_transactions(
