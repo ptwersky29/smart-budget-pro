@@ -1,6 +1,7 @@
 """Real Stripe subscription billing — monthly (£5) and yearly (£48)."""
 import os
 import logging
+from urllib.parse import urlsplit
 from datetime import datetime, timezone
 
 import stripe
@@ -50,6 +51,31 @@ def _subscription_grants_premium(status: str | None) -> bool:
     return (status or "").lower() in {"active", "trialing"}
 
 
+def _validated_checkout_origin(requested: str) -> str:
+    """Allow checkout to return only to explicitly configured frontend origins."""
+    allowed = [
+        value.strip().rstrip("/")
+        for value in (os.environ.get("FRONTEND_URL", "") + "," +
+                      os.environ.get("BILLING_ALLOWED_ORIGINS", "")).split(",")
+        if value.strip()
+    ]
+    if not allowed:
+        raise HTTPException(503, "Billing return URL is not configured")
+    try:
+        parsed = urlsplit(requested.strip())
+    except (ValueError, AttributeError) as exc:
+        raise HTTPException(400, "Invalid billing return origin") from exc
+    if (parsed.scheme not in {"https", "http"} or not parsed.hostname or
+        parsed.username or parsed.password or parsed.path not in {"", "/"} or
+        parsed.query or parsed.fragment or
+        (parsed.scheme != "https" and parsed.hostname not in {"localhost", "127.0.0.1"})):
+        raise HTTPException(400, "Invalid billing return origin")
+    normalized = f"{parsed.scheme}://{parsed.netloc.lower()}"
+    if normalized not in allowed:
+        raise HTTPException(400, "Billing return origin is not allowed")
+    return normalized
+
+
 class CheckoutIn(BaseModel):
     package_id: str = "premium_monthly"
     origin_url: str
@@ -71,7 +97,7 @@ def build_router() -> APIRouter:
         if payload.package_id not in PACKAGES:
             raise HTTPException(400, "Invalid package")
         pkg = PACKAGES[payload.package_id]
-        origin = payload.origin_url.rstrip("/")
+        origin = _validated_checkout_origin(payload.origin_url)
 
         stripe.api_key = _get_stripe_key()
 
