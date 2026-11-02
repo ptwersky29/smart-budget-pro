@@ -119,7 +119,7 @@ const BudgetCard = React.memo(({ budget, isCurrentMonth, currentDay, monthElapse
   };
   const CatIcon = CATEGORY_ICONS[budget.category.toLowerCase().trim()] || (pct >= 100 ? TrendingDown : Target);
   return (
-    <div key={budget.budget_id} onClick={handleCardClick} className={`group rounded-xl border ${isSelected ? "border-emerald bg-emerald/[0.03] ring-1 ring-emerald/30" : "border-border/50 bg-background/40"} backdrop-blur-xl p-3 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-border transition-all duration-300 relative overflow-hidden border-l-[3px] cursor-pointer ${over ? "border-l-ruby" : pct >= 80 ? "border-l-topaz" : "border-l-emerald"}`}>
+    <div key={budget.budget_id} role="button" tabIndex={0} aria-label={`View ${budget.category} budget transactions`} onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget) { event.preventDefault(); openBudgetTransactions(budget); } }} onClick={handleCardClick} className={`group rounded-xl border ${isSelected ? "border-emerald bg-emerald/[0.03] ring-1 ring-emerald/30" : "border-border/50 bg-background/40"} backdrop-blur-xl p-3 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-border transition-all duration-300 relative overflow-hidden border-l-[3px] cursor-pointer ${over ? "border-l-ruby" : pct >= 80 ? "border-l-topaz" : "border-l-emerald"}`}>
       <div className="flex items-start gap-2 mb-2">
         <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${over ? "from-ruby to-ruby/70" : pct >= 80 ? "from-topaz to-topaz/70" : "from-emerald to-emerald/70"} flex items-center justify-center text-white shrink-0 shadow-sm`}>
           <CatIcon className="h-3.5 w-3.5" />
@@ -265,7 +265,7 @@ const EventGroupCard = React.memo(({ group, setConfirmDelete, fetchData }) => {
             <div className="w-16">
               <input name="newItemAmt" type="number" step="0.01" min="0.01" placeholder="£0" aria-label="New item amount" className="w-full h-7 rounded bg-secondary/30 border border-transparent px-2 text-[11px] text-right placeholder:text-muted-foreground focus:border-ring focus:outline-none" />
             </div>
-            <button type="submit" className="h-7 w-7 rounded bg-emerald text-white hover:bg-emerald/90 flex items-center justify-center"><Plus className="h-3.5 w-3.5" /></button>
+            <button type="submit" aria-label="Add event budget item" className="h-7 w-7 rounded bg-emerald text-white hover:bg-emerald/90 flex items-center justify-center"><Plus className="h-3.5 w-3.5" /></button>
             <button type="button" onClick={() => setShowAdd(false)} className="h-7 px-2 rounded bg-secondary text-muted-foreground hover:text-foreground text-[11px]">Cancel</button>
           </form>
         ) : (
