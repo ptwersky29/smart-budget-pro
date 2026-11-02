@@ -137,21 +137,6 @@ export default function Subscriptions() {
     }
   };
 
-  const sub = subsRef.current.find(s => s.subscription_id === id);
-    if (!sub) return;
-    setSubs(prev => prev.filter(s => s.subscription_id !== id));
-    withUndo({
-      action: () => api.delete(`/subscriptions/${id}`),
-      undo: async () => {
-        setSubs(prev => [...prev, sub]);
-        await api.post("/subscriptions", { name: sub.name, amount: Math.abs(sub.amount), category: sub.category, frequency: sub.frequency, merchant: sub.merchant, notes: sub.notes });
-      },
-      onError: () => setSubs(prev => [...prev, sub]),
-      successMsg: "Subscription deleted",
-      errorMsg: "Could not delete",
-    });
-  };
-
   const monthlyTotal = useMemo(() => {
     return subs.filter((s) => s.active).reduce((sum, s) => sum + Math.abs(s.amount), 0);
   }, [subs]);
