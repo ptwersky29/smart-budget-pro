@@ -35,6 +35,8 @@ import {
 } from "../components/ui/sheet";
 import TransactionForm from "../components/TransactionForm";
 import CategoryPieChart from "../components/CategoryPieChart";
+import TransactionInspectorPanel from "../components/TransactionInspectorPanel";
+import { WorkspaceHeader, WorkspaceMetric, WorkspaceMetrics, WorkspaceTabs, WorkspaceViewToggle, WorkspaceBlank, WorkspaceSkeleton } from "../components/ui/workspace";
 
 function fmtMonth(y, m) { return `${y}-${String(m).padStart(2, "0")}`; }
 
@@ -280,11 +282,14 @@ const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
   monthControl, summary, everyday, atRiskCount, budgetTableRows, budgetView, setBudgetView,
   categorySpend, recentTransactions, onAdd, onRefresh, onCopyPrevious, onViewAll, openBudgetTransactions,
   startEdit, displayMode, setDisplayMode, onManageCategories, onViewReports, onAlerts,
+  searchQuery, setSearchQuery, sortOption, setSortOption, sortOrder, setSortOrder,
+  loading, loadError, onRetry, onSeedDefaults, unbudgetedCategories, eventGroups,
+  onDeleteEvent, monthlyTrend, insights, onApplyInsight, applyingInsight,
 }) {
   const statCards = [
     { label: "Total Budgeted", value: `£${summary.totalPlanned.toFixed(2)}`, note: `${summary.count} categories`, icon: Target, tone: "emerald" },
     { label: "Total Spent", value: `£${summary.totalSpent.toFixed(2)}`, note: `${summary.totalPlanned ? Math.round((summary.totalSpent / summary.totalPlanned) * 100) : 0}% of budget`, icon: TrendingDown, tone: "ruby", progress: summary.totalPlanned ? (summary.totalSpent / summary.totalPlanned) * 100 : 0 },
-    { label: "Remaining", value: `£${Math.max(0, summary.totalRemaining).toFixed(2)}`, note: `${summary.totalPlanned ? Math.max(0, Math.round((summary.totalRemaining / summary.totalPlanned) * 100)) : 0}% left`, icon: PiggyBank, tone: "emerald", progress: summary.totalPlanned ? (summary.totalRemaining / summary.totalPlanned) * 100 : 0 },
+    { label: summary.totalRemaining < 0 ? "Over budget" : "Remaining", value: `£${Math.abs(summary.totalRemaining).toFixed(2)}`, note: summary.totalPlanned ? `${Math.round(Math.abs(summary.totalRemaining / summary.totalPlanned) * 100)}% ${summary.totalRemaining < 0 ? "over" : "left"}` : "No budget set", icon: PiggyBank, tone: summary.totalRemaining < 0 ? "ruby" : "emerald", progress: summary.totalPlanned ? Math.abs(summary.totalRemaining / summary.totalPlanned) * 100 : 0 },
     { label: "At Risk", value: String(atRiskCount), note: atRiskCount ? `${atRiskCount} categories over 80% spent` : "All budgets on track", icon: AlertCircle, tone: "topaz" },
   ];
   const tabs = [
@@ -295,19 +300,43 @@ const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
   ];
 
   return (
-    <div className="budget-workspace hidden xl:flex xl:flex-col" onClick={(event) => {
-      const label = event.target instanceof Element ? event.target.closest("span")?.textContent : "";
-      if (label?.includes("View all")) onViewAll?.();
-    }}>
-      <div className="mb-4 flex items-start justify-between gap-6 px-[14px]">
-        <div><h1 className="text-[30px] font-semibold leading-none tracking-[-0.045em]">Budgets</h1><p className="mt-2 text-[13px] text-muted-foreground">Track your spending, set budgets and stay in control.</p></div>
-        <div className="flex items-center gap-2">{monthControl}<button type="button" onClick={onAdd} className="inline-flex h-9 items-center gap-2 rounded-[10px] bg-emerald px-4 text-[12px] font-semibold text-white shadow-[0_6px_16px_hsl(var(--emerald)/0.18)]"><Plus className="h-3.5 w-3.5" /> Add budget</button><DropdownMenu><DropdownMenuTrigger asChild><button className="grid h-9 w-9 place-items-center rounded-[10px] border border-border bg-card text-muted-foreground"><MoreHorizontal className="h-4 w-4" /></button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={onCopyPrevious}><Copy className="mr-2 h-4 w-4" /> Copy previous month</DropdownMenuItem><DropdownMenuItem onClick={onRefresh}><RefreshCw className="mr-2 h-4 w-4" /> Refresh</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
+    <div className="budget-workspace hidden xl:flex xl:flex-col">
+      <div className="shrink-0 px-[14px]">
+        <WorkspaceHeader title="Budgets" description="Track your spending, set budgets and stay in control."
+          actions={<>
+            {monthControl}
+            <button type="button" onClick={() => onAdd()} className="inline-flex h-9 items-center gap-2 rounded-[10px] bg-emerald px-4 text-[12px] font-semibold text-white shadow-[0_6px_16px_hsl(var(--emerald)/0.18)]"><Plus className="h-3.5 w-3.5" /> Add budget</button>
+            <DropdownMenu><DropdownMenuTrigger asChild><button aria-label="More budget actions" className="grid h-9 w-9 place-items-center rounded-[10px] border border-border bg-card text-muted-foreground"><MoreHorizontal className="h-4 w-4" /></button></DropdownMenuTrigger>
+              <DropdownMenuContent align="end"><DropdownMenuItem onClick={onCopyPrevious}><Copy className="mr-2 h-4 w-4" /> Copy previous month</DropdownMenuItem><DropdownMenuItem onClick={onRefresh}><RefreshCw className="mr-2 h-4 w-4" /> Refresh</DropdownMenuItem><DropdownMenuItem onClick={onSeedDefaults}><Download className="mr-2 h-4 w-4" /> Load defaults</DropdownMenuItem></DropdownMenuContent>
+            </DropdownMenu>
+          </>} />
       </div>
-      <div className="grid grid-cols-4 gap-3 px-[14px]">{statCards.map(({ label, value, note, icon: Icon, tone, progress }) => <div key={label} className="surface rounded-[16px] p-3.5"><div className="flex items-start gap-3"><span className={`grid h-10 w-10 place-items-center rounded-xl ${tone === "ruby" ? "bg-ruby/10 text-ruby" : tone === "topaz" ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}><Icon className="h-[18px] w-[18px]" /></span><div><p className="text-[11px] text-muted-foreground">{label}</p><p className={`money-tabular mt-1 text-[22px] font-semibold leading-none tracking-[-0.03em] ${tone === "topaz" && value !== "0" ? "text-ruby" : ""}`}>{value}</p><p className={`mt-2 text-[10.5px] font-medium ${tone === "ruby" ? "text-emerald" : tone === "topaz" && value !== "0" ? "text-ruby" : "text-muted-foreground"}`}>{note}</p></div></div>{progress !== undefined ? <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary"><div className={`h-full rounded-full ${tone === "ruby" ? "bg-gradient-to-r from-emerald to-topaz" : "bg-emerald/70"}`} style={{ width: `${Math.min(100, progress)}%` }} /></div> : null}</div>)}</div>
-      <div className="mt-4 grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_430px] gap-4 px-[14px]">
-        <div className="flex min-h-0 min-w-0 flex-col gap-3"><div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2">{tabs.map((tab) => <button key={tab.key} type="button" onClick={() => setBudgetView(tab.key)} className={`inline-flex h-8 items-center gap-2 rounded-full px-3 text-[11px] font-medium ${budgetView === tab.key ? "bg-emerald text-white shadow-[0_5px_12px_hsl(var(--emerald)/0.18)]" : "border border-border bg-card text-muted-foreground"}`}>{tab.label}<span className={`rounded-full px-1.5 py-0.5 text-[10px] ${budgetView === tab.key ? "bg-white/20" : "bg-secondary"}`}>{tab.count}</span></button>)}</div><div className="flex gap-1 rounded-[10px] border border-border bg-card p-1" role="group" aria-label="Budget view"><button type="button" onClick={() => setDisplayMode("list")} aria-label="List view" title="List view" aria-pressed={displayMode === "list"} className={`grid h-8 w-8 place-items-center rounded-[8px] transition-colors ${displayMode === "list" ? "bg-emerald/10 text-emerald" : "text-muted-foreground hover:bg-secondary"}`}><List className="h-4 w-4" /></button><button type="button" onClick={() => setDisplayMode("grid")} aria-label="Grid view" title="Grid view" aria-pressed={displayMode === "grid"} className={`grid h-8 w-8 place-items-center rounded-[8px] transition-colors ${displayMode === "grid" ? "bg-emerald/10 text-emerald" : "text-muted-foreground hover:bg-secondary"}`}><LayoutGrid className="h-4 w-4" /></button></div></div>
-          {displayMode === "list" ? (<div data-testid="budget-list" className="surface min-h-0 flex-1 overflow-auto rounded-[16px]"><table className="w-full text-left"><thead className="sticky top-0 z-10 bg-card"><tr className="border-b border-border text-[11px] font-medium text-muted-foreground"><th className="px-4 py-3">Category</th><th className="px-3 py-3 text-right">Spent</th><th className="px-3 py-3 text-right">Budget</th><th className="w-[180px] px-3 py-3">Progress</th><th className="px-3 py-3">Status</th><th className="w-[90px]" /></tr></thead><tbody>{budgetTableRows.map((budget) => { const pct = Number(budget.progress_pct) || 0; const risk = pct >= 80; const over = pct >= 100; const Icon = CATEGORY_ICONS[budget.category.toLowerCase().trim()] || Target; return <tr key={budget.budget_id} onClick={() => openBudgetTransactions(budget)} className="cursor-pointer border-b border-border/70 last:border-0 hover:bg-secondary/30"><td className="px-4 py-2.5"><span className="flex items-center gap-2.5"><span className={`grid h-8 w-8 place-items-center rounded-xl ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}><Icon className="h-4 w-4" /></span><span className="text-[12px] font-medium capitalize">{budget.category}</span></span></td><td className="money-tabular px-3 py-2.5 text-right text-[12px]">£{Number(budget.spent || 0).toFixed(2)}</td><td className="money-tabular px-3 py-2.5 text-right text-[12px] text-muted-foreground">£{Number(budget.limit || 0).toFixed(2)}</td><td className="px-3 py-2.5"><div className="flex items-center gap-2"><div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary"><div className={`h-full rounded-full ${over ? "bg-ruby" : risk ? "bg-gradient-to-r from-topaz to-ruby/70" : "bg-gradient-to-r from-emerald to-sky"}`} style={{ width: `${Math.min(100, pct)}%` }} /></div><span className="w-7 text-right text-[10px] text-muted-foreground">{Math.round(pct)}%</span></div></td><td className="px-3 py-2.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-medium ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}>{over ? "Exceeded" : risk ? "At risk" : "On track"}</span></td><td className="px-3 py-2.5"><button type="button" aria-label={`Edit ${budget.category} budget`} onClick={(event) => { event.stopPropagation(); startEdit(budget); }} className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2 text-[11px] font-medium text-foreground hover:bg-secondary"><Pencil className="h-3 w-3" />Edit</button></td></tr>; })}</tbody></table>{budgetTableRows.length === 0 ? <div className="py-10 text-center text-sm text-muted-foreground">No budgets in this view.</div> : null}</div> ) : (
-            <div data-testid="budget-grid" className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
+      <div className="mt-4 px-[14px]"><WorkspaceMetrics columns={4}>
+        {statCards.map(({ label, value, note, icon, tone, progress }) => <WorkspaceMetric key={label} label={label} value={value} note={note} icon={icon} tone={tone} progress={progress} />)}
+      </WorkspaceMetrics></div>
+      <div className="mt-4 grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(305px,32%)] gap-4 px-[14px]">
+        <div className="budget-primary flex min-h-0 min-w-0 flex-col gap-3">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+            <WorkspaceTabs tabs={tabs} active={budgetView} onChange={setBudgetView} label="Budget category status" />
+            <WorkspaceViewToggle value={displayMode} onChange={setDisplayMode} label="Budget view" />
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <label className="relative min-w-[130px] flex-1" aria-label="Search budgets">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <input type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search categories and budgets" className="h-9 w-full rounded-[9px] border border-border bg-card pl-8 pr-3 text-[12px] outline-none focus:border-emerald/40" />
+            </label>
+            <PenniSelect value={sortOption} onChange={(e) => setSortOption(e.target.value)}
+              aria-label="Sort budgets" className="h-9 min-w-[130px] rounded-[9px] border border-border bg-card px-3 text-xs">
+              <option value="progress">Sort: Progress</option><option value="name">Sort: Name</option>
+              <option value="limit">Sort: Budget</option><option value="spent">Sort: Spent</option><option value="remaining">Sort: Remaining</option>
+            </PenniSelect>
+            <button type="button" onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")} aria-label="Reverse sort" className="grid h-9 w-9 place-items-center rounded-[9px] border border-border bg-card">
+              {sortOrder === "desc" ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+            </button>
+          </div>
+          {loading ? <WorkspaceSkeleton /> : loadError ? <WorkspaceBlank title="Could not load budgets" description={loadError} error action={<button onClick={onRetry} className="rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white">Try again</button>} /> : displayMode === "list" ? (<div data-testid="budget-list" className="workspace-table-panel budget-ledger-scroll surface min-h-0 flex-1 overflow-auto rounded-[16px]"><table className="workspace-table w-full text-left"><thead className="sticky top-0 z-10 bg-card"><tr className="border-b border-border text-[11px] font-medium text-muted-foreground"><th className="px-4 py-3">Category</th><th className="px-3 py-3 text-right">Spent</th><th className="px-3 py-3 text-right">Budget</th><th className="w-[180px] px-3 py-3">Progress</th><th className="px-3 py-3">Status</th><th className="w-[90px]" /></tr></thead><tbody>{budgetTableRows.map((budget) => { const pct = Number(budget.progress_pct) || 0; const risk = pct >= 80; const over = pct >= 100; const Icon = CATEGORY_ICONS[budget.category.toLowerCase().trim()] || Target; return <tr key={budget.budget_id} onClick={() => openBudgetTransactions(budget)} className="cursor-pointer border-b border-border/70 last:border-0 hover:bg-secondary/30"><td className="px-4 py-2.5"><span className="flex items-center gap-2.5"><span className={`grid h-8 w-8 place-items-center rounded-xl ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}><Icon className="h-4 w-4" /></span><span className="text-[12px] font-medium capitalize">{budget.category}</span></span></td><td className="money-tabular px-3 py-2.5 text-right text-[12px]">£{Number(budget.spent || 0).toFixed(2)}</td><td className="money-tabular px-3 py-2.5 text-right text-[12px] text-muted-foreground">£{Number(budget.limit || 0).toFixed(2)}</td><td className="px-3 py-2.5"><div className="flex items-center gap-2"><div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary"><div className={`h-full rounded-full ${over ? "bg-ruby" : risk ? "bg-gradient-to-r from-topaz to-ruby/70" : "bg-gradient-to-r from-emerald to-sky"}`} style={{ width: `${Math.min(100, pct)}%` }} /></div><span className="w-7 text-right text-[10px] text-muted-foreground">{Math.round(pct)}%</span></div></td><td className="px-3 py-2.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-medium ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}>{over ? "Exceeded" : risk ? "At risk" : "On track"}</span></td><td className="px-3 py-2.5"><button type="button" aria-label={`Edit ${budget.category} budget`} onClick={(event) => { event.stopPropagation(); startEdit(budget); }} className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2 text-[11px] font-medium text-foreground hover:bg-secondary"><Pencil className="h-3 w-3" />Edit</button></td></tr>; })}</tbody></table>{budgetTableRows.length === 0 ? <WorkspaceBlank title={searchQuery || budgetView !== "all" ? "No matching budgets" : "No budgets yet"} description={searchQuery || budgetView !== "all" ? "Try clearing your search or changing the status tab." : "Create a budget to track spending, or choose a category from the unbudgeted list."} action={!searchQuery && budgetView === "all" ? <button type="button" onClick={() => onAdd()} className="rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white">Create budget</button> : null} /> : null}</div> ) : (
+            <div data-testid="budget-grid" className="budget-ledger-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 {budgetTableRows.map((budget) => {
                   const pct = Number(budget.progress_pct) || 0;
@@ -332,12 +361,67 @@ const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
                   );
                 })}
               </div>
-              {budgetTableRows.length === 0 ? <p className="py-10 text-center text-sm text-muted-foreground">No budgets in this view.</p> : null}
+              {budgetTableRows.length === 0 ? <WorkspaceBlank title="No budgets in this view" description="Try another filter or create a budget." /> : null}
             </div>
           )}
-          <div className="surface max-h-[165px] shrink-0 overflow-y-auto rounded-[16px]"><div className="flex items-center justify-between border-b border-border px-4 py-3"><p className="text-[13px] font-semibold">Recent Budget Activity</p><span className="text-[11px] font-medium text-emerald">View all <ArrowUpRight className="inline h-3 w-3" /></span></div><table className="w-full text-left"><thead className="text-[10.5px] text-muted-foreground"><tr><th className="px-4 py-2">Date</th><th className="px-3 py-2">Category</th><th className="px-3 py-2">Description</th><th className="px-4 py-2 text-right">Amount</th></tr></thead><tbody>{recentTransactions.map((tx) => <tr key={tx.transaction_id} className="border-t border-border/60 text-[11px]"><td className="px-4 py-2 text-muted-foreground">{tx.date ? format(new Date(tx.date), "d MMM yyyy") : "—"}</td><td className="px-3 py-2 capitalize">{tx.category || "Uncategorised"}</td><td className="max-w-[240px] truncate px-3 py-2">{tx.description || tx.merchant || "Transaction"}</td><td className={`money-tabular px-4 py-2 text-right font-medium ${Number(tx.amount) < 0 ? "text-ruby" : "text-emerald"}`}>{Number(tx.amount) < 0 ? "-" : "+"}£{Math.abs(Number(tx.amount) || 0).toFixed(2)}</td></tr>)}</tbody></table></div>
+
         </div>
-        <aside className="space-y-4"><div className="surface rounded-[16px] p-4"><div className="flex items-center justify-between"><h2 className="text-[15px] font-semibold">Spending by Category</h2><span className="rounded-lg bg-secondary px-2.5 py-1 text-[10px] text-muted-foreground">This Month</span></div>{categorySpend.length ? <CategoryPieChart data={categorySpend.slice(0, 7)} /> : <div className="py-16 text-center text-sm text-muted-foreground">No category spending this month.</div>}</div><div className="surface rounded-[16px] p-4"><div className="flex items-center justify-between"><h2 className="text-[15px] font-semibold">Monthly Trend</h2><span className="text-[10px] text-muted-foreground">Budget vs spent</span></div><div className="mt-6 flex h-[112px] items-end justify-between gap-3">{budgetTableRows.slice(0, 6).map((budget) => { const limit = Math.max(Number(budget.limit) || 0, 1); const spent = Number(budget.spent) || 0; return <div key={budget.budget_id} className="flex min-w-0 flex-1 flex-col items-center gap-1"><div className="flex h-[88px] items-end gap-1"><span className="w-3 rounded-t bg-sky" style={{ height: `${Math.max(5, Math.min(100, spent / limit * 100))}%` }} /><span className="w-3 rounded-t bg-secondary" style={{ height: "100%" }} /></div><span className="max-w-full truncate text-[9px] text-muted-foreground">{budget.category}</span></div>; })}</div><div className="mt-3 flex justify-end gap-3 text-[10px] text-muted-foreground"><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-sky" />Spent</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-secondary" />Budget</span></div></div><div className="surface rounded-[16px] p-4"><h2 className="text-[15px] font-semibold">Quick Actions</h2><div className="mt-3 grid grid-cols-2 gap-2">{[{ label: "Add Budget", sub: "Create a new budget", icon: Plus, tone: "emerald", action: onAdd }, { label: "Manage Categories", sub: "Edit spending categories", icon: FolderCog, tone: "topaz", action: onManageCategories }, { label: "View Reports", sub: "Detailed analysis", icon: BarChart3, tone: "violet", action: onViewReports }, { label: "Set Alerts", sub: "Notifications near limits", icon: Bell, tone: "ruby", action: onAlerts }].map(({ label, sub, icon: Icon, tone, action }) => <button key={label} type="button" onClick={action} className="rounded-xl border border-border/70 p-3 text-left hover:border-emerald/30 hover:bg-secondary/30"><span className={`mb-2 grid h-8 w-8 place-items-center rounded-xl ${tone === "topaz" ? "bg-topaz/10 text-topaz" : tone === "ruby" ? "bg-ruby/10 text-ruby" : tone === "violet" ? "bg-violet/10 text-violet" : "bg-emerald/10 text-emerald"}`}><Icon className="h-4 w-4" /></span><span className="block text-[11px] font-semibold">{label}</span><span className="mt-0.5 block text-[9.5px] text-muted-foreground">{sub}</span></button>)}</div></div></aside>
+        <aside className="budget-insights-sidebar subtle-scroll min-h-0 min-w-0 space-y-3 overflow-y-auto overscroll-contain pb-2 pr-1">
+          {unbudgetedCategories?.length > 0 && <section className="surface rounded-[16px] p-4">
+            <h2 className="text-[14px] font-semibold">Unbudgeted spending</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Spending in categories without a budget</p>
+            <div className="mt-3 space-y-1">
+              {unbudgetedCategories.map(category => <div key={category.name} className="flex items-center justify-between gap-2 rounded-lg border border-border/60 px-2 py-2 text-xs">
+                <span className="min-w-0 truncate capitalize">{category.name} · £{Number(category.value||0).toFixed(2)}</span>
+                <button type="button" onClick={() => onAdd(category.name)} className="shrink-0 rounded-lg bg-emerald/10 px-2 py-1.5 font-semibold text-emerald" aria-label={`Create budget for ${category.name}`}>Add budget</button>
+              </div>)}
+            </div>
+          </section>}
+          <section className="surface rounded-[16px] p-4">
+            <div className="flex items-center justify-between gap-2"><h2 className="text-[14px] font-semibold">Spending by Category</h2><span className="rounded-lg bg-secondary px-2.5 py-1 text-[10px] text-muted-foreground">This month</span></div>
+            {categorySpend.length ? <CategoryPieChart data={categorySpend.slice(0, 7)} /> : <WorkspaceBlank title="No category spending" description="Spending will appear here as transactions are added." />}
+          </section>
+          <section className="surface rounded-[16px] p-4">
+            <div className="flex items-center justify-between gap-2"><h2 className="text-[14px] font-semibold">Monthly Trend</h2><span className="text-[10px] text-muted-foreground">Last 6 months</span></div>
+            {monthlyTrend?.length ? <>
+              <div className="mt-5 flex h-[120px] items-end gap-2" role="img" aria-label="Monthly budget versus spending for the last six months">
+                {monthlyTrend.map(point => {
+                  const peak = Math.max(1,...monthlyTrend.flatMap(item => [item.budgeted,item.spent]));
+                  return <div key={point.month} className="flex min-w-0 flex-1 flex-col items-center gap-2">
+                    <div className="flex h-[92px] w-full items-end justify-center gap-1">
+                      <div className="w-[35%] min-w-[4px] rounded-t bg-emerald/75" style={{height:`${Math.max(point.budgeted ? 3 : 0,point.budgeted/peak*100)}%`}} title={`Budget ${point.month}: £${point.budgeted.toFixed(2)}`} />
+                      <div className="w-[35%] min-w-[4px] rounded-t bg-topaz/80" style={{height:`${Math.max(point.spent ? 3 : 0,point.spent/peak*100)}%`}} title={`Spent ${point.month}: £${point.spent.toFixed(2)}`} />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">{point.label}</span>
+                  </div>;
+                })}
+              </div>
+              <div className="mt-2 flex justify-center gap-4 text-[10px] text-muted-foreground"><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald/75" />Budget</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-topaz/80" />Spent</span></div>
+            </> : <WorkspaceBlank title="Trend unavailable" description="Historical monthly budget figures could not be loaded." />}
+          </section>
+          <section className="surface rounded-[16px] p-4">
+            <div className="mb-2 flex items-center justify-between gap-3"><h2 className="text-[14px] font-semibold">Recent Budget Activity</h2><button type="button" onClick={onViewAll} className="text-xs font-semibold text-emerald hover:underline">View all</button></div>
+            {recentTransactions.length ? <div className="divide-y divide-border/70">
+              {recentTransactions.map(tx => <div key={tx.transaction_id} className="flex items-center justify-between gap-2 py-2 text-xs"><div className="min-w-0"><p className="truncate font-medium">{tx.description||tx.merchant||"Transaction"}</p><p className="text-[10px] text-muted-foreground">{tx.date?.slice(0,10)||"No date"} · {tx.category||"Uncategorised"}</p></div><span className={`money-tabular shrink-0 text-xs font-semibold ${Number(tx.amount)<0?"text-ruby":"text-emerald"}`}>{Number(tx.amount)<0?"−":"+"}£{Math.abs(Number(tx.amount)||0).toFixed(2)}</span></div>)}
+            </div> : <p className="py-4 text-center text-xs text-muted-foreground">No recent activity.</p>}
+          </section>
+          {Object.values(eventGroups || {}).length > 0 && <section className="surface rounded-[16px] p-3">
+            <h2 className="mb-2 px-1 text-[14px] font-semibold">Event budgets</h2>
+            <div className="space-y-2">{Object.values(eventGroups).map(group => <EventGroupCard key={group.event_group_id} group={group} setConfirmDelete={onDeleteEvent} fetchData={onRetry} />)}</div>
+          </section>}
+          {insights?.length > 0 && <section className="surface rounded-[16px] p-4">
+            <h2 className="mb-1 text-[14px] font-semibold">Penni Coach</h2><p className="mb-3 text-xs text-muted-foreground">Budget suggestions based on your spending</p>
+            <div className="space-y-2">{insights.map(insight => <div key={insight.category} className="rounded-lg border border-border/70 p-3 text-xs">
+              <p className="font-semibold capitalize">{insight.category}</p><p className="mt-1 text-muted-foreground">{insight.reason}</p>
+              {insight.current_budget !== insight.suggested_budget && <button type="button" disabled={applyingInsight===insight.category} onClick={() => onApplyInsight(insight)} className="mt-2 rounded-lg bg-emerald/10 px-2.5 py-1.5 font-semibold text-emerald disabled:opacity-50">{applyingInsight===insight.category?"Updating…":`Update to £${insight.suggested_budget}`}</button>}
+            </div>)}</div>
+          </section>}
+          <section className="surface rounded-[16px] p-4"><h2 className="text-[14px] font-semibold">Quick Actions</h2>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {[{label:"Add Budget",icon:Plus,action:()=>onAdd()}, {label:"Manage Categories",icon:FolderCog,action:onManageCategories}, {label:"View Reports",icon:BarChart3,action:onViewReports},{label:"Set Alerts",icon:Bell,action:onAlerts}].map(({label,icon:Icon,action})=><button key={label} onClick={action} className="flex flex-col items-start gap-2 rounded-xl border border-border/70 p-3 text-left text-[11px] font-medium hover:bg-secondary/40"><Icon className="h-4 w-4 text-emerald" />{label}</button>)}
+            </div>
+          </section>
+        </aside>
       </div>
     </div>
   );
@@ -387,6 +471,7 @@ export default React.memo(function BudgetPage() {
   const [categoryHierarchy, setCategoryHierarchy] = useState({});
   const [categorySpend, setCategorySpend] = useState([]);
   const [recentTransactions, setRecentTransactions] = useState([]);
+  const [monthlyTrend, setMonthlyTrend] = useState([]);
   const [budgetView, setBudgetView] = useState("all");
   const [displayMode, setDisplayMode] = useState("list");
 
@@ -395,6 +480,8 @@ export default React.memo(function BudgetPage() {
   const [budgetTxCategory, setBudgetTxCategory] = useState("");
   const [budgetTxList, setBudgetTxList] = useState([]);
   const [budgetTxLoading, setBudgetTxLoading] = useState(false);
+  const [inspectedBudgetTx, setInspectedBudgetTx] = useState(null);
+  const [accountOptions, setAccountOptions] = useState([]);
   const [txEditForm, setTxEditForm] = useState(null);
   const [txEditId, setTxEditId] = useState(null);
 
@@ -524,7 +611,7 @@ export default React.memo(function BudgetPage() {
 
   const sectionsForDisplay = useMemo(() => {
     const groups = {};
-    filteredEveryday.forEach((b) => {
+    budgetTableRows.forEach((b) => {
       const sec = sectionForCategory[b.category] || "Other";
       if (!groups[sec]) groups[sec] = [];
       groups[sec].push(b);
@@ -536,7 +623,7 @@ export default React.memo(function BudgetPage() {
     });
     Object.entries(groups).forEach(([sec, items]) => { ordered[sec] = items; });
     return ordered;
-  }, [filteredEveryday, sectionForCategory, categoryHierarchy]);
+  }, [budgetTableRows, sectionForCategory, categoryHierarchy]);
 
   const unbudgetedCategories = useMemo(() => {
     if (!categorySpend.length) return [];
@@ -615,7 +702,21 @@ export default React.memo(function BudgetPage() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    let active = true;
+    // Build a real six-month history; categories in one month are not a time series.
+    const months = Array.from({ length: 6 }, (_, index) => addMonth(month, index - 5));
+    Promise.all(months.map(async key => {
+      try {
+        const { data } = await api.get("/budgets", { params: { month: key } });
+        const rows = (data.budgets || []).filter(b => (b.budget_type || "everyday") !== "event");
+        return { month: key, label: MONTH_NAMES[Number(key.slice(5))-1].slice(0,3), budgeted: rows.reduce((n,b)=>n+(Number(b.limit)||0),0), spent: rows.reduce((n,b)=>n+(Number(b.spent)||0),0) };
+      } catch { return null; }
+    })).then(rows => { if (active) setMonthlyTrend(rows.filter(Boolean)); });
+    return () => { active = false; };
+  }, [month]);
   useEffect(() => { fetchCategories(); }, []);
+  useEffect(() => { api.get("/accounts").then(({data}) => setAccountOptions(data.accounts||[])).catch(() => {}); }, []);
   useEffect(() => { fetchInsights(); }, []);
 
   const resetForm = () => setForm({ category: "", limit: "", budget_type: "everyday", event_date: "", event_group_id: "", event_group_name: "" });
@@ -839,140 +940,77 @@ export default React.memo(function BudgetPage() {
         setDisplayMode={setDisplayMode}
         categorySpend={categorySpend}
         recentTransactions={recentTransactions}
-        onAdd={() => openAddBudget("everyday")}
+        onAdd={(category = "") => openAddBudget("everyday", category)}
         onRefresh={fetchData}
         onCopyPrevious={handleCopyPreviousMonth}
         onViewAll={() => navigate(`/transactions?date_from=${month}-01&date_to=${month}-${String(daysInMonth).padStart(2, "0")}`)}
         onManageCategories={() => navigate("/settings/categories")}
         onViewReports={() => navigate("/reports")}
         onAlerts={() => navigate("/settings")}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        sortOption={sortOption}
+        setSortOption={setSortOption}
+        sortOrder={sortOrder}
+        setSortOrder={setSortOrder}
+        loading={loading}
+        loadError={loadError}
+        onRetry={fetchData}
+        onSeedDefaults={handleSeedDefaults}
+        unbudgetedCategories={unbudgetedCategories}
+        eventGroups={eventGroups}
+        onDeleteEvent={setConfirmDelete}
+        monthlyTrend={monthlyTrend}
+        insights={insights}
+        onApplyInsight={handleApplyInsight}
+        applyingInsight={applyingInsight}
         openBudgetTransactions={openBudgetTransactions}
         startEdit={startEdit}
       />
 
       <div className="xl:hidden">
 
-      <PageHeader
-        eyebrow="Planning"
+      <WorkspaceHeader
         title="Budgets"
-        description="Set simple limits, follow your pace and keep everyday spending easy to understand."
+        description="Track your spending, set budgets and stay in control."
+        actions={<>
+          <MonthPicker label={monthLabel} onPrev={() => setMonth(addMonth(month, -1))} onNext={() => setMonth(addMonth(month, 1))}
+            onToday={() => setMonth(fmtMonth(now.getFullYear(), now.getMonth() + 1))} isToday={isCurrentMonth} />
+          <Button variant="primary" size="sm" onClick={() => openAddBudget("everyday")}><Plus className="mr-1 h-4 w-4" /> Add budget</Button>
+          <DropdownMenu><DropdownMenuTrigger asChild><button type="button" aria-label="More budget actions" className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-card"><MoreHorizontal className="h-4 w-4" /></button></DropdownMenuTrigger>
+            <DropdownMenuContent align="end"><DropdownMenuItem onClick={handleCopyPreviousMonth}>Copy previous month</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSeedDefaults}>Load defaults</DropdownMenuItem><DropdownMenuItem onClick={fetchData}>Refresh</DropdownMenuItem></DropdownMenuContent>
+          </DropdownMenu>
+        </>}
       />
-
-      {/* Budget summary */}
-      <div className="surface p-4 sm:p-5">
-        <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
-          {/* Large progress ring with subtle shadow */}
-          <div className="relative shrink-0 drop-shadow-[0_0_8px_rgba(48,164,108,0.4)]">
-            <ProgressRing pct={summary.totalPlanned ? (summary.totalSpent / summary.totalPlanned) * 100 : 0} size={80} stroke={5}
-              color={summary.overCount > 0 ? "#e5484d" : summary.totalSpent > summary.totalPlanned * 0.8 ? "#e8a838" : "#30a46c"} />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-lg font-bold tabular-nums">{summary.totalPlanned ? Math.round((summary.totalSpent / summary.totalPlanned) * 100) : 0}%</span>
-            </div>
-          </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2">
-                <MonthPicker
-                  label={monthLabel}
-                  onPrev={() => setMonth(addMonth(month, -1))}
-                  onNext={() => setMonth(addMonth(month, 1))}
-                  onToday={() => setMonth(fmtMonth(now.getFullYear(), now.getMonth() + 1))}
-                  isToday={isCurrentMonth}
-                />
-              </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-              <span className="text-muted-foreground">Budgeted <strong className="text-foreground">£{summary.totalPlanned.toLocaleString()}</strong></span>
-              <span className="text-muted-foreground">Spent <strong className={summary.overCount > 0 ? "text-ruby" : "text-emerald"}>£{summary.totalSpent.toLocaleString()}</strong></span>
-              {summary.totalPlanned > 0 && (
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  summary.overCount > 0 ? "bg-ruby/10 text-ruby" :
-                  summary.totalSpent > summary.totalPlanned * 0.8 ? "bg-topaz/10 text-topaz" :
-                  "bg-emerald/10 text-emerald"
-                }`}>
-                  {summary.overCount > 0 ? `${summary.overCount} over budget` :
-                   summary.totalSpent > summary.totalPlanned * 0.8 ? "Nearing limit" : "On track"}
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:shrink-0">
-            <div className="relative w-full sm:w-40 lg:w-48 group/search order-first sm:order-none">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none transition-transform duration-200 group-focus-within/search:scale-110" />
-              <input type="search" placeholder="Search budgets..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} aria-label="Search budgets"
-                className="w-full h-8 pl-8 pr-3 rounded-full bg-secondary/40 border border-transparent text-xs placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring/30 focus:outline-none transition-all" />
-            </div>
-            <PenniSelect value={sortOption} onChange={(e) => { setSortOption(e.target.value); setSortOrder("desc"); }} aria-label="Sort budgets"
-              className="sm:hidden h-8 flex-1 basis-0 min-w-0 px-2 rounded-full bg-secondary/50 border border-border/50 text-[11px] font-medium focus:outline-none focus:border-ring">
-              <option value="progress">Progress</option>
-              <option value="name">Name</option>
-              <option value="limit">Limit</option>
-              <option value="spent">Spent</option>
-              <option value="remaining">Remaining</option>
-            </PenniSelect>
-            <button onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")} aria-label="Toggle sort order"
-              className="sm:hidden h-8 w-8 shrink-0 grid place-items-center rounded-full bg-secondary/50 border border-border/50 hover:bg-secondary/80 transition-colors">
-              {sortOrder === "desc" ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronUp className="h-3 w-3 text-muted-foreground" />}
-            </button>
-            <div className="hidden sm:flex flex-wrap gap-1.5">
-              {["progress", "name", "limit", "spent", "remaining"].map((opt) => (
-                <button key={opt} onClick={() => {
-                  if (sortOption === opt) setSortOrder(sortOrder === "desc" ? "asc" : "desc");
-                  else { setSortOption(opt); setSortOrder("desc"); }
-                }}
-                  className={`h-7 px-3 rounded-full text-[11px] font-medium border transition-all duration-200 ${sortOption === opt
-                    ? "bg-emerald/10 text-emerald border-emerald/20"
-                    : "bg-card/80 text-muted-foreground border-border/50 hover:bg-secondary/60 hover:text-foreground"}`}>
-                  {opt.charAt(0).toUpperCase() + opt.slice(1)}
-                  {sortOption === opt && (sortOrder === "desc" ? " ↓" : " ↑")}
-                </button>
-              ))}
-            </div>
-            <Button variant="primary" size="sm" onClick={() => openAddBudget("everyday")} aria-label="Add budget">
-              <Plus className="h-3.5 w-3.5" /> <span className="hidden min-[360px]:inline">Add</span>
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="h-8 w-8 rounded-full grid place-items-center text-muted-foreground hover:bg-secondary/60 hover:text-foreground transition-all duration-200">
-                  <MoreHorizontal className="h-3.5 w-3.5" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={handleCopyPreviousMonth} disabled={copying}>
-                  <Copy className={`h-4 w-4 mr-2 ${copying ? "animate-pulse" : ""}`} /> {copying ? "Copying..." : "Copy Previous"}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleSeedDefaults} disabled={seeding || loading}>
-                  <Download className={`h-4 w-4 mr-2 ${seeding ? "animate-pulse" : ""}`} /> {seeding ? "Loading..." : "Load Defaults"}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={fetchData} disabled={loading}>
-                  <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Refresh
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
+      <WorkspaceMetrics columns={4}>
+        <WorkspaceMetric label="Total Budgeted" value={`£${summary.totalPlanned.toFixed(2)}`} note={`${summary.count} categories`} icon={Target} />
+        <WorkspaceMetric label="Total Spent" value={`£${summary.totalSpent.toFixed(2)}`} note={summary.totalPlanned ? `${Math.round(summary.totalSpent/summary.totalPlanned*100)}% of budget` : "No budget set"} icon={TrendingDown} tone="ruby" progress={summary.totalPlanned ? summary.totalSpent/summary.totalPlanned*100 : 0} />
+        <WorkspaceMetric label={summary.totalRemaining < 0 ? "Over budget" : "Remaining"} value={`£${Math.abs(summary.totalRemaining).toFixed(2)}`} note={summary.totalPlanned ? "Across your budgets" : "No budget set"} icon={PiggyBank} tone={summary.totalRemaining < 0 ? "ruby" : "emerald"} />
+        <WorkspaceMetric label="At Risk" value={String(atRiskCount)} note={atRiskCount ? "Categories over 80% spent" : "All budgets on track"} icon={AlertCircle} tone="topaz" />
+      </WorkspaceMetrics>
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <label className="relative min-w-[160px] flex-1">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"/>
+          <input type="search" placeholder="Search budgets..." value={searchQuery} onChange={(e)=>setSearchQuery(e.target.value)}
+            aria-label="Search budgets" className="h-9 w-full rounded-[9px] border border-border bg-card pl-8 pr-3 text-xs outline-none focus:border-emerald/40" />
+        </label>
+        <PenniSelect value={sortOption} onChange={(e)=>setSortOption(e.target.value)} aria-label="Sort budgets" className="h-9 min-w-[112px] rounded-[9px] border border-border bg-card px-3 text-xs">
+          <option value="progress">Progress</option><option value="name">Name</option>
+          <option value="limit">Budget</option><option value="spent">Spent</option><option value="remaining">Remaining</option>
+        </PenniSelect>
+        <button type="button" onClick={()=>setSortOrder(sortOrder==="desc"?"asc":"desc")} aria-label="Reverse budget sort" className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-card">
+          {sortOrder==="desc" ? <ChevronDown className="h-4 w-4"/> : <ChevronUp className="h-4 w-4"/>}
+        </button>
       </div>
-
-      {/* Quick stats row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 relative z-10 fade-up">
-        <div className="surface surface-hover p-4 sm:p-5">
-          <div className="mx-auto mb-2 grid h-9 w-9 place-items-center rounded-xl bg-emerald/10 text-emerald"><Wallet className="h-4 w-4" /></div>
-          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Budgets</p>
-          <p className="text-2xl sm:text-3xl font-bold tracking-tight tabular-nums">{summary.count}</p>
-        </div>
-        <div className="surface surface-hover p-4 sm:p-5">
-          <div className="mx-auto mb-2 grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary"><Target className="h-4 w-4" /></div>
-          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Budgeted</p>
-          <p className="text-2xl sm:text-3xl font-bold tracking-tight tabular-nums">£{summary.totalPlanned.toLocaleString()}</p>
-        </div>
-        <div className="surface surface-hover p-4 sm:p-5">
-          <div className="mx-auto mb-2 grid h-9 w-9 place-items-center rounded-xl bg-ruby/10 text-ruby"><TrendingDown className="h-4 w-4" /></div>
-          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Spent</p>
-          <p className={`text-2xl sm:text-3xl font-bold tracking-tight tabular-nums ${summary.overCount > 0 ? "text-ruby" : "text-emerald"}`}>£{summary.totalSpent.toLocaleString()}</p>
-        </div>
-        <div className={`surface surface-hover p-4 sm:p-5 ${summary.totalRemaining < 0 ? "border-ruby/30" : ""}`}>
-          <div className={`mx-auto mb-2 grid h-9 w-9 place-items-center rounded-xl ${summary.totalRemaining < 0 ? "bg-ruby/10 text-ruby" : "bg-emerald/10 text-emerald"}`}><PiggyBank className="h-4 w-4" /></div>
-          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Remaining</p>
-          <p className={`text-2xl sm:text-3xl font-bold tracking-tight tabular-nums ${summary.totalRemaining < 0 ? "text-ruby" : "text-emerald"}`}>£{Math.abs(summary.totalRemaining).toLocaleString()}</p>
-        </div>
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <WorkspaceTabs tabs={[
+          {key:"all",label:"All Categories",count:everyday.length},
+          {key:"track",label:"On Track",count:everyday.filter(b=>(Number(b.progress_pct)||0)<80).length},
+          {key:"risk",label:"At Risk",count:atRiskCount},
+          {key:"exceeded",label:"Exceeded",count:summary.overCount},
+        ]} active={budgetView} onChange={setBudgetView} label="Budget status"/>
+        <WorkspaceViewToggle value={displayMode} onChange={setDisplayMode} label="Budget view"/>
       </div>
 
       {/* Loading */}
@@ -1079,7 +1117,7 @@ export default React.memo(function BudgetPage() {
                     £{totalRemaining >= 0 ? `${totalRemaining} left` : `${Math.abs(totalRemaining)} over`}
                   </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className={`grid gap-3 ${displayMode === "list" ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"}`}>
                   {items.map((b, idx) => <div key={b.budget_id} className={`fade-up delay-${Math.min(idx, 5)}`}><BudgetCard budget={b} isCurrentMonth={isCurrentMonth} currentDay={currentDay} monthElapsedPct={monthElapsedPct} daysInMonth={daysInMonth} startEdit={startEdit} bulkSelected={bulkSelected} setBulkSelected={setBulkSelected} setConfirmDelete={setConfirmDelete} openBudgetTransactions={openBudgetTransactions} /></div>)}
                   <button onClick={() => openAddBudget("everyday")}
                     className="rounded-xl border-2 border-dashed border-border/40 hover:border-emerald/40 hover:bg-emerald/5 hover:text-emerald hover:scale-[1.02] active:scale-[0.98] text-muted-foreground/50 transition-all duration-200 flex flex-col items-center justify-center p-3 w-full group/add">
@@ -1546,7 +1584,7 @@ export default React.memo(function BudgetPage() {
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${tx.amount > 0 ? "bg-emerald/10 text-emerald" : "bg-rose-50 text-rose-600"}`}>
                     {tx.amount > 0 ? "+" : "-"}
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <button type="button" onClick={() => { setBudgetTxOpen(false); setInspectedBudgetTx(tx); }} className="flex-1 min-w-0 text-left" aria-label={`View details for ${tx.description || tx.merchant || "transaction"}`}>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium truncate">{tx.description || tx.merchant || "—"}</span>
                       {tx.category && <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-secondary capitalize">{tx.category}</span>}
@@ -1555,7 +1593,7 @@ export default React.memo(function BudgetPage() {
                       {tx.date ? format(new Date(tx.date), "dd MMM yyyy") : "—"}
                       {tx.merchant && <span> · {tx.merchant}</span>}
                     </div>
-                  </div>
+                  </button>
                   <span className={`text-sm font-semibold tabular-nums shrink-0 ${tx.amount > 0 ? "text-emerald" : "text-rose-600"}`}>
                     {tx.amount > 0 ? "+" : ""}£{Math.abs(tx.amount).toFixed(2)}
                   </span>
@@ -1569,6 +1607,17 @@ export default React.memo(function BudgetPage() {
         </SheetContent>
       </Sheet>
 
+      <Sheet open={Boolean(inspectedBudgetTx)} onOpenChange={(open) => { if (!open) setInspectedBudgetTx(null); }}>
+        <SheetContent side="right" className="w-full p-0 sm:max-w-md">
+          <TransactionInspectorPanel
+            key={inspectedBudgetTx?.transaction_id || "empty"}
+            transaction={inspectedBudgetTx}
+            account={accountOptions.find(account => account.account_id === inspectedBudgetTx?.account_id)}
+            onClose={() => setInspectedBudgetTx(null)}
+            onEdit={(transaction) => { setInspectedBudgetTx(null); openTxEdit(transaction); }}
+          />
+        </SheetContent>
+      </Sheet>
       {/* Transaction Edit Modal */}
       {txEditForm && (
         <TransactionForm
@@ -1578,8 +1627,8 @@ export default React.memo(function BudgetPage() {
           setForm={setTxEditForm}
           onClose={closeTxEdit}
           onSubmit={handleTxEditSubmit}
-          selectedCats={[]}
-          accounts={[]}
+          selectedCats={allCats}
+          accounts={accountOptions}
           accountsLoading={false}
         />
       )}

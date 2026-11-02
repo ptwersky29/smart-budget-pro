@@ -296,38 +296,46 @@ body {
   scroll-behavior: auto;
   -webkit-overflow-scrolling: touch;
 }
+/* Penni budgets: scroll the ledger, not an arbitrary nth child.
+   Keep the sidebar independently accessible without nested table scrolling. */
 @media (min-width: 1280px) {
   .budget-workspace {
-    height: calc(100dvh - 7.75rem);
-    min-height: 40rem;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
     overflow: hidden;
   }
-  .budget-workspace > .grid > div:first-child {
+  .budget-workspace .budget-primary {
     display: flex;
+    min-width: 0;
     min-height: 0;
+    overflow: hidden;
     flex-direction: column;
   }
-  .budget-workspace > .grid > div:first-child > div:nth-child(2) {
-    min-height: 15rem;
+  .budget-workspace .budget-ledger-scroll {
     flex: 1 1 auto;
-    overflow-x: hidden;
+    min-width: 0;
+    min-height: 0;
+    overflow-x: auto;
     overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
   }
-  .budget-workspace > .grid > div:first-child > div:nth-child(2) thead {
+  .budget-workspace .budget-ledger-scroll thead {
     position: sticky;
     top: 0;
-    z-index: 1;
+    z-index: 2;
     background: hsl(var(--card));
   }
-  .budget-workspace > .grid > div:first-child > div:nth-child(3) {
-    max-height: 10.75rem;
-    flex: 0 0 auto;
-    overflow-y: auto;
-  }
-  .budget-workspace > .grid > aside {
+  .budget-workspace .budget-insights-sidebar {
     min-height: 0;
+    overflow-x: hidden;
     overflow-y: auto;
-    padding-right: 0.25rem;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
   }
 }
 .section-title {
@@ -757,6 +765,28 @@ html { font-size: calc(var(--fs-base, 0.875rem) * var(--fs-multiplier, 1)); }
   }
   .budgets-route > .budget-workspace {
     height: auto;
-    min-height: 40rem;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
   }
+  .budget-workspace .budget-primary,
+  .budget-workspace .budget-ledger-scroll,
+  .budget-workspace .budget-insights-sidebar {
+    max-height: none;
+    overflow-y: visible;
+  }
+}
+
+/* Shared table and finance workspace visual contract. */
+.workspace-page-header { min-width: 0; }
+.workspace-metric { min-height: 92px; }
+.workspace-metric > .flex { min-width: 0; }
+.workspace-table-panel { border-radius: 16px; }
+.workspace-table { border-collapse: separate; border-spacing: 0; }
+.workspace-table thead th { position: sticky; top: 0; z-index: 3; background: hsl(var(--card)); color: hsl(var(--muted-foreground)); font-weight: 500; border-bottom: 1px solid hsl(var(--border)); }
+.workspace-table tbody tr { transition: background-color 140ms ease; }
+.workspace-table tbody tr:hover { background: hsl(var(--secondary) / 0.34); }
+.workspace-table td { vertical-align: middle; }
+@media (max-width: 1279px) {
+  .budgets-route { overflow-x: hidden; }
 }
