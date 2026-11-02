@@ -35,6 +35,7 @@ import {
 } from "../components/ui/sheet";
 import TransactionForm from "../components/TransactionForm";
 import CategoryPieChart from "../components/CategoryPieChart";
+import TransactionInspectorPanel from "../components/TransactionInspectorPanel";
 import { WorkspaceHeader, WorkspaceMetric, WorkspaceMetrics, WorkspaceTabs, WorkspaceViewToggle, WorkspaceBlank } from "../components/ui/workspace";
 
 function fmtMonth(y, m) { return `${y}-${String(m).padStart(2, "0")}`; }
@@ -479,6 +480,8 @@ export default React.memo(function BudgetPage() {
   const [budgetTxCategory, setBudgetTxCategory] = useState("");
   const [budgetTxList, setBudgetTxList] = useState([]);
   const [budgetTxLoading, setBudgetTxLoading] = useState(false);
+  const [inspectedBudgetTx, setInspectedBudgetTx] = useState(null);
+  const [accountOptions, setAccountOptions] = useState([]);
   const [txEditForm, setTxEditForm] = useState(null);
   const [txEditId, setTxEditId] = useState(null);
 
@@ -713,6 +716,7 @@ export default React.memo(function BudgetPage() {
     return () => { active = false; };
   }, [month]);
   useEffect(() => { fetchCategories(); }, []);
+  useEffect(() => { api.get("/accounts").then(({data}) => setAccountOptions(data.accounts||[])).catch(() => {}); }, []);
   useEffect(() => { fetchInsights(); }, []);
 
   const resetForm = () => setForm({ category: "", limit: "", budget_type: "everyday", event_date: "", event_group_id: "", event_group_name: "" });
@@ -1580,7 +1584,7 @@ export default React.memo(function BudgetPage() {
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${tx.amount > 0 ? "bg-emerald/10 text-emerald" : "bg-rose-50 text-rose-600"}`}>
                     {tx.amount > 0 ? "+" : "-"}
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <button type="button" onClick={() => { setBudgetTxOpen(false); setInspectedBudgetTx(tx); }} className="flex-1 min-w-0 text-left" aria-label={`View details for ${tx.description || tx.merchant || "transaction"}`}>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium truncate">{tx.description || tx.merchant || "—"}</span>
                       {tx.category && <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-secondary capitalize">{tx.category}</span>}
@@ -1589,7 +1593,7 @@ export default React.memo(function BudgetPage() {
                       {tx.date ? format(new Date(tx.date), "dd MMM yyyy") : "—"}
                       {tx.merchant && <span> · {tx.merchant}</span>}
                     </div>
-                  </div>
+                  </button>
                   <span className={`text-sm font-semibold tabular-nums shrink-0 ${tx.amount > 0 ? "text-emerald" : "text-rose-600"}`}>
                     {tx.amount > 0 ? "+" : ""}£{Math.abs(tx.amount).toFixed(2)}
                   </span>
@@ -1603,6 +1607,17 @@ export default React.memo(function BudgetPage() {
         </SheetContent>
       </Sheet>
 
+      <Sheet open={Boolean(inspectedBudgetTx)} onOpenChange={(open) => { if (!open) setInspectedBudgetTx(null); }}>
+        <SheetContent side="right" className="w-full p-0 sm:max-w-md">
+          <TransactionInspectorPanel
+            key={inspectedBudgetTx?.transaction_id || "empty"}
+            transaction={inspectedBudgetTx}
+            account={accountOptions.find(account => account.account_id === inspectedBudgetTx?.account_id)}
+            onClose={() => setInspectedBudgetTx(null)}
+            onEdit={(transaction) => { setInspectedBudgetTx(null); openTxEdit(transaction); }}
+          />
+        </SheetContent>
+      </Sheet>
       {/* Transaction Edit Modal */}
       {txEditForm && (
         <TransactionForm
@@ -1612,8 +1627,8 @@ export default React.memo(function BudgetPage() {
           setForm={setTxEditForm}
           onClose={closeTxEdit}
           onSubmit={handleTxEditSubmit}
-          selectedCats={[]}
-          accounts={[]}
+          selectedCats={allCats}
+          accounts={accountOptions}
           accountsLoading={false}
         />
       )}
