@@ -950,7 +950,7 @@ export default React.memo(function BudgetPage() {
         onCopyPrevious={handleCopyPreviousMonth}
         onViewAll={() => openAction("transaction-search", { month })}
         onManageCategories={() => openAction("categories")}
-        onViewReports={() => openAction("reports")}
+        onViewReports={() => openAction("reports", {month})}
         onAlerts={() => openAction("alerts")}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
