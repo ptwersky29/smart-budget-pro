@@ -1,3 +1,4 @@
+import PenniSelect from "./PenniSelect";
 import React, { useEffect, useMemo, useState } from "react";
 import { Loader2, Palette, SmilePlus } from "lucide-react";
 import {
@@ -119,7 +120,7 @@ export default function CategoryEditorDialog({
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-1.5 block text-sm font-medium">Section</label>
-                  <select
+                  <PenniSelect
                     value={form.section}
                     onChange={(event) => setForm((current) => ({ ...current, section: event.target.value }))}
                     className="flex h-11 w-full rounded-2xl border border-border bg-secondary/40 px-4 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/20"
@@ -127,7 +128,7 @@ export default function CategoryEditorDialog({
                     {sectionOptions.map((section) => (
                       <option key={section} value={section}>{section}</option>
                     ))}
-                  </select>
+                  </PenniSelect>
                 </div>
                 <label className="flex items-center gap-3 rounded-2xl border border-border bg-secondary/20 px-4 py-3 text-sm">
                   <input
