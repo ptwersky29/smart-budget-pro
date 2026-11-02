@@ -307,7 +307,18 @@ export default function AccountDetailPage() {
     finally { setUploadBusy(false); }
   };
 
-  const deleteAccount = () => setConfirmDelete(true);
+  const deleteAccount = async () => {
+    try {
+      const { data } = await api.get("/transactions", { params: { account_id: accountId, limit: 1 } });
+      if (Number(data.total) > 0) {
+        toast.error(`This account has ${data.total} transaction(s). Reassign them before deleting the account.`);
+        return;
+      }
+      setConfirmDelete(true);
+    } catch (error) {
+      toast.error(formatApiError(error.response?.data?.detail) || "Could not check this account's transactions");
+    }
+  };
 
   const handleConfirmDelete = async () => {
     setConfirmDelete(false);
