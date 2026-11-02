@@ -11,6 +11,7 @@ export default function StatementAction({ initialDraft, initialAccountId, onSave
   const [accountId, setAccountId] = useState(initialAccountId || "");
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [duplicateWarning, setDuplicateWarning] = useState(null);
   const file = useRef(null);
   useEffect(() => {
     setDraft(initialDraft || null);
@@ -23,6 +24,7 @@ export default function StatementAction({ initialDraft, initialAccountId, onSave
     if (picked.size > 5 * 1024 * 1024) { toast.error("Maximum file size is 5 MB"); return; }
     if (!/\.(csv|pdf)$/i.test(picked.name)) { toast.error("Choose a CSV or PDF file"); return; }
     setBusy(true);
+    setDuplicateWarning(null);
     try {
       const body = new FormData();
       body.append("file", picked);
@@ -34,8 +36,8 @@ export default function StatementAction({ initialDraft, initialAccountId, onSave
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Could not upload statement"); }
     finally { setBusy(false); }
   };
-  const update = (index, field, value) => setRows(prev => prev.map((row, i) => i === index ? { ...row, [field]: value } : row));
-  const save = async () => {
+  const update = (index, field, value) => {setDuplicateWarning(null);setRows(prev => prev.map((row, i) => i === index ? { ...row, [field]: value } : row));};
+  const save = async (confirmDuplicates = false) => {
     if (!accountId) { toast.error("Choose the receiving account"); return; }
     if (!draft?.statement_id) { toast.error("Upload a statement first"); return; }
     setSaving(true);
@@ -43,16 +45,22 @@ export default function StatementAction({ initialDraft, initialAccountId, onSave
       const body = new FormData();
       body.append("account_id", accountId);
       body.append("transactions_json", JSON.stringify(rows));
+      if (confirmDuplicates) body.append("allow_duplicates", "true");
       const { data } = await api.post(`/statements/${draft.statement_id}/save`, body);
       toast.success(`Saved ${data.saved_count} transactions`);
       onSaved?.();
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Could not save statement"); }
+    } catch (e) {
+      const detail = e.response?.data?.detail;
+      if (e.response?.status === 409 && detail?.code === "duplicate_statement_transactions") {
+        setDuplicateWarning(detail);
+      } else toast.error(formatApiError(detail) || "Could not save statement");
+    }
     finally { setSaving(false); }
   };
   return <div className="space-y-4">
     <div>
       <label className="mb-1.5 block text-xs font-semibold">Import into account</label>
-      <PenniSelect value={accountId} onChange={event => setAccountId(event.target.value)}
+      <PenniSelect value={accountId} onChange={event => {setAccountId(event.target.value);setDuplicateWarning(null)}}
         className="flex h-10 w-full items-center rounded-xl border border-border bg-card px-3 text-sm" aria-label="Select bank account">
         <option value="">Select an account</option>
         {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.name}</option>)}
