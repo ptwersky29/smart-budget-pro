@@ -2,6 +2,7 @@ import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from "rea
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useAssistant } from "../contexts/AssistantContext";
+import { useActions } from "../contexts/ActionContext";
 import { useSettings } from "../contexts/SettingsContext";
 import { useTheme } from "next-themes";
 import { useKeyboardShortcut } from "../hooks/useKeyboardShortcut";
@@ -42,6 +43,7 @@ export default function AppLayout() {
   const { user, logout } = useAuth();
   const { settings } = useSettings();
   const { openAssistant } = useAssistant();
+  const { openAction } = useActions();
   const location = useLocation();
   const workspaceRoute = FIXED_WORKSPACE_ROUTES.has(location.pathname) || /^\/accounts\/[^/]+$/.test(location.pathname);
   const navigate = useNavigate();
@@ -115,17 +117,22 @@ export default function AppLayout() {
     const handler = (event) => {
       const { action } = event.detail || {};
       if (action === "new-transaction") {
-        window.dispatchEvent(new CustomEvent("app-quick-action", { detail: { action: "open-new-transaction" } }));
+        openAction("transaction-new");
       } else if (action === "search-transactions") {
-        navigate("/transactions");
-        setTimeout(() => window.dispatchEvent(new CustomEvent("app-quick-action", { detail: { action: "focus-search" } })), 100);
+        openAction("transaction-search");
+      } else if (action === "new-budget") {
+        openAction("budget-new");
+      } else if (action === "new-account") {
+        openAction("account-new");
+      } else if (action === "upload-statement") {
+        openAction("statement-import");
       } else if (action === "open-assistant") {
         openAssistant();
       }
     };
     window.addEventListener("command-action", handler);
     return () => window.removeEventListener("command-action", handler);
-  }, [navigate, openAssistant]);
+  }, [navigate, openAssistant, openAction]);
 
   const routeMeta = useMemo(() => getRouteMeta(location.pathname), [location.pathname]);
   const settingsActive = isActivePath(location.pathname, "/settings");
