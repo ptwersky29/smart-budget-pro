@@ -45,7 +45,7 @@ export default function GlobalActionHost() {
   const payload = active?.payload || {};
   const item = payload.transaction;
   const isTxForm = type === "transaction-new" || type === "transaction-edit";
-  const isAccountForm = type === "account-new";
+  const isAccountForm = type === "account-new" || type === "account-edit";
   const isInfo = type === "transaction-info" || type === "account-info" || type === "budget-info";
   const isLarge = type === "categories" || type === "statement-import" || type === "reports";
   useEffect(() => {
@@ -135,7 +135,7 @@ export default function GlobalActionHost() {
     onClassify={classifyTransaction} classifying={classifying} classification={classification}
     onClearClassification={() => setClassification(null)}
     saveAsRecurring={saveAsRecurring} setSaveAsRecurring={setSaveAsRecurring} saving={savingTransaction}/>;
-  if (isAccountForm) return <AccountFormModal key={active.key} open onClose={closeAction} onCreated={()=>changed("accounts")} />;
+  if (isAccountForm) return <AccountFormModal key={active.key} open editAccount={type === "account-edit" ? payload.account : null} onClose={closeAction} onCreated={() => afterSave("accounts")} />;
 
   return <Sheet open={Boolean(active)} onOpenChange={open=>{if(!open)closeAction()}}>
     <SheetContent side="right" className={`flex h-full w-full flex-col overflow-hidden p-0 ${isLarge?"sm:max-w-[min(940px,92vw)]":isInfo?"sm:max-w-[440px]":"sm:max-w-lg"}`}>
@@ -164,7 +164,7 @@ export default function GlobalActionHost() {
           <Button variant="outlinePill" className="w-full" onClick={() => openAction("account-new")}>Add account</Button>
         </div>}
         {type==="account-info" && <AccountActionPreview accountId={payload.accountId||payload.account?.account_id}
-          account={payload.account} onAddTransaction={accountId=>openAction("transaction-new",{accountId})} onClose={closeAction}/>}
+          account={payload.account} onAddTransaction={accountId=>openAction("transaction-new",{accountId})} onEdit={account=>openAction("account-edit",{account})} onClose={closeAction}/>}
         {type==="statement-import" && <StatementAction initialDraft={payload.draft} initialAccountId={payload.accountId}
           accounts={accounts} onSaved={()=>afterSave("transactions")}/>}
         {type==="categories" && <Suspense fallback={<p className="p-4 text-xs text-muted-foreground">Loading categories…</p>}><CategoryManager /></Suspense>}
