@@ -705,6 +705,11 @@ export default React.memo(function BudgetPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
   useEffect(() => {
+    const onChanged = () => fetchData();
+    window.addEventListener("penni:data-changed", onChanged);
+    return () => window.removeEventListener("penni:data-changed", onChanged);
+  }, [fetchData]);
+  useEffect(() => {
     let active = true;
     // Build a real six-month history; categories in one month are not a time series.
     const months = Array.from({ length: 6 }, (_, index) => addMonth(month, index - 5));
