@@ -1,3 +1,4 @@
+import PenniSelect from "./PenniSelect";
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Plus, Loader2, Sparkles, Check, X, Brain } from "lucide-react";
 import { Button } from "./ui/button";
@@ -118,7 +119,7 @@ export default function QuickAddWidget() {
             </div>
 
             <div className="space-y-2">
-              <select value={accountId} onChange={(e) => setAccountId(e.target.value)}
+              <PenniSelect value={accountId} onChange={(e) => setAccountId(e.target.value)}
                 className="w-full h-10 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-emerald focus:outline-none text-sm">
                 <option value="">Select account…</option>
                 {accounts.map((a) => (
@@ -126,7 +127,7 @@ export default function QuickAddWidget() {
                     {a.name} {a.type === "savings" ? "(Savings)" : ""}
                   </option>
                 ))}
-              </select>
+              </PenniSelect>
 
               <input placeholder="Description (e.g. Tesco £84)" value={desc}
                 onChange={e => { setDesc(e.target.value); setClassification(null); }}
