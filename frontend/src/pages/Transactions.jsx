@@ -1789,7 +1789,7 @@ const Transactions = React.memo(function Transactions() {
               ) : null}
 
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pt-[8px]">
-                <div className="flex min-w-0 items-center gap-4 overflow-x-auto xl:pl-[14px]">
+                <div className="no-scrollbar flex min-h-[44px] min-w-0 flex-1 items-center gap-4 overflow-x-auto overflow-y-hidden whitespace-nowrap xl:pl-[14px]">
                   {[
                     { key: "all", label: "All Transactions", count: tabCounts.all },
                     { key: "expenses", label: "Expenses", count: tabCounts.expenses },
@@ -1801,7 +1801,7 @@ const Transactions = React.memo(function Transactions() {
                       key={tab.key}
                       type="button"
                       onClick={() => selectLedgerTab(tab.key)}
-                      className={`-mb-px inline-flex h-10 shrink-0 items-center gap-1.5 border-b-2 text-[12px] transition ${
+                      className={`inline-flex h-10 shrink-0 items-center gap-1.5 border-b-2 text-[12px] transition ${
                         ledgerTab === tab.key
                           ? "border-emerald font-semibold text-foreground"
                           : "border-transparent text-muted-foreground hover:text-foreground"
