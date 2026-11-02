@@ -14,7 +14,10 @@ import StatementAction from "./StatementAction";
 import { BudgetActionForm, BudgetActionPreview, AccountActionPreview, ReportsActionPreview, SearchTransactionsAction, SplitTransactionAction, PairTransferAction } from "./FinanceActions";
 
 const CategoryManager = lazy(() => import("../../pages/CategoryManager"));
-const today = () => new Date().toISOString().slice(0,10);
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 const emptyTransaction = (account_id="") => ({
   description:"", date:today(), amount:"", category:"", merchant:"", notes:"",
   account_id, is_income:false, is_transfer:false, entry_mode:"standard",
@@ -39,7 +42,7 @@ export default function GlobalActionHost() {
   const [saveAsRecurring, setSaveAsRecurring] = useState(false);
   const [savingTransaction, setSavingTransaction] = useState(false);
   const savingRef = useRef(false);
-  const [fromDate,setFromDate] = useState(() => {const d=new Date();d.setDate(d.getDate()-90);return d.toISOString().slice(0,10)});
+  const [fromDate,setFromDate] = useState(() => {const d=new Date();d.setDate(d.getDate()-90);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`});
 
   const type = active?.type;
   const payload = active?.payload || {};
