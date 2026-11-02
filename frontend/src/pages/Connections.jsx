@@ -207,7 +207,13 @@ export default function Connections() {
 
   const saveManualBalance = async (id) => {
     try {
-      await api.put(`/accounts/manual/${id}`, { balance: parseFloat(balanceValue) || 0 });
+      const trimmed = String(balanceValue).trim();
+      const balance = Number(trimmed);
+      if (!trimmed || !Number.isFinite(balance)) {
+        toast.error("Enter a valid numeric balance; it was not changed");
+        return;
+      }
+      await api.put(`/accounts/manual/${id}`, { balance });
       toast.success("Balance updated");
       setEditingBalance(null);
       await load();
