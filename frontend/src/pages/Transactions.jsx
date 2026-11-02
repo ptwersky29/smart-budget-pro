@@ -1,7 +1,7 @@
 import { WorkspaceHeader, WorkspaceMetrics, WorkspaceMetric, WorkspaceTabs, WorkspaceViewToggle, WorkspaceBlank, WorkspaceSkeleton } from "../components/ui/workspace";
 import PenniSelect from "../components/PenniSelect";
-﻿import { createPortal } from "react-dom";
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
 import { Plus, Trash2, Loader2, Pencil, Search, Sparkles, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, BarChart3, Star, Receipt, Download, MoreHorizontal, RefreshCw, CheckCircle2, PieChart as PieChartIcon, ArrowDownLeft, ArrowUpRight, CalendarDays, Tag, Wallet, StickyNote, Building2, Scissors, Link2, Link2Off, AlertTriangle, Calculator, TrendingUp, TrendingDown, LayoutGrid, List, Copy, ArrowLeft } from "lucide-react";
