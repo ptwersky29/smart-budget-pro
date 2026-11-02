@@ -1,3 +1,4 @@
+import PenniSelect from "../PenniSelect";
 import React, { useCallback, useEffect, useState } from "react";
 import { Bot, Sparkles, Trash2, Plus } from "lucide-react";
 import { api } from "../../lib/api";
@@ -112,12 +113,12 @@ export default React.memo(function AutomationSettings() {
             </div>
             <div>
               <label className="label-overline">Provider *</label>
-              <select value={form.provider}
+              <PenniSelect value={form.provider}
                 onChange={(e) => setForm({ ...form, provider: e.target.value })}
                 className="mt-1 w-full h-11 rounded-xl bg-secondary/50 border border-transparent px-4 text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none"
               >
                 {PROVIDERS.map((p) => <option key={p}>{p}</option>)}
-              </select>
+              </PenniSelect>
             </div>
             <div>
               <label className="label-overline">Model *</label>
