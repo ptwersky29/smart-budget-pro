@@ -1,4 +1,5 @@
 import PenniSelect from "../components/PenniSelect";
+import { useActions } from "../contexts/ActionContext";
 import React, { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
@@ -33,6 +34,7 @@ function today() {
 }
 
 export default function AccountDetailPage() {
+  const { openAction } = useActions();
   const { accountId } = useParams();
   const navigate = useNavigate();
   useEffect(() => { document.title = "Account | Penni"; }, []);
@@ -197,6 +199,11 @@ export default function AccountDetailPage() {
   }, [account?.account_id, accountId, filters, offset]);
 
   useEffect(() => { loadAccount(); loadHistory(); loadTlConn(); }, [loadAccount, loadHistory, loadTlConn]);
+  useEffect(() => {
+    const refresh = () => { loadAccount(); loadTransactions(); loadHistory(); };
+    window.addEventListener("penni:data-changed", refresh);
+    return () => window.removeEventListener("penni:data-changed", refresh);
+  }, [loadAccount, loadTransactions, loadHistory]);
   useEffect(() => { if (account) loadTransactions(); }, [account?.account_id, loadTransactions]);
 
   // Load the next batch into the same list as the user approaches its bottom.
@@ -290,7 +297,8 @@ export default function AccountDetailPage() {
     try {
       const { data } = await api.post("/statements/upload", fd);
       toast.success(`${data.transaction_count || 0} transactions extracted — review before saving`);
-      navigate("/statements", { state: { draft: data } });
+      setUploadOpen(false);
+      openAction("statement-import", { draft: data, accountId });
     } catch (e) { toast.error(formatApiError(e) || "Upload failed"); }
     finally { setUploadBusy(false); }
   };

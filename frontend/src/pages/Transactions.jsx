@@ -649,6 +649,11 @@ const Transactions = React.memo(function Transactions() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const onChanged = () => load();
+    window.addEventListener("penni:data-changed", onChanged);
+    return () => window.removeEventListener("penni:data-changed", onChanged);
+  }, [load]);
   useEffect(() => { loadCats(); }, [loadCats]);
 
   const loadAccounts = useCallback(async () => {

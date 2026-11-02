@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -21,6 +21,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useAssistant } from "../contexts/AssistantContext";
 import { useSettings } from "../contexts/SettingsContext";
 import { useCategories } from "../contexts/CategoriesContext";
+import { useActions } from "../contexts/ActionContext";
 import { Button } from "../components/ui/button";
 import Skeleton from "../components/ui/Skeleton";
 import {
@@ -48,13 +49,14 @@ function monthLabel(value) {
   return formatted.split(" ")[0];
 }
 
-function TransactionLine({ transaction }) {
+function TransactionLine({ transaction, onSelect }) {
   const income = Number(transaction.amount) > 0;
   const title = transaction.description || transaction.merchant || "Transaction";
   return (
-    <Link
-      to={`/transactions?search=${encodeURIComponent(title)}`}
-      className="group flex items-center gap-3 px-4 py-2.5 transition hover:bg-secondary/35 sm:px-5"
+    <button
+      type="button"
+      onClick={() => onSelect(transaction)}
+      className="group flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-secondary/35 sm:px-5"
     >
       <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl ${income ? "bg-emerald/10 text-emerald" : "bg-secondary text-muted-foreground"}`}>
         {income ? <ArrowDownLeft className="h-3.5 w-3.5" /> : <ArrowUpRight className="h-3.5 w-3.5" />}
@@ -70,17 +72,17 @@ function TransactionLine({ transaction }) {
       <span className={`money-tabular shrink-0 text-[12.5px] font-semibold ${income ? "text-emerald" : ""}`}>
         {formatCurrency(transaction.amount, { signed: true })}
       </span>
-    </Link>
+    </button>
   );
 }
 
-function BudgetLine({ budget }) {
+function BudgetLine({ budget, onSelect }) {
   const limit = Number(budget.limit ?? budget.amount ?? 0);
   const spent = Number(budget.spent ?? 0);
   const pct = Math.min(Number(budget.progress_pct ?? (limit ? (spent / limit) * 100 : 0)), 100);
   const over = Number(budget.progress_pct ?? 0) >= 100;
   return (
-    <Link to="/budgets" className="block px-4 py-2.5 transition hover:bg-secondary/30 sm:px-5">
+    <button type="button" onClick={() => onSelect(budget)} className="block w-full px-4 py-2.5 text-left transition hover:bg-secondary/30 sm:px-5">
       <div className="flex items-center justify-between gap-3">
         <span className="truncate text-[12px] font-medium capitalize">{budget.category || "Budget"}</span>
         <span className={`money-tabular shrink-0 text-[11px] ${over ? "font-semibold text-ruby" : "text-muted-foreground"}`}>
@@ -93,7 +95,7 @@ function BudgetLine({ budget }) {
           style={{ width: `${Math.max(pct, spent > 0 ? 3 : 0)}%` }}
         />
       </div>
-    </Link>
+    </button>
   );
 }
 
@@ -102,7 +104,7 @@ export default function Dashboard() {
   const { settings } = useSettings();
   const { version: categoriesVersion } = useCategories();
   const { openAssistant } = useAssistant();
-  const navigate = useNavigate();
+  const { openAction } = useActions();
   const [overview, setOverview] = useState(null);
   const [budgets, setBudgets] = useState([]);
   const [alerts, setAlerts] = useState([]);
@@ -162,6 +164,11 @@ export default function Dashboard() {
   useEffect(() => {
     loadAll();
   }, [loadAll, categoriesVersion]);
+  useEffect(() => {
+    const onChanged = () => loadAll(true);
+    window.addEventListener("penni:data-changed", onChanged);
+    return () => window.removeEventListener("penni:data-changed", onChanged);
+  }, [loadAll]);
 
   const accounts = overview?.accounts || [];
   const categories = useMemo(
@@ -185,12 +192,7 @@ export default function Dashboard() {
   const totalBudget = budgets.reduce((sum, budget) => sum + (Number(budget.limit ?? budget.amount) || 0), 0);
   const totalSpentBudget = budgets.reduce((sum, budget) => sum + (Number(budget.spent) || 0), 0);
 
-  const addTransaction = () => {
-    navigate("/transactions");
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent("app-quick-action", { detail: { action: "open-new-transaction" } }));
-    }, 250);
-  };
+  const addTransaction = () => openAction("transaction-new");
 
   const seed = async () => {
     try {
@@ -286,15 +288,9 @@ export default function Dashboard() {
             description="Connect your bank to import transactions automatically, upload a statement, or add your first transaction manually to get started."
             action={
               <div className="flex flex-wrap justify-center gap-2">
-                <Button variant="primary" size="pill" asChild>
-                  <Link to="/accounts">Connect bank <ArrowRight className="h-4 w-4" /></Link>
-                </Button>
-                <Button variant="outlinePill" size="pill" asChild>
-                  <Link to="/accounts">Upload statement</Link>
-                </Button>
-                <Button variant="outlinePill" size="pill" asChild>
-                  <Link to="/transactions">Add manually</Link>
-                </Button>
+                <Button variant="primary" size="pill" onClick={() => openAction("bank-connect")}>Connect bank <ArrowRight className="h-4 w-4" /></Button>
+                <Button variant="outlinePill" size="pill" onClick={() => openAction("statement-import")}>Upload statement</Button>
+                <Button variant="outlinePill" size="pill" onClick={addTransaction}>Add manually</Button>
                 <button
                   type="button"
                   onClick={seed}
@@ -326,7 +322,15 @@ export default function Dashboard() {
                 {alert.title || alert.message}
               </p>
               {alert.action_url ? (
-                <Link to={alert.action_url} className="shrink-0 text-[10.5px] font-semibold text-topaz">
+                <Link to={alert.action_url} onClick={event => {
+                  const destination = String(alert.action_url || "").split("?")[0];
+                  const action = destination.startsWith("/budgets") ? "budget-new"
+                    : destination.startsWith("/transactions") ? "transaction-search"
+                    : destination.startsWith("/accounts") ? "accounts-overview"
+                    : destination.startsWith("/reports") ? "reports"
+                    : destination.startsWith("/settings") ? "alerts" : null;
+                  if (action) { event.preventDefault(); openAction(action); }
+                }} className="shrink-0 text-[10.5px] font-semibold text-topaz">
                   Review
                 </Link>
               ) : null}
@@ -389,23 +393,24 @@ export default function Dashboard() {
               title="Accounts"
               subtitle="Balances across your connected banks"
               actions={
-                <Link to="/accounts" className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald">
+                <button type="button" onClick={() => openAction("accounts-overview")} className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald">
                   View all <ChevronRight className="h-3.5 w-3.5" />
-                </Link>
+                </button>
               }
               compact
             />
             <div className="mt-3 grid grid-cols-1 gap-2.5 px-4 pb-4 sm:grid-cols-2 sm:px-5 sm:pb-5 lg:grid-cols-3">
               {accounts.slice(0, 5).map((account) => (
-                <AccountTile key={account.account_id || account.id} account={account} />
+                <AccountTile key={account.account_id || account.id} account={account} onSelect={selected => openAction("account-info", { accountId: selected.account_id, account: selected })} />
               ))}
-              <Link
-                to="/accounts"
+              <button
+                type="button"
+                onClick={() => openAction("account-new")}
                 className="flex min-h-[96px] flex-col items-center justify-center gap-1.5 rounded-[1rem] border border-dashed border-border/80 p-4 text-muted-foreground transition hover:border-emerald/30 hover:bg-emerald/[0.03] hover:text-emerald"
               >
                 <Plus className="h-4 w-4" />
                 <span className="text-[11px] font-medium">Add account</span>
-              </Link>
+              </button>
             </div>
           </Surface>
 
@@ -416,7 +421,7 @@ export default function Dashboard() {
                   <p className="text-[13px] font-semibold tracking-[-0.02em]">Spending breakdown</p>
                   <p className="mt-0.5 text-[10.5px] text-muted-foreground">This month by category</p>
                 </div>
-                <Link to="/reports" className="text-[10.5px] font-semibold text-emerald">Details</Link>
+                <button type="button" onClick={() => openAction("reports")} className="text-[10.5px] font-semibold text-emerald">Details</button>
               </div>
               <CategoryDonut data={categories} total={spend} size={146} />
             </Surface>
@@ -428,7 +433,7 @@ export default function Dashboard() {
                     <p className="text-[13px] font-semibold tracking-[-0.02em]">Cash flow</p>
                     <p className="mt-0.5 text-[10.5px] text-muted-foreground">Income vs spending</p>
                   </div>
-                  <Link to="/reports" className="text-[10.5px] font-semibold text-emerald">Reports</Link>
+                  <button type="button" onClick={() => openAction("reports")} className="text-[10.5px] font-semibold text-emerald">Reports</button>
                 </div>
                 {monthlyFlow.length ? (
                   <div>
@@ -466,15 +471,15 @@ export default function Dashboard() {
                 title="Recent transactions"
                 subtitle="The latest movement across your accounts"
                 actions={
-                  <Link to="/transactions" className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald">
+                  <button type="button" onClick={() => openAction("transaction-search")} className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald">
                     View ledger <ChevronRight className="h-3.5 w-3.5" />
-                  </Link>
+                  </button>
                 }
                 compact
               />
               <div className="mt-2 divide-y divide-border/50 border-t border-border/50">
                 {overview.recent.slice(0, 5).map((transaction, index) => (
-                  <TransactionLine key={transaction.transaction_id || transaction.tx_id || index} transaction={transaction} />
+                  <TransactionLine key={transaction.transaction_id || transaction.tx_id || index} transaction={transaction} onSelect={selected => openAction("transaction-info", { transaction: selected })} />
                 ))}
               </div>
             </Surface>
@@ -527,13 +532,13 @@ export default function Dashboard() {
                     ? `${formatCurrency(totalSpentBudget, { compact: true })} of ${formatCurrency(totalBudget, { compact: true })} used`
                     : "Keep everyday spending in view"
                 }
-                actions={<Link to="/budgets" className="text-[11px] font-semibold text-emerald">Manage</Link>}
+                actions={<button type="button" onClick={() => openAction("budget-new")} className="text-[11px] font-semibold text-emerald">Add budget</button>}
                 compact
               />
               {budgets.length ? (
                 <div className="mt-3 divide-y divide-border/50 border-t border-border/50">
                   {budgets.slice(0, 4).map((budget) => (
-                    <BudgetLine key={budget.budget_id || budget.category} budget={budget} />
+                    <BudgetLine key={budget.budget_id || budget.category} budget={budget} onSelect={selected => openAction("budget-info", { budget: selected })} />
                   ))}
                 </div>
               ) : (
@@ -542,9 +547,7 @@ export default function Dashboard() {
                   title="No budgets yet"
                   description="Set a simple monthly limit for the categories that matter."
                   action={
-                    <Button variant="outlinePill" size="sm" asChild>
-                      <Link to="/budgets">Create a budget</Link>
-                    </Button>
+                    <Button variant="outlinePill" size="sm" onClick={() => openAction("budget-new")}>Create a budget</Button>
                   }
                   className="py-8"
                 />

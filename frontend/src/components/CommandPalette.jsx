@@ -34,6 +34,9 @@ const COMMAND_GROUPS = [
     items: [
       { key: "action-new-tx", label: "New transaction", icon: Plus, action: "new-transaction" },
       { key: "action-search-tx", label: "Search transactions", icon: Search, action: "search-transactions" },
+      { key: "action-new-budget", label: "New budget", icon: PiggyBank, action: "new-budget" },
+      { key: "action-new-account", label: "Add account", icon: Landmark, action: "new-account" },
+      { key: "action-upload-statement", label: "Upload statement", icon: Upload, action: "upload-statement" },
       { key: "action-ai", label: "Ask Penni AI", icon: Sparkles, action: "open-assistant" },
     ]
   },

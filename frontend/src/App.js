@@ -13,6 +13,8 @@ import AdminRoute from "./components/AdminRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ConsentBanner from "./components/ConsentBanner";
 import PageLoader from "./components/PageLoader";
+import { ActionProvider } from "./contexts/ActionContext";
+import GlobalActionHost from "./components/actions/GlobalActionHost";
 
 const Landing = lazy(() => import("./pages/Landing"));
 const Login = lazy(() => import("./pages/Login"));
@@ -122,9 +124,12 @@ export default function App() {
             <SettingsProvider>
               <CategoriesProvider>
                 <ErrorBoundary>
-                  <Suspense fallback={<PageLoader />}>
-                    <AppRouter />
-                  </Suspense>
+                  <ActionProvider>
+                    <Suspense fallback={<PageLoader />}>
+                      <AppRouter />
+                    </Suspense>
+                    <GlobalActionHost />
+                  </ActionProvider>
                   <AssistantPanel />
                   <ConsentBanner />
                   <Toaster richColors position="top-right" />
