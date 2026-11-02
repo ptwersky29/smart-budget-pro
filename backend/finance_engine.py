@@ -2531,6 +2531,12 @@ Output ONLY valid JSON, no markdown, no explanation:
                     400,
                     "A transfer pair needs one outgoing expense and one incoming income",
                 )
+            if round(abs(float(outgoing.amount)) * 100) != round(abs(float(incoming.amount)) * 100):
+                raise HTTPException(400, "Transfer amounts must be equal")
+            if (outgoing.currency or "GBP") != (incoming.currency or "GBP"):
+                raise HTTPException(400, "Transfer accounts must use the same currency")
+            if outgoing.account_id == incoming.account_id:
+                raise HTTPException(400, "A transfer must move between two different accounts")
             if outgoing.transfer_pair_id or incoming.transfer_pair_id:
                 raise HTTPException(400, "One of these transactions is already paired")
             pair_id = f"trp_{uuid.uuid4().hex[:12]}"
