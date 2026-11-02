@@ -727,7 +727,7 @@ def build_router() -> APIRouter:
                     category=t.get("category", "uncategorized"),
                     account_id=t.get("account_id") or target_account,
                     date=datetime.fromisoformat(t["date"]) if t.get("date") else now,
-                    source="manual",
+                    source="statement",
                     approval_status="approved",
                     category_approval_status="approved",
                     ai_selected_category=t.get("category", "uncategorized"),
