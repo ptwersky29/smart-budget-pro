@@ -1,3 +1,4 @@
+import PenniSelect from "../components/PenniSelect";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { parseISO, isBefore, getDaysInMonth, getDate, format } from "date-fns";
@@ -899,14 +900,14 @@ export default React.memo(function BudgetPage() {
               <input type="search" placeholder="Search budgets..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} aria-label="Search budgets"
                 className="w-full h-8 pl-8 pr-3 rounded-full bg-secondary/40 border border-transparent text-xs placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring/30 focus:outline-none transition-all" />
             </div>
-            <select value={sortOption} onChange={(e) => { setSortOption(e.target.value); setSortOrder("desc"); }} aria-label="Sort budgets"
+            <PenniSelect value={sortOption} onChange={(e) => { setSortOption(e.target.value); setSortOrder("desc"); }} aria-label="Sort budgets"
               className="sm:hidden h-8 flex-1 basis-0 min-w-0 px-2 rounded-full bg-secondary/50 border border-border/50 text-[11px] font-medium focus:outline-none focus:border-ring">
               <option value="progress">Progress</option>
               <option value="name">Name</option>
               <option value="limit">Limit</option>
               <option value="spent">Spent</option>
               <option value="remaining">Remaining</option>
-            </select>
+            </PenniSelect>
             <button onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")} aria-label="Toggle sort order"
               className="sm:hidden h-8 w-8 shrink-0 grid place-items-center rounded-full bg-secondary/50 border border-border/50 hover:bg-secondary/80 transition-colors">
               {sortOrder === "desc" ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronUp className="h-3 w-3 text-muted-foreground" />}
