@@ -1,4 +1,5 @@
 import PenniSelect from "../components/PenniSelect";
+import { useActions } from "../contexts/ActionContext";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { parseISO, isBefore, getDaysInMonth, getDate, format } from "date-fns";
@@ -428,6 +429,7 @@ const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
 });
 
 export default React.memo(function BudgetPage() {
+  const { openAction } = useActions();
   const navigate = useNavigate();
   useEffect(() => { document.title = "Budgets | Penni"; }, []);
   const [now, setNow] = useState(new Date());
@@ -943,10 +945,10 @@ export default React.memo(function BudgetPage() {
         onAdd={(category = "") => openAddBudget("everyday", category)}
         onRefresh={fetchData}
         onCopyPrevious={handleCopyPreviousMonth}
-        onViewAll={() => navigate(`/transactions?date_from=${month}-01&date_to=${month}-${String(daysInMonth).padStart(2, "0")}`)}
-        onManageCategories={() => navigate("/settings/categories")}
-        onViewReports={() => navigate("/reports")}
-        onAlerts={() => navigate("/settings")}
+        onViewAll={() => openAction("transaction-search", { month })}
+        onManageCategories={() => openAction("categories")}
+        onViewReports={() => openAction("reports")}
+        onAlerts={() => openAction("alerts")}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         sortOption={sortOption}
