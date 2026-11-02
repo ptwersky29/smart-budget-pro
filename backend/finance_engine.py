@@ -2801,7 +2801,7 @@ Output ONLY valid JSON, no markdown, no explanation:
             if payload.date_to:
                 base = base.where(
                     Transaction.date
-                    <= datetime.fromisoformat(payload.date_to) + timedelta(days=1)
+                    < datetime.fromisoformat(payload.date_to) + timedelta(days=1)
                 )
             # Fetch matching IDs, delete splits first, then transactions
             ids_result = await session.execute(
