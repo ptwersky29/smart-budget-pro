@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -105,7 +105,6 @@ export default function Dashboard() {
   const { version: categoriesVersion } = useCategories();
   const { openAssistant } = useAssistant();
   const { openAction } = useActions();
-  const navigate = useNavigate();
   const [overview, setOverview] = useState(null);
   const [budgets, setBudgets] = useState([]);
   const [alerts, setAlerts] = useState([]);
