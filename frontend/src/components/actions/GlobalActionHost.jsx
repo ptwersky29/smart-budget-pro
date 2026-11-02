@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useEffect, useState } from "react";
+import React, { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Building2, Loader2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "../../lib/api";
@@ -37,6 +37,8 @@ export default function GlobalActionHost() {
   const [classifying, setClassifying] = useState(false);
   const [classification, setClassification] = useState(null);
   const [saveAsRecurring, setSaveAsRecurring] = useState(false);
+  const [savingTransaction, setSavingTransaction] = useState(false);
+  const savingRef = useRef(false);
   const [fromDate,setFromDate] = useState(() => {const d=new Date();d.setDate(d.getDate()-90);return d.toISOString().slice(0,10)});
 
   const type = active?.type;
@@ -61,7 +63,9 @@ export default function GlobalActionHost() {
     if (type==="transaction-edit" && item) {
       setTransactionForm({...emptyTransaction(item.account_id||""), description:item.description||"",date:String(item.date||today()).slice(0,10),
         amount:String(Math.abs(Number(item.amount)||0)), category:item.category||"",merchant:item.merchant||"",notes:item.notes||"",
-        account_id:item.account_id||"",is_income:Number(item.amount)>0,is_transfer:!!item.is_transfer});
+        account_id:item.account_id||"",is_income:Number(item.amount)>0,is_transfer:!!(item.is_transfer || item.tx_type === "transfer"),
+        exclude_from_maaser:!!item.exclude_from_maaser,budget_type:item.budget_type||"",occasion:item.occasion||"",
+        balance_type:item.balance_type||"available",pending:!!item.pending,tags:item.tags||null});
     } else setTransactionForm(emptyTransaction(payload.accountId || ""));
   }, [type, active?.key]);
 
@@ -75,7 +79,8 @@ export default function GlobalActionHost() {
   };
   const afterSave = (entity) => { changed(entity); closeAction(); };
   const saveTransaction = async event => {
-    event.preventDefault();
+    event?.preventDefault?.();
+    if (savingRef.current) return;
     const amount = Number(transactionForm.amount);
     if (!transactionForm.account_id) {toast.error("Choose an account");return;}
     if (!Number.isFinite(amount) || amount<=0) {toast.error("Enter an amount greater than zero");return;}
@@ -83,6 +88,8 @@ export default function GlobalActionHost() {
       category:transactionForm.category||undefined,date:transactionForm.date||today(),account_id:transactionForm.account_id,
       merchant:transactionForm.merchant||undefined,notes:transactionForm.notes||undefined,
       is_income:!!transactionForm.is_income,is_transfer:!!transactionForm.is_transfer};
+    savingRef.current = true;
+    setSavingTransaction(true);
     try {
       let createdTransaction = null;
       if (type==="transaction-edit" && item?.transaction_id) {
@@ -112,6 +119,7 @@ export default function GlobalActionHost() {
       }
       afterSave("transactions");
     } catch(e){toast.error(formatApiError(e.response?.data?.detail)||"Could not save transaction");}
+    finally { savingRef.current = false; setSavingTransaction(false); }
   };
   const connectBank = async () => {
     setConnecting(true);
@@ -127,7 +135,7 @@ export default function GlobalActionHost() {
     onClose={closeAction} onSubmit={saveTransaction} accounts={accounts} accountsLoading={accountLoading}
     onClassify={classifyTransaction} classifying={classifying} classification={classification}
     onClearClassification={() => setClassification(null)}
-    saveAsRecurring={saveAsRecurring} setSaveAsRecurring={setSaveAsRecurring}/>;
+    saveAsRecurring={saveAsRecurring} setSaveAsRecurring={setSaveAsRecurring} saving={savingTransaction}/>;
   if (isAccountForm) return <AccountFormModal key={active.key} open onClose={closeAction} onCreated={()=>changed("accounts")} />;
 
   return <Sheet open={Boolean(active)} onOpenChange={open=>{if(!open)closeAction()}}>
