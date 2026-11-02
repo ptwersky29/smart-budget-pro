@@ -108,14 +108,14 @@ export function ReportsActionPreview() {
   </div><h3 className="pt-2 text-sm font-semibold">Spending by category</h3><div className="divide-y divide-border rounded-xl border border-border">{data.categories.slice(0,12).map((c,i)=><div key={c.category||i} className="flex justify-between gap-3 p-3 text-xs"><span className="capitalize">{c.category||c.name}</span><span className="font-semibold">{formatCurrency(Number(c.amount??c.total??c.value)||0)}</span></div>)}{!data.categories.length&&<p className="p-4 text-xs text-muted-foreground">No spending data available</p>}</div></div>;
 }
 
-export function SearchTransactionsAction({ onInspect }) {
+export function SearchTransactionsAction({ onInspect, month }) {
   const [term,setTerm]=useState("");
   const [rows,setRows]=useState([]);
   const [loading,setLoading]=useState(false);
-  useEffect(()=>{if(!term.trim()){setRows([]);return}let alive=true;const t=setTimeout(async()=>{setLoading(true);try{const {data}=await api.get("/transactions",{params:{search:term,limit:30}});if(alive)setRows(data.transactions||[])}catch{if(alive)toast.error("Search failed")}finally{if(alive)setLoading(false)}},300);return()=>{alive=false;clearTimeout(t)}},[term]);
+  useEffect(()=>{if(!term.trim() && !month){setRows([]);return}let alive=true;const t=setTimeout(async()=>{setLoading(true);try{const {data}=await api.get("/transactions",{params:{...(term.trim() ? {search:term.trim()} : {}),...(month ? {date_from:`${month}-01`,date_to:`${month}-${new Date(Number(month.slice(0,4)), Number(month.slice(5)),0).getDate()}`} : {}),limit:30}});if(alive)setRows(data.transactions||[])}catch{if(alive)toast.error("Search failed")}finally{if(alive)setLoading(false)}},300);return()=>{alive=false;clearTimeout(t)}},[term,month]);
   return <div className="space-y-3"><label className="relative block"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground"/><input autoFocus value={term} onChange={e=>setTerm(e.target.value)} placeholder="Search transactions, merchants or descriptions" className="h-10 w-full rounded-xl border border-border bg-card pl-10 pr-3 text-sm"/></label>
     <div className="subtle-scroll max-h-[55vh] overflow-y-auto divide-y divide-border rounded-xl border border-border">{loading?<p className="p-4 text-xs text-muted-foreground">Searching…</p>:rows.map(tx=><button key={tx.transaction_id} type="button" onClick={()=>onInspect(tx)} className="flex w-full items-center gap-3 p-3 text-left text-xs hover:bg-secondary/50"><Receipt className="h-4 w-4 shrink-0 text-muted-foreground"/><span className="min-w-0 flex-1"><span className="block truncate font-semibold">{tx.description||tx.merchant||"Transaction"}</span><span className="text-muted-foreground">{String(tx.date||"").slice(0,10)}</span></span><span className="shrink-0 font-semibold">{formatCurrency(Number(tx.amount)||0)}</span></button>)}
-      {!loading&&!rows.length&&<p className="p-4 text-center text-xs text-muted-foreground">{term?"No matching transactions":"Start typing to search"}</p>}
+      {!loading&&!rows.length&&<p className="p-4 text-center text-xs text-muted-foreground">{term || month ? "No matching transactions" : "Start typing to search"}</p>}
     </div>
   </div>;
 }
