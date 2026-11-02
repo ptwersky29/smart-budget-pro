@@ -65,6 +65,7 @@ export default function AccountDetailPage() {
   const { categories: selectedCats, version: categoriesVersion } = useCategories();
 
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [pendingDeleteTxId, setPendingDeleteTxId] = useState(null);
   const [tlConn, setTlConn] = useState(null);
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadHistory, setUploadHistory] = useState([]);
@@ -239,20 +240,23 @@ export default function AccountDetailPage() {
 
   useEffect(() => { txsRef.current = txs; }, [txs]);
 
-  const deleteTx = useCallback(async (txId) => {
-    const old = txsRef.current.find(t => t.transaction_id === txId);
-    setTxs(prev => prev.filter(t => t.transaction_id !== txId));
-    withUndo({
-      action: () => api.delete(`/transactions/${txId}`),
-      undo: async () => {
-        if (old) { await api.post("/transactions", old); }
-        await refreshTransactions();
-      },
-      onError: () => { if (old) setTxs(prev => [...prev, old]); refreshTransactions(); },
-      successMsg: "Transaction deleted",
-      errorMsg: "Could not delete",
-    });
-  }, [refreshTransactions]);
+  const deleteTx = useCallback((txId) => {
+    setPendingDeleteTxId(txId);
+  }, []);
+
+  const confirmTransactionDelete = async () => {
+    const txId = pendingDeleteTxId;
+    setPendingDeleteTxId(null);
+    if (!txId) return;
+    try {
+      await api.delete(`/transactions/${txId}`);
+      await refreshTransactions();
+      toast.success("Transaction permanently deleted");
+    } catch (e) {
+      toast.error(formatApiError(e) || "Could not delete transaction");
+      await refreshTransactions();
+    }
+  };
 
   const handleAddTransaction = useCallback(async (e) => {
     e.preventDefault();
@@ -660,6 +664,14 @@ export default function AccountDetailPage() {
       <TransactionForm open={txFormOpen} editingId={editingTxId} form={txForm} setForm={setTxForm}
         selectedCats={selectedCats} onClose={closeTxForm} onSubmit={handleAddTransaction}
         accounts={allAccounts} accountsLoading={allAccountsLoading} />
+      <ConfirmModal
+        open={Boolean(pendingDeleteTxId)}
+        title="Permanently delete transaction?"
+        message="This transaction and its associated records will be removed. This cannot be undone."
+        confirmLabel="Delete permanently"
+        onConfirm={confirmTransactionDelete}
+        onCancel={() => setPendingDeleteTxId(null)}
+      />
       <ConfirmModal
         open={confirmDelete}
         title="Delete this account?"
