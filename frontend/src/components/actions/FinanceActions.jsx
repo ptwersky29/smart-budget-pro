@@ -111,14 +111,76 @@ export function ReportsActionPreview() {
 }
 
 export function SearchTransactionsAction({ onInspect, month }) {
-  const [term,setTerm]=useState("");
-  const [rows,setRows]=useState([]);
-  const [loading,setLoading]=useState(false);
-  useEffect(()=>{if(!term.trim() && !month){setRows([]);return}let alive=true;const t=setTimeout(async()=>{setLoading(true);try{const {data}=await api.get("/transactions",{params:{...(term.trim() ? {search:term.trim()} : {}),...(month ? {date_from:`${month}-01`,date_to:`${month}-${new Date(Number(month.slice(0,4)), Number(month.slice(5)),0).getDate()}`} : {}),limit:30}});if(alive)setRows(data.transactions||[])}catch{if(alive)toast.error("Search failed")}finally{if(alive)setLoading(false)}},300);return()=>{alive=false;clearTimeout(t)}},[term,month]);
-  return <div className="space-y-3"><label className="relative block"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground"/><input autoFocus value={term} onChange={e=>setTerm(e.target.value)} placeholder="Search transactions, merchants or descriptions" className="h-10 w-full rounded-xl border border-border bg-card pl-10 pr-3 text-sm"/></label>
-    <div className="subtle-scroll max-h-[55vh] overflow-y-auto divide-y divide-border rounded-xl border border-border">{loading?<p className="p-4 text-xs text-muted-foreground">Searching…</p>:rows.map(tx=><button key={tx.transaction_id} type="button" onClick={()=>onInspect(tx)} className="flex w-full items-center gap-3 p-3 text-left text-xs hover:bg-secondary/50"><Receipt className="h-4 w-4 shrink-0 text-muted-foreground"/><span className="min-w-0 flex-1"><span className="block truncate font-semibold">{tx.description||tx.merchant||"Transaction"}</span><span className="text-muted-foreground">{String(tx.date||"").slice(0,10)}</span></span><span className="shrink-0 font-semibold">{formatCurrency(Number(tx.amount)||0)}</span></button>)}
-      {!loading&&!rows.length&&<p className="p-4 text-center text-xs text-muted-foreground">{term || month ? "No matching transactions" : "Start typing to search"}</p>}
+  const [term, setTerm] = useState("");
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [error, setError] = useState("");
+  const requestKey = React.useRef("");
+  const pageSize = 100;
+  const filters = (query) => ({
+    ...(query.trim() ? { search: query.trim() } : {}),
+    ...(month ? { date_from: `${month}-01`, date_to: `${month}-${new Date(Number(month.slice(0, 4)), Number(month.slice(5)), 0).getDate()}` } : {}),
+  });
+  useEffect(() => {
+    const key = `${term}| ${month || ""}`;
+    requestKey.current = key;
+    setRows([]);
+    setTotal(0);
+    setError("");
+    if (!term.trim() && !month) { setLoading(false); return; }
+    let active = true;
+    const timeout = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const { data } = await api.get("/transactions", { params: { ...filters(term), limit: pageSize, offset: 0 } });
+        if (active && requestKey.current === key) {
+          setRows(data.transactions || []);
+          setTotal(Number(data.total) || 0);
+        }
+      } catch {
+        if (active) setError("Search failed. Please try again.");
+      } finally { if (active) setLoading(false); }
+    }, 300);
+    return () => { active = false; clearTimeout(timeout); };
+  }, [term, month]);
+
+  const loadMore = async () => {
+    if (loading || rows.length >= total) return;
+    const key = requestKey.current;
+    setLoading(true);
+    try {
+      const { data } = await api.get("/transactions", { params: { ...filters(term), limit: pageSize, offset: rows.length } });
+      if (requestKey.current === key) setRows(previous => [...previous, ...(data.transactions || [])]);
+    } catch { setError("Could not load more results"); }
+    finally { if (requestKey.current === key) setLoading(false); }
+  };
+  return <div className="space-y-3">
+    <label className="relative block">
+      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground"/>
+      <input autoFocus value={term} onChange={event => setTerm(event.target.value)}
+        placeholder="Search transactions, merchants or descriptions"
+        className="h-10 w-full rounded-xl border border-border bg-card pl-10 pr-3 text-sm"/>
+    </label>
+    <p className="text-xs text-muted-foreground">{rows.length} of {total} matching transactions shown</p>
+    {error && <p role="alert" className="text-xs text-ruby">{error}</p>}
+    <div className="subtle-scroll max-h-[55vh] overflow-y-auto divide-y divide-border rounded-xl border border-border">
+      {rows.map(tx => <button key={tx.transaction_id} type="button" onClick={()=>onInspect(tx)}
+        className="flex w-full items-center gap-3 p-3 text-left text-xs hover:bg-secondary/50">
+        <Receipt className="h-4 w-4 shrink-0 text-muted-foreground"/>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-semibold">{tx.description||tx.merchant||"Transaction"}</span>
+          <span className="text-muted-foreground">{String(tx.date||"").slice(0,10)}</span>
+        </span>
+        <span className="shrink-0 font-semibold">{formatCurrency(Number(tx.amount)||0)}</span>
+      </button>)}
+      {!loading && !rows.length && <p className="p-4 text-center text-xs text-muted-foreground">
+        {term || month ? "No matching transactions" : "Start typing to search"}
+      </p>}
     </div>
+    {rows.length < total && <Button onClick={loadMore} disabled={loading} variant="outlinePill" className="w-full">
+      {loading ? "Loading…" : "Load more transactions"}
+    </Button>}
   </div>;
 }
 
@@ -157,33 +219,80 @@ export function SplitTransactionAction({ transaction, categories, onSaved }) {
 }
 
 export function PairTransferAction({ transaction, onSaved }) {
-  const [candidates,setCandidates] = useState([]);
-  const [selected,setSelected] = useState("");
-  const [busy,setBusy] = useState(false);
-  const [loading,setLoading] = useState(true);
-  useEffect(()=>{let active=true;api.get("/transactions",{params:{limit:500}})
-    .then(({data})=>{if(active)setCandidates((data.transactions||[]).filter(row=>
-      row.transaction_id!==transaction?.transaction_id && !row.transfer_pair_id && Number(row.amount||0)*Number(transaction?.amount||0)<0))})
-    .catch(()=>toast.error("Could not load potential matches")).finally(()=>{if(active)setLoading(false)});
-    return()=>{active=false};},[transaction?.transaction_id,transaction?.amount]);
-  const save=async()=>{
-    const candidate=candidates.find(c=>c.transaction_id===selected);
-    if(!candidate){toast.error("Choose the matching transaction");return}
-    const outgoing=Number(transaction.amount)<0?transaction.transaction_id:candidate.transaction_id;
-    const incoming=Number(transaction.amount)>0?transaction.transaction_id:candidate.transaction_id;
-    setBusy(true);try{await api.post("/transactions/transfer-pairs",{outgoing_transaction_id:outgoing,incoming_transaction_id:incoming});toast.success("Transfer paired");onSaved?.()}
-    catch(e){toast.error(formatApiError(e.response?.data?.detail)||"Could not pair transfer")}
-    finally{setBusy(false)}
+  const [candidates, setCandidates] = useState([]);
+  const [selected, setSelected] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [offset, setOffset] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [error, setError] = useState("");
+  const pageSize = 250;
+  const fetchPage = async (pageOffset, isCurrent = () => true) => {
+    const { data } = await api.get("/transactions", { params: { limit: pageSize, offset: pageOffset } });
+    if (!isCurrent()) return;
+    const newCandidates = (data.transactions || []).filter(row =>
+      row.transaction_id !== transaction?.transaction_id && !row.transfer_pair_id &&
+      row.account_id !== transaction?.account_id &&
+      (row.currency || "GBP") === (transaction?.currency || "GBP") &&
+      Number(row.amount || 0) * Number(transaction?.amount || 0) < 0 &&
+      Math.round(Math.abs(Number(row.amount || 0)) * 100) === Math.round(Math.abs(Number(transaction?.amount || 0)) * 100)
+    );
+    setCandidates(previous => pageOffset === 0 ? newCandidates : [...previous, ...newCandidates]);
+    setOffset(pageOffset + (data.transactions || []).length);
+    setTotal(Number(data.total) || 0);
+  };
+  useEffect(() => {
+    let active = true;
+    setCandidates([]);
+    setOffset(0);
+    setLoading(true);
+    fetchPage(0, () => active)
+      .catch(() => { if (active) setError("Could not load possible transfer matches"); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [transaction?.transaction_id, transaction?.amount]);
+
+  const loadMore = async () => {
+    setLoading(true);
+    try { await fetchPage(offset); }
+    catch { setError("Could not load more transfer matches"); }
+    finally { setLoading(false); }
+  };
+  const save = async () => {
+    const candidate = candidates.find(row => row.transaction_id === selected);
+    if (!candidate) { toast.error("Choose the matching transaction"); return; }
+    const outgoing = Number(transaction.amount) < 0 ? transaction.transaction_id : candidate.transaction_id;
+    const incoming = Number(transaction.amount) > 0 ? transaction.transaction_id : candidate.transaction_id;
+    setBusy(true);
+    try {
+      await api.post("/transactions/transfer-pairs", { outgoing_transaction_id: outgoing, incoming_transaction_id: incoming });
+      toast.success("Transfer paired");
+      onSaved?.();
+    } catch(error) { toast.error(formatApiError(error.response?.data?.detail) || "Could not pair transfer"); }
+    finally { setBusy(false); }
   };
   return <div className="space-y-4">
-    <div className="rounded-xl bg-secondary/40 p-3 text-xs"><p className="font-semibold">{transaction?.description||"Transfer"}</p><p>{formatCurrency(Number(transaction?.amount)||0)}</p></div>
-    <div><label className="mb-1.5 block text-xs font-semibold">Matching opposite-side transaction</label>
-      <PenniSelect value={selected} onChange={e=>setSelected(e.target.value)} className="h-11 w-full rounded-xl border border-border bg-card px-3 text-xs" aria-label="Matching transaction">
-        <option value="">Select matching transaction</option>
-        {candidates.map(c=><option key={c.transaction_id} value={c.transaction_id}>{c.date} · {c.description||c.merchant||"Transaction"} · {formatCurrency(Number(c.amount)||0)}</option>)}
-      </PenniSelect>
+    <div className="rounded-xl bg-secondary/40 p-3 text-xs">
+      <p className="font-semibold">{transaction?.description || "Transfer"}</p>
+      <p>{formatCurrency(Number(transaction?.amount) || 0)}</p>
     </div>
-    {loading?<p className="text-xs text-muted-foreground">Looking for matches…</p>:!candidates.length?<p className="text-xs text-muted-foreground">No matching opposite-side transactions found. You can close and pair later from Transactions.</p>:null}
-    <Button variant="primary" className="w-full" disabled={busy||!selected} onClick={save}>{busy?"Pairing…":"Pair transfer"}</Button>
+    <label className="block text-xs font-semibold" htmlFor="pair-transfer-match">Matching transaction from a different account</label>
+    <PenniSelect id="pair-transfer-match" value={selected} onChange={event => setSelected(event.target.value)}
+      className="h-11 w-full rounded-xl border border-border bg-card px-3 text-xs" aria-label="Matching transaction">
+      <option value="">Select matching transaction</option>
+      {candidates.map(row => <option key={row.transaction_id} value={row.transaction_id}>
+        {row.date} · {row.description || row.merchant || "Transaction"} · {formatCurrency(Number(row.amount) || 0)}
+      </option>)}
+    </PenniSelect>
+    <p className="text-xs text-muted-foreground">Checked {offset} of {total} transactions for an exact matching amount.</p>
+    {error && <p role="alert" className="text-xs text-ruby">{error}</p>}
+    {offset < total && <Button variant="outlinePill" disabled={loading} onClick={loadMore} className="w-full">
+      {loading ? "Looking for matches…" : "Look for older matching transactions"}
+    </Button>}
+    {!loading && offset >= total && !candidates.length &&
+      <p className="text-xs text-muted-foreground">No matching transfer found. You can pair it later from Transactions.</p>}
+    <Button variant="primary" className="w-full" disabled={busy || !selected} onClick={save}>
+      {busy ? "Pairing…" : "Pair transfer"}
+    </Button>
   </div>;
 }
