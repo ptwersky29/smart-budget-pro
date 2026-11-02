@@ -1,5 +1,6 @@
 """GDPR compliance: data export, deletion, consent management."""
 import json
+import secrets
 import logging
 from datetime import datetime, timezone
 from typing import Optional
@@ -9,7 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, delete as sa_delete, func
 
 from db import (
-    get_session_maker, User, Transaction, MaaserLedger, HolidayBudget,
+    Base, get_session_maker, User, Transaction, MaaserLedger, HolidayBudget,
     ChasunaPlan, InvestmentHolding, ConsentRecord, Budget, BankAccount,
     BankConnection, Subscription, RecurringTransaction, SplitTransaction,
     Category, CategoryRule, SmsMessage, SmsSender, Notification,
@@ -122,21 +123,63 @@ def build_router() -> APIRouter:
 
     @router.delete("/data")
     async def delete_data(request: Request, user: dict = Depends(get_current_user)):
+        """Erase locally stored personal data for this account.
+
+        User row is retained as a disabled, anonymized tombstone so the
+        original identity cannot be reused to authenticate and retained
+        accounting constraints have a stable identifier. Third-party data
+        retention and payment cancellation remain external processes.
+        """
         sm = get_session_maker()
+        uid = user["user_id"]
+        deleted_counts = {}
         async with sm() as session:
-            u = (await session.execute(select(User).where(User.user_id == user["user_id"]))).scalar_one_or_none()
+            u = (await session.execute(select(User).where(User.user_id == uid))).scalar_one_or_none()
             if not u:
                 raise HTTPException(404, "User not found")
-            for tbl in [Transaction, MaaserLedger, HolidayBudget, ChasunaPlan, InvestmentHolding]:
-                await session.execute(sa_delete(tbl).where(tbl.user_id == user["user_id"]))
-            u.email = f"deleted-{user['user_id'][:8]}@anonymized.com"
+
+            # Delete children before parents in FK-safe dependency order,
+            # including new models added in future migrations.
+            for table in reversed(Base.metadata.sorted_tables):
+                if table.name == User.__table__.name or "user_id" not in table.c:
+                    continue
+                result = await session.execute(
+                    sa_delete(table).where(table.c.user_id == uid)
+                )
+                if result.rowcount:
+                    deleted_counts[table.name] = result.rowcount
+
+            u.email = f"deleted-{secrets.token_hex(16)}@anonymized.invalid"
             u.name = "Deleted User"
             u.picture = None
+            u.hashed_password = secrets.token_urlsafe(64)
+            u.google_sub = None
+            u.stripe_customer_id = None
+            u.stripe_subscription_id = None
+            u.subscription_status = None
+            u.premium_until = None
             u.preferences = {}
+            u.role = "free_user"
+            u.tier = "free"
+            u.is_admin = False
+            u.disabled = True
+            u.email_verified = False
+            u.email_verification_token = None
+            u.email_verification_sent_at = None
+            u.onboarding_step = None
+            u.consent_terms = False
+            u.consent_privacy = False
+            u.consent_marketing = False
             u.data_deleted_at = datetime.now(timezone.utc)
+            u.password_changed_at = datetime.now(timezone.utc)
             await session.commit()
-        await log_action(user["user_id"], "data_deletion", "user", user["user_id"], request=request)
-        return {"status": "deleted", "message": "All personal data has been deleted and account anonymized."}
+
+        # Do not log a new user-linked audit row after removing audit history.
+        return {
+            "status": "anonymized",
+            "local_records_deleted": deleted_counts,
+            "message": "Local personal data was erased and login disabled. A non-identifying account tombstone remains. External billing and banking providers may retain records under their own policies; contact support to address those records.",
+        }
 
     @router.post("/consent")
     async def record_consent(payload: ConsentIn, request: Request, user: dict = Depends(get_current_user)):
