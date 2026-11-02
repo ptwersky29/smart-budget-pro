@@ -79,7 +79,7 @@ export function BudgetActionPreview({ budget, onEdit, onCreate }) {
   </div>;
 }
 
-export function AccountActionPreview({ accountId, account: initialAccount, onAddTransaction, onClose }) {
+export function AccountActionPreview({ accountId, account: initialAccount, onAddTransaction, onEdit, onClose }) {
   const [account,setAccount]=useState(initialAccount||null);
   const [transactions,setTransactions]=useState([]);
   const [loading,setLoading]=useState(true);
@@ -92,6 +92,7 @@ export function AccountActionPreview({ accountId, account: initialAccount, onAdd
   return <div className="space-y-4">
     <div className="rounded-xl bg-secondary/50 p-4"><p className="text-xs text-muted-foreground">Available balance</p><p className="mt-1 text-2xl font-semibold">{formatCurrency(Number(account?.balance)||0)}</p><p className="mt-2 text-xs text-muted-foreground">{account?.name} · {account?.currency||"GBP"}</p></div>
     <Button variant="outlinePill" className="w-full" onClick={()=>onAddTransaction(accountId)}><Plus className="mr-2 h-4 w-4"/> Add transaction to this account</Button>
+    <Button variant="outlinePill" className="w-full" onClick={()=>onEdit(account)} disabled={!account?.account_id}><Pencil className="mr-2 h-4 w-4"/> Edit account details</Button>
     <Link to={`/accounts/${accountId}`} onClick={onClose} className="block rounded-lg border border-border p-3 text-center text-xs font-semibold text-emerald hover:bg-secondary/40">Open full account dashboard</Link>
     <h3 className="text-sm font-semibold">Recent transactions</h3>
     <div className="divide-y divide-border/60 rounded-xl border border-border">{transactions.map(t=><div key={t.transaction_id} className="flex gap-2 p-3 text-xs"><span className="min-w-0 flex-1"><span className="block truncate font-medium">{t.description||t.merchant||"Transaction"}</span><span className="text-muted-foreground">{String(t.date||"").slice(0,10)}</span></span><span className="shrink-0 font-semibold">{formatCurrency(Number(t.amount)||0)}</span></div>)}
