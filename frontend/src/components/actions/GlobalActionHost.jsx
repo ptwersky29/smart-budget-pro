@@ -24,7 +24,7 @@ const PANEL_TITLES = {
   "transaction-info":"Transaction details", "budget-new":"Create budget", "budget-edit":"Edit budget",
   "budget-info":"Budget details", "account-info":"Account details", "statement-import":"Import statement",
   "categories":"Manage categories", "reports":"Spending report", "alerts":"Notification settings",
-  "transaction-search":"Search transactions", "bank-connect":"Connect bank"
+  "transaction-search":"Search transactions", "bank-connect":"Connect bank", "accounts-overview":"All accounts"
 };
 
 export default function GlobalActionHost() {
@@ -34,6 +34,9 @@ export default function GlobalActionHost() {
   const [accountLoading, setAccountLoading] = useState(false);
   const [transactionForm, setTransactionForm] = useState(emptyTransaction);
   const [connecting, setConnecting] = useState(false);
+  const [classifying, setClassifying] = useState(false);
+  const [classification, setClassification] = useState(null);
+  const [saveAsRecurring, setSaveAsRecurring] = useState(false);
   const [fromDate,setFromDate] = useState(() => {const d=new Date();d.setDate(d.getDate()-90);return d.toISOString().slice(0,10)});
 
   const type = active?.type;
@@ -44,7 +47,7 @@ export default function GlobalActionHost() {
   const isInfo = type === "transaction-info" || type === "account-info" || type === "budget-info";
   const isLarge = type === "categories" || type === "statement-import" || type === "reports";
   useEffect(() => {
-    if (!isTxForm && type !== "statement-import" && type !== "account-info") return;
+    if (!isTxForm && type !== "statement-import" && type !== "account-info" && type !== "transaction-info" && type !== "accounts-overview") return;
     let alive = true;
     setAccountLoading(true);
     api.get("/accounts").then(({data})=>{if(alive)setAccounts(data.accounts||[])}).catch(()=>{if(alive)toast.error("Could not load accounts")})
@@ -53,6 +56,8 @@ export default function GlobalActionHost() {
   }, [type]);
   useEffect(() => {
     if (!isTxForm) return;
+    setClassification(null);
+    setSaveAsRecurring(false);
     if (type==="transaction-edit" && item) {
       setTransactionForm({...emptyTransaction(item.account_id||""), description:item.description||"",date:String(item.date||today()).slice(0,10),
         amount:String(Math.abs(Number(item.amount)||0)), category:item.category||"",merchant:item.merchant||"",notes:item.notes||"",
@@ -60,6 +65,14 @@ export default function GlobalActionHost() {
     } else setTransactionForm(emptyTransaction(payload.accountId || ""));
   }, [type, active?.key]);
 
+  const classifyTransaction = async ({ description, amount }) => {
+    setClassifying(true);
+    try {
+      const { data } = await api.post("/budget-system/classify", { description, amount });
+      setClassification(data);
+    } catch(e) { toast.error(formatApiError(e.response?.data?.detail) || "Could not classify transaction"); }
+    finally { setClassifying(false); }
+  };
   const afterSave = (entity) => { changed(entity); closeAction(); };
   const saveTransaction = async event => {
     event.preventDefault();
@@ -88,7 +101,10 @@ export default function GlobalActionHost() {
   if (!active) return null;
   if (isTxForm) return <TransactionForm key={active.key} open editingId={type==="transaction-edit"?item?.transaction_id:null}
     form={transactionForm} setForm={setTransactionForm} selectedCats={categories}
-    onClose={closeAction} onSubmit={saveTransaction} accounts={accounts} accountsLoading={accountLoading}/>;
+    onClose={closeAction} onSubmit={saveTransaction} accounts={accounts} accountsLoading={accountLoading}
+    onClassify={classifyTransaction} classifying={classifying} classification={classification}
+    onClearClassification={() => setClassification(null)}
+    saveAsRecurring={saveAsRecurring} setSaveAsRecurring={setSaveAsRecurring}/>;
   if (isAccountForm) return <AccountFormModal key={active.key} open onClose={closeAction} onCreated={()=>changed("accounts")} />;
 
   return <Sheet open={Boolean(active)} onOpenChange={open=>{if(!open)closeAction()}}>
@@ -106,6 +122,15 @@ export default function GlobalActionHost() {
         {type==="budget-info" && <BudgetActionPreview budget={payload.budget}
           onEdit={()=>openAction("budget-edit",{budget:payload.budget})}
           onCreate={()=>openAction("budget-new")}/>}
+        {type==="accounts-overview" && <div className="space-y-2">
+          {accounts.map(account => <button key={account.account_id} type="button" onClick={() => openAction("account-info", {accountId:account.account_id, account})}
+            className="flex w-full items-center justify-between gap-3 rounded-xl border border-border p-3 text-left hover:bg-secondary/40">
+            <span className="truncate text-sm font-medium">{account.name}</span>
+            <span className="shrink-0 text-sm font-semibold">£{Number(account.balance||0).toFixed(2)}</span>
+          </button>)}
+          {!accounts.length && <p className="py-6 text-center text-xs text-muted-foreground">{accountLoading?"Loading accounts…":"No accounts yet"}</p>}
+          <Button variant="outlinePill" className="w-full" onClick={() => openAction("account-new")}>Add account</Button>
+        </div>}
         {type==="account-info" && <AccountActionPreview accountId={payload.accountId||payload.account?.account_id}
           account={payload.account} onAddTransaction={accountId=>openAction("transaction-new",{accountId})}/>}
         {type==="statement-import" && <StatementAction initialDraft={payload.draft} initialAccountId={payload.accountId}
