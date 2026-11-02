@@ -1,3 +1,4 @@
+import PenniSelect from "../components/PenniSelect";
 ﻿import { createPortal } from "react-dom";
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -1615,14 +1616,14 @@ const Transactions = React.memo(function Transactions() {
                 </DropdownMenu>
 
                 {/* Account */}
-                <select
+                <PenniSelect
                   value={filters.account_id}
                   onChange={(event) => toggleFilter("account_id", event.target.value)}
                   className={`h-9 w-[110px] shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.account_id ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
                 >
                   <option value="">All Accounts</option>
                   {accounts.map((account) => <option key={account.account_id} value={account.account_id}>{account.name}</option>)}
-                </select>
+                </PenniSelect>
 
                 {/* Category */}
                 <CategoryCombobox
@@ -1636,7 +1637,7 @@ const Transactions = React.memo(function Transactions() {
                 />
 
                 {/* Type */}
-                <select
+                <PenniSelect
                   value={filters.tx_type}
                   onChange={(event) => { toggleFilter("tx_type", event.target.value); setLedgerTab(event.target.value === "expense" ? "expenses" : event.target.value === "income" ? "income" : event.target.value === "transfer" ? "transfers" : "all"); }}
                   className={`h-9 w-[86px] shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.tx_type ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
@@ -1645,10 +1646,10 @@ const Transactions = React.memo(function Transactions() {
                   <option value="income">Income</option>
                   <option value="expense">Expense</option>
                   <option value="transfer">Transfer</option>
-                </select>
+                </PenniSelect>
 
                 {/* Status */}
-                <select
+                <PenniSelect
                   value={filters.approval_status}
                   onChange={(event) => { toggleFilter("approval_status", event.target.value); setLedgerTab(event.target.value === "unapproved" ? "unapproved" : "all"); }}
                   className={`h-9 w-[96px] shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.approval_status ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
@@ -1657,7 +1658,7 @@ const Transactions = React.memo(function Transactions() {
                   <option value="approved">Approved</option>
                   <option value="unapproved">Unapproved</option>
                   <option value="failed">Failed</option>
-                </select>
+                </PenniSelect>
 
                 {/* Merchant */}
                 <div className="relative shrink-0">
@@ -1690,11 +1691,11 @@ const Transactions = React.memo(function Transactions() {
                     </SheetHeader>
                     <div className="mt-4 space-y-4 sm:mt-6 sm:space-y-5">
                       <div className="flex items-center gap-2 sm:hidden">
-                        <select value={filters.sort} onChange={(event) => setFilter("sort", event.target.value)} className="h-10 flex-1 rounded-xl border border-transparent bg-secondary/50 px-3 text-sm outline-none focus:border-ring">
+                        <PenniSelect value={filters.sort} onChange={(event) => setFilter("sort", event.target.value)} className="h-10 flex-1 rounded-xl border border-transparent bg-secondary/50 px-3 text-sm outline-none focus:border-ring">
                           <option value="date">Sort by date</option>
                           <option value="amount">Sort by amount</option>
                           <option value="description">Sort by description</option>
-                        </select>
+                        </PenniSelect>
                         <button onClick={() => setFilter("order", filters.order === "desc" ? "asc" : "desc")} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-transparent bg-secondary/50 transition-colors hover:bg-secondary/80" aria-label="Toggle sort order">
                           {filters.order === "desc" ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronUp className="h-4 w-4 text-muted-foreground" />}
                         </button>
@@ -1702,22 +1703,22 @@ const Transactions = React.memo(function Transactions() {
                       <div className="space-y-2">
                         <p className="text-xs font-medium text-muted-foreground">Narrow results</p>
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
-                          <select value={filters.account_id} onChange={(event) => toggleFilter("account_id", event.target.value)} className="h-10 rounded-xl border border-transparent bg-secondary/50 px-3 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30">
+                          <PenniSelect value={filters.account_id} onChange={(event) => toggleFilter("account_id", event.target.value)} className="h-10 rounded-xl border border-transparent bg-secondary/50 px-3 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30">
                             <option value="">All accounts</option>
                             {accounts.map((account) => <option key={account.account_id} value={account.account_id}>{account.name}</option>)}
-                          </select>
-                          <select value={filters.tx_type} onChange={(event) => { toggleFilter("tx_type", event.target.value); setLedgerTab(event.target.value === "expense" ? "expenses" : event.target.value === "income" ? "income" : event.target.value === "transfer" ? "transfers" : "all"); }} className="h-10 rounded-xl border border-transparent bg-secondary/50 px-3 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30">
+                          </PenniSelect>
+                          <PenniSelect value={filters.tx_type} onChange={(event) => { toggleFilter("tx_type", event.target.value); setLedgerTab(event.target.value === "expense" ? "expenses" : event.target.value === "income" ? "income" : event.target.value === "transfer" ? "transfers" : "all"); }} className="h-10 rounded-xl border border-transparent bg-secondary/50 px-3 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30">
                             <option value="">All types</option>
                             <option value="income">Income</option>
                             <option value="expense">Expense</option>
                             <option value="transfer">Transfer</option>
-                          </select>
-                          <select value={filters.approval_status} onChange={(event) => { toggleFilter("approval_status", event.target.value); setLedgerTab(event.target.value === "unapproved" ? "unapproved" : "all"); }} className="h-10 rounded-xl border border-transparent bg-secondary/50 px-3 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30">
+                          </PenniSelect>
+                          <PenniSelect value={filters.approval_status} onChange={(event) => { toggleFilter("approval_status", event.target.value); setLedgerTab(event.target.value === "unapproved" ? "unapproved" : "all"); }} className="h-10 rounded-xl border border-transparent bg-secondary/50 px-3 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30">
                             <option value="">All statuses</option>
                             <option value="approved">Approved</option>
                             <option value="unapproved">Unapproved</option>
                             <option value="failed">Failed</option>
-                          </select>
+                          </PenniSelect>
                           <Input value={filters.merchant} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, merchant: event.target.value })); }} placeholder="Merchant" className="h-10 text-sm" />
                         </div>
                         <CategoryCombobox
@@ -1731,10 +1732,10 @@ const Transactions = React.memo(function Transactions() {
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                        <select value={filters.source} onChange={(event) => toggleFilter("source", event.target.value)} className="h-10 rounded-xl border border-transparent bg-secondary/50 px-4 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30">
+                        <PenniSelect value={filters.source} onChange={(event) => toggleFilter("source", event.target.value)} className="h-10 rounded-xl border border-transparent bg-secondary/50 px-4 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30">
                           <option value="">All sources</option>
                           {Object.entries(SOURCE_LABELS).map(([key, value]) => <option key={key} value={key}>{value}</option>)}
-                        </select>
+                        </PenniSelect>
                         <Input type="number" min="0" step="0.01" placeholder="Min Â£" value={filters.amount_min} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, amount_min: event.target.value })); }} className="h-10 text-sm" />
                         <Input type="number" min="0" step="0.01" placeholder="Max Â£" value={filters.amount_max} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, amount_max: event.target.value })); }} className="h-10 text-sm" />
                         <Input type="date" value={filters.date_from} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, date_from: event.target.value })); }} className="h-10 text-sm" />
@@ -1812,11 +1813,11 @@ const Transactions = React.memo(function Transactions() {
                   ))}
                 </div>
                 <div className="flex items-center gap-2 pb-1 xl:pr-[10px]">
-                  <select value={filters.sort} onChange={(event) => setFilter("sort", event.target.value)} className="h-8 rounded-[8px] border border-border bg-card px-2 text-[11px] font-medium outline-none">
+                  <PenniSelect value={filters.sort} onChange={(event) => setFilter("sort", event.target.value)} className="h-8 rounded-[8px] border border-border bg-card px-2 text-[11px] font-medium outline-none">
                     <option value="date">Sort: Date (newest)</option>
                     <option value="amount">Sort: Amount</option>
                     <option value="description">Sort: Description</option>
-                  </select>
+                  </PenniSelect>
                   <div className="flex overflow-hidden rounded-[8px] border border-border bg-card">
                     <button onClick={() => setViewMode("list")} className={`grid h-8 w-8 place-items-center transition ${viewMode === "list" ? "bg-emerald/10 text-emerald" : "text-muted-foreground hover:text-foreground"}`} aria-label="List view">
                       <List className="h-3.5 w-3.5" />
@@ -2545,7 +2546,7 @@ const Transactions = React.memo(function Transactions() {
             {transferCandidates.length ? (
               <div className="space-y-2">
                 <label className="label-overline">Matching transaction</label>
-                <select
+                <PenniSelect
                   value={transferTargetId}
                   onChange={(e) => setTransferTargetId(e.target.value)}
                   className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-ring"
@@ -2556,7 +2557,7 @@ const Transactions = React.memo(function Transactions() {
                       {candidate.date} - {candidate.description || candidate.merchant || "Transaction"} - {fmt(candidate.amount)}
                     </option>
                   ))}
-                </select>
+                </PenniSelect>
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
