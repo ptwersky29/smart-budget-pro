@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
@@ -14,6 +14,11 @@ export default function ResetPassword() {
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  useEffect(() => {
+    if (!done) return undefined;
+    const redirect = window.setTimeout(() => navigate("/login"), 3000);
+    return () => window.clearTimeout(redirect);
+  }, [done, navigate]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -29,7 +34,7 @@ export default function ResetPassword() {
     try {
       await api.post("/auth/reset-password", { token, new_password: password });
       setDone(true);
-      setTimeout(() => navigate("/login"), 3000);
+
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail) || "Could not reset password");
     } finally {
