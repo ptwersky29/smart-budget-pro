@@ -179,11 +179,12 @@ export default function Dashboard() {
   const income = Number(overview?.income) || 0;
   const spend = Number(overview?.spend ?? overview?.spending) || 0;
   const savings = income - spend;
-  const savingsRate = Number(overview?.savings_rate) || (income > 0 ? Math.round((savings / income) * 100) : 0);
+  const savingsRate = overview?.savings_rate != null && Number.isFinite(Number(overview.savings_rate))
+    ? Number(overview.savings_rate) : (income > 0 ? Math.round((savings / income) * 100) : 0);
   const balance = Number(
-    overview?.truelayer_balance ||
-      accounts.reduce((sum, account) => sum + (Number(account.balance) || 0), 0) ||
-      overview?.balance ||
+    overview?.truelayer_balance ??
+      (accounts.length ? accounts.reduce((sum, account) => sum + (Number(account.balance) || 0), 0) : null) ??
+      overview?.balance ??
       0,
   );
   const trendValues = monthlyFlow.map((month) => Number(month.income) - Number(month.spend));
