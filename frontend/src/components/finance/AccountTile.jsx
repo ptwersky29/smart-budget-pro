@@ -10,7 +10,7 @@ import {
 import { formatCurrency } from "../../lib/format";
 import { getDisplayName } from "../../lib/utils";
 
-export default function AccountTile({ account, compact = false, className = "" }) {
+export default function AccountTile({ account, compact = false, className = "", onSelect }) {
   const [imageFailed, setImageFailed] = useState(false);
   const institution = pickBankInstitution(
     account?.institution,
@@ -34,6 +34,7 @@ export default function AccountTile({ account, compact = false, className = "" }
     return (
       <Link
         to={to}
+        onClick={onSelect ? event => { event.preventDefault(); onSelect(account); } : undefined}
         className={`group flex min-w-0 items-center gap-3 rounded-2xl border border-transparent px-2 py-2 transition hover:border-border/70 hover:bg-secondary/40 ${className}`}
       >
         <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-white shadow-sm ring-1 ring-black/[0.04] dark:bg-white/10">
@@ -63,6 +64,7 @@ export default function AccountTile({ account, compact = false, className = "" }
   return (
     <Link
       to={to}
+      onClick={onSelect ? event => { event.preventDefault(); onSelect(account); } : undefined}
       className={`surface surface-hover group relative flex min-w-0 flex-col justify-between overflow-hidden p-4 ${className}`}
     >
       <span className="absolute inset-y-4 left-0 w-[3px] rounded-r-full" style={{ background: color }} />
