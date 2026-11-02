@@ -88,15 +88,19 @@ export default function GlobalActionHost() {
       category:transactionForm.category||undefined,date:transactionForm.date||today(),account_id:transactionForm.account_id,
       merchant:transactionForm.merchant||undefined,notes:transactionForm.notes||undefined,
       is_income:!!transactionForm.is_income,is_transfer:!!transactionForm.is_transfer};
+    // Keep complex workflows as drafts until the final confirmation.
+    // Canceling either panel must not create a real transaction.
+    if (type === "transaction-new" &&
+        (transactionForm.entry_mode === "split" || transactionForm.entry_mode === "transfer")) {
+      openAction(transactionForm.entry_mode === "split" ? "transaction-split" : "transaction-transfer",
+        { transaction: { ...body, currency: transactionForm.currency || "GBP", entry_mode: transactionForm.entry_mode } });
+      return;
+    }
     savingRef.current = true;
     setSavingTransaction(true);
     try {
-      let createdTransaction = null;
       if (type==="transaction-edit" && item?.transaction_id) {
         await api.patch(`/transactions/${item.transaction_id}`, {...body, exclude_from_maaser: !!transactionForm.exclude_from_maaser});
-      } else if (transactionForm.entry_mode === "split" || transactionForm.entry_mode === "transfer") {
-        const {data} = await api.post("/transactions", {...body, exclude_from_maaser: transactionForm.entry_mode === "transfer" || !!transactionForm.exclude_from_maaser});
-        createdTransaction = data;
       } else if (classification || transactionForm.budget_type) {
         const suggestions = classification?.suggestions || [];
         const chosenIndex = suggestions.findIndex(s=>s.category === transactionForm.category);
@@ -112,11 +116,6 @@ export default function GlobalActionHost() {
         await api.post("/transactions", {...body, exclude_from_maaser: !!transactionForm.exclude_from_maaser});
       }
       toast.success(type==="transaction-edit"?"Transaction updated":"Transaction added");
-      if (createdTransaction?.transaction_id && (transactionForm.entry_mode === "split" || transactionForm.entry_mode === "transfer")) {
-        changed("transactions");
-        openAction(transactionForm.entry_mode === "split" ? "transaction-split" : "transaction-transfer", {transaction:createdTransaction});
-        return;
-      }
       afterSave("transactions");
     } catch(e){toast.error(formatApiError(e.response?.data?.detail)||"Could not save transaction");}
     finally { savingRef.current = false; setSavingTransaction(false); }
