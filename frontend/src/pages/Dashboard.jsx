@@ -152,9 +152,13 @@ export default function Dashboard() {
         setLoadError(message);
         if (silent) toast.error(message || "Could not refresh dashboard");
       }
-      if (bd.status === "fulfilled") setBudgets(bd.value.data.budgets || []);
-      if (al.status === "fulfilled") setAlerts(al.value.data.alerts || al.value.data || []);
-      if (up.status === "fulfilled") setUpcoming(up.value.data.upcoming || up.value.data || []);
+      setBudgets(bd.status === "fulfilled" ? (bd.value.data.budgets || []) : []);
+      setAlerts(al.status === "fulfilled" ? (al.value.data.alerts || al.value.data || []) : []);
+      setUpcoming(up.status === "fulfilled" ? (up.value.data.upcoming || up.value.data || []) : []);
+      const failed = [["Budgets", bd], ["Alerts", al], ["Upcoming expenses", up]]
+        .filter(([, result]) => result.status !== "fulfilled")
+        .map(([name]) => name);
+      if (failed.length) toast.error(`Could not load ${failed.join(", ")}. Their cards have been cleared; retry refresh.`);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -187,6 +191,13 @@ export default function Dashboard() {
       overview?.balance ??
       0,
   );
+  const currencies = Array.from(new Set(accounts.map(account => account.balance_currency || account.currency || "GBP")));
+  const mixedCurrencies = Boolean(overview?.multi_currency) || currencies.length > 1;
+  const balanceLabel = mixedCurrencies ? "Multiple currencies" : formatCurrency(balance);
+  const currencyDetail = mixedCurrencies
+    ? currencies.map(currency => `${currency}: ${accounts.filter(a => (a.balance_currency || a.currency || "GBP") === currency)
+        .reduce((total, a) => total + (Number(a.balance) || 0), 0).toFixed(2)}`).join(" · ")
+    : `${accounts.length} ${accounts.length === 1 ? "account" : "accounts"} connected`;
   const trendValues = monthlyFlow.map((month) => Number(month.income) - Number(month.spend));
   const topAlerts = (Array.isArray(alerts) ? alerts : []).slice(0, 2);
   const topUpcoming = (Array.isArray(upcoming) ? upcoming : []).slice(0, 4);
@@ -344,8 +355,8 @@ export default function Dashboard() {
         {showWidget("net_worth") ? (
           <StatCard
             label="Total balance"
-            value={formatCurrency(balance)}
-            detail={`${accounts.length} ${accounts.length === 1 ? "account" : "accounts"} connected`}
+            value={balanceLabel}
+            detail={currencyDetail}
             icon={Wallet}
             tone="emerald"
             delta={monthlyFlow.length ? `${monthLabel(monthlyFlow[monthlyFlow.length - 1]?.month)} net` : null}
@@ -357,7 +368,7 @@ export default function Dashboard() {
         {showWidget("income") ? (
           <StatCard
             label="Income"
-            value={formatCurrency(income)}
+            value={mixedCurrencies ? "—" : formatCurrency(income)}
             detail="This month"
             icon={ArrowDownLeft}
             tone="blue"
@@ -368,7 +379,7 @@ export default function Dashboard() {
         {showWidget("spending") ? (
           <StatCard
             label="Spending"
-            value={formatCurrency(spend)}
+            value={mixedCurrencies ? "—" : formatCurrency(spend)}
             detail={`${categories.length} ${categories.length === 1 ? "category" : "categories"}`}
             icon={ArrowUpRight}
             tone="ruby"
@@ -377,7 +388,7 @@ export default function Dashboard() {
         {showWidget("health_score") ? (
           <StatCard
             label="Net saved"
-            value={formatCurrency(savings)}
+            value={mixedCurrencies ? "—" : formatCurrency(savings)}
             detail={`${savingsRate}% of income`}
             icon={PiggyBank}
             tone="topaz"

@@ -229,12 +229,16 @@ export default function Reports() {
         </DropdownMenu>
       </PageToolbar>
 
+      {data.multi_currency && <div role="alert" className="rounded-xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm">
+        This report contains accounts in different currencies. Combined pound figures are not directly comparable without exchange-rate conversion.
+        <span className="mt-1 block font-semibold">{Object.entries(data.account_balance_breakdown || {}).map(([currency,value])=>`${currency}: ${Number(value).toFixed(2)}`).join(" · ")}</span>
+      </div>}
       <Surface className="p-5 sm:p-6">
         <div className="flex items-center gap-2 sm:gap-3">
           <ShieldCheck className="h-4 w-4 text-emerald shrink-0" />
           <p className="label-overline">Health score</p>
           <span className="ml-auto text-2xl sm:text-3xl tracking-tight font-light">
-            {data.health_score}
+            {data.multi_currency ? "—" : data.health_score}
             <span className="text-xs sm:text-sm text-muted-foreground">
               /100
             </span>
@@ -243,14 +247,14 @@ export default function Reports() {
         <div className="mt-3 sm:mt-4 h-2 bg-secondary rounded-full overflow-hidden">
           <div
             className="h-full gradient-emerald"
-            style={{ width: `${data.health_score}%` }}
+            style={{ width: `${data.multi_currency ? 0 : data.health_score}%` }}
           />
         </div>
         <div className="mt-3 sm:mt-4 flex flex-wrap items-center gap-x-4 sm:gap-x-6 gap-y-1.5 sm:gap-y-2 text-xs sm:text-sm">
           <span>
             Savings rate:{" "}
             <span className="text-emerald font-medium">
-              {data.savings_rate}%
+              {data.multi_currency ? "—" : `${data.savings_rate}%`}
             </span>
           </span>
           <span className="flex items-center gap-2">
@@ -275,7 +279,7 @@ export default function Reports() {
           <span>
             Cash flow:{" "}
             <span className="font-medium">
-              £{data.balance.toLocaleString()}
+              {data.multi_currency ? "—" : `£${Number(data.balance || 0).toLocaleString()}`}
             </span>
           </span>
         </div>

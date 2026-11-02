@@ -14,7 +14,10 @@ import StatementAction from "./StatementAction";
 import { BudgetActionForm, BudgetActionPreview, AccountActionPreview, ReportsActionPreview, SearchTransactionsAction, SplitTransactionAction, PairTransferAction } from "./FinanceActions";
 
 const CategoryManager = lazy(() => import("../../pages/CategoryManager"));
-const today = () => new Date().toISOString().slice(0,10);
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 const emptyTransaction = (account_id="") => ({
   description:"", date:today(), amount:"", category:"", merchant:"", notes:"",
   account_id, is_income:false, is_transfer:false, entry_mode:"standard",
@@ -39,13 +42,13 @@ export default function GlobalActionHost() {
   const [saveAsRecurring, setSaveAsRecurring] = useState(false);
   const [savingTransaction, setSavingTransaction] = useState(false);
   const savingRef = useRef(false);
-  const [fromDate,setFromDate] = useState(() => {const d=new Date();d.setDate(d.getDate()-90);return d.toISOString().slice(0,10)});
+  const [fromDate,setFromDate] = useState(() => {const d=new Date();d.setDate(d.getDate()-90);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`});
 
   const type = active?.type;
   const payload = active?.payload || {};
   const item = payload.transaction;
   const isTxForm = type === "transaction-new" || type === "transaction-edit";
-  const isAccountForm = type === "account-new";
+  const isAccountForm = type === "account-new" || type === "account-edit";
   const isInfo = type === "transaction-info" || type === "account-info" || type === "budget-info";
   const isLarge = type === "categories" || type === "statement-import" || type === "reports";
   useEffect(() => {
@@ -88,15 +91,19 @@ export default function GlobalActionHost() {
       category:transactionForm.category||undefined,date:transactionForm.date||today(),account_id:transactionForm.account_id,
       merchant:transactionForm.merchant||undefined,notes:transactionForm.notes||undefined,
       is_income:!!transactionForm.is_income,is_transfer:!!transactionForm.is_transfer};
+    // Keep complex workflows as drafts until the final confirmation.
+    // Canceling either panel must not create a real transaction.
+    if (type === "transaction-new" &&
+        (transactionForm.entry_mode === "split" || transactionForm.entry_mode === "transfer")) {
+      openAction(transactionForm.entry_mode === "split" ? "transaction-split" : "transaction-transfer",
+        { transaction: { ...body, currency: transactionForm.currency || "GBP", entry_mode: transactionForm.entry_mode } });
+      return;
+    }
     savingRef.current = true;
     setSavingTransaction(true);
     try {
-      let createdTransaction = null;
       if (type==="transaction-edit" && item?.transaction_id) {
         await api.patch(`/transactions/${item.transaction_id}`, {...body, exclude_from_maaser: !!transactionForm.exclude_from_maaser});
-      } else if (transactionForm.entry_mode === "split" || transactionForm.entry_mode === "transfer") {
-        const {data} = await api.post("/transactions", {...body, exclude_from_maaser: transactionForm.entry_mode === "transfer" || !!transactionForm.exclude_from_maaser});
-        createdTransaction = data;
       } else if (classification || transactionForm.budget_type) {
         const suggestions = classification?.suggestions || [];
         const chosenIndex = suggestions.findIndex(s=>s.category === transactionForm.category);
@@ -112,11 +119,6 @@ export default function GlobalActionHost() {
         await api.post("/transactions", {...body, exclude_from_maaser: !!transactionForm.exclude_from_maaser});
       }
       toast.success(type==="transaction-edit"?"Transaction updated":"Transaction added");
-      if (createdTransaction?.transaction_id && (transactionForm.entry_mode === "split" || transactionForm.entry_mode === "transfer")) {
-        changed("transactions");
-        openAction(transactionForm.entry_mode === "split" ? "transaction-split" : "transaction-transfer", {transaction:createdTransaction});
-        return;
-      }
       afterSave("transactions");
     } catch(e){toast.error(formatApiError(e.response?.data?.detail)||"Could not save transaction");}
     finally { savingRef.current = false; setSavingTransaction(false); }
@@ -136,7 +138,7 @@ export default function GlobalActionHost() {
     onClassify={classifyTransaction} classifying={classifying} classification={classification}
     onClearClassification={() => setClassification(null)}
     saveAsRecurring={saveAsRecurring} setSaveAsRecurring={setSaveAsRecurring} saving={savingTransaction}/>;
-  if (isAccountForm) return <AccountFormModal key={active.key} open onClose={closeAction} onCreated={()=>changed("accounts")} />;
+  if (isAccountForm) return <AccountFormModal key={active.key} open editAccount={type === "account-edit" ? payload.account : null} onClose={closeAction} onCreated={() => afterSave("accounts")} />;
 
   return <Sheet open={Boolean(active)} onOpenChange={open=>{if(!open)closeAction()}}>
     <SheetContent side="right" className={`flex h-full w-full flex-col overflow-hidden p-0 ${isLarge?"sm:max-w-[min(940px,92vw)]":isInfo?"sm:max-w-[440px]":"sm:max-w-lg"}`}>
@@ -159,17 +161,17 @@ export default function GlobalActionHost() {
           {accounts.map(account => <button key={account.account_id} type="button" onClick={() => openAction("account-info", {accountId:account.account_id, account})}
             className="flex w-full items-center justify-between gap-3 rounded-xl border border-border p-3 text-left hover:bg-secondary/40">
             <span className="truncate text-sm font-medium">{account.name}</span>
-            <span className="shrink-0 text-sm font-semibold">£{Number(account.balance||0).toFixed(2)}</span>
+            <span className="shrink-0 text-sm font-semibold">{account.currency || "GBP"} {Number(account.balance||0).toFixed(2)}</span>
           </button>)}
           {!accounts.length && <p className="py-6 text-center text-xs text-muted-foreground">{accountLoading?"Loading accounts…":"No accounts yet"}</p>}
           <Button variant="outlinePill" className="w-full" onClick={() => openAction("account-new")}>Add account</Button>
         </div>}
         {type==="account-info" && <AccountActionPreview accountId={payload.accountId||payload.account?.account_id}
-          account={payload.account} onAddTransaction={accountId=>openAction("transaction-new",{accountId})} onClose={closeAction}/>}
+          account={payload.account} onAddTransaction={accountId=>openAction("transaction-new",{accountId})} onEdit={account=>openAction("account-edit",{account})} onClose={closeAction}/>}
         {type==="statement-import" && <StatementAction initialDraft={payload.draft} initialAccountId={payload.accountId}
           accounts={accounts} onSaved={()=>afterSave("transactions")}/>}
         {type==="categories" && <Suspense fallback={<p className="p-4 text-xs text-muted-foreground">Loading categories…</p>}><CategoryManager /></Suspense>}
-        {type==="reports" && <ReportsActionPreview />}
+        {type==="reports" && <ReportsActionPreview initialMonth={payload.month} />}
         {type==="alerts" && <NotificationSettings />}
         {type==="transaction-search" && <SearchTransactionsAction month={payload.month} onInspect={transaction=>openAction("transaction-info",{transaction})}/>}
         {type==="bank-connect" && <div className="space-y-4">
