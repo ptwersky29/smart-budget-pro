@@ -129,9 +129,9 @@ export default function TransactionInspectorPanel({
                   <Sparkles className="mr-2 h-4 w-4" /> Ask Penni
                 </DropdownMenuItem> : null}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onDelete(transaction.transaction_id)} className="text-ruby">
+                {onDelete && <DropdownMenuItem onClick={() => onDelete(transaction.transaction_id)} className="text-ruby">
                   <Trash2 className="mr-2 h-4 w-4" /> Delete
-                </DropdownMenuItem>
+                </DropdownMenuItem>}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
