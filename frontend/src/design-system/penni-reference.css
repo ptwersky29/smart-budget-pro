@@ -51,6 +51,16 @@
 .dark .penni-v2[data-penni-accent="rose"] { --penni-accent:#f2587f; }
 .dark .penni-v2[data-penni-accent="sky"] { --penni-accent:#2fa8f5; }
 .dark .penni-v2[data-penni-accent="violet"] { --penni-accent:#a07bff; }
+.penni-v2[data-penni-accent="emerald"] { --primary:160 85% 35%; --accent:160 85% 35%; --ring:160 85% 35%; }
+.penni-v2[data-penni-accent="copper"] { --primary:25 68% 52%; --accent:25 68% 52%; --ring:25 68% 52%; }
+.penni-v2[data-penni-accent="rose"] { --primary:346 74% 56%; --accent:346 74% 56%; --ring:346 74% 56%; }
+.penni-v2[data-penni-accent="sky"] { --primary:204 89% 48%; --accent:204 89% 48%; --ring:204 89% 48%; }
+.penni-v2[data-penni-accent="violet"] { --primary:258 90% 66%; --accent:258 90% 66%; --ring:258 90% 66%; }
+.dark .penni-v2[data-penni-accent="emerald"] { --primary:160 77% 43%; --accent:160 77% 43%; --ring:160 77% 43%; }
+.dark .penni-v2[data-penni-accent="copper"] { --primary:25 85% 59%; --accent:25 85% 59%; --ring:25 85% 59%; }
+.dark .penni-v2[data-penni-accent="rose"] { --primary:346 84% 65%; --accent:346 84% 65%; --ring:346 84% 65%; }
+.dark .penni-v2[data-penni-accent="sky"] { --primary:204 90% 57%; --accent:204 90% 57%; --ring:204 90% 57%; }
+.dark .penni-v2[data-penni-accent="violet"] { --primary:258 100% 74%; --accent:258 100% 74%; --ring:258 100% 74%; }
 .penni-v2, .penni-v2 * { scrollbar-color:rgba(102,112,133,.28) transparent; scrollbar-width:thin; }
 .penni-v2 *:focus-visible { outline:2px solid var(--penni-accent); outline-offset:2px; }
 .penni-v2 .penni-sidebar { background:var(--penni-surface); border:0; border-right:1px solid var(--penni-line); border-radius:0; box-shadow:none; }
