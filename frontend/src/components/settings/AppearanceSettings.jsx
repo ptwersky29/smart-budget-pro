@@ -5,6 +5,14 @@ import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { Label } from "../ui/label";
 import { useSettings } from "../../contexts/SettingsContext";
 
+const ACCENTS = [
+  {value:"indigo", label:"Indigo", color:"#5b5cf0"},
+  {value:"emerald", label:"Emerald", color:"#0ea371"},
+  {value:"copper", label:"Copper", color:"#d9772f"},
+  {value:"rose", label:"Rose", color:"#e23d68"},
+  {value:"sky", label:"Sky", color:"#0d93e8"},
+  {value:"violet", label:"Violet", color:"#8b5cf6"},
+];
 const THEMES = [
   { value: "light", label: "Light", icon: Sun },
   { value: "dark", label: "Dark", icon: Moon },
@@ -56,6 +64,22 @@ export default React.memo(function AppearanceSettings() {
         </div>
       </SectionCard>
 
+      <SectionCard
+        eyebrow="Appearance"
+        title="Accent colour"
+        description="Choose the colour used throughout the application."
+      >
+        <div className="flex flex-wrap gap-3" role="group" aria-label="Accent colour">
+          {ACCENTS.map(({value,label,color}) => (
+            <button key={value} type="button" onClick={() => setAppearance("accent",value)}
+              disabled={saving} aria-pressed={(appearance.accent||"indigo")===value}
+              className={"flex min-w-[94px] flex-col items-center gap-2 rounded-2xl border bg-card p-3 text-xs font-medium transition-colors " + ((appearance.accent||"indigo")===value ? "border-foreground/35 ring-1 ring-foreground/10" : "border-border hover:border-foreground/30")}>
+              <span className="grid h-8 w-8 place-items-center rounded-full text-white" style={{background:color}}>{(appearance.accent||"indigo")===value ? "✓" : ""}</span>
+              {label}
+            </button>
+          ))}
+        </div>
+      </SectionCard>
       <SectionCard
         eyebrow="Appearance"
         title="Density"
