@@ -45,7 +45,12 @@ export default function CategoryCombobox({
   const [addOpen, setAddOpen] = useState(false);
   const [adding, setAdding] = useState(false);
 
-  const categories = categoriesProp?.length ? categoriesProp : sharedCategories;
+  // Older accounts may contain incomplete custom-category records.
+  // A malformed category must never crash the transaction modal on open.
+  const incoming = Array.isArray(categoriesProp) && categoriesProp.length ? categoriesProp : sharedCategories;
+  const categories = (Array.isArray(incoming) ? incoming : []).filter(
+    category => category && typeof category === "object" && typeof category.name === "string"
+  );
   const selected = value ? resolveCategory(value) : null;
 
   const filteredGroups = useMemo(() => {
