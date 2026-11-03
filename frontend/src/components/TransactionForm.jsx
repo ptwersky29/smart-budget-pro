@@ -1,6 +1,6 @@
 import PenniSelect from "./PenniSelect";
-import React, { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import React, { useState } from "react";
+import NativePopup from "./ui/NativePopup";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -47,15 +47,6 @@ export default function TransactionForm({
 }) {
   const [showMore, setShowMore] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
-
   if (!open) return null;
 
   const canClassify =
@@ -85,20 +76,12 @@ export default function TransactionForm({
   const topSuggestion = suggestions[0];
   const autoFill = topSuggestion && topSuggestion.confidence >= 0.95;
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label={editingId ? "Edit transaction" : "New transaction"}
-    >
-      <div
-        className="penni-v2 penni-overlay-content my-auto rounded-2xl border border-border bg-card shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-[fadeUp_0.2s_ease-out]"
-        onClick={(e) => e.stopPropagation()}
-      >
+  return (
+    <NativePopup open={open} onClose={onClose} title={editingId ? "Edit transaction" : "New transaction"}
+      size="md" className="penni-transaction-popup" bodyClassName="penni-transaction-body">
+      <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border px-5 py-4 bg-card/90">
+        <div className="penni-transaction-header flex items-center justify-between border-b border-border px-5 py-4 bg-card/90">
           <div className="flex items-center gap-3">
             <span
               className={`grid h-9 w-9 place-items-center rounded-xl ${
@@ -138,15 +121,15 @@ export default function TransactionForm({
         {/* Scrollable Form Body */}
         <form
           onSubmit={onSubmit}
-          className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4"
+          className="penni-transaction-fields flex-1 overflow-y-auto p-5 sm:p-6 space-y-4"
           aria-labelledby="transaction-form-title"
         >
           {/* Type Toggle: Expense vs Income */}
           <div>
-            <label className="text-xs font-medium text-muted-foreground block mb-1.5">
+            <label className="sr-only">
               Transaction Type
             </label>
-            <div className="grid grid-cols-2 gap-2 rounded-xl border border-border bg-secondary/25 p-1">
+            <div className="penni-ref-segment grid grid-cols-2 gap-2 rounded-xl border border-border bg-secondary/25 p-1" role="group" aria-label="Transaction type">
               <button
                 type="button"
                 onClick={() =>
@@ -196,8 +179,8 @@ export default function TransactionForm({
             >
               Amount <span className="text-ruby">*</span>
             </label>
-            <div className="relative">
-              <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">
+            <div className="penni-amount-field relative">
+              <span className="penni-currency-sign pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">
                 £
               </span>
               <Input
@@ -212,7 +195,7 @@ export default function TransactionForm({
                   setForm({ ...form, amount: e.target.value });
                   if (onClearClassification) onClearClassification();
                 }}
-                className="h-11 pl-8 text-base font-bold tabular-nums"
+                className="penni-ref-amount h-11 pl-8 text-base font-bold tabular-nums"
               />
             </div>
           </div>
@@ -237,6 +220,104 @@ export default function TransactionForm({
               }}
               className="h-11 text-sm"
             />
+          </div>
+
+          {/* Category Selector */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                Category
+              </label>
+              {!editingId && canClassify && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const parsed = parseFloat(form.amount);
+                    if (isNaN(parsed)) {
+                      toast.error("Invalid amount");
+                      return;
+                    }
+                    onClassify({
+                      description: form.description,
+                      amount: parsed,
+                    });
+                  }}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald hover:underline"
+                >
+                  {classifying ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3 w-3" />
+                  )}
+                  {classifying ? "Classifying..." : "Suggest with AI"}
+                </button>
+              )}
+            </div>
+
+
+            {/* Reference quick-pick tiles, bound to existing categories. */}
+            {Array.isArray(selectedCats) && selectedCats.length > 0 && (
+              <div className="penni-ref-category-grid" role="group" aria-label="Quick categories">
+                {selectedCats.filter(c => !c.is_archived).slice(0,11).map(c => {
+                  const name = c.name || c.slug || c.label;
+                  const selected = form.category === name;
+                  return (
+                    <button key={c.category_id || name} type="button" aria-pressed={selected}
+                      className={`penni-ref-category-tile ${selected ? "selected" : ""}`}
+                      onClick={() => setForm({ ...form, category:name })}>
+                      <span className="penni-ref-category-icon" style={{ background:(c.color || "#5b5cf0") + "1b",color:c.color || "#5b5cf0" }}>
+                        {c.emoji || c.icon || "•"}
+                      </span>
+                      <span className="truncate">{c.display_name || c.label || String(name).replace(/_/g," ")}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <CategoryCombobox
+              value={form.category}
+              onChange={(val) => setForm({ ...form, category: val })}
+              categories={selectedCats}
+              placeholder={
+                autoFill
+                  ? `${topSuggestion.category} (AI Suggested · ${Math.round(topSuggestion.confidence * 100)}%)`
+                  : "Select category..."
+              }
+              onCategoryCreated={onCategoryCreated}
+            />
+
+            {/* Source badges for selected category */}
+            {form.category && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                {(() => {
+                  const found = selectedCats?.find?.(
+                    (c) => c.name === form.category,
+                  );
+                  if (found) {
+                    return (
+                      <>
+                        <CategoryBadge category={found} size="sm" />
+                        {found.section && (
+                          <span className="px-2 py-0.5 rounded-md bg-secondary/50 text-[10px] font-medium">
+                            {found.section}
+                          </span>
+                        )}
+                        {found.source === "System" ? (
+                          <span className="px-2 py-0.5 rounded-md bg-secondary/60 text-[10px]">
+                            System
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-md bg-topaz/10 text-topaz text-[10px] font-medium">
+                            Custom
+                          </span>
+                        )}
+                      </>
+                    );
+                  }
+                  return <CategoryBadge category={form.category} size="sm" />;
+                })()}
+              </div>
+            )}
           </div>
 
           {/* Account & Date (2 columns) */}
@@ -295,84 +376,6 @@ export default function TransactionForm({
                 className="h-11 text-xs"
               />
             </div>
-          </div>
-
-          {/* Category Selector */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                Category
-              </label>
-              {!editingId && canClassify && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const parsed = parseFloat(form.amount);
-                    if (isNaN(parsed)) {
-                      toast.error("Invalid amount");
-                      return;
-                    }
-                    onClassify({
-                      description: form.description,
-                      amount: parsed,
-                    });
-                  }}
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald hover:underline"
-                >
-                  {classifying ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-3 w-3" />
-                  )}
-                  {classifying ? "Classifying..." : "Suggest with AI"}
-                </button>
-              )}
-            </div>
-
-            <CategoryCombobox
-              value={form.category}
-              onChange={(val) => setForm({ ...form, category: val })}
-              categories={selectedCats}
-              placeholder={
-                autoFill
-                  ? `${topSuggestion.category} (AI Suggested · ${Math.round(topSuggestion.confidence * 100)}%)`
-                  : "Select category..."
-              }
-              onCategoryCreated={onCategoryCreated}
-            />
-
-            {/* Source badges for selected category */}
-            {form.category && (
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                {(() => {
-                  const found = selectedCats?.find?.(
-                    (c) => c.name === form.category,
-                  );
-                  if (found) {
-                    return (
-                      <>
-                        <CategoryBadge category={found} size="sm" />
-                        {found.section && (
-                          <span className="px-2 py-0.5 rounded-md bg-secondary/50 text-[10px] font-medium">
-                            {found.section}
-                          </span>
-                        )}
-                        {found.source === "System" ? (
-                          <span className="px-2 py-0.5 rounded-md bg-secondary/60 text-[10px]">
-                            System
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-md bg-topaz/10 text-topaz text-[10px] font-medium">
-                            Custom
-                          </span>
-                        )}
-                      </>
-                    );
-                  }
-                  return <CategoryBadge category={form.category} size="sm" />;
-                })()}
-              </div>
-            )}
           </div>
 
           {/* AI Suggestions dropdown if classification returned */}
@@ -602,7 +605,7 @@ export default function TransactionForm({
         </form>
 
         {/* Modal Footer */}
-        <div className="border-t border-border px-5 py-3.5 bg-card/90 flex items-center justify-end gap-2.5">
+        <div className="penni-transaction-footer border-t border-border px-5 py-3.5 bg-card/90 flex items-center justify-end gap-2.5">
           <Button
             type="button"
             variant="outlinePill"
@@ -625,7 +628,6 @@ export default function TransactionForm({
           </Button>
         </div>
       </div>
-    </div>,
-    document.body
+    </NativePopup>
   );
 }

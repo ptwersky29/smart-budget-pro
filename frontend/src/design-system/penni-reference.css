@@ -305,3 +305,43 @@ html.dark[data-penni-accent="violet"] .penni-v2 {--penni-accent:#a07bff;}
   .penni-v2 .penni-dashboard-header > :last-child {width:100%;justify-content:flex-start;}
   .penni-v2 .penni-dashboard-alerts {padding:12px;}
 }
+
+
+/* Penny ZIP Accounts: compact summary, coloured horizontal cards and split inspector workspace. */
+.penni-v2 .penni-reference-account-summary .surface{min-width:0;min-height:110px;border-radius:22px;}
+.penni-v2 .penni-account-selector{scroll-snap-type:x proximity;scrollbar-width:thin;}
+.penni-v2 .penni-account-selector .penni-selected-account{border:2px solid transparent;transition:border-color .22s,box-shadow .22s;scroll-snap-align:start;}
+.penni-v2 .penni-account-selector .penni-selected-account.is-selected{border-color:var(--penni-accent);}
+.penni-v2 .penni-account-selector .penni-account-card{min-height:190px;box-shadow:0 18px 30px -17px rgba(0,0,0,.38);}
+.penni-v2 .penni-account-selector .penni-account-card .money-tabular{font-size:24px;}
+.penni-v2 .penni-account-workspace .surface{border-radius:24px;}
+.penni-v2 .penni-account-history{min-height:470px;}
+.penni-v2 .penni-account-history-list{scrollbar-width:thin;scrollbar-color:rgba(102,112,133,.28) transparent;}
+@media(min-width:1024px){.penni-v2 .penni-account-history{max-height:min(70dvh,650px);}}
+@media(max-width:767px){
+ .penni-v2 .penni-account-selector .penni-selected-account{width:265px;min-width:265px;}
+ .penni-v2 .penni-account-history{min-height:390px;}
+}
+
+
+/* Exact Penny type rhythm, space, warm logo and spring-like navigation. */
+.penni-v2{font-family:"Inter","Inter Variable",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;letter-spacing:-.007em;font-feature-settings:"cv11","ss01";-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+.penni-v2 .penni-route-header{height:73px;display:flex;flex-direction:column;justify-content:center;}
+.penni-v2 .penni-side-link{min-height:43px;font-size:13px;font-weight:500;}
+.penni-v2 .penni-side-link[aria-current="page"]{animation:penni-nav-select .3s cubic-bezier(.22,1,.36,1) both;}
+.penni-v2 .penni-sidebar{background:color-mix(in srgb,var(--penni-surface) 72%,var(--penni-bg));}
+.penni-v2 .penni-sidebar .penni-nav-icon{width:28px;height:28px;}
+.penni-v2 .penni-search{border-radius:16px;font-size:13px;}
+.penni-v2 .penni-accent-button{font-weight:600;box-shadow:0 10px 24px -10px var(--penni-accent),inset 0 1px 0 rgba(255,255,255,.22);}
+.penni-v2 .penni-side-link:hover{transform:translateX(1px);}
+.penni-v2 .penni-side-link:active{transform:scale(.985);}
+.penni-v2 .surface{box-shadow:var(--penni-shadow);}
+.penni-v2 .surface h2,.penni-v2 .surface h3{font-weight:650;letter-spacing:-.025em;}
+.penni-v2 .money-tabular{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;letter-spacing:-.035em;}
+.penni-v2 .penni-selected-account .penni-account-card>div:first-child>span:first-child{display:none;}
+.penni-v2 .penni-ref-account-row .penni-account-card>div:first-child>span:first-child{display:none;}
+.penni-v2 .penni-account-card{transition:transform .25s cubic-bezier(.22,1,.36,1),box-shadow .25s;}
+.penni-v2 .penni-account-card:hover{transform:translateY(-3px);box-shadow:0 25px 45px -22px rgba(0,0,0,.45);}
+@keyframes penni-nav-select{from{opacity:.8;transform:scale(.985)}to{opacity:1;transform:scale(1)}}
+@media(max-width:767px){.penni-v2 .penni-route-header{height:62px;}}
+@media(prefers-reduced-motion:reduce){.penni-v2 .penni-side-link[aria-current="page"]{animation:none;}}

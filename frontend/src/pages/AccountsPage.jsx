@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useActions } from "../contexts/ActionContext";
 import {
@@ -22,6 +22,9 @@ import { getDisplayName } from "../lib/utils";
 import { accountGradient } from "../design-system/account-gradients";
 import { getBankLogoOrFallback, pickBankInstitution } from "../data/bankLogos";
 import { formatCurrency } from "../lib/format";
+import { buildDailyBalanceTrend } from "../lib/balanceTrend";
+import Sparkline from "../components/ui/Sparkline";
+import { humanizeCategoryName } from "../lib/categories";
 import Skeleton from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
 import {
@@ -30,7 +33,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
-import { EmptyPanel, PageHeader, Surface, SurfaceHeader } from "../components/ui/page";
+import { EmptyPanel, PageHeader, Surface } from "../components/ui/page";
 import AccountFormModal from "../components/AccountFormModal";
 
 const ACCOUNT_TYPE_META = {
@@ -145,76 +148,32 @@ function AccountCard({ account, connection, onSelect }) {
 }
 
 function BalanceHero({ accounts, loading, connections, totalTx, onConnect, connecting, onSync, syncing }) {
-  const totalBalance = accounts.reduce((sum, account) => sum + (Number(account.balance) || 0), 0);
-  const savingsBalance = accounts.filter((account) => account.type === "savings").reduce((sum, account) => sum + (Number(account.balance) || 0), 0);
-  const currentBalance = totalBalance - savingsBalance;
-
-  if (loading) {
-    return (
-      <div className="rounded-[1.25rem] bg-[#211b50] p-6 text-white sm:p-7">
-        <Skeleton className="h-3 w-28 bg-white/10" />
-        <Skeleton className="mt-4 h-10 w-56 bg-white/10" />
-        <Skeleton className="mt-4 h-4 w-72 max-w-full bg-white/10" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative overflow-hidden rounded-[1.25rem] bg-[#211b50] p-5 text-white shadow-[0_28px_60px_-36px_rgba(10,42,32,0.95)] sm:p-7">
-      <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-28 left-1/3 h-56 w-56 rounded-full bg-[#f3c970]/10 blur-3xl" />
-      <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/50">Total balance</p>
-          <p className="money-tabular mt-2 text-[clamp(2rem,4vw,3rem)] font-semibold leading-none tracking-[-0.055em]">
-            {formatCurrency(totalBalance)}
-          </p>
-          <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] text-white/60">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#7fd6b2]" />
-              Available <strong className="font-medium text-white/90">{formatCurrency(currentBalance)}</strong>
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#c7b6f5]" />
-              Savings <strong className="font-medium text-white/90">{formatCurrency(savingsBalance)}</strong>
-            </span>
-            <span>{accounts.length} {accounts.length === 1 ? "account" : "accounts"}</span>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={onConnect}
-            disabled={connecting}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-white px-4 text-[11px] font-semibold text-[#211b50] transition hover:bg-white/90 disabled:opacity-60"
-          >
-            {connecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Building2 className="h-3.5 w-3.5" />}
-            Connect bank
-          </button>
-          <button
-            type="button"
-            onClick={onSync}
-            disabled={syncing || connections === 0}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.07] px-4 text-[11px] font-medium text-white/85 transition hover:bg-white/[0.12] disabled:opacity-40"
-          >
-            {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
-            Sync now
-          </button>
-        </div>
-      </div>
-
-      <div className="relative mt-6 grid grid-cols-2 gap-2.5 border-t border-white/10 pt-4 sm:max-w-sm">
-        <div>
-          <p className="text-[9px] uppercase tracking-[0.14em] text-white/40">Connections</p>
-          <p className="mt-0.5 text-lg font-semibold">{connections}</p>
-        </div>
-        <div>
-          <p className="text-[9px] uppercase tracking-[0.14em] text-white/40">Synced transactions</p>
-          <p className="mt-0.5 text-lg font-semibold">{Number(totalTx || 0).toLocaleString()}</p>
-        </div>
-      </div>
-    </div>
-  );
+ const balance = accounts.reduce((sum,a)=>sum+(Number(a.balance)||0),0);
+ const savings = accounts.filter(a=>a.type==="savings").reduce((sum,a)=>sum+(Number(a.balance)||0),0);
+ const current = balance-savings;
+ if(loading) return <Skeleton className="h-36 rounded-[24px]"/>;
+ return <section className="penni-reference-account-summary grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Account summary">
+  {[
+    {label:"Net worth",value:formatCurrency(balance)},
+    {label:"Available",value:formatCurrency(current)},
+    {label:"Savings",value:formatCurrency(savings)},
+    {label:"Connected accounts",value:String(accounts.length)},
+  ].map(metric=><div key={metric.label} className="surface p-4 sm:p-5">
+    <p className="text-[11px] font-semibold uppercase tracking-[.09em] text-muted-foreground">{metric.label}</p>
+    <p className="money-tabular mt-3 truncate text-[clamp(19px,2.3vw,29px)] font-semibold tracking-[-.04em]">{metric.value}</p>
+  </div>)}
+  <div className="col-span-2 flex flex-wrap items-center gap-2 lg:col-span-4">
+   <button type="button" onClick={onConnect} disabled={connecting}
+     className="inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-card px-3 text-xs font-medium transition-colors hover:border-primary/40">
+     {connecting?<Loader2 className="h-4 w-4 animate-spin"/>:<Building2 className="h-4 w-4"/>} Connect bank
+   </button>
+   <button type="button" onClick={onSync} disabled={syncing||connections===0}
+     className="inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-card px-3 text-xs font-medium transition-colors hover:border-primary/40">
+     {syncing?<Loader2 className="h-4 w-4 animate-spin"/>:<RefreshCcw className="h-4 w-4"/>} Sync balances
+   </button>
+   <span className="ml-auto text-[11px] text-muted-foreground">{connections} bank connections · {Number(totalTx||0).toLocaleString("en-GB")} synced transactions</span>
+  </div>
+ </section>;
 }
 
 export default function AccountsPage() {
@@ -226,6 +185,12 @@ export default function AccountsPage() {
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editAccount, setEditAccount] = useState(null);
+  const [selectedAccountId, setSelectedAccountId] = useState("");
+  const [accountTransactions, setAccountTransactions] = useState([]);
+  const [transactionLoading, setTransactionLoading] = useState(false);
+  const [transactionQuery, setTransactionQuery] = useState("");
+  const [transactionType, setTransactionType] = useState("all");
   const [status, setStatus] = useState("idle");
   const [conns, setConns] = useState([]);
   const [totalTx, setTotalTx] = useState(0);
@@ -339,9 +304,31 @@ export default function AccountsPage() {
   const needsReconnectConn = (connection) => connection.status === "reconnect_required" || isTokenExpired(connection);
   const needsReconnect = conns.some(needsReconnectConn);
   const connByAccountId = Object.fromEntries(conns.map((connection) => [connection.account_id, connection]));
-  const currentAccounts = accounts.filter((account) => account.type !== "savings");
-  const savingsAccounts = accounts.filter((account) => account.type === "savings");
   const connecting = status === "connecting" || status === "redirecting";
+  const selectedAccount = accounts.find(a => String(a.account_id) === String(selectedAccountId)) || accounts[0] || null;
+  const selectedId = selectedAccount?.account_id;
+  useEffect(() => {
+    if(!selectedId) {setAccountTransactions([]);return;}
+    let active = true;
+    setTransactionLoading(true);
+    api.get("/transactions", {params:{account_id:selectedId,limit:200,sort:"date",order:"desc"}})
+      .then(({data})=>{if(active)setAccountTransactions(data.transactions||[]);})
+      .catch(()=>{if(active)setAccountTransactions([]);})
+      .finally(()=>{if(active)setTransactionLoading(false);});
+    return ()=>{active=false;};
+  },[selectedId]);
+  const filteredTransactions = useMemo(()=>accountTransactions.filter(t=>{
+    const text=(t.description||t.merchant||t.category||"").toLowerCase();
+    const matches=text.includes(transactionQuery.toLowerCase());
+    return matches && (transactionType==="all"||(transactionType==="in"?Number(t.amount)>0:Number(t.amount)<0));
+  }),[accountTransactions,transactionQuery,transactionType]);
+  const selectedHistory = useMemo(()=>buildDailyBalanceTrend(
+    accountTransactions, Number(selectedAccount?.balance||0), 90, new Date(), selectedId?[selectedId]:[]
+  ).map(row=>row.balance),[accountTransactions,selectedAccount?.balance,selectedId]);
+  const monthKey = new Date().toISOString().slice(0,7);
+  const thisMonthTransactions = accountTransactions.filter(t=>String(t.date||"").slice(0,7)===monthKey);
+  const monthIn = thisMonthTransactions.reduce((n,t)=>n+(Number(t.amount)>0?Number(t.amount):0),0);
+  const monthOut = thisMonthTransactions.reduce((n,t)=>n+(Number(t.amount)<0?Math.abs(Number(t.amount)):0),0);
 
   return (
     <div className="accounts-workspace page-stack pb-4">
@@ -432,58 +419,119 @@ export default function AccountsPage() {
         </Surface>
       ) : null}
 
-      {currentAccounts.length > 0 ? (
-        <Surface className="overflow-hidden">
-          <SurfaceHeader
-            icon={Wallet}
-            title="Current accounts"
-            subtitle={`${currentAccounts.length} ${currentAccounts.length === 1 ? "account" : "accounts"}`}
-            actions={
-              <Link to="/connections" className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald">
-                Connections <ChevronRight className="h-3.5 w-3.5" />
-              </Link>
-            }
-            compact
-          />
-          <div className="mt-3 grid grid-cols-1 gap-3 border-t border-border/50 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-3">
-            {currentAccounts.map((account) => (
-              <AccountCard key={account.account_id} account={account} connection={connByAccountId[account.account_id]} onSelect={selected => openAction("account-info", { accountId: selected.account_id, account: selected })} />
-            ))}
-            <Link
-              to="/connections"
-              className="flex min-h-[124px] flex-col items-center justify-center gap-1.5 rounded-[1rem] border border-dashed border-border/80 p-4 text-muted-foreground transition hover:border-emerald/30 hover:bg-emerald/[0.03] hover:text-emerald"
-            >
-              <ArrowRight className="h-4 w-4" />
-              <span className="text-[11px] font-medium">Connect another bank</span>
-            </Link>
-          </div>
-        </Surface>
-      ) : null}
-
-      {savingsAccounts.length > 0 ? (
-        <Surface className="overflow-hidden">
-          <SurfaceHeader
-            icon={PiggyBank}
-            title="Savings"
-            subtitle={`${formatCurrency(savingsAccounts.reduce((sum, account) => sum + (Number(account.balance) || 0), 0))} set aside`}
-            compact
-          />
-          <div className="mt-3 grid grid-cols-1 gap-3 border-t border-border/50 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-3">
-            {savingsAccounts.map((account) => (
-              <AccountCard key={account.account_id} account={account} connection={connByAccountId[account.account_id]} />
-            ))}
-          </div>
-        </Surface>
+      {accounts.length > 0 ? (
+        <>
+          <section className="penni-reference-account-select" aria-label="Select an account">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-[18px] font-semibold tracking-[-.035em]">Your accounts</h2>
+              <button type="button" onClick={()=>{setEditAccount(null);setShowCreateModal(true);}}
+                className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary">
+                <Plus className="h-4 w-4"/> Add account
+              </button>
+            </div>
+            <div className="penni-account-selector flex min-w-0 gap-4 overflow-x-auto pb-3">
+              {accounts.map(account=>(
+                <div key={account.account_id}
+                  className={`penni-selected-account w-[290px] min-w-[290px] shrink-0 rounded-[27px] p-[2px] ${String(selectedId)===String(account.account_id)?"is-selected":""}`}>
+                  <AccountCard account={account} connection={connByAccountId[account.account_id]}
+                    onSelect={selected=>{setSelectedAccountId(selected.account_id);setTransactionQuery("");setTransactionType("all");}}/>
+                </div>
+              ))}
+            </div>
+          </section>
+          {selectedAccount && <div className="penni-account-workspace grid min-h-0 gap-5 lg:grid-cols-[minmax(300px,0.85fr)_minmax(0,1.15fr)]">
+            <section className="min-w-0 space-y-5">
+              <div className="surface min-w-0 p-5 sm:p-6">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">{getDisplayName(selectedAccount)} · {ACCOUNT_TYPE_META[selectedAccount.type]?.label||"Account"}</p>
+                    <h2 className="mt-1 truncate text-[19px] font-semibold tracking-[-.03em]">{selectedAccount.name||selectedAccount.account_name}</h2>
+                  </div>
+                  <button type="button" onClick={()=>{setEditAccount(selectedAccount);setShowCreateModal(true);}}
+                    className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-border bg-secondary/40 px-3 text-xs font-semibold hover:bg-secondary">
+                    Edit
+                  </button>
+                </div>
+                <p className="money-tabular mt-5 text-[clamp(32px,3vw,40px)] font-semibold tracking-[-.05em]">{formatCurrency(selectedAccount.balance)}</p>
+                <div className="mt-5">
+                  {transactionLoading?<Skeleton className="h-36 w-full rounded-xl"/>:<Sparkline values={selectedHistory} height={155} stroke="var(--penni-accent)" />}
+                </div>
+                <p className="mt-1 text-[10px] text-muted-foreground">Estimated 90-day balance movement based on recorded transactions.</p>
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl bg-secondary/60 p-4">
+                    <p className="text-xs text-muted-foreground">In this month</p>
+                    <p className="money-tabular mt-2 text-[19px] font-semibold text-emerald">{formatCurrency(monthIn)}</p>
+                  </div>
+                  <div className="rounded-2xl bg-secondary/60 p-4">
+                    <p className="text-xs text-muted-foreground">Out this month</p>
+                    <p className="money-tabular mt-2 text-[19px] font-semibold">{formatCurrency(monthOut)}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="surface p-5">
+                <h3 className="text-[16px] font-semibold">Details</h3>
+                <p className="mt-2 text-xs text-muted-foreground">Account type: {ACCOUNT_TYPE_META[selectedAccount.type]?.label||"Account"}</p>
+                <p className="mt-1 text-xs text-muted-foreground">Currency: {selectedAccount.currency||"GBP"}</p>
+                <Link to={`/accounts/${selectedId}`} className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-primary">
+                  Full account dashboard <ArrowRight className="h-4 w-4"/>
+                </Link>
+              </div>
+            </section>
+            <section className="surface penni-account-history flex min-w-0 flex-col overflow-hidden">
+              <div className="flex flex-wrap items-center justify-between gap-2 p-5 pb-3">
+                <div>
+                  <h2 className="text-[17px] font-semibold tracking-[-.03em]">Transaction history</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">{accountTransactions.length} recent transactions</p>
+                </div>
+                <button type="button" onClick={()=>openAction("transaction-new",{accountId:selectedId})}
+                  className="inline-flex h-9 items-center gap-1 rounded-xl bg-primary/10 px-3 text-xs font-semibold text-primary">
+                  <Plus className="h-4 w-4"/> Add
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2 px-5 pb-3">
+                <input aria-label="Search this account" placeholder="Search this account..."
+                  value={transactionQuery} onChange={e=>setTransactionQuery(e.target.value)}
+                  className="h-10 min-w-[180px] flex-1 rounded-xl border border-border bg-secondary/50 px-3 text-xs"/>
+                <div className="inline-flex items-center rounded-xl border border-border bg-secondary/40 p-1" role="group" aria-label="Transaction direction">
+                  {[{v:"all",t:"All"},{v:"in",t:"In"},{v:"out",t:"Out"}].map(x=>
+                    <button type="button" key={x.v} aria-pressed={transactionType===x.v}
+                      onClick={()=>setTransactionType(x.v)}
+                      className={`h-8 rounded-lg px-3 text-xs ${transactionType===x.v?"bg-card font-semibold shadow-sm":"text-muted-foreground"}`}>{x.t}</button>)}
+                </div>
+              </div>
+              <div className="penni-account-history-list min-h-0 flex-1 overflow-y-auto border-t border-border/60">
+                {transactionLoading?<p className="p-5 text-xs text-muted-foreground">Loading transactions…</p>:
+                filteredTransactions.length ? filteredTransactions.map((t,i)=>
+                  <button type="button" key={t.transaction_id||i}
+                    onClick={()=>openAction("transaction-info",{transaction:t})}
+                    className="flex w-full items-center gap-3 border-b border-border/50 px-5 py-3 text-left transition-colors hover:bg-secondary/40">
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-secondary text-muted-foreground">
+                      <ArrowRight className={`h-4 w-4 ${Number(t.amount)<0?"rotate-45":"-rotate-45"}`}/>
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] font-medium">{t.description||t.merchant||"Transaction"}</span>
+                      <span className="mt-1 block truncate text-[11px] text-muted-foreground">{humanizeCategoryName(t.category)} · {String(t.date||"").slice(0,10)}</span>
+                    </span>
+                    <span className={`money-tabular shrink-0 text-[13px] font-semibold ${Number(t.amount)>0?"text-emerald":""}`}>{formatCurrency(t.amount,{signed:true})}</span>
+                  </button>
+                ):<p className="p-6 text-center text-xs text-muted-foreground">No matching transactions.</p>}
+              </div>
+            </section>
+          </div>}
+        </>
       ) : null}
 
       </div>
 
       <AccountFormModal
+        key={editAccount?.account_id || "new"}
+        editAccount={editAccount}
         open={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        onClose={() => {setShowCreateModal(false);setEditAccount(null);}}
         onCreated={() => {
           loadAccounts();
           setShowCreateModal(false);
+          setEditAccount(null);
         }}
       />
     </div>

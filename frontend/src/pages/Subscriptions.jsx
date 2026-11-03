@@ -1,4 +1,5 @@
 import PenniSelect from "../components/PenniSelect";
+import NativePopup from "../components/ui/NativePopup";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, formatApiError } from "../lib/api";
 import { toast } from "sonner";
@@ -326,8 +327,8 @@ export default function Subscriptions() {
       </SectionCard>
 
       {open && (
-        <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={() => setOpen(false)}>
-          <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <NativePopup open={open} title={editingId ? "Edit subscription" : "New subscription"} onClose={() => setOpen(false)} size="md">
+          <div className="penni-native-form space-y-4">
             <h3 className="text-xl tracking-tight font-medium mb-4">{editingId ? "Edit subscription" : "New subscription"}</h3>
             <form onSubmit={submit} className="space-y-3">
               <Input required placeholder="Name (e.g. Netflix)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full" />
@@ -346,7 +347,7 @@ export default function Subscriptions() {
               </div>
             </form>
           </div>
-        </div>
+        </NativePopup>
       )}
       <ConfirmModal
         open={Boolean(pendingDeleteId)}

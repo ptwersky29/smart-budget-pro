@@ -3,6 +3,8 @@ import { X, Upload, Wallet, Lock } from "lucide-react";
 import { api, formatApiError } from "../lib/api";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
+import NativePopup from "./ui/NativePopup";
+import { Loader2 } from "lucide-react";
 
 const ACCOUNT_TYPES = [
   { value: "current", label: "Current Account", icon: "💰" },
@@ -151,14 +153,8 @@ export default function AccountFormModal({ open, onClose, onCreated, editAccount
   const isSavings = accountType === "savings";
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="account-form-title"
-    >
-      <div className="w-full max-w-md rounded-2xl bg-card border border-border/60 shadow-xl p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
+    <NativePopup open={open} onClose={onClose} title={editAccount ? "Edit account" : "New account"} size="md">
+      <div className="penni-native-form space-y-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <span className={`grid h-8 w-8 place-items-center rounded-xl ${isSavings ? "bg-violet/10 text-violet" : "bg-emerald/10 text-emerald"}`}>
@@ -253,7 +249,7 @@ export default function AccountFormModal({ open, onClose, onCreated, editAccount
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-3 pt-1">
+          <div className="penni-native-actions flex items-center gap-3 pt-1">
             <Button type="button" variant="outlinePill" onClick={onClose} className="flex-1">Cancel</Button>
             <Button type="submit" variant="primary" disabled={saving || cropping} className="flex-1">
               {saving ? "Saving…" : editAccount ? "Save Changes" : "Create Account"}
@@ -261,6 +257,6 @@ export default function AccountFormModal({ open, onClose, onCreated, editAccount
           </div>
         </form>
       </div>
-    </div>
+    </NativePopup>
   );
 }

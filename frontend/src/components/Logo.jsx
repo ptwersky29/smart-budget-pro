@@ -16,8 +16,8 @@ export default function Logo({ size = "md", className = "" }) {
       className={"relative inline-grid shrink-0 select-none place-items-center rounded-full font-semibold text-white " +
         (sizes[size] || size) + " " + className}
       style={{
-        background: "linear-gradient(145deg, var(--penni-accent, #5b5cf0), #8b5cf6)",
-        boxShadow: "0 8px 18px -9px rgba(91,92,240,.7), inset 0 1px 0 rgba(255,255,255,.25)",
+        background: "radial-gradient(circle at 30% 25%, #ffd2a1 0%, #e48b4a 38%, #b4551f 78%, #8c3f14 100%)",
+        boxShadow: "inset 0 1px 2px rgba(255,255,255,.55), inset 0 -3px 6px rgba(80,25,0,.35), 0 4px 14px -4px rgba(180,85,31,.6)",
         fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
       }}>
       p

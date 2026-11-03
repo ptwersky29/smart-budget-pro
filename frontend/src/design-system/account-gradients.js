@@ -11,6 +11,11 @@ export const ACCOUNT_GRADIENTS = Object.freeze([
 ]);
 
 export function accountGradient(account = {}) {
+  const brand = [account.institution,account.provider,account.name,account.account_name,account.nickname]
+    .filter(Boolean).join(" ").toLowerCase();
+  if(brand.includes("monzo"))return ACCOUNT_GRADIENTS[2];
+  if(brand.includes("barclays"))return ACCOUNT_GRADIENTS[5];
+  if(brand.includes("marcus"))return ACCOUNT_GRADIENTS[1];
   const identity = String(account.account_id || account.id || account.name || "");
   let hash = 0;
   for (const char of identity) hash = ((hash * 31) + char.charCodeAt(0)) >>> 0;

@@ -4,6 +4,7 @@ import { X, Upload, Wallet } from "lucide-react";
 import { api, formatApiError } from "../lib/api";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
+import NativePopup from "./ui/NativePopup";
 
 const ACCOUNT_TYPES = [
   { value: "current", label: "Current Account" },
@@ -73,8 +74,8 @@ export default function AddManualAccountModal({ open, onClose, onCreated }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl bg-card border border-border/60 shadow-xl p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
+    <NativePopup open={open} onClose={onClose} title="Add manual account" size="md">
+      <div className="penni-native-form space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -147,7 +148,7 @@ export default function AddManualAccountModal({ open, onClose, onCreated }) {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-3 pt-1">
+          <div className="penni-native-actions flex items-center gap-3 pt-1">
             <Button type="button" variant="outlinePill" onClick={onClose} className="flex-1">Cancel</Button>
             <Button type="submit" variant="primary" disabled={saving} className="flex-1">
               {saving ? "Saving…" : "Add Account"}
@@ -155,6 +156,6 @@ export default function AddManualAccountModal({ open, onClose, onCreated }) {
           </div>
         </form>
       </div>
-    </div>
+    </NativePopup>
   );
 }
