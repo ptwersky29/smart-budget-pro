@@ -19,6 +19,7 @@ import {
 import { toast } from "sonner";
 import { api, formatApiError } from "../lib/api";
 import { getDisplayName } from "../lib/utils";
+import { accountGradient } from "../design-system/account-gradients";
 import { getBankLogoOrFallback, pickBankInstitution } from "../data/bankLogos";
 import { formatCurrency } from "../lib/format";
 import Skeleton from "../components/ui/Skeleton";
@@ -98,9 +99,10 @@ function AccountCard({ account, connection, onSelect }) {
     <Link
       to={`/accounts/${account.account_id}`}
       onClick={onSelect ? event => { event.preventDefault(); onSelect(account); } : undefined}
-      className="surface surface-hover group relative flex flex-col overflow-hidden p-4"
+      className="penni-account-card penni-interactive group relative flex flex-col justify-between overflow-hidden p-5"
+      style={{ "--account-gradient": accountGradient(account) }}
     >
-      <span className="absolute inset-y-4 left-0 w-[3px] rounded-r-full" style={{ background: account.color || "#2f9e73" }} />
+      
       <div className="flex min-w-0 items-start gap-3">
         <AccountLogo account={account} />
         <div className="min-w-0 flex-1">
@@ -117,7 +119,7 @@ function AccountCard({ account, connection, onSelect }) {
         <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/50 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
       </div>
 
-      <div className="mt-4 flex items-end justify-between gap-2">
+      <div className="relative mt-8 flex items-end justify-between gap-2">
         <div>
           <p className="text-[9.5px] uppercase tracking-[0.1em] text-muted-foreground">
             {isSavings ? "Saved" : "Available"}
@@ -149,7 +151,7 @@ function BalanceHero({ accounts, loading, connections, totalTx, onConnect, conne
 
   if (loading) {
     return (
-      <div className="rounded-[1.25rem] bg-[#123c30] p-6 text-white sm:p-7">
+      <div className="rounded-[1.25rem] bg-[#211b50] p-6 text-white sm:p-7">
         <Skeleton className="h-3 w-28 bg-white/10" />
         <Skeleton className="mt-4 h-10 w-56 bg-white/10" />
         <Skeleton className="mt-4 h-4 w-72 max-w-full bg-white/10" />
@@ -158,7 +160,7 @@ function BalanceHero({ accounts, loading, connections, totalTx, onConnect, conne
   }
 
   return (
-    <div className="relative overflow-hidden rounded-[1.25rem] bg-[#123c30] p-5 text-white shadow-[0_28px_60px_-36px_rgba(10,42,32,0.95)] sm:p-7">
+    <div className="relative overflow-hidden rounded-[1.25rem] bg-[#211b50] p-5 text-white shadow-[0_28px_60px_-36px_rgba(10,42,32,0.95)] sm:p-7">
       <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-28 left-1/3 h-56 w-56 rounded-full bg-[#f3c970]/10 blur-3xl" />
       <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -184,7 +186,7 @@ function BalanceHero({ accounts, loading, connections, totalTx, onConnect, conne
             type="button"
             onClick={onConnect}
             disabled={connecting}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-white px-4 text-[11px] font-semibold text-[#123c30] transition hover:bg-white/90 disabled:opacity-60"
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-white px-4 text-[11px] font-semibold text-[#211b50] transition hover:bg-white/90 disabled:opacity-60"
           >
             {connecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Building2 className="h-3.5 w-3.5" />}
             Connect bank

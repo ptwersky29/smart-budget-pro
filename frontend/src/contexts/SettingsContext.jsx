@@ -19,8 +19,22 @@ function saveToStorage(data) {
 
 const SettingsContext = createContext(null);
 
+// Deep-merge preference groups: changing the accent must not discard
+// density, font-size, dashboard layout or accessibility preferences.
+function mergePreferences(previous = {}, incoming = {}) {
+  const result = { ...previous };
+  for (const [key, value] of Object.entries(incoming)) {
+    const existing = result[key];
+    result[key] = value && typeof value === "object" && !Array.isArray(value) &&
+      existing && typeof existing === "object" && !Array.isArray(existing)
+      ? mergePreferences(existing, value)
+      : value;
+  }
+  return result;
+}
+
 const DEFAULTS = {
-  appearance: { density: "comfortable", font_size: "medium" },
+  appearance: { density: "comfortable", font_size: "medium", accent: "indigo" },
   dashboard: {
     layout: "default",
     widgets: ["net_worth", "income", "spending", "health_score", "cash_flow", "budgets_overview", "quick_actions", "ai_insights", "maaser_balance", "recent_transactions"],
@@ -42,6 +56,7 @@ function applyToDOM(preferences) {
   const a = preferences?.appearance || {};
   const acc = preferences?.accessibility || {};
 
+  root.dataset.penniAccent = a.accent || "indigo";
   root.dataset.density = a.density || "comfortable";
   root.dataset.fontSize = a.font_size || "medium";
   root.style.setProperty("--fs-multiplier", String((acc.font_scaling ?? 100) / 100));
@@ -103,7 +118,7 @@ export function SettingsProvider({ children }) {
 
   const updateSettings = useCallback(async (patch) => {
     const prev = settingsRef.current;
-    const merged = { ...prev, ...patch, preferences: { ...prev.preferences, ...patch.preferences } };
+    const merged = { ...prev, ...patch, preferences: mergePreferences(prev.preferences, patch.preferences) };
     setSettings(merged);
     if (patch.theme) setTheme(patch.theme);
     applyToDOM(merged.preferences || DEFAULTS);

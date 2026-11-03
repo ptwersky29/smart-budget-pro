@@ -5,6 +5,14 @@ import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { Label } from "../ui/label";
 import { useSettings } from "../../contexts/SettingsContext";
 
+const ACCENTS = [
+  {value:"indigo", label:"Indigo", color:"#5b5cf0"},
+  {value:"emerald", label:"Emerald", color:"#0ea371"},
+  {value:"copper", label:"Copper", color:"#d9772f"},
+  {value:"rose", label:"Rose", color:"#e23d68"},
+  {value:"sky", label:"Sky", color:"#0d93e8"},
+  {value:"violet", label:"Violet", color:"#8b5cf6"},
+];
 const THEMES = [
   { value: "light", label: "Light", icon: Sun },
   { value: "dark", label: "Dark", icon: Moon },
@@ -45,7 +53,7 @@ export default React.memo(function AppearanceSettings() {
               disabled={saving}
               className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border text-sm transition-all ${
                 settings.theme === value
-                  ? "border-emerald bg-emerald/5 text-emerald ring-1 ring-emerald/20"
+                  ? "border-primary bg-primary/5 text-primary ring-1 ring-primary/20"
                   : "border-border bg-card/50 text-muted-foreground hover:border-muted-foreground/30"
               }`}
             >
@@ -58,6 +66,22 @@ export default React.memo(function AppearanceSettings() {
 
       <SectionCard
         eyebrow="Appearance"
+        title="Accent colour"
+        description="Choose the colour used throughout the application."
+      >
+        <div className="flex flex-wrap gap-3" role="group" aria-label="Accent colour">
+          {ACCENTS.map(({value,label,color}) => (
+            <button key={value} type="button" onClick={() => setAppearance("accent",value)}
+              disabled={saving} aria-pressed={(appearance.accent||"indigo")===value}
+              className={"flex min-w-[94px] flex-col items-center gap-2 rounded-2xl border bg-card p-3 text-xs font-medium transition-colors " + ((appearance.accent||"indigo")===value ? "border-foreground/35 ring-1 ring-foreground/10" : "border-border hover:border-foreground/30")}>
+              <span className="grid h-8 w-8 place-items-center rounded-full text-white" style={{background:color}}>{(appearance.accent||"indigo")===value ? "✓" : ""}</span>
+              {label}
+            </button>
+          ))}
+        </div>
+      </SectionCard>
+      <SectionCard
+        eyebrow="Appearance"
         title="Density"
         description="Controls spacing and layout compactness."
       >
@@ -67,7 +91,7 @@ export default React.memo(function AppearanceSettings() {
           className="space-y-2"
         >
           {DENSITIES.map(({ value, label, desc }) => (
-            <div key={value} className="flex items-start gap-3 p-3 rounded-xl border border-border has-[:checked]:border-emerald/30 has-[:checked]:bg-emerald/5 transition-colors">
+            <div key={value} className="flex items-start gap-3 p-3 rounded-xl border border-border has-[:checked]:border-primary/30 has-[:checked]:bg-primary/5 transition-colors">
               <RadioGroupItem value={value} id={`density-${value}`} className="mt-0.5" />
               <Label htmlFor={`density-${value}`} className="flex flex-col cursor-pointer">
                 <span className="text-sm font-medium">{label}</span>
@@ -89,7 +113,7 @@ export default React.memo(function AppearanceSettings() {
           className="space-y-2"
         >
           {FONT_SIZES.map(({ value, label, desc }) => (
-            <div key={value} className="flex items-start gap-3 p-3 rounded-xl border border-border has-[:checked]:border-emerald/30 has-[:checked]:bg-emerald/5 transition-colors">
+            <div key={value} className="flex items-start gap-3 p-3 rounded-xl border border-border has-[:checked]:border-primary/30 has-[:checked]:bg-primary/5 transition-colors">
               <RadioGroupItem value={value} id={`font-${value}`} className="mt-0.5" />
               <Label htmlFor={`font-${value}`} className="flex flex-col cursor-pointer">
                 <span className="text-sm font-medium">{label}</span>

@@ -10,26 +10,26 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow hover:bg-primary/90 rounded-md",
+          "penni-accent-button shadow-sm",
         destructive:
           "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90 rounded-md",
         outline:
-          "border border-input bg-transparent shadow-sm hover:bg-accent hover:text-accent-foreground rounded-md",
+          "penni-outline-button shadow-sm hover:bg-secondary",
         secondary:
-          "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80 rounded-md",
-        ghost: "hover:bg-accent hover:text-accent-foreground rounded-md",
+          "penni-secondary-button hover:brightness-95",
+        ghost: "penni-ghost-button",
         link: "text-primary underline-offset-4 hover:underline",
         /* ─── App Design System Variants ─── */
         primary:
-          "rounded-full gradient-emerald text-white shadow-lg shadow-emerald/25 ring-1 ring-white/20 active:scale-[0.97]",
+          "penni-accent-button active:scale-[0.97]",
         warning:
-          "rounded-full gradient-topaz text-white shadow-lg shadow-topaz/20 ring-1 ring-white/20 active:scale-[0.97]",
+          "rounded-2xl gradient-topaz text-white shadow-sm active:scale-[0.97]",
         danger:
-          "rounded-full border border-ruby/40 bg-white/55 backdrop-blur-xl text-ruby hover:bg-ruby/5 active:scale-[0.97]",
+          "rounded-2xl border border-ruby/30 bg-ruby/10 text-ruby hover:bg-ruby/15 active:scale-[0.97]",
         outlinePill:
-          "rounded-full border border-white/70 bg-white/55 backdrop-blur-xl text-foreground/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_8px_22px_-18px_rgba(15,23,42,0.5)] hover:bg-white/75 hover:text-foreground active:scale-[0.97] dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/10",
+          "penni-outline-button active:scale-[0.97]",
         chip:
-          "rounded-full border border-white/70 bg-white/50 px-3 py-1.5 text-xs font-medium text-foreground/75 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] hover:bg-white/75 hover:text-foreground active:scale-[0.97] dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/10",
+          "penni-secondary-button px-3 py-1.5 text-xs font-medium active:scale-[0.97]",
       },
       size: {
         default: "h-9 px-4 py-2",

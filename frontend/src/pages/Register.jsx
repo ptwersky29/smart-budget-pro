@@ -19,8 +19,8 @@ function PasswordStrength({ password }) {
   return (
     <div className="mt-2 space-y-1">
       {checks.map(({ label, ok }) => (
-        <p key={label} className={`text-xs flex items-center gap-1.5 ${ok ? "text-emerald" : "text-muted-foreground"}`}>
-          <Check className={`h-3 w-3 shrink-0 ${ok ? "text-emerald" : "text-border"}`} />
+        <p key={label} className={`text-xs flex items-center gap-1.5 ${ok ? "text-primary" : "text-muted-foreground"}`}>
+          <Check className={`h-3 w-3 shrink-0 ${ok ? "text-primary" : "text-border"}`} />
           {label}
         </p>
       ))}
@@ -185,7 +185,7 @@ export default function Register() {
                 />
                 <span>
                   I agree to the{" "}
-                  <Link to="/privacy" className="text-emerald hover:underline" target="_blank" rel="noreferrer">
+                  <Link to="/privacy" className="text-primary hover:underline" target="_blank" rel="noreferrer">
                     Privacy Policy
                   </Link>
                 </span>
@@ -236,14 +236,14 @@ export default function Register() {
 
           <p className="text-xs text-muted-foreground mt-6 text-center">
             Already have an account?{" "}
-            <Link to="/login" className="text-emerald hover:underline">Sign in</Link>
+            <Link to="/login" className="text-primary hover:underline">Sign in</Link>
           </p>
 
           {/* Trust bar */}
           <div className="mt-8 flex items-center justify-center gap-4 text-xs text-muted-foreground border-t border-border pt-6">
-            <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-emerald" /> 14-day free trial</span>
-            <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-emerald" /> Cancel anytime</span>
-            <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-emerald" /> TLS 1.3</span>
+            <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-primary" /> 14-day free trial</span>
+            <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-primary" /> Cancel anytime</span>
+            <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-primary" /> TLS 1.3</span>
           </div>
         </div>
       </div>

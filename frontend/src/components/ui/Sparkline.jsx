@@ -2,7 +2,7 @@ import React, { useId, useMemo } from "react";
 
 export default function Sparkline({
   values = [],
-  stroke = "hsl(var(--emerald))",
+  stroke = "var(--penni-accent, hsl(var(--emerald)))",
   height = 30,
   className = "",
   fill = true,
@@ -54,7 +54,7 @@ export default function Sparkline({
         d={line}
         fill="none"
         stroke={stroke}
-        strokeWidth="1.6"
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
         vectorEffect="non-scaling-stroke"

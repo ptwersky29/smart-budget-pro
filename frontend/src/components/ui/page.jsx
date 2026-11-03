@@ -36,7 +36,7 @@ export function SurfaceHeader({
     >
       <div className="flex min-w-0 items-start gap-3">
         {Icon ? (
-          <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald/10 text-emerald">
+          <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl penni-accent-text" style={{ background: "var(--penni-glow)" }}>
             <Icon className="h-4 w-4" />
           </span>
         ) : null}
@@ -90,18 +90,18 @@ export function PageHeader({
   ) : null;
 
   return (
-    <div className={cn("flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between", className)}>
+    <div className={cn("penni-inner-page-header flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between", className)}>
       <div className="flex min-w-0 items-start gap-3">
         {backControl}
         <div className="min-w-0">
           {eyebrow ? (
-            <p className="label-overline text-emerald">{eyebrow}</p>
+            <p className="penni-inner-eyebrow label-overline">{eyebrow}</p>
           ) : null}
-          <h1 className="text-[clamp(1.55rem,2.4vw,2.15rem)] font-semibold leading-[1.1] tracking-[-0.045em]">
+          <h1 className="penni-inner-title text-[clamp(1.55rem,2.4vw,2.15rem)] font-semibold leading-[1.1] tracking-[-0.045em]">
             {title}
           </h1>
           {description ? (
-            <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            <p className="penni-inner-description mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
               {description}
             </p>
           ) : null}
@@ -221,7 +221,7 @@ export function EmptyPanel({ icon: Icon, title, description, action, className }
   return (
     <div className={cn("flex flex-col items-center justify-center px-6 py-10 text-center", className)}>
       {Icon ? (
-        <span className="mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-emerald/10 text-emerald">
+        <span className="penni-accent-text mb-3 grid h-12 w-12 place-items-center rounded-2xl" style={{ background: "var(--penni-glow)" }}>
           <Icon className="h-5 w-5" />
         </span>
       ) : null}

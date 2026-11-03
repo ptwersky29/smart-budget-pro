@@ -94,7 +94,7 @@ export default function TransactionForm({
       aria-label={editingId ? "Edit transaction" : "New transaction"}
     >
       <div
-        className="my-auto rounded-2xl border border-border bg-card shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-[fadeUp_0.2s_ease-out]"
+        className="penni-v2 penni-overlay-content my-auto rounded-2xl border border-border bg-card shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-[fadeUp_0.2s_ease-out]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -468,9 +468,9 @@ export default function TransactionForm({
           {/* Mode Selector (Standard / Split / Transfer) */}
           <div>
             <label className="text-xs font-medium text-muted-foreground block mb-1.5">
-              Mode
+              Transaction mode
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2" role="group" aria-label="Transaction mode">
               {transactionModes.map(({ value, label, Icon }) => {
                 const active = entryMode === value;
                 return (
@@ -478,6 +478,7 @@ export default function TransactionForm({
                     key={value}
                     type="button"
                     onClick={() => setEntryMode(value)}
+                    aria-pressed={active}
                     className={`flex items-center justify-center gap-1.5 rounded-xl border py-2 text-xs font-medium transition ${
                       active
                         ? "border-emerald/40 bg-emerald/10 text-foreground font-semibold shadow-sm"

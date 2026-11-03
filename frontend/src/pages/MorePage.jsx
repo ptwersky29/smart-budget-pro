@@ -80,7 +80,7 @@ export default function MorePage() {
         <div className="space-y-4">
           <Surface className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-emerald text-base font-semibold text-white shadow-md shadow-emerald/20">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary text-base font-semibold text-white shadow-md shadow-emerald/20">
                 {initials}
               </span>
               <div className="min-w-0">
@@ -110,7 +110,8 @@ export default function MorePage() {
           </Surface>
 
           <Section title="Money & planning">
-            <SettingRow to="/reports" icon={BarChart3} title="Reports" description="Understand cash flow, categories and trends" />
+            <SettingRow to="/analytics" icon={BarChart3} title="Analytics" description="Interactive income, spending and budget trends" />
+            <SettingRow to="/reports" icon={FileText} title="Reports" description="Financial reports and exportable documents" />
             <SettingRow to="/subscriptions" icon={RefreshCcw} title="Subscriptions" description="Recurring payments and renewals" />
             <SettingRow to="/statements" icon={FileText} title="Statements" description="Upload and reconcile bank statements" />
             <SettingRow to="/investments" icon={TrendingUp} title="Investments" description="Projections and long-term planning" />
@@ -139,7 +140,7 @@ export default function MorePage() {
         </div>
 
         <aside className="space-y-4">
-          <div className="relative overflow-hidden rounded-[1.25rem] bg-[#123c30] p-5 text-white shadow-[0_24px_50px_-34px_rgba(10,42,32,0.9)]">
+          <div className="relative overflow-hidden rounded-[1.25rem] bg-[#211b50] p-5 text-white shadow-[0_24px_50px_-34px_rgba(10,42,32,0.9)]">
             <div className="absolute -right-10 -top-12 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
             <div className="relative">
               <span className="grid h-10 w-10 place-items-center rounded-2xl bg-white/12 ring-1 ring-white/15">
@@ -153,7 +154,7 @@ export default function MorePage() {
               <button
                 type="button"
                 onClick={() => openAssistant()}
-                className="mt-4 inline-flex h-9 items-center gap-2 rounded-full bg-white px-4 text-xs font-semibold text-[#123c30] transition hover:bg-white/90"
+                className="mt-4 inline-flex h-9 items-center gap-2 rounded-full bg-white px-4 text-xs font-semibold text-[#211b50] transition hover:bg-white/90"
               >
                 Open assistant
                 <ArrowUpRight className="h-3.5 w-3.5" />

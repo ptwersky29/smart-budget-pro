@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { formatCurrency } from "../../lib/format";
 
-const COLORS = ["#2f9e73", "#e8a838", "#5b8def", "#b07cc6", "#e8798e", "#f08a4b", "#44b6ae", "#8b75dd"];
+const COLORS = ["#5b5cf0", "#0ea371", "#d9772f", "#e23d68", "#0d93e8", "#8b5cf6", "#94a3b8", "#34d399"];
 
 export default function CategoryDonut({ data = [], total, size = 168 }) {
   const normalized = useMemo(
@@ -41,9 +41,9 @@ export default function CategoryDonut({ data = [], total, size = 168 }) {
               nameKey="name"
               cx="50%"
               cy="50%"
-              innerRadius={size * 0.31}
+              innerRadius={size * 0.35}
               outerRadius={size * 0.47}
-              paddingAngle={2.5}
+              paddingAngle={3}
               stroke="none"
             >
               {normalized.map((item, index) => (
@@ -55,7 +55,7 @@ export default function CategoryDonut({ data = [], total, size = 168 }) {
               contentStyle={{
                 background: "hsl(var(--card))",
                 border: "1px solid hsl(var(--border))",
-                borderRadius: 12,
+                borderRadius: 18,
                 fontSize: 12,
                 boxShadow: "0 12px 30px -18px rgba(15,23,42,.35)",
               }}

@@ -30,6 +30,7 @@ const Investments = lazy(() => import("./pages/Investments"));
 const Jewish = lazy(() => import("./pages/Jewish"));
 const UKTools = lazy(() => import("./pages/UKTools"));
 const Reports = lazy(() => import("./pages/Reports"));
+const Analytics = lazy(() => import("./pages/Analytics"));
 const Settings = lazy(() => import("./pages/Settings"));
 const CategoryManager = lazy(() => import("./pages/CategoryManager"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
@@ -106,6 +107,7 @@ function AppRouter() {
         <Route path="/jewish" element={<Jewish />} />
         <Route path="/uk-tools" element={<UKTools />} />
         <Route path="/reports" element={<Reports />} />
+        <Route path="/analytics" element={<Analytics />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/settings/categories" element={<CategoryManager />} />
         <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
