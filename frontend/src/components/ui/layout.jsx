@@ -17,7 +17,7 @@ export const SectionCard = React.memo(function SectionCard({ eyebrow, title, des
       {(eyebrow || title || description || actions) && (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between p-5 sm:p-6 border-b border-white/40 dark:border-white/5">
           <div className="max-w-2xl space-y-1">
-            {eyebrow && <p className="label-overline text-emerald">{eyebrow}</p>}
+            {eyebrow && <p className="label-overline">{eyebrow}</p>}
             {title && <h2 className="text-lg sm:text-xl lg:text-2xl tracking-[-0.03em] font-semibold">{title}</h2>}
             {description && <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>}
           </div>
