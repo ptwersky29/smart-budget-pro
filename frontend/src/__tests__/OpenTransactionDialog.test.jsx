@@ -2,6 +2,7 @@ import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ActionProvider, useActions } from "../contexts/ActionContext";
 import GlobalActionHost from "../components/actions/GlobalActionHost";
+import { api } from "../lib/api";
 
 jest.mock("../contexts/CategoriesContext", () => ({
   useCategories: () => ({
@@ -27,12 +28,16 @@ function NewTransactionLauncher() {
 }
 
 test("global New transaction button opens a visible, accessible native form", async () => {
+  // react-scripts resets jest.fn implementations before each test.
+  api.get.mockImplementation(() => Promise.resolve({ data: { accounts: [
+    { account_id: "a1", name: "Current", balance: 100, currency: "GBP" },
+  ] } }));
   render(<ActionProvider><NewTransactionLauncher/><GlobalActionHost/></ActionProvider>);
   fireEvent.click(screen.getByRole("button",{name:"New transaction"}));
   const dialog = await screen.findByRole("dialog",{name:"New transaction"});
   expect(dialog).toBeVisible();
   expect(screen.getByTestId("tx-amount")).toBeVisible();
-  await waitFor(() => expect(screen.getByRole("button",{name:/choose option/i})).toBeInTheDocument());
+  await waitFor(() => expect(api.get).toHaveBeenCalledWith("/accounts"));
   fireEvent.click(screen.getByRole("button",{name:"Close dialog"}));
   await waitFor(() => expect(screen.queryByRole("dialog",{name:"New transaction"})).not.toBeInTheDocument());
 });

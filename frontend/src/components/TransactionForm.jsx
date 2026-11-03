@@ -44,6 +44,7 @@ export default function TransactionForm({
   onCategoryCreated,
   accounts,
   accountsLoading,
+  validationError,
 }) {
   const [showMore, setShowMore] = useState(false);
 
@@ -604,6 +605,12 @@ export default function TransactionForm({
           <button type="submit" className="hidden" tabIndex={-1} />
         </form>
 
+        {/* Inline feedback remains visible when the form's fields scroll. */}
+        {validationError ? (
+          <p role="alert" className="mx-5 mb-2 rounded-xl border border-ruby/20 bg-ruby/10 px-3 py-2 text-xs font-medium text-ruby">
+            {validationError}
+          </p>
+        ) : null}
         {/* Modal Footer */}
         <div className="penni-transaction-footer border-t border-border px-5 py-3.5 bg-card/90 flex items-center justify-end gap-2.5">
           <Button
