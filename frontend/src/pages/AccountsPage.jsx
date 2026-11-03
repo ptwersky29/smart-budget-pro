@@ -86,6 +86,22 @@ function AccountLogo({ account, size = "md" }) {
   );
 }
 
+const ACCOUNT_GRADIENTS = [
+  "linear-gradient(135deg,#1e1b4b 0%,#312e81 45%,#5b5cf0 115%)",
+  "linear-gradient(135deg,#052e2b 0%,#0f766e 55%,#34d399 125%)",
+  "linear-gradient(135deg,#082f49 0%,#0369a1 58%,#38bdf8 125%)",
+  "linear-gradient(135deg,#0b0f19 0%,#26272d 55%,#6b6f7a 130%)",
+  "linear-gradient(135deg,#6b1d0e 0%,#d1344f 58%,#fb923c 125%)",
+  "linear-gradient(135deg,#14341d 0%,#3f6212 60%,#a3e635 140%)",
+  "linear-gradient(135deg,#6b0f35 0%,#be185d 58%,#f9a8d4 130%)",
+];
+function accountGradient(account) {
+  const identity = String(account.account_id || account.id || account.name || "");
+  let hash = 0;
+  for (const char of identity) hash = ((hash * 31) + char.charCodeAt(0)) >>> 0;
+  return ACCOUNT_GRADIENTS[hash % ACCOUNT_GRADIENTS.length];
+}
+
 function AccountCard({ account, connection, onSelect }) {
   const meta = ACCOUNT_TYPE_META[account.type] || ACCOUNT_TYPE_META.current;
   const Icon = meta.icon;
@@ -98,9 +114,10 @@ function AccountCard({ account, connection, onSelect }) {
     <Link
       to={`/accounts/${account.account_id}`}
       onClick={onSelect ? event => { event.preventDefault(); onSelect(account); } : undefined}
-      className="surface surface-hover group relative flex flex-col overflow-hidden p-4"
+      className="penni-account-card penni-interactive group relative flex flex-col justify-between overflow-hidden p-5"
+      style={{ "--account-gradient": accountGradient(account) }}
     >
-      <span className="absolute inset-y-4 left-0 w-[3px] rounded-r-full" style={{ background: account.color || "#2f9e73" }} />
+      
       <div className="flex min-w-0 items-start gap-3">
         <AccountLogo account={account} />
         <div className="min-w-0 flex-1">
@@ -117,7 +134,7 @@ function AccountCard({ account, connection, onSelect }) {
         <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/50 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
       </div>
 
-      <div className="mt-4 flex items-end justify-between gap-2">
+      <div className="relative mt-8 flex items-end justify-between gap-2">
         <div>
           <p className="text-[9.5px] uppercase tracking-[0.1em] text-muted-foreground">
             {isSavings ? "Saved" : "Available"}
