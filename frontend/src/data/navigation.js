@@ -27,6 +27,8 @@ export const NAV_SECTIONS = [
     label: "Connect",
     items: [
       { to: "/investments", label: "Investments", icon: TrendingUp },
+      { to: "/connections", label: "Bank Connections", icon: Landmark },
+      { to: "/integrations", label: "Integrations", icon: RefreshCcw },
     ],
   },
   {
@@ -34,6 +36,7 @@ export const NAV_SECTIONS = [
     items: [
       { to: "/jewish", label: "Jewish Tools", icon: Star },
       { to: "/uk-tools", label: "UK Benefits", icon: Landmark },
+      { to: "/sms", label: "SMS", icon: Receipt },
     ],
   },
   {
