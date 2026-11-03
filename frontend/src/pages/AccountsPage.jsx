@@ -419,7 +419,7 @@ export default function AccountsPage() {
         </Surface>
       ) : null}
 
-      {accounts.length > 0 && (
+      {accounts.length > 0 ? (
         <>
           <section className="penni-reference-account-select" aria-label="Select an account">
             <div className="mb-4 flex items-center justify-between">

@@ -27,8 +27,15 @@ describe("page contracts", () => {
       "utf8"
     );
 
-    expect(source).toContain('role="dialog"');
-    expect(source).toContain('aria-modal="true"');
-    expect(source).toContain('aria-labelledby="account-form-title"');
+    // Radix supplies role="dialog", aria-modal and title association via
+    // Dialog.Content / Dialog.Title, avoiding fragile hand-written overlays.
+    expect(source).toContain("<NativePopup");
+    const native = fs.readFileSync(
+      path.join(__dirname, "..", "components", "ui", "NativePopup.jsx"),
+      "utf8"
+    );
+    expect(native).toContain("<Dialog.Root");
+    expect(native).toContain("<Dialog.Content");
+    expect(native).toContain("<Dialog.Title");
   });
 });
