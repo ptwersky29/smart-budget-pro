@@ -65,6 +65,15 @@ export default function AppLayout() {
   });
   const prevPath = useRef(location.pathname);
   const leaderBuffer = useRef([]);
+  const [tablet, setTablet] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 768px) and (max-width: 1023px)");
+    const update = () => setTablet(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  const sidebarCompact = collapsed || tablet;
   const dark = resolvedTheme === "dark";
   const accent = settings.preferences?.appearance?.accent || "indigo";
   const [privacy, setPrivacy] = useState(() => {
@@ -187,17 +196,17 @@ export default function AppLayout() {
   };
 
   return (
-    <div className={`penni-v2 app-shell relative flex min-h-screen text-foreground lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden ${privacy ? "penni-private" : ""}`} data-penni-accent={accent}>
+    <div className={`penni-v2 app-shell relative flex min-h-screen text-foreground md:h-[100dvh] md:min-h-0 md:overflow-hidden ${privacy ? "penni-private" : ""}`} data-penni-accent={accent}>
       <aside
         data-tour="sidebar"
-        className={`penni-sidebar sticky top-0 z-40 hidden h-screen shrink-0 flex-col overflow-hidden transition-[width] duration-300 lg:flex ${
-          collapsed ? "w-[84px]" : "w-[264px]"
+        className={`penni-sidebar sticky top-0 z-40 hidden h-screen shrink-0 flex-col overflow-hidden transition-[width] duration-300 md:flex ${
+          sidebarCompact ? "w-[84px]" : "w-[264px]"
         }`}
       >
-        <div className={`shrink-0 ${collapsed ? "flex h-[76px] items-center justify-center px-2" : "flex h-[76px] items-center justify-between px-5"}`}>
+        <div className={`shrink-0 ${sidebarCompact ? "flex h-[76px] items-center justify-center px-2" : "flex h-[76px] items-center justify-between px-5"}`}>
           <Link to="/dashboard" className="flex min-w-0 items-center gap-3" data-testid="sidebar-logo">
-            <Logo size={collapsed ? "sm" : "sidebar"} />
-            {!collapsed ? (
+            <Logo size={sidebarCompact ? "sm" : "sidebar"} />
+            {!sidebarCompact ? (
               <span className="min-w-0">
                 <span className="flex items-center gap-1.5">
                   <span className="truncate text-[17px] font-semibold tracking-[-0.03em]">{APP_NAME}</span>
@@ -208,7 +217,7 @@ export default function AppLayout() {
               </span>
             ) : null}
           </Link>
-          {!collapsed ? (
+          {!sidebarCompact ? (
             <button
               type="button"
               onClick={toggleSidebar}
@@ -221,18 +230,18 @@ export default function AppLayout() {
           ) : null}
         </div>
 
-        <div className={`mb-3 ${collapsed ? "px-3" : "px-4"}`}>
+        <div className={`mb-3 ${sidebarCompact ? "px-3" : "px-4"}`}>
           <button type="button" onClick={() => openAction("transaction-new")}
             className="penni-accent-button flex h-11 w-full items-center justify-center gap-2 text-sm font-semibold"
             aria-label="New transaction" title="New transaction">
             <Plus className="h-4 w-4" />
-            {!collapsed && <span>New transaction</span>}
+            {!sidebarCompact && <span>New transaction</span>}
           </button>
         </div>
-        <div className={`subtle-scroll flex-1 space-y-5 overflow-y-auto ${collapsed ? "px-3" : "px-4"} py-2`}>
+        <div className={`subtle-scroll flex-1 space-y-5 overflow-y-auto ${sidebarCompact ? "px-3" : "px-4"} py-2`}>
           {NAV_SECTIONS.filter((section) => !section.adminOnly || user?.role === "admin").map((section) => (
             <div key={section.label} className="space-y-1">
-              {!collapsed ? (
+              {!sidebarCompact ? (
                 <p className="px-2.5 pb-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
                   {section.label}
                 </p>
@@ -245,9 +254,9 @@ export default function AppLayout() {
                     to={to}
                     data-testid={`nav-${label.toLowerCase().replace(/\s+/g, "-")}`}
                     aria-current={active ? "page" : undefined}
-                    title={collapsed ? label : undefined}
+                    title={sidebarCompact ? label : undefined}
                     className={`penni-side-link group flex items-center rounded-xl border transition-colors ${
-                      collapsed ? "justify-center px-0 py-2.5" : "gap-2.5 px-2.5 py-2"
+                      sidebarCompact ? "justify-center px-0 py-2.5" : "gap-2.5 px-2.5 py-2"
                     } ${
                       active ? "font-semibold" : "hover:bg-secondary/55"
                     }`}
@@ -255,7 +264,7 @@ export default function AppLayout() {
                     <span className="penni-nav-icon grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-colors">
                       <Icon className="h-[17px] w-[17px]" strokeWidth={active ? 2.1 : 1.8} />
                     </span>
-                    {!collapsed ? (
+                    {!sidebarCompact ? (
                       <span className="flex-1 truncate text-[13px] font-medium">{label}</span>
                     ) : null}
                   </Link>
@@ -265,13 +274,13 @@ export default function AppLayout() {
           ))}
         </div>
 
-        <div className={`shrink-0 ${collapsed ? "p-3" : "px-4 pb-4 pt-3"}`}>
+        <div className={`shrink-0 ${sidebarCompact ? "p-3" : "px-4 pb-4 pt-3"}`}>
           <Link
             to={SETTINGS_NAV_ITEM.to}
             aria-current={settingsActive ? "page" : undefined}
-            title={collapsed ? "Settings" : undefined}
+            title={sidebarCompact ? "Settings" : undefined}
             className={`penni-side-link group mb-3 flex items-center rounded-xl border transition-colors ${
-              collapsed ? "justify-center px-0 py-2.5" : "gap-2.5 px-2.5 py-2"
+              sidebarCompact ? "justify-center px-0 py-2.5" : "gap-2.5 px-2.5 py-2"
             } ${
               settingsActive ? "font-semibold" : "hover:bg-secondary/55"
             }`}
@@ -279,14 +288,14 @@ export default function AppLayout() {
             <span className="penni-nav-icon grid h-7 w-7 shrink-0 place-items-center rounded-lg">
               <Settings className="h-[17px] w-[17px]" strokeWidth={settingsActive ? 2.1 : 1.8} />
             </span>
-            {!collapsed ? <span className="flex-1 text-[13px] font-medium">Settings</span> : null}
+            {!sidebarCompact ? <span className="flex-1 text-[13px] font-medium">Settings</span> : null}
           </Link>
 
-          <div className={`flex items-center rounded-2xl border border-border/60 bg-card shadow-[0_10px_26px_-22px_hsl(var(--foreground)/0.35)] ${collapsed ? "justify-center p-1.5" : "gap-2.5 p-2"}`}>
+          <div className={`flex items-center rounded-2xl border border-border/60 bg-card shadow-[0_10px_26px_-22px_hsl(var(--foreground)/0.35)] ${sidebarCompact ? "justify-center p-1.5" : "gap-2.5 p-2"}`}>
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald/12 text-[12px] font-semibold text-emerald">
               {initials}
             </span>
-            {!collapsed ? (
+            {!sidebarCompact ? (
               <>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[12px] font-medium">{user?.name || user?.email}</span>
@@ -305,7 +314,7 @@ export default function AppLayout() {
               </>
             ) : null}
           </div>
-          {collapsed ? (
+          {sidebarCompact ? (
             <button
               type="button"
               onClick={toggleSidebar}
@@ -319,8 +328,8 @@ export default function AppLayout() {
         </div>
       </aside>
 
-      <div className="penni-main-panel relative min-w-0 flex-1 lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden">
-        <header data-tour="route-header" className="penni-route-header sticky top-0 z-30 lg:shrink-0">
+      <div className="penni-main-panel relative min-w-0 flex-1 md:flex md:min-h-0 md:flex-col md:overflow-hidden">
+        <header data-tour="route-header" className="penni-route-header sticky top-0 z-30 md:shrink-0">
           {routeLoading ? (
             <div className="absolute left-0 right-0 top-0 z-50 h-0.5 overflow-hidden">
               <div className={`h-full bg-emerald ${noAnim ? "" : "animate-[routeProgress_0.4s_ease-out_forwards]"}`} />
@@ -428,7 +437,7 @@ export default function AppLayout() {
           </div>
         </header>
 
-        <main data-tour="main-content" className={`app-main-scroll relative mx-auto w-full max-w-[1360px] px-4 pb-24 pt-5 md:px-8 lg:min-h-0 lg:flex-1 lg:pb-6 lg:pt-7 ${workspaceRoute ? "workspace-main lg:overflow-hidden" : "lg:overflow-y-auto lg:overscroll-contain"}`}>
+        <main data-tour="main-content" className={`app-main-scroll relative mx-auto w-full max-w-[1360px] px-4 pb-24 pt-5 md:px-8 md:min-h-0 md:flex-1 md:overflow-y-auto md:overscroll-contain md:pb-6 lg:pt-7 ${workspaceRoute ? "workspace-main lg:overflow-hidden" : ""}`}>
           <div key={location.pathname} className={[noAnim ? "" : "page-in", workspaceRoute ? "workspace-route-view" : ""].filter(Boolean).join(" ")}>
             <Outlet />
           </div>
@@ -437,7 +446,7 @@ export default function AppLayout() {
 
       <nav
         data-tour="mobile-nav"
-        className="penni-bottom-nav tap-highlight-none fixed left-0 right-0 bottom-0 z-40 lg:hidden"
+        className="penni-bottom-nav tap-highlight-none fixed left-0 right-0 bottom-0 z-40 md:hidden"
         aria-label="Main navigation"
       >
         <div className="flex h-[64px] items-center justify-around px-1">
