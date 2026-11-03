@@ -20,6 +20,9 @@ import {
 } from "../components/ui/dropdown-menu";
 import {
   Compass,
+  Eye,
+  EyeOff,
+  Plus,
   LogOut,
   MoonStar,
   PanelLeftClose,
@@ -63,6 +66,16 @@ export default function AppLayout() {
   const prevPath = useRef(location.pathname);
   const leaderBuffer = useRef([]);
   const dark = resolvedTheme === "dark";
+  const accent = settings.preferences?.appearance?.accent || "indigo";
+  const [privacy, setPrivacy] = useState(() => {
+    try { return localStorage.getItem("penni.privacy") === "true"; }
+    catch { return false; }
+  });
+  const togglePrivacy = () => setPrivacy(previous => {
+    const next = !previous;
+    try { localStorage.setItem("penni.privacy", String(next)); } catch {}
+    return next;
+  });
 
   useKeyboardShortcut("?", () => setHelpOpen((previous) => !previous));
 
@@ -174,14 +187,14 @@ export default function AppLayout() {
   };
 
   return (
-    <div className="app-shell relative flex min-h-screen text-foreground lg:h-[100dvh] lg:min-h-0 lg:gap-2 lg:overflow-hidden lg:p-2">
+    <div className={`penni-v2 app-shell relative flex min-h-screen text-foreground lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden ${privacy ? "penni-private" : ""}`} data-penni-accent={accent}>
       <aside
         data-tour="sidebar"
-        className={`sticky top-0 z-40 hidden h-screen shrink-0 flex-col overflow-hidden border-r border-border/45 bg-[linear-gradient(180deg,hsl(150_30%_98%)_0%,hsl(150_18%_94%)_100%)] transition-[width] duration-300 lg:top-2 lg:h-[calc(100dvh-1rem)] lg:rounded-[1.75rem] lg:border lg:border-border/55 lg:shadow-[0_18px_42px_-34px_hsl(var(--foreground)/0.42)] lg:flex dark:bg-[hsl(160_16%_8%)] ${
-          collapsed ? "w-[4.75rem]" : "w-[242px]"
+        className={`penni-sidebar sticky top-0 z-40 hidden h-screen shrink-0 flex-col overflow-hidden transition-[width] duration-300 lg:flex ${
+          collapsed ? "w-[84px]" : "w-[264px]"
         }`}
       >
-        <div className={`shrink-0 ${collapsed ? "flex h-16 items-center justify-center px-2" : "flex items-start justify-between px-6 pb-5 pt-[50px]"}`}>
+        <div className={`shrink-0 ${collapsed ? "flex h-[76px] items-center justify-center px-2" : "flex h-[76px] items-center justify-between px-5"}`}>
           <Link to="/dashboard" className="flex min-w-0 items-center gap-3" data-testid="sidebar-logo">
             <Logo size={collapsed ? "sm" : "sidebar"} />
             {!collapsed ? (
@@ -208,7 +221,15 @@ export default function AppLayout() {
           ) : null}
         </div>
 
-        <div className="subtle-scroll flex-1 space-y-5 overflow-y-auto px-6 py-3">
+        <div className={`mb-3 ${collapsed ? "px-3" : "px-4"}`}>
+          <button type="button" onClick={() => openAction("transaction-new")}
+            className="penni-accent-button flex h-11 w-full items-center justify-center gap-2 text-sm font-semibold"
+            aria-label="New transaction" title="New transaction">
+            <Plus className="h-4 w-4" />
+            {!collapsed && <span>New transaction</span>}
+          </button>
+        </div>
+        <div className={`subtle-scroll flex-1 space-y-5 overflow-y-auto ${collapsed ? "px-3" : "px-4"} py-2`}>
           {NAV_SECTIONS.filter((section) => !section.adminOnly || user?.role === "admin").map((section) => (
             <div key={section.label} className="space-y-1">
               {!collapsed ? (
@@ -225,7 +246,7 @@ export default function AppLayout() {
                     data-testid={`nav-${label.toLowerCase().replace(/\s+/g, "-")}`}
                     aria-current={active ? "page" : undefined}
                     title={collapsed ? label : undefined}
-                    className={`group flex items-center rounded-xl border transition-colors ${
+                    className={`penni-side-link group flex items-center rounded-xl border transition-colors ${
                       collapsed ? "justify-center px-0 py-2.5" : "gap-2.5 px-2.5 py-2"
                     } ${
                       active
@@ -253,7 +274,7 @@ export default function AppLayout() {
             to={SETTINGS_NAV_ITEM.to}
             aria-current={settingsActive ? "page" : undefined}
             title={collapsed ? "Settings" : undefined}
-            className={`group mb-3 flex items-center rounded-xl border transition-colors ${
+            className={`penni-side-link group mb-3 flex items-center rounded-xl border transition-colors ${
               collapsed ? "justify-center px-0 py-2.5" : "gap-2.5 px-2.5 py-2"
             } ${
               settingsActive
@@ -304,15 +325,15 @@ export default function AppLayout() {
         </div>
       </aside>
 
-      <div className="relative min-w-0 flex-1 lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden lg:rounded-[1.75rem] lg:border lg:border-border/55 lg:bg-background/75 lg:shadow-[0_18px_42px_-34px_hsl(var(--foreground)/0.42)]">
-        <header data-tour="route-header" className="sticky top-0 z-30 border-b border-border/50 bg-background/95 lg:shrink-0">
+      <div className="penni-main-panel relative min-w-0 flex-1 lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden">
+        <header data-tour="route-header" className="penni-route-header sticky top-0 z-30 lg:shrink-0">
           {routeLoading ? (
             <div className="absolute left-0 right-0 top-0 z-50 h-0.5 overflow-hidden">
               <div className={`h-full bg-emerald ${noAnim ? "" : "animate-[routeProgress_0.4s_ease-out_forwards]"}`} />
             </div>
           ) : null}
           <h1 className="sr-only">{routeMeta.title} - {APP_NAME}</h1>
-          <div className="flex h-[56px] items-center justify-between gap-3 pl-3 pr-3 sm:px-4 lg:pl-[10px] lg:pr-[18px]">
+          <div className="flex h-[68px] items-center justify-between gap-3 px-4 md:px-8">
             <div className="flex min-w-0 flex-1 items-center gap-2.5">
               <Link to="/dashboard" className="grid h-9 w-9 shrink-0 place-items-center md:hidden" aria-label={`${APP_NAME} home`}>
                 <Logo size="sm" />
@@ -322,11 +343,11 @@ export default function AppLayout() {
                 onClick={() => setCommandOpen(true)}
                 data-tour="command-search"
                 data-testid="command-open"
-                className="hidden h-8 w-full max-w-[552px] items-center gap-2.5 rounded-[9px] border border-border/80 bg-card px-3 text-left text-[12px] text-muted-foreground shadow-[0_1px_2px_hsl(var(--foreground)/0.03)] transition hover:border-border hover:text-foreground md:flex"
+                className="penni-search hidden h-10 w-full max-w-[280px] items-center gap-2.5 px-3 text-left text-[12px] transition hover:text-foreground lg:flex"
                 aria-label="Search or jump to"
               >
                 <Search className="h-4 w-4 shrink-0" />
-                <span className="truncate">Search transactions, accounts, categories, merchants...</span>
+                <span className="truncate">Search or jump to…</span>
                 <kbd className="ml-auto shrink-0 rounded-[6px] border border-border/70 bg-secondary/45 px-1.5 py-0.5 text-[9.5px] font-medium text-muted-foreground">
                   ⌘ K
                 </kbd>
@@ -414,10 +435,10 @@ export default function AppLayout() {
 
       <nav
         data-tour="mobile-nav"
-        className="floating-tabbar tap-highlight-none fixed left-3 right-3 z-40 rounded-[1.4rem] glass-bar lg:hidden"
+        className="penni-bottom-nav tap-highlight-none fixed left-0 right-0 bottom-0 z-40 lg:hidden"
         aria-label="Main navigation"
       >
-        <div className="flex h-[60px] items-center justify-around px-1">
+        <div className="flex h-[64px] items-center justify-around px-1">
           {BOTTOM_NAV.map(({ to, label, icon: Icon }) => {
             const active = to === "/more" ? moreActive : isActivePath(location.pathname, to);
             return (
@@ -425,7 +446,7 @@ export default function AppLayout() {
                 key={to}
                 to={to}
                 aria-current={active ? "page" : undefined}
-                className={`flex h-12 min-w-0 max-w-[76px] flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl transition-colors ${
+                className={`penni-bottom-link flex h-12 min-w-0 max-w-[76px] flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl transition-colors ${
                   active ? "text-emerald" : "text-muted-foreground active:text-foreground"
                 }`}
               >
