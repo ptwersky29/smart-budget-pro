@@ -17,6 +17,8 @@ import {
   Wallet,
 } from "lucide-react";
 import { api, formatApiError } from "../lib/api";
+import { humanizeCategoryName } from "../lib/categories";
+import { formatDashboardAlertText } from "../lib/dashboardPresentation";
 import { useAuth } from "../contexts/AuthContext";
 import { useAssistant } from "../contexts/AssistantContext";
 import { useSettings } from "../contexts/SettingsContext";
@@ -65,7 +67,7 @@ function TransactionLine({ transaction, onSelect }) {
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[12.5px] font-medium">{title}</span>
         <span className="mt-0.5 flex items-center gap-1.5 truncate text-[10.5px] capitalize text-muted-foreground">
-          <span>{transaction.category || "uncategorized"}</span>
+          <span>{humanizeCategoryName(transaction.category)}</span>
           <span className="text-border">·</span>
           <span>{formatShortDate(transaction.date)}</span>
         </span>
@@ -85,7 +87,7 @@ function BudgetLine({ budget, onSelect }) {
   return (
     <button type="button" onClick={() => onSelect(budget)} className="block w-full px-4 py-2.5 text-left transition hover:bg-secondary/30 sm:px-5">
       <div className="flex items-center justify-between gap-3">
-        <span className="truncate text-[12px] font-medium capitalize">{budget.category || "Budget"}</span>
+        <span className="truncate text-[12px] font-medium">{humanizeCategoryName(budget.category || "Budget")}</span>
         <span className={`money-tabular shrink-0 text-[11px] ${over ? "font-semibold text-ruby" : "text-muted-foreground"}`}>
           {formatCurrency(spent, { compact: true })} / {formatCurrency(limit, { compact: true })}
         </span>
@@ -252,6 +254,7 @@ export default function Dashboard() {
 
   const header = (
     <PageHeader
+      className="penni-dashboard-header"
       eyebrow={formatLongDate(new Date(), { weekday: false })}
       title={`${greetingForNow()}${user?.name ? `, ${user.name.split(" ")[0]}` : ""}`}
       description="Your accounts, spending and plans, gathered into one calm view."
@@ -313,32 +316,43 @@ export default function Dashboard() {
       {header}
 
       {topAlerts.length > 0 ? (
-        <div className="flex flex-col gap-2 sm:flex-row">
-          {topAlerts.map((alert, index) => (
-            <div
-              key={`${alert.title || alert.message}-${index}`}
-              className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl border border-topaz/20 bg-topaz/[0.065] px-3.5 py-2.5"
-            >
-              <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-topaz" />
-              <p className="min-w-0 flex-1 truncate text-[11.5px] font-medium">
-                {alert.title || alert.message}
-              </p>
-              {alert.action_url ? (
-                <Link to={alert.action_url} onClick={event => {
-                  const destination = String(alert.action_url || "").split("?")[0];
-                  const action = destination.startsWith("/budgets") ? "budget-new"
-                    : destination.startsWith("/transactions") ? "transaction-search"
-                    : destination.startsWith("/accounts") ? "accounts-overview"
-                    : destination.startsWith("/reports") ? "reports"
-                    : destination.startsWith("/settings") ? "alerts" : null;
-                  if (action) { event.preventDefault(); openAction(action); }
-                }} className="shrink-0 text-[10.5px] font-semibold text-topaz">
-                  Review
-                </Link>
-              ) : null}
-            </div>
-          ))}
-        </div>
+        <section
+          aria-label="Spending insights"
+          className="penni-dashboard-alerts flex min-w-0 flex-col gap-3 rounded-2xl border border-border/70 bg-card px-4 py-3 shadow-sm xl:flex-row xl:items-center"
+        >
+          <div className="flex shrink-0 items-center gap-2 text-xs font-semibold text-foreground">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+            </span>
+            Spending insights
+          </div>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-6 gap-y-2">
+            {topAlerts.map((alert, index) => (
+              <div
+                key={`${alert.title || alert.message}-${index}`}
+                className="flex min-w-0 items-start gap-2 text-[11.5px] text-muted-foreground"
+              >
+                <span className="mt-[6px] h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden="true" />
+                <span className="min-w-0 leading-5" title={formatDashboardAlertText(alert.title || alert.message)}>
+                  {formatDashboardAlertText(alert.title || alert.message)}
+                </span>
+                {alert.action_url ? (
+                  <Link to={alert.action_url} onClick={event => {
+                    const destination = String(alert.action_url || "").split("?")[0];
+                    const action = destination.startsWith("/budgets") ? "budget-new"
+                      : destination.startsWith("/transactions") ? "transaction-search"
+                      : destination.startsWith("/accounts") ? "accounts-overview"
+                      : destination.startsWith("/reports") ? "reports"
+                      : destination.startsWith("/settings") ? "alerts" : null;
+                    if (action) { event.preventDefault(); openAction(action); }
+                  }} className="shrink-0 pt-px font-semibold text-primary hover:underline">
+                    Review
+                  </Link>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </section>
       ) : null}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

@@ -343,7 +343,6 @@ export default function AppLayout() {
               </Link>
               <div className="hidden min-w-0 flex-1 md:block">
                 <p className="truncate text-[21px] font-semibold leading-tight tracking-[-0.035em]">{routeMeta.title}</p>
-                <p className="hidden max-w-[370px] truncate text-[12px] text-muted-foreground lg:block">{routeMeta.description}</p>
               </div>
               <button
                 type="button"
