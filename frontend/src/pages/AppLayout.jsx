@@ -36,7 +36,7 @@ import {
 
 const ProductTour = lazy(() => import("../components/ProductTour"));
 const SIDEBAR_KEY = "penni.sidebar.collapsed";
-const FIXED_WORKSPACE_ROUTES = new Set(["/dashboard", "/accounts", "/transactions", "/budgets"]);
+const FIXED_WORKSPACE_ROUTES = new Set(["/transactions", "/budgets"]); // long Dashboard and Accounts pages scroll in the shell
 
 function isActivePath(pathname, to) {
   if (to === "/dashboard") return pathname === "/dashboard";

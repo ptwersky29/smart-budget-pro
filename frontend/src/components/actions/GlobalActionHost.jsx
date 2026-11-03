@@ -38,6 +38,7 @@ export default function GlobalActionHost() {
   const [classification, setClassification] = useState(null);
   const [saveAsRecurring, setSaveAsRecurring] = useState(false);
   const [savingTransaction, setSavingTransaction] = useState(false);
+  const [transactionError, setTransactionError] = useState("");
   const savingRef = useRef(false);
   const [fromDate,setFromDate] = useState(() => {const d=new Date();d.setDate(d.getDate()-90);return d.toISOString().slice(0,10)});
 
@@ -60,6 +61,7 @@ export default function GlobalActionHost() {
     if (!isTxForm) return;
     setClassification(null);
     setSaveAsRecurring(false);
+    setTransactionError("");
     if (type==="transaction-edit" && item) {
       setTransactionForm({...emptyTransaction(item.account_id||""), description:item.description||"",date:String(item.date||today()).slice(0,10),
         amount:String(Math.abs(Number(item.amount)||0)), category:item.category||"",merchant:item.merchant||"",notes:item.notes||"",
@@ -68,6 +70,15 @@ export default function GlobalActionHost() {
         balance_type:item.balance_type||"available",pending:!!item.pending,tags:item.tags||null});
     } else setTransactionForm(emptyTransaction(payload.accountId || ""));
   }, [type, active?.key]);
+
+  // Avoid forcing users with one account to select the only option, but never
+  // silently choose among multiple accounts.
+  useEffect(() => {
+    if (!isTxForm || type !== "transaction-new" || accounts.length !== 1) return;
+    setTransactionForm(previous => previous.account_id ? previous : {
+      ...previous, account_id: accounts[0].account_id,
+    });
+  }, [isTxForm, type, accounts]);
 
   const classifyTransaction = async ({ description, amount }) => {
     setClassifying(true);
@@ -82,8 +93,10 @@ export default function GlobalActionHost() {
     event?.preventDefault?.();
     if (savingRef.current) return;
     const amount = Number(transactionForm.amount);
-    if (!transactionForm.account_id) {toast.error("Choose an account");return;}
-    if (!Number.isFinite(amount) || amount<=0) {toast.error("Enter an amount greater than zero");return;}
+    if (!transactionForm.account_id) {setTransactionError("Choose an account before saving.");return;}
+    if (!Number.isFinite(amount) || amount<=0) {setTransactionError("Enter an amount greater than zero.");return;}
+    if (!String(transactionForm.description || "").trim()) {setTransactionError("Enter a transaction description.");return;}
+    setTransactionError("");
     const body={description:transactionForm.description,amount:transactionForm.is_income?Math.abs(amount):-Math.abs(amount),
       category:transactionForm.category||undefined,date:transactionForm.date||today(),account_id:transactionForm.account_id,
       merchant:transactionForm.merchant||undefined,notes:transactionForm.notes||undefined,
@@ -118,7 +131,11 @@ export default function GlobalActionHost() {
         return;
       }
       afterSave("transactions");
-    } catch(e){toast.error(formatApiError(e.response?.data?.detail)||"Could not save transaction");}
+    } catch(e){
+      const message = formatApiError(e.response?.data?.detail)||"Could not save transaction";
+      setTransactionError(message);
+      toast.error(message);
+    }
     finally { savingRef.current = false; setSavingTransaction(false); }
   };
   const connectBank = async () => {
@@ -130,12 +147,13 @@ export default function GlobalActionHost() {
     } catch(e){toast.error(formatApiError(e.response?.data?.detail)||"Could not connect bank");setConnecting(false);}
   };
   if (!active) return null;
-  if (isTxForm) return <TransactionForm key={active.key} open editingId={type==="transaction-edit"?item?.transaction_id:null}
-    form={transactionForm} setForm={setTransactionForm} selectedCats={categories}
+  if (isTxForm) return <TransactionForm key={active.key} open={true} editingId={type==="transaction-edit"?item?.transaction_id:null}
+    form={transactionForm} setForm={next => {setTransactionError("");setTransactionForm(next);}} selectedCats={categories}
     onClose={closeAction} onSubmit={saveTransaction} accounts={accounts} accountsLoading={accountLoading}
     onClassify={classifyTransaction} classifying={classifying} classification={classification}
     onClearClassification={() => setClassification(null)}
-    saveAsRecurring={saveAsRecurring} setSaveAsRecurring={setSaveAsRecurring} saving={savingTransaction}/>;
+    saveAsRecurring={saveAsRecurring} setSaveAsRecurring={setSaveAsRecurring} saving={savingTransaction}
+    validationError={transactionError}/>;
   if (isAccountForm) return <AccountFormModal key={active.key} open onClose={closeAction} onCreated={()=>changed("accounts")} />;
 
   return <Sheet open={Boolean(active)} onOpenChange={open=>{if(!open)closeAction()}}>
