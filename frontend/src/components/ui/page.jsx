@@ -36,7 +36,7 @@ export function SurfaceHeader({
     >
       <div className="flex min-w-0 items-start gap-3">
         {Icon ? (
-          <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald/10 text-emerald">
+          <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl penni-accent-text" style={{ background: "var(--penni-glow)" }}>
             <Icon className="h-4 w-4" />
           </span>
         ) : null}
@@ -95,7 +95,7 @@ export function PageHeader({
         {backControl}
         <div className="min-w-0">
           {eyebrow ? (
-            <p className="label-overline text-emerald">{eyebrow}</p>
+            <p className="label-overline">{eyebrow}</p>
           ) : null}
           <h1 className="text-[clamp(1.55rem,2.4vw,2.15rem)] font-semibold leading-[1.1] tracking-[-0.045em]">
             {title}
@@ -221,7 +221,7 @@ export function EmptyPanel({ icon: Icon, title, description, action, className }
   return (
     <div className={cn("flex flex-col items-center justify-center px-6 py-10 text-center", className)}>
       {Icon ? (
-        <span className="mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-emerald/10 text-emerald">
+        <span className="penni-accent-text mb-3 grid h-12 w-12 place-items-center rounded-2xl" style={{ background: "var(--penni-glow)" }}>
           <Icon className="h-5 w-5" />
         </span>
       ) : null}
