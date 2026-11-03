@@ -7,7 +7,7 @@ export function WorkspaceHeader({ title, description, actions }) {
   return (
     <header className="workspace-page-header flex shrink-0 flex-wrap items-start justify-between gap-3">
       <div className="min-w-0">
-        <h1 className="text-[30px] font-semibold leading-none tracking-[-0.045em]">{title}</h1>
+        <h1 className="text-[26px] font-semibold leading-tight tracking-[-0.035em]">{title}</h1>
         {description && <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -26,7 +26,7 @@ export function WorkspaceMetrics({ children, columns = 3 }) {
 export function WorkspaceMetric({ label, value, note, icon: Icon, tone = "emerald", progress, className = "" }) {
   const toneStyle = tone === "ruby" ? "bg-ruby/10 text-ruby" : tone === "topaz" ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald";
   return (
-    <div className={`surface workspace-metric min-w-0 rounded-[16px] p-3.5 ${className}`}>
+    <div className={`surface workspace-metric min-w-0 rounded-[20px] p-4 ${className}`}>
       <div className="flex min-h-[58px] items-center gap-3">
         {Icon && <span className={`grid h-[38px] w-[38px] shrink-0 place-items-center rounded-xl ${toneStyle}`}><Icon className="h-[18px] w-[18px]" /></span>}
         <div className="min-w-0">
@@ -46,7 +46,7 @@ export function WorkspaceTabs({ tabs, active, onChange, label = "View", classNam
   return (
     <div role="tablist" aria-label={label} className={`no-scrollbar flex min-h-[44px] min-w-0 flex-1 items-center gap-4 overflow-x-auto overflow-y-hidden whitespace-nowrap border-b border-border ${className}`}>
       {tabs.map(tab => <button key={tab.key} role="tab" aria-selected={active === tab.key} type="button" onClick={() => onChange(tab.key)}
-        className={`inline-flex h-10 shrink-0 items-center gap-1.5 border-b-2 text-[12px] transition-colors ${active === tab.key ? "border-emerald font-semibold text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+        className={`inline-flex h-10 shrink-0 items-center gap-1.5 border-b-2 text-[12px] transition-colors ${active === tab.key ? "font-semibold text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
         {tab.label}<span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active === tab.key ? "bg-emerald/10 text-emerald" : "bg-secondary text-muted-foreground"}`}>{tab.count}</span>
       </button>)}
     </div>
