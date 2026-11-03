@@ -1,0 +1,38 @@
+import React from "react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { ActionProvider, useActions } from "../contexts/ActionContext";
+import GlobalActionHost from "../components/actions/GlobalActionHost";
+
+jest.mock("../contexts/CategoriesContext", () => ({
+  useCategories: () => ({
+    categories: [{ name: "groceries", label: "Groceries", color: "#5b5cf0" }],
+    version: 1,
+    resolveCategory: name => ({ name, label: String(name).replace(/_/g," "), color:"#5b5cf0" }),
+    createCategory: jest.fn(),
+  }),
+}));
+jest.mock("../lib/api", () => ({
+  api: {
+    get: jest.fn(() => Promise.resolve({ data: { accounts: [
+      { account_id: "a1", name: "Current", balance: 100, currency: "GBP" },
+    ] } })),
+    post: jest.fn(() => Promise.resolve({ data: {} })),
+  },
+  formatApiError: () => "Request failed",
+}));
+
+function NewTransactionLauncher() {
+  const { openAction } = useActions();
+  return <button type="button" onClick={() => openAction("transaction-new")}>New transaction</button>;
+}
+
+test("global New transaction button opens a visible, accessible native form", async () => {
+  render(<ActionProvider><NewTransactionLauncher/><GlobalActionHost/></ActionProvider>);
+  fireEvent.click(screen.getByRole("button",{name:"New transaction"}));
+  const dialog = await screen.findByRole("dialog",{name:"New transaction"});
+  expect(dialog).toBeVisible();
+  expect(screen.getByTestId("tx-amount")).toBeVisible();
+  await waitFor(() => expect(screen.getByRole("button",{name:/choose option/i})).toBeInTheDocument());
+  fireEvent.click(screen.getByRole("button",{name:"Close dialog"}));
+  await waitFor(() => expect(screen.queryByRole("dialog",{name:"New transaction"})).not.toBeInTheDocument());
+});

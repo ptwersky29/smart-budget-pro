@@ -130,7 +130,7 @@ export default function GlobalActionHost() {
     } catch(e){toast.error(formatApiError(e.response?.data?.detail)||"Could not connect bank");setConnecting(false);}
   };
   if (!active) return null;
-  if (isTxForm) return <TransactionForm key={active.key} open editingId={type==="transaction-edit"?item?.transaction_id:null}
+  if (isTxForm) return <TransactionForm key={active.key} open={true} editingId={type==="transaction-edit"?item?.transaction_id:null}
     form={transactionForm} setForm={setTransactionForm} selectedCats={categories}
     onClose={closeAction} onSubmit={saveTransaction} accounts={accounts} accountsLoading={accountLoading}
     onClassify={classifyTransaction} classifying={classifying} classification={classification}

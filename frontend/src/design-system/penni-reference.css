@@ -345,3 +345,80 @@ html.dark[data-penni-accent="violet"] .penni-v2 {--penni-accent:#a07bff;}
 @keyframes penni-nav-select{from{opacity:.8;transform:scale(.985)}to{opacity:1;transform:scale(1)}}
 @media(max-width:767px){.penni-v2 .penni-route-header{height:62px;}}
 @media(prefers-reduced-motion:reduce){.penni-v2 .penni-side-link[aria-current="page"]{animation:none;}}
+
+/* 2.1 regression fix: new Dashboard/Accounts exceeded the old short fixed workspace.
+ * Their page content must scroll naturally inside the app shell. */
+@media (min-width: 1024px) {
+  .penni-v2 .app-main-scroll:not(.workspace-main) {
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    overscroll-behavior: contain;
+  }
+  .penni-v2 .app-main-scroll:not(.workspace-main) > .page-in {
+    height: auto;
+    min-height: min-content;
+  }
+  .penni-v2 .dashboard-reference,
+  .penni-v2 .accounts-workspace {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+  .penni-v2 .dashboard-reference > .dashboard-panels,
+  .penni-v2 .accounts-workspace > .accounts-panels {
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow: visible;
+  }
+  .penni-v2 .dashboard-reference > .dashboard-panels > div {
+    min-height: 0;
+    overflow: visible;
+  }
+}
+.penni-v2 .penni-hero-grid,
+.penni-v2 .penni-reference-balance-card,
+.penni-v2 .penni-month-summary,
+.penni-v2 .penni-ref-accounts,
+.penni-v2 .penni-account-workspace,
+.penni-v2 .penni-account-selector {
+  min-width: 0;
+  max-width: 100%;
+}
+.penni-v2 .penni-reference-balance-card,
+.penni-v2 .penni-month-summary {
+  min-height: 0;
+}
+.penni-v2 .penni-hero-balance {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: clamp(30px, 4vw, 60px);
+}
+.penni-v2 .penni-ref-account-row,
+.penni-v2 .penni-account-selector {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.penni-v2 .penni-account-history-list {
+  min-height: 0;
+  max-height: min(65dvh, 620px);
+  overflow-y: auto;
+}
+@media (max-width: 767px) {
+  .penni-v2 .penni-hero-grid {grid-template-columns: minmax(0,1fr);}
+  .penni-v2 .penni-account-workspace {grid-template-columns: minmax(0,1fr);}
+  .penni-v2 .penni-hero-balance {font-size: clamp(29px, 8vw, 48px);}
+  .penni-v2 .penni-month-summary {height: auto;}
+  .penni-v2 .penni-account-history {min-width: 0;}
+  .penni-v2 .penni-native-popup {max-height: calc(100dvh - max(8px, env(safe-area-inset-top)));}
+}
+
+/* Keep portal dialogs above every sticky header, action dock and sidebar.
+   Popups render under document.body, not under the route's stacking context. */
+.penni-native-backdrop { z-index: 9990; }
+.penni-native-popup { z-index: 9991; }
+.penni-native-popup .penni-transaction-body { min-height:0; }
+.penni-native-popup .penni-transaction-fields { overscroll-behavior:contain; }

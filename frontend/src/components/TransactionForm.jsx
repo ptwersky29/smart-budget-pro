@@ -256,9 +256,9 @@ export default function TransactionForm({
 
 
             {/* Reference quick-pick tiles, bound to existing categories. */}
-            {Array.isArray(selectedCats) && selectedCats.length > 0 && (
+            {Array.isArray(selectedCats) && selectedCats.some(c => c && typeof c === "object") && (
               <div className="penni-ref-category-grid" role="group" aria-label="Quick categories">
-                {selectedCats.filter(c => !c.is_archived).slice(0,11).map(c => {
+                {selectedCats.filter(c => c && typeof c === "object" && !c.is_archived).slice(0,11).map(c => {
                   const name = c.name || c.slug || c.label;
                   const selected = form.category === name;
                   return (

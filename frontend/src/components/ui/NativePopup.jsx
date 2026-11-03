@@ -12,7 +12,8 @@ export default function NativePopup({ open, onClose, title = "Penni", descriptio
     <Dialog.Root open={Boolean(open)} onOpenChange={next => { if (!next) onClose?.(); }}>
       <Dialog.Portal>
         <Dialog.Overlay className="penni-native-backdrop" />
-        <Dialog.Content className={cn("penni-v2 penni-native-popup", className)} data-size={size}>
+        <Dialog.Content className={cn("penni-v2 penni-native-popup", className)} data-size={size}
+          data-testid="penni-native-popup" aria-describedby={description ? undefined : undefined}>
           <div aria-hidden="true" className="penni-native-handle-zone"
             onTouchStart={e => { swipeStart.current = e.touches[0]?.clientY ?? null; }}
             onTouchEnd={e => {
@@ -32,7 +33,8 @@ export default function NativePopup({ open, onClose, title = "Penni", descriptio
                 <button type="button" ref={closeButton} className="penni-native-close" aria-label="Close dialog"><X className="h-5 w-5" /></button>
               </Dialog.Close>
             </div>
-          ) : <Dialog.Title className="sr-only">{title}</Dialog.Title>}
+          ) : <><Dialog.Title className="sr-only">{title}</Dialog.Title>
+            <Dialog.Description className="sr-only">{description || "Complete the form and save or cancel."}</Dialog.Description></>}
           {!showHeader && <Dialog.Close asChild><button type="button" ref={closeButton} className="sr-only" aria-label="Close dialog">Close</button></Dialog.Close>}
           <div className={cn("penni-native-body", bodyClassName)}>{children}</div>
           {footer && <div className="penni-native-footer">{footer}</div>}
