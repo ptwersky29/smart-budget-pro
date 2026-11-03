@@ -273,3 +273,35 @@ html.dark[data-penni-accent="copper"] .penni-v2 {--penni-accent:#f08a3e;}
 html.dark[data-penni-accent="rose"] .penni-v2 {--penni-accent:#f2587f;}
 html.dark[data-penni-accent="sky"] .penni-v2 {--penni-accent:#2fa8f5;}
 html.dark[data-penni-accent="violet"] .penni-v2 {--penni-accent:#a07bff;}
+
+/* Dashboard layout repair: the sticky app header owns the route name, while
+   the Dashboard introduces the user with a real heading alongside its actions.
+   Avoid hiding the left-hand title while retaining right-hand controls. */
+.penni-v2 .penni-dashboard-header {
+  align-items:center;
+  column-gap:20px;
+  row-gap:12px;
+}
+.penni-v2 .penni-dashboard-header > :first-child { min-width:0; flex:1 1 340px; }
+.penni-v2 .penni-dashboard-header > :last-child { flex:0 0 auto; }
+.penni-v2 .penni-dashboard-alerts { box-shadow:var(--penni-shadow); }
+@media(min-width:768px) {
+  .penni-v2 .penni-inner-page-header.penni-dashboard-header .penni-inner-title,
+  .penni-v2 .penni-inner-page-header.penni-dashboard-header .penni-inner-description,
+  .penni-v2 .penni-inner-page-header.penni-dashboard-header .penni-inner-eyebrow {
+    display:block;
+  }
+  .penni-v2 .penni-dashboard-header .penni-inner-title {
+    font-size:clamp(21px,2vw,28px);
+    line-height:1.2;
+  }
+  .penni-v2 .penni-dashboard-header .penni-inner-description { font-size:12px; }
+}
+@media(min-width:768px) and (max-width:1199px) {
+  .penni-v2 .penni-dashboard-header {flex-wrap:wrap;}
+  .penni-v2 .penni-dashboard-header > :last-child {width:100%;justify-content:flex-start;}
+}
+@media(max-width:767px) {
+  .penni-v2 .penni-dashboard-header > :last-child {width:100%;justify-content:flex-start;}
+  .penni-v2 .penni-dashboard-alerts {padding:12px;}
+}
