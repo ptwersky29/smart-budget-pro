@@ -8,6 +8,7 @@ jest.mock("../contexts/CategoriesContext", () => ({
   useCategories: () => ({
     categories: [{ name: "groceries", label: "Groceries", color: "#5b5cf0" }],
     version: 1,
+    sectionOptions: ["Everyday", "Other"],
     resolveCategory: name => ({ name, label: String(name).replace(/_/g," "), color:"#5b5cf0" }),
     createCategory: jest.fn(),
   }),
@@ -38,6 +39,6 @@ test("global New transaction button opens a visible, accessible native form", as
   expect(dialog).toBeVisible();
   expect(screen.getByTestId("tx-amount")).toBeVisible();
   await waitFor(() => expect(api.get).toHaveBeenCalledWith("/accounts"));
-  fireEvent.click(screen.getByRole("button",{name:"Close dialog"}));
+  fireEvent.click(screen.getByRole("button",{name:"Cancel"}));
   await waitFor(() => expect(screen.queryByRole("dialog",{name:"New transaction"})).not.toBeInTheDocument());
 });
