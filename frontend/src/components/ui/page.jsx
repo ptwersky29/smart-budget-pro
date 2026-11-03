@@ -90,18 +90,18 @@ export function PageHeader({
   ) : null;
 
   return (
-    <div className={cn("flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between", className)}>
+    <div className={cn("penni-inner-page-header flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between", className)}>
       <div className="flex min-w-0 items-start gap-3">
         {backControl}
         <div className="min-w-0">
           {eyebrow ? (
-            <p className="label-overline">{eyebrow}</p>
+            <p className="penni-inner-eyebrow label-overline">{eyebrow}</p>
           ) : null}
-          <h1 className="text-[clamp(1.55rem,2.4vw,2.15rem)] font-semibold leading-[1.1] tracking-[-0.045em]">
+          <h1 className="penni-inner-title text-[clamp(1.55rem,2.4vw,2.15rem)] font-semibold leading-[1.1] tracking-[-0.045em]">
             {title}
           </h1>
           {description ? (
-            <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            <p className="penni-inner-description mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
               {description}
             </p>
           ) : null}
