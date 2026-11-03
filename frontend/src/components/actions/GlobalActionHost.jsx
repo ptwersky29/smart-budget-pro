@@ -139,7 +139,7 @@ export default function GlobalActionHost() {
   if (isAccountForm) return <AccountFormModal key={active.key} open onClose={closeAction} onCreated={()=>changed("accounts")} />;
 
   return <Sheet open={Boolean(active)} onOpenChange={open=>{if(!open)closeAction()}}>
-    <SheetContent side="right" className={`flex h-full w-full flex-col overflow-hidden p-0 ${isLarge?"sm:max-w-[min(940px,92vw)]":isInfo?"sm:max-w-[440px]":"sm:max-w-lg"}`}>
+    <SheetContent side="right" variant={isInfo || type==="accounts-overview" || type==="transaction-search" ? "panel" : "modal"} size={isLarge?"lg":"md"} className={`flex w-full flex-col overflow-hidden p-0 ${isLarge?"sm:max-w-[min(940px,92vw)]":isInfo?"sm:max-w-[440px]":"sm:max-w-lg"}`}>
       <SheetHeader className="shrink-0 border-b border-border bg-card px-5 py-5 pr-14 text-left">
         <SheetTitle className="text-base">{PANEL_TITLES[type] || "Penni action"}</SheetTitle>
         <SheetDescription>Complete this action without leaving your current page.</SheetDescription>

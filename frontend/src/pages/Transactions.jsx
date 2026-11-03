@@ -1,6 +1,6 @@
 import { WorkspaceHeader, WorkspaceMetrics, WorkspaceMetric, WorkspaceTabs, WorkspaceViewToggle, WorkspaceBlank, WorkspaceSkeleton } from "../components/ui/workspace";
 import PenniSelect from "../components/PenniSelect";
-import { createPortal } from "react-dom";
+import NativePopup from "../components/ui/NativePopup";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
@@ -121,38 +121,12 @@ function useMediaQuery(query) {
 }
 
 function TransactionActionPanel({ open, title, description, onClose, children, footer, className = "max-w-md" }) {
-  if (!open) return null;
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-    >
-      <div
-        className={`my-auto rounded-2xl border border-border bg-card shadow-2xl p-6 w-full ${className} animate-[fadeUp_0.2s_ease-out]`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <div className="min-w-0">
-            <h3 className="text-xl tracking-tight font-medium">{title}</h3>
-            {description && <p className="text-sm text-muted-foreground mt-1">{description}</p>}
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground"
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        {children}
-        {footer && <div className="flex flex-col-reverse sm:flex-row gap-3 justify-end pt-4">{footer}</div>}
-      </div>
-    </div>,
-    document.body
+  return (
+    <NativePopup open={open} title={title} description={description} onClose={onClose}
+      showHeader size={className.includes("max-w-2xl") ? "lg" : "md"}
+      footer={footer ? <div className="flex flex-wrap justify-end gap-3">{footer}</div> : null}>
+      <div className="space-y-4">{children}</div>
+    </NativePopup>
   );
 }
 
@@ -2253,8 +2227,8 @@ const Transactions = React.memo(function Transactions() {
 
         {/* Edit Modal */}
         {maaserEditEntry && (
-          <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={() => setMaaserEditEntry(null)}>
-            <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+          <NativePopup open={Boolean(maaserEditEntry)} title="Edit Maaser entry" onClose={() => setMaaserEditEntry(null)} size="md">
+            <div className="penni-native-form space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl tracking-tight font-medium">Edit Maaser Entry</h3>
                 <button onClick={() => setMaaserEditEntry(null)} className="p-3 rounded-lg hover:bg-secondary text-muted-foreground"><X className="h-4 w-4" /></button>
@@ -2281,13 +2255,13 @@ const Transactions = React.memo(function Transactions() {
                 </div>
               </div>
             </div>
-          </div>
+          </NativePopup>
         )}
 
         {/* Give Modal */}
         {maaserShowGive && (
-          <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={() => setMaaserShowGive(false)}>
-            <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+          <NativePopup open={maaserShowGive} title="Give Maaser" onClose={() => setMaaserShowGive(false)} size="md">
+            <div className="penni-native-form space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl tracking-tight font-medium">Give Maaser</h3>
                 <button onClick={() => setMaaserShowGive(false)} className="p-3 rounded-lg hover:bg-secondary text-muted-foreground"><X className="h-4 w-4" /></button>
@@ -2310,7 +2284,7 @@ const Transactions = React.memo(function Transactions() {
                 </div>
               </div>
             </div>
-          </div>
+          </NativePopup>
         )}
 
         {/* Confirm Reset */}
@@ -2537,8 +2511,8 @@ const Transactions = React.memo(function Transactions() {
       />
 
       {newCategoryModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={() => setNewCategoryModal(false)}>
-          <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+        <NativePopup open={newCategoryModal} title="New category" onClose={() => setNewCategoryModal(false)} size="sm">
+          <div className="penni-native-form space-y-4">
             <h3 className="text-lg font-medium mb-4">Add Custom Category</h3>
             <input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)}
               placeholder="Category name" autoFocus
@@ -2549,7 +2523,7 @@ const Transactions = React.memo(function Transactions() {
               <button onClick={() => { if (newCategoryName.trim()) { bulkCategory(newCategoryName.trim().toLowerCase().replace(/\s+/g, "_")); setNewCategoryModal(false); } }} className="flex-1 h-10 rounded-xl bg-emerald text-white text-sm font-medium hover:bg-emerald/90">Add</button>
             </div>
           </div>
-        </div>
+        </NativePopup>
       )}
 
       <TransactionInspector

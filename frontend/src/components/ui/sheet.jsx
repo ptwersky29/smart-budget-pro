@@ -43,7 +43,7 @@ const sheetVariants = cva(
   }
 )
 
-const SheetContent = React.forwardRef(function SheetContent({ side = "right", className, overlayClassName, children, ...props }, ref) {
+const SheetContent = React.forwardRef(function SheetContent({ side = "right", variant = "panel", size = "md", className, overlayClassName, children, ...props }, ref) {
   const [mobile, setMobile] = React.useState(false);
   React.useEffect(() => {
     const query = window.matchMedia("(max-width: 767px)");
@@ -56,8 +56,9 @@ const SheetContent = React.forwardRef(function SheetContent({ side = "right", cl
   return (
     <SheetPortal>
       <SheetOverlay className={overlayClassName} />
-      <SheetPrimitive.Content ref={ref} data-penni-side={effectiveSide}
+      <SheetPrimitive.Content ref={ref} data-penni-side={effectiveSide} data-penni-variant={variant} data-penni-size={size}
         className={cn("penni-v2 penni-overlay-content", sheetVariants({ side: effectiveSide }), className)} {...props}>
+        <div className="penni-native-handle-zone" aria-hidden="true"><div className="penni-native-handle" /></div>
         <SheetPrimitive.Close
           className="absolute right-4 top-4 rounded-full bg-white/60 p-2 text-foreground/70 backdrop-blur-xl ring-1 ring-white/70 transition-opacity hover:opacity-100 hover:bg-white/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none dark:bg-white/10 dark:ring-white/10">
           <X className="h-4 w-4" />

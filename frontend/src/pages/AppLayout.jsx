@@ -20,6 +20,7 @@ import {
 } from "../components/ui/dropdown-menu";
 import {
   Compass,
+  ChevronDown,
   Eye,
   EyeOff,
   Plus,
@@ -53,6 +54,7 @@ export default function AppLayout() {
   const { setTheme, resolvedTheme } = useTheme();
   const noAnim = settings.preferences?.dashboard?.animations === false || settings.preferences?.accessibility?.reduce_motion === true;
   const [helpOpen, setHelpOpen] = useState(false);
+  const [moreExpanded, setMoreExpanded] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [routeLoading, setRouteLoading] = useState(false);
   const [tourLoaded, setTourLoaded] = useState(false);
@@ -158,6 +160,9 @@ export default function AppLayout() {
 
   const routeMeta = useMemo(() => getRouteMeta(location.pathname), [location.pathname]);
   const settingsActive = isActivePath(location.pathname, "/settings");
+  const coreRoutes = ["/dashboard","/accounts","/transactions","/budgets","/analytics"];
+  const onCoreRoute = coreRoutes.some(to=>isActivePath(location.pathname,to));
+  useEffect(()=>{if(!onCoreRoute && !settingsActive)setMoreExpanded(true);},[onCoreRoute,settingsActive]);
   const moreActive = location.pathname === "/more" || !["/dashboard", "/accounts", "/transactions"].some((path) => isActivePath(location.pathname, path));
   const initials = (user?.name?.[0] || user?.email?.[0] || "P").toUpperCase();
 
@@ -209,10 +214,8 @@ export default function AppLayout() {
             {!sidebarCompact ? (
               <span className="min-w-0">
                 <span className="flex items-center gap-1.5">
-                  <span className="truncate text-[17px] font-semibold tracking-[-0.03em]">{APP_NAME}</span>
-                  <span className="rounded-md border border-topaz/25 bg-topaz/10 px-1 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] text-topaz">
-                    Beta
-                  </span>
+                  <span className="truncate text-[21px] font-semibold tracking-[-0.04em]">{APP_NAME}</span>
+
                 </span>
               </span>
             ) : null}
@@ -239,7 +242,7 @@ export default function AppLayout() {
           </button>
         </div>
         <div className={`subtle-scroll flex-1 space-y-5 overflow-y-auto ${sidebarCompact ? "px-3" : "px-4"} py-2`}>
-          {NAV_SECTIONS.filter((section) => !section.adminOnly || user?.role === "admin").map((section) => (
+          {NAV_SECTIONS.filter((section) => (!section.adminOnly || user?.role === "admin") && (section.label === "Main" || moreExpanded)).map((section) => (
             <div key={section.label} className="space-y-1">
               {!sidebarCompact ? (
                 <p className="px-2.5 pb-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
@@ -272,6 +275,12 @@ export default function AppLayout() {
               })}
             </div>
           ))}
+          <button type="button" onClick={()=>setMoreExpanded(value=>!value)} aria-expanded={moreExpanded}
+            className="penni-side-link flex w-full items-center gap-2.5 rounded-2xl px-3 py-3 text-[13px] font-medium"
+            title="More tools">
+            <Compass className="h-[19px] w-[19px] shrink-0"/>
+            {!sidebarCompact && <><span className="flex-1 text-left">More tools</span><ChevronDown className={`h-4 w-4 transition-transform ${moreExpanded?"rotate-180":""}`}/></>}
+          </button>
         </div>
 
         <div className={`shrink-0 ${sidebarCompact ? "p-3" : "px-4 pb-4 pt-3"}`}>
@@ -343,6 +352,7 @@ export default function AppLayout() {
               </Link>
               <div className="hidden min-w-0 flex-1 md:block">
                 <p className="truncate text-[21px] font-semibold leading-tight tracking-[-0.035em]">{routeMeta.title}</p>
+                {location.pathname === "/dashboard" && <p className="mt-1 text-[12px] leading-tight text-muted-foreground">{new Date().toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}</p>}
               </div>
               <button
                 type="button"

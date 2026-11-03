@@ -19,6 +19,11 @@ export const NAV_SECTIONS = [
       { to: "/transactions", label: "Transactions", icon: Receipt },
       { to: "/budgets", label: "Budgets", icon: PiggyBank },
       { to: "/analytics", label: "Analytics", icon: BarChart3 },
+    ],
+  },
+  {
+    label: "Tools",
+    items: [
       { to: "/reports", label: "Reports", icon: FileText },
       { to: "/subscriptions", label: "Subscriptions", icon: RefreshCcw },
       { to: "/statements", label: "Statements", icon: FileText },

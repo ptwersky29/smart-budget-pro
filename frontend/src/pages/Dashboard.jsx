@@ -10,7 +10,6 @@ import {
   ChevronRight,
   PiggyBank,
   Plus,
-  RefreshCw,
   Sparkles,
   Target,
   TrendingUp,
@@ -19,7 +18,6 @@ import {
 import { api, formatApiError } from "../lib/api";
 import { humanizeCategoryName } from "../lib/categories";
 import { formatDashboardAlertText } from "../lib/dashboardPresentation";
-import { useAuth } from "../contexts/AuthContext";
 import { useAssistant } from "../contexts/AssistantContext";
 import { useSettings } from "../contexts/SettingsContext";
 import { useCategories } from "../contexts/CategoriesContext";
@@ -28,18 +26,17 @@ import { Button } from "../components/ui/button";
 import Skeleton from "../components/ui/Skeleton";
 import {
   EmptyPanel,
-  PageHeader,
   StatCard,
   Surface,
   SurfaceHeader,
 } from "../components/ui/page";
 import Sparkline from "../components/ui/Sparkline";
 import ReferenceCashFlowChart from "../components/finance/ReferenceCashFlowChart";
+import ReferenceBalanceHero from "../components/finance/ReferenceBalanceHero";
 import AccountTile from "../components/finance/AccountTile";
 import CategoryDonut from "../components/finance/CategoryDonut";
 import {
   formatCurrency,
-  formatLongDate,
   formatMonth,
   formatShortDate,
   greetingForNow,
@@ -103,7 +100,6 @@ function BudgetLine({ budget, onSelect }) {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
   const { settings } = useSettings();
   const { version: categoriesVersion } = useCategories();
   const { openAssistant } = useAssistant();
@@ -252,40 +248,10 @@ export default function Dashboard() {
     accounts.length === 0 &&
     budgets.length === 0;
 
-  const header = (
-    <PageHeader
-      className="penni-dashboard-header"
-      eyebrow={formatLongDate(new Date(), { weekday: false })}
-      title={`${greetingForNow()}${user?.name ? `, ${user.name.split(" ")[0]}` : ""}`}
-      description="Your accounts, spending and plans, gathered into one calm view."
-      actions={
-        <>
-          <button
-            type="button"
-            onClick={() => loadAll(true)}
-            className="grid h-9 w-9 place-items-center rounded-full border border-border/70 bg-card text-muted-foreground transition hover:text-foreground"
-            aria-label="Refresh dashboard"
-            title="Refresh"
-          >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-          </button>
-          <Button variant="outlinePill" size="pill" onClick={() => openAssistant()}>
-            <Sparkles className="h-4 w-4" />
-            Ask Penni
-          </Button>
-          <Button variant="primary" size="pill" onClick={addTransaction}>
-            <Plus className="h-4 w-4" />
-            Add transaction
-          </Button>
-        </>
-      }
-    />
-  );
 
   if (empty) {
     return (
       <div className="page-stack" data-testid="dashboard-root">
-        {header}
         <Surface>
           <EmptyPanel
             icon={Wallet}
@@ -313,7 +279,10 @@ export default function Dashboard() {
 
   return (
     <div className="page-stack dashboard-reference" data-testid="dashboard-root">
-      {header}
+
+      <ReferenceBalanceHero balance={balance} accounts={accounts} income={income} spend={spend}
+        budgets={budgets} onRefresh={()=>loadAll(true)} refreshing={refreshing}
+        onAssistant={()=>openAssistant()} />
 
       {topAlerts.length > 0 ? (
         <section
@@ -354,6 +323,24 @@ export default function Dashboard() {
           </div>
         </section>
       ) : null}
+
+      <section className="penni-ref-accounts" aria-label="Your accounts">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-[18px] font-semibold tracking-[-.035em]">Accounts</h2>
+          <Link to="/accounts" className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary">Manage <ArrowRight className="h-4 w-4"/></Link>
+        </div>
+        <div className="penni-ref-account-row flex gap-4 overflow-x-auto pb-3">
+          {accounts.map(account=>(
+            <AccountTile key={account.account_id||account.id} account={account}
+              className="w-[292px] min-w-[292px] max-w-[340px] flex-shrink-0"
+              onSelect={selected=>openAction("account-info",{accountId:selected.account_id,account:selected})}/>
+          ))}
+          <button type="button" onClick={()=>openAction("account-new")}
+            className="flex min-h-[170px] w-[200px] flex-shrink-0 flex-col items-center justify-center gap-3 rounded-[26px] border border-dashed border-border text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary">
+            <Plus className="h-6 w-6"/><span className="text-sm font-medium">Add account</span>
+          </button>
+        </div>
+      </section>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {showWidget("net_worth") ? (
@@ -404,32 +391,6 @@ export default function Dashboard() {
 
       <div className="dashboard-panels grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_288px]">
         <div className="space-y-4">
-          <Surface className="overflow-hidden">
-            <SurfaceHeader
-              title="Accounts"
-              subtitle="Balances across your connected banks"
-              actions={
-                <button type="button" onClick={() => openAction("accounts-overview")} className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald">
-                  View all <ChevronRight className="h-3.5 w-3.5" />
-                </button>
-              }
-              compact
-            />
-            <div className="mt-3 grid grid-cols-1 gap-2.5 px-4 pb-4 sm:grid-cols-2 sm:px-5 sm:pb-5 lg:grid-cols-3">
-              {accounts.slice(0, 5).map((account) => (
-                <AccountTile key={account.account_id || account.id} account={account} onSelect={selected => openAction("account-info", { accountId: selected.account_id, account: selected })} />
-              ))}
-              <button
-                type="button"
-                onClick={() => openAction("account-new")}
-                className="flex min-h-[96px] flex-col items-center justify-center gap-1.5 rounded-[1rem] border border-dashed border-border/80 p-4 text-muted-foreground transition hover:border-emerald/30 hover:bg-emerald/[0.03] hover:text-emerald"
-              >
-                <Plus className="h-4 w-4" />
-                <span className="text-[11px] font-medium">Add account</span>
-              </button>
-            </div>
-          </Surface>
-
           <div className="grid gap-4 md:grid-cols-2">
             <Surface className="min-w-0 p-4 sm:p-5">
               <div className="mb-3 flex items-center justify-between gap-3">

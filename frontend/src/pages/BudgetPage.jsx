@@ -1,5 +1,6 @@
 import PenniSelect from "../components/PenniSelect";
 import { useActions } from "../contexts/ActionContext";
+import NativePopup from "../components/ui/NativePopup";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseISO, isBefore, getDaysInMonth, getDate, format } from "date-fns";
 import {
@@ -1309,13 +1310,10 @@ export default React.memo(function BudgetPage() {
       </div>
 
       {showAdd && (
-        <div className="fixed inset-0 z-50 bg-black/40 lg:flex lg:items-start lg:justify-center lg:pt-[10vh]" onClick={() => { setShowAdd(false); resetForm(); resetQuickForm(); if (addTab === "budget") setForm((prev) => ({ ...prev, event_group_id: "", event_group_name: "" })); }}>
-          <div
-            className="absolute bottom-0 left-0 right-0 rounded-t-2xl border border-border bg-card/95 backdrop-blur-xl shadow-modal p-6 max-h-[85vh] overflow-y-auto animate-slide-up lg:relative lg:mx-0 lg:max-w-md lg:rounded-2xl lg:shadow-lg lg:animate-[fadeUp_0.2s_ease-out]"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <NativePopup open={showAdd} title="New budget or expense" onClose={() => { setShowAdd(false); resetForm(); resetQuickForm(); if (addTab === "budget") setForm((prev) => ({ ...prev, event_group_id: "", event_group_name: "" })); }} size="md">
+          <div className="penni-native-form space-y-4">
             {/* Handle */}
-            <div className="w-10 h-1 rounded-full bg-muted-foreground/20 mx-auto mb-4" />
+            
 
             {/* Tabs */}
             <div className="flex gap-2 p-1 rounded-xl bg-muted/50 mb-5">
@@ -1516,7 +1514,7 @@ export default React.memo(function BudgetPage() {
               </form>
             )}
           </div>
-        </div>
+        </NativePopup>
       )}
 
 
