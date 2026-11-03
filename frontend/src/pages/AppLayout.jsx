@@ -249,14 +249,10 @@ export default function AppLayout() {
                     className={`penni-side-link group flex items-center rounded-xl border transition-colors ${
                       collapsed ? "justify-center px-0 py-2.5" : "gap-2.5 px-2.5 py-2"
                     } ${
-                      active
-                        ? "border-emerald bg-emerald text-white shadow-[0_6px_16px_hsl(var(--emerald)/0.18)]"
-                        : "border-transparent text-muted-foreground hover:bg-secondary/55 hover:text-foreground"
+                      active ? "font-semibold" : "hover:bg-secondary/55"
                     }`}
                   >
-                    <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-colors ${
-                      active ? "bg-white/15 text-white" : "text-muted-foreground group-hover:text-foreground"
-                    }`}>
+                    <span className="penni-nav-icon grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-colors">
                       <Icon className="h-[17px] w-[17px]" strokeWidth={active ? 2.1 : 1.8} />
                     </span>
                     {!collapsed ? (
@@ -269,7 +265,7 @@ export default function AppLayout() {
           ))}
         </div>
 
-        <div className={`shrink-0 ${collapsed ? "p-2.5" : "px-6 pb-[30px] pt-4"}`}>
+        <div className={`shrink-0 ${collapsed ? "p-3" : "px-4 pb-4 pt-3"}`}>
           <Link
             to={SETTINGS_NAV_ITEM.to}
             aria-current={settingsActive ? "page" : undefined}
@@ -277,12 +273,10 @@ export default function AppLayout() {
             className={`penni-side-link group mb-3 flex items-center rounded-xl border transition-colors ${
               collapsed ? "justify-center px-0 py-2.5" : "gap-2.5 px-2.5 py-2"
             } ${
-              settingsActive
-                ? "border-emerald bg-emerald text-white shadow-[0_6px_16px_hsl(var(--emerald)/0.18)]"
-                : "border-transparent text-muted-foreground hover:bg-secondary/55 hover:text-foreground"
+              settingsActive ? "font-semibold" : "hover:bg-secondary/55"
             }`}
           >
-            <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${settingsActive ? "bg-white/15 text-white" : ""}`}>
+            <span className="penni-nav-icon grid h-7 w-7 shrink-0 place-items-center rounded-lg">
               <Settings className="h-[17px] w-[17px]" strokeWidth={settingsActive ? 2.1 : 1.8} />
             </span>
             {!collapsed ? <span className="flex-1 text-[13px] font-medium">Settings</span> : null}
