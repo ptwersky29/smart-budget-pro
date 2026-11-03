@@ -3,12 +3,12 @@ import { Link } from "react-router-dom";
 import { Building2 } from "lucide-react";
 import {
   getBankLogoOrFallback,
-  getBankColor,
   pickBankInstitution,
   toAccountTypeLabel,
 } from "../../data/bankLogos";
 import { formatCurrency } from "../../lib/format";
 import { getDisplayName } from "../../lib/utils";
+import { accountGradient } from "../../design-system/account-gradients";
 
 export default function AccountTile({ account, compact = false, className = "", onSelect }) {
   const [imageFailed, setImageFailed] = useState(false);
@@ -20,7 +20,7 @@ export default function AccountTile({ account, compact = false, className = "", 
     account?.nickname,
   );
   const logo = imageFailed ? null : getBankLogoOrFallback(institution);
-  const color = account?.color || getBankColor(institution);
+
   const name = getDisplayName({
     name: account?.name || account?.account_name || account?.nickname,
     provider: account?.provider,
@@ -65,9 +65,10 @@ export default function AccountTile({ account, compact = false, className = "", 
     <Link
       to={to}
       onClick={onSelect ? event => { event.preventDefault(); onSelect(account); } : undefined}
-      className={`surface surface-hover group relative flex min-w-0 flex-col justify-between overflow-hidden p-4 ${className}`}
+      className={`penni-account-card penni-interactive group relative flex min-w-0 flex-col justify-between overflow-hidden p-5 ${className}`}
+      style={{ "--account-gradient": accountGradient(account) }}
     >
-      <span className="absolute inset-y-4 left-0 w-[3px] rounded-r-full" style={{ background: color }} />
+      
       <div className="flex min-w-0 items-center gap-3">
         <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-white shadow-sm ring-1 ring-black/[0.04] dark:bg-white/10">
           {logo ? (
@@ -87,7 +88,7 @@ export default function AccountTile({ account, compact = false, className = "", 
           <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{type}</p>
         </div>
       </div>
-      <div className="mt-4 flex items-end justify-between gap-2">
+      <div className="relative mt-6 flex items-end justify-between gap-2">
         <p className="money-tabular text-lg font-semibold leading-none">{formatCurrency(balance)}</p>
         <span className="text-[10px] text-muted-foreground">{currency}</span>
       </div>
