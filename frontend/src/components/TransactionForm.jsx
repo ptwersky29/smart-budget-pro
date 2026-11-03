@@ -121,6 +121,8 @@ export default function TransactionForm({
 
         {/* Scrollable Form Body */}
         <form
+          id="penni-transaction-form"
+          noValidate
           onSubmit={onSubmit}
           className="penni-transaction-fields flex-1 overflow-y-auto p-5 sm:p-6 space-y-4"
           aria-labelledby="transaction-form-title"
@@ -601,13 +603,11 @@ export default function TransactionForm({
             </div>
           )}
 
-          {/* Hidden submit trigger so Enter in any input triggers onSubmit */}
-          <button type="submit" className="hidden" tabIndex={-1} />
         </form>
 
         {/* Inline feedback remains visible when the form's fields scroll. */}
         {validationError ? (
-          <p role="alert" className="mx-5 mb-2 rounded-xl border border-ruby/20 bg-ruby/10 px-3 py-2 text-xs font-medium text-ruby">
+          <p id="penni-transaction-save-error" role="alert" className="mx-5 mb-2 rounded-xl border border-ruby/20 bg-ruby/10 px-3 py-2 text-xs font-medium text-ruby">
             {validationError}
           </p>
         ) : null}
@@ -623,12 +623,13 @@ export default function TransactionForm({
             Cancel
           </Button>
           <Button
-            type="button"
+            type="submit"
+            form="penni-transaction-form"
             variant="primary"
             size="sm"
             data-testid="tx-submit"
             disabled={saving}
-            onClick={onSubmit}
+            aria-describedby={validationError ? "penni-transaction-save-error" : undefined}
             className="text-xs font-semibold px-4"
           >
             {saving ? "Saving…" : editingId ? "Save changes" : "Add transaction"}

@@ -93,11 +93,13 @@ export default function GlobalActionHost() {
     event?.preventDefault?.();
     if (savingRef.current) return;
     const amount = Number(transactionForm.amount);
+    const description = String(transactionForm.description || "").trim();
     if (!transactionForm.account_id) {setTransactionError("Choose an account before saving.");return;}
     if (!Number.isFinite(amount) || amount<=0) {setTransactionError("Enter an amount greater than zero.");return;}
-    if (!String(transactionForm.description || "").trim()) {setTransactionError("Enter a transaction description.");return;}
+    if (!description) {setTransactionError("Enter a transaction description.");return;}
+    if (!transactionForm.date) {setTransactionError("Choose a transaction date.");return;}
     setTransactionError("");
-    const body={description:transactionForm.description,amount:transactionForm.is_income?Math.abs(amount):-Math.abs(amount),
+    const body={description,amount:transactionForm.is_income?Math.abs(amount):-Math.abs(amount),
       category:transactionForm.category||undefined,date:transactionForm.date||today(),account_id:transactionForm.account_id,
       merchant:transactionForm.merchant||undefined,notes:transactionForm.notes||undefined,
       is_income:!!transactionForm.is_income,is_transfer:!!transactionForm.is_transfer};
@@ -132,7 +134,7 @@ export default function GlobalActionHost() {
       }
       afterSave("transactions");
     } catch(e){
-      const message = formatApiError(e.response?.data?.detail)||"Could not save transaction";
+      const message = formatApiError(e) || "Could not save transaction";
       setTransactionError(message);
       toast.error(message);
     }
