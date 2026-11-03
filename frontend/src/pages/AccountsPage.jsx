@@ -160,7 +160,7 @@ function BalanceHero({ accounts, loading, connections, totalTx, onConnect, conne
   }
 
   return (
-    <div className="relative overflow-hidden rounded-[1.25rem] bg-[#123c30] p-5 text-white shadow-[0_28px_60px_-36px_rgba(10,42,32,0.95)] sm:p-7">
+    <div className="relative overflow-hidden rounded-[1.25rem] bg-[#211b50] p-5 text-white shadow-[0_28px_60px_-36px_rgba(10,42,32,0.95)] sm:p-7">
       <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-28 left-1/3 h-56 w-56 rounded-full bg-[#f3c970]/10 blur-3xl" />
       <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">

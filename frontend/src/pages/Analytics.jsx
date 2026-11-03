@@ -85,10 +85,10 @@ export default function Analytics() {
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-busy={loading}>
-            <StatCard label="Total income" value={formatCurrency(summary.income)} detail="Selected period" icon={ArrowDownRight} tone="blue" />
-            <StatCard label="Total spending" value={formatCurrency(summary.spending)} detail="Selected period" icon={ArrowUpRight} tone="ruby" />
-            <StatCard label="Net saved" value={formatCurrency(summary.saved)} detail="Income minus spending" icon={PiggyBank} tone="topaz" />
-            <StatCard label="Savings rate" value={summary.savingsRate.toFixed(1) + "%"} detail="Share of total income" icon={Wallet} />
+            <StatCard label="Total income" value={loading ? "—" : formatCurrency(summary.income)} detail="Selected period" icon={ArrowDownRight} tone="blue" />
+            <StatCard label="Total spending" value={loading ? "—" : formatCurrency(summary.spending)} detail="Selected period" icon={ArrowUpRight} tone="ruby" />
+            <StatCard label="Net saved" value={loading ? "—" : formatCurrency(summary.saved)} detail="Income minus spending" icon={PiggyBank} tone="topaz" />
+            <StatCard label="Savings rate" value={loading ? "—" : summary.savingsRate.toFixed(1) + "%"} detail="Share of total income" icon={Wallet} />
           </div>
           <div className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,1fr)]">
             <Surface className="min-w-0 p-4 sm:p-6">
