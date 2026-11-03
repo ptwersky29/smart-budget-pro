@@ -32,6 +32,7 @@ import {
   SurfaceHeader,
 } from "../components/ui/page";
 import Sparkline from "../components/ui/Sparkline";
+import ReferenceCashFlowChart from "../components/finance/ReferenceCashFlowChart";
 import AccountTile from "../components/finance/AccountTile";
 import CategoryDonut from "../components/finance/CategoryDonut";
 import {
@@ -438,7 +439,8 @@ export default function Dashboard() {
                 </div>
                 {monthlyFlow.length ? (
                   <div>
-                    <div className="flex h-[124px] items-end gap-2">
+                    <ReferenceCashFlowChart data={monthlyFlow} height={185} />
+                    <div className="hidden">
                       {monthlyFlow.map((month) => {
                         const highest = Math.max(...monthlyFlow.map((item) => Math.max(Number(item.income) || 0, Number(item.spend) || 0)), 1);
                         const incomeHeight = Math.max(((Number(month.income) || 0) / highest) * 100, 2);
@@ -454,7 +456,7 @@ export default function Dashboard() {
                         );
                       })}
                     </div>
-                    <div className="mt-3 flex items-center justify-center gap-4 text-[9.5px] text-muted-foreground">
+                    <div className="hidden mt-3 flex items-center justify-center gap-4 text-[9.5px] text-muted-foreground">
                       <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-emerald" />Income</span>
                       <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-topaz/60" />Spending</span>
                     </div>
@@ -493,7 +495,7 @@ export default function Dashboard() {
               <div className="absolute -right-10 -top-12 h-36 w-36 rounded-full bg-sky/10 blur-2xl" />
               <div className="relative">
                 <div className="flex items-center justify-between">
-                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet via-sky to-emerald text-white shadow-[0_6px_14px_hsl(var(--sky)/0.25)]">
+                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[#5b5cf0] via-[#7476ff] to-[#8b5cf6] text-white shadow-[0_6px_14px_hsl(var(--sky)/0.25)]">
                     <Sparkles className="h-[18px] w-[18px]" />
                   </span>
                   <span className="rounded-full bg-secondary px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">

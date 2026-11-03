@@ -151,7 +151,7 @@ function BalanceHero({ accounts, loading, connections, totalTx, onConnect, conne
 
   if (loading) {
     return (
-      <div className="rounded-[1.25rem] bg-[#123c30] p-6 text-white sm:p-7">
+      <div className="rounded-[1.25rem] bg-[#211b50] p-6 text-white sm:p-7">
         <Skeleton className="h-3 w-28 bg-white/10" />
         <Skeleton className="mt-4 h-10 w-56 bg-white/10" />
         <Skeleton className="mt-4 h-4 w-72 max-w-full bg-white/10" />
@@ -186,7 +186,7 @@ function BalanceHero({ accounts, loading, connections, totalTx, onConnect, conne
             type="button"
             onClick={onConnect}
             disabled={connecting}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-white px-4 text-[11px] font-semibold text-[#123c30] transition hover:bg-white/90 disabled:opacity-60"
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-white px-4 text-[11px] font-semibold text-[#211b50] transition hover:bg-white/90 disabled:opacity-60"
           >
             {connecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Building2 className="h-3.5 w-3.5" />}
             Connect bank

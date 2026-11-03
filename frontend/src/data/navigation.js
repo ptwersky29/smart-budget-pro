@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Wallet, Receipt, PiggyBank, TrendingUp, Star,
-  Landmark, FileText, Settings, RefreshCcw, MoreHorizontal, Shield,
+  Landmark, FileText, Settings, RefreshCcw, MoreHorizontal, Shield, BarChart3,
 } from "lucide-react";
 
 export const BOTTOM_NAV = [
@@ -18,6 +18,7 @@ export const NAV_SECTIONS = [
       { to: "/accounts", label: "Accounts", icon: Wallet },
       { to: "/transactions", label: "Transactions", icon: Receipt },
       { to: "/budgets", label: "Budgets", icon: PiggyBank },
+      { to: "/analytics", label: "Analytics", icon: BarChart3 },
       { to: "/reports", label: "Reports", icon: FileText },
       { to: "/subscriptions", label: "Subscriptions", icon: RefreshCcw },
       { to: "/statements", label: "Statements", icon: FileText },
@@ -80,6 +81,11 @@ export const ROUTE_META = [
     description: "Set simple limits, track progress, and keep spending easy to understand.",
     primary: { label: "Add budget", to: "/budgets" },
     secondary: { label: "View reports", to: "/reports" },
+  },
+  {
+    paths: ["/analytics"],
+    eyebrow: "Analytics", title: "Analytics",
+    description: "Income, spending, category and budget trends from your accounts.",
   },
   {
     paths: ["/subscriptions"],
@@ -181,4 +187,4 @@ export function getRouteMeta(pathname) {
   })) || ROUTE_META[0];
 }
 
-export const KEYBOARD_GOTO = { d: "/dashboard", t: "/transactions", b: "/budgets", s: "/subscriptions", r: "/reports", a: "/accounts", g: "/settings", m: "/more" };
+export const KEYBOARD_GOTO = { d: "/dashboard", t: "/transactions", b: "/budgets", s: "/subscriptions", r: "/reports", a: "/accounts", g: "/settings", m: "/more", y: "/analytics" };

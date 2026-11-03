@@ -56,6 +56,7 @@ function applyToDOM(preferences) {
   const a = preferences?.appearance || {};
   const acc = preferences?.accessibility || {};
 
+  root.dataset.penniAccent = a.accent || "indigo";
   root.dataset.density = a.density || "comfortable";
   root.dataset.fontSize = a.font_size || "medium";
   root.style.setProperty("--fs-multiplier", String((acc.font_scaling ?? 100) / 100));
