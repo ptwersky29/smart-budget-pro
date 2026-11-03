@@ -338,6 +338,10 @@ export default function AppLayout() {
               <Link to="/dashboard" className="grid h-9 w-9 shrink-0 place-items-center md:hidden" aria-label={`${APP_NAME} home`}>
                 <Logo size="sm" />
               </Link>
+              <div className="hidden min-w-0 flex-1 md:block">
+                <p className="truncate text-[21px] font-semibold leading-tight tracking-[-0.035em]">{routeMeta.title}</p>
+                <p className="hidden max-w-[370px] truncate text-[12px] text-muted-foreground lg:block">{routeMeta.description}</p>
+              </div>
               <button
                 type="button"
                 onClick={() => setCommandOpen(true)}
@@ -356,7 +360,7 @@ export default function AppLayout() {
                 type="button"
                 onClick={() => setCommandOpen(true)}
                 data-testid="command-open-mobile"
-                className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground transition hover:bg-secondary hover:text-foreground md:hidden"
+                className="penni-icon-button grid h-9 w-9 place-items-center lg:hidden"
                 aria-label="Search or jump to"
               >
                 <Search className="h-[18px] w-[18px]" />
@@ -374,12 +378,16 @@ export default function AppLayout() {
             </div>
 
             <div className="flex shrink-0 items-center gap-1.5">
+              <button type="button" onClick={togglePrivacy} aria-label={privacy ? "Show balances" : "Hide balances"} title={privacy ? "Show balances" : "Hide balances"} aria-pressed={privacy}
+                className="penni-icon-button grid h-10 w-10 place-items-center">
+                {privacy ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
+              </button>
               <NotificationCenter />
               <button
                 type="button"
                 onClick={toggleTheme}
                 data-testid="theme-toggle"
-                className="hidden h-9 w-9 place-items-center rounded-full text-muted-foreground transition hover:bg-secondary hover:text-foreground sm:grid"
+                className="penni-icon-button hidden h-10 w-10 place-items-center sm:grid"
                 aria-label="Toggle theme"
                 title="Toggle theme"
               >
@@ -426,7 +434,7 @@ export default function AppLayout() {
           </div>
         </header>
 
-        <main data-tour="main-content" className={`app-main-scroll mx-auto w-full max-w-[1440px] px-3 pb-24 pt-3 sm:px-4 lg:min-h-0 lg:flex-1 lg:pl-[10px] lg:pr-[9px] lg:pb-[14px] lg:pt-[21px] ${workspaceRoute ? "workspace-main lg:overflow-hidden" : "lg:overflow-y-auto lg:overscroll-contain"}`}>
+        <main data-tour="main-content" className={`app-main-scroll relative mx-auto w-full max-w-[1360px] px-4 pb-24 pt-5 md:px-8 lg:min-h-0 lg:flex-1 lg:pb-6 lg:pt-7 ${workspaceRoute ? "workspace-main lg:overflow-hidden" : "lg:overflow-y-auto lg:overscroll-contain"}`}>
           <div key={location.pathname} className={[noAnim ? "" : "page-in", workspaceRoute ? "workspace-route-view" : ""].filter(Boolean).join(" ")}>
             <Outlet />
           </div>
@@ -447,7 +455,7 @@ export default function AppLayout() {
                 to={to}
                 aria-current={active ? "page" : undefined}
                 className={`penni-bottom-link flex h-12 min-w-0 max-w-[76px] flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl transition-colors ${
-                  active ? "text-emerald" : "text-muted-foreground active:text-foreground"
+                  active ? "font-semibold" : "text-muted-foreground active:text-foreground"
                 }`}
               >
                 <span className={`grid h-7 w-10 place-items-center rounded-full transition-colors ${
