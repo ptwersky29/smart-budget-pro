@@ -76,9 +76,9 @@ export default function Landing() {
       <section className="relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 pt-20 pb-32 grid lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-7 space-y-8 fade-up">
-            <span className="inline-flex items-center gap-2 label-overline text-emerald"><span className="w-1.5 h-1.5 rounded-full bg-emerald"></span> Premium AI Personal Finance</span>
+            <span className="inline-flex items-center gap-2 label-overline text-primary"><span className="w-1.5 h-1.5 rounded-full bg-primary"></span> Premium AI Personal Finance</span>
             <h1 className="text-5xl sm:text-6xl lg:text-7xl tracking-tight leading-[0.95] font-medium break-words">
-              Your money,<br />reading <span className="italic text-emerald" style={{fontFamily:'Fraunces'}}>your mind.</span>
+              Your money,<br />reading <span className="italic text-primary" style={{fontFamily:'Fraunces'}}>your mind.</span>
             </h1>
             <p className="text-lg text-muted-foreground max-w-xl leading-relaxed">
               Penni sees every penny you spend, every bracha you make, every bill you forgot — and quietly keeps your budget, your forecasts, and your maaser in line.
@@ -104,7 +104,7 @@ export default function Landing() {
             <div className="absolute -bottom-6 -left-6 glass rounded-2xl p-4 w-56 hidden sm:block">
               <p className="label-overline">Cash Flow</p>
               <p className="text-2xl font-medium tracking-tight mt-1">£12,408</p>
-              <p className="text-xs text-emerald mt-1">↑ 8.4% this month</p>
+              <p className="text-xs text-primary mt-1">↑ 8.4% this month</p>
             </div>
           </div>
         </div>
@@ -114,9 +114,9 @@ export default function Landing() {
       <div className="max-w-7xl mx-auto px-6 py-12 text-center border-y border-border">
         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-6">Trusted by users across the UK</p>
         <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-4 text-sm text-muted-foreground">
-          <span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald" /> 2,400+ UK banks supported</span>
-          <span className="flex items-center gap-2"><Star className="h-4 w-4 text-emerald" /> 14-day free trial</span>
-          <span className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald" /> TLS 1.3 encrypted</span>
+          <span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" /> 2,400+ UK banks supported</span>
+          <span className="flex items-center gap-2"><Star className="h-4 w-4 text-primary" /> 14-day free trial</span>
+          <span className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> TLS 1.3 encrypted</span>
         </div>
       </div>
 
@@ -124,7 +124,7 @@ export default function Landing() {
       <section id="features" className="max-w-7xl mx-auto px-6 py-24">
         <div className="grid lg:grid-cols-12 gap-8 mb-16">
           <div className="lg:col-span-5">
-            <p className="label-overline text-emerald">What's inside</p>
+            <p className="label-overline text-primary">What's inside</p>
             <h2 className="text-4xl lg:text-5xl tracking-tight mt-3 font-medium">Six tools, one premium brain.</h2>
           </div>
           <div className="lg:col-span-6 lg:col-start-7 text-muted-foreground leading-relaxed">
@@ -134,7 +134,7 @@ export default function Landing() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {FEATURES.map(({ icon: Icon, title, desc }) => (
             <div key={title} data-testid={`feature-${title.toLowerCase().replace(/\s+/g, "-")}`} className="rounded-2xl border border-border p-6 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 bg-card">
-              <div className="w-10 h-10 rounded-xl bg-secondary grid place-items-center mb-4"><Icon className="h-5 w-5 text-emerald" /></div>
+              <div className="w-10 h-10 rounded-xl bg-secondary grid place-items-center mb-4"><Icon className="h-5 w-5 text-primary" /></div>
               <h3 className="text-lg tracking-tight font-medium mb-2">{title}</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
             </div>
@@ -151,7 +151,7 @@ export default function Landing() {
             <p className="text-muted-foreground mt-4 leading-relaxed">Penni is the only platform that natively understands Jewish life. Auto-calculates Maaser on every paycheck, forecasts Pesach 6 weeks ahead, and tracks every penny of Tzedakah for the year-end.</p>
             <ul className="mt-6 space-y-2 text-sm">
               {["10% Maaser automation", "Tzedakah ledger with receipts", "Yom Tov spending forecasts", "Hebrew calendar integration"].map((t) => (
-                <li key={t} className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald" /> {t}</li>
+                <li key={t} className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> {t}</li>
               ))}
             </ul>
           </div>
@@ -164,7 +164,7 @@ export default function Landing() {
             ))}
             <div className="flex items-center justify-between pt-4 mt-2 border-t border-border">
               <span className="label-overline">Total Given</span>
-              <span className="text-xl font-medium tracking-tight text-emerald">£286.00</span>
+              <span className="text-xl font-medium tracking-tight text-primary">£286.00</span>
             </div>
           </div>
         </div>
@@ -173,7 +173,7 @@ export default function Landing() {
       {/* Pricing */}
       <section id="pricing" className="max-w-5xl mx-auto px-6 py-24">
         <div className="text-center mb-12">
-          <p className="label-overline text-emerald">Pricing</p>
+          <p className="label-overline text-primary">Pricing</p>
           <h2 className="text-4xl lg:text-5xl tracking-tight mt-3 font-medium">Simple. Honest. Premium when you need it.</h2>
         </div>
         <div className="grid md:grid-cols-2 gap-6">
@@ -192,12 +192,12 @@ export default function Landing() {
           </div>
           <div className="rounded-3xl border-2 border-emerald p-8 bg-card relative overflow-hidden">
             <span className="absolute top-4 right-4 text-xs px-3 py-1 rounded-full gradient-emerald text-white">Most popular</span>
-            <p className="label-overline text-emerald">Premium</p>
+            <p className="label-overline text-primary">Premium</p>
             <p className="text-4xl tracking-tight mt-2 font-medium">£5<span className="text-base text-muted-foreground">/mo</span></p>
             <p className="text-sm text-muted-foreground mt-2">Everything you'll ever need.</p>
             <ul className="mt-6 space-y-2 text-sm">
               {["Unlimited Claude Sonnet 4.5 AI","UK bank sync (TrueLayer)","PDF & SMS parsing","Investment forecasting","Premium reports + PDF","Auto-Maaser & Tzedakah"].map((t)=>(
-                <li key={t} className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald" /> {t}</li>
+                <li key={t} className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> {t}</li>
               ))}
             </ul>
             <Button variant="primary" size="pill" asChild className="mt-8 w-full">

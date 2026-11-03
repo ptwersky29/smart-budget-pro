@@ -98,7 +98,7 @@ export default function Login() {
             <div>
               <div className="flex items-center justify-between">
                 <label htmlFor="login-password" className="label-overline">Password</label>
-                <Link to="/forgot-password" className="text-xs text-emerald hover:underline">Forgot password?</Link>
+                <Link to="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>
               </div>
               <div className="relative mt-1">
                 <Input
@@ -177,14 +177,14 @@ export default function Login() {
 
           <p className="text-xs text-muted-foreground mt-6 text-center">
             No account?{" "}
-            <Link to="/register" className="text-emerald hover:underline">Create one free</Link>
+            <Link to="/register" className="text-primary hover:underline">Create one free</Link>
           </p>
 
           {/* Trust bar */}
           <div className="mt-8 flex items-center justify-center gap-4 text-xs text-muted-foreground border-t border-border pt-6">
-            <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-emerald" /> 256-bit encrypted</span>
-            <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-emerald" /> TLS 1.3</span>
-            <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-emerald" /> Cancel anytime</span>
+            <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-primary" /> 256-bit encrypted</span>
+            <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-primary" /> TLS 1.3</span>
+            <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-primary" /> Cancel anytime</span>
           </div>
         </div>
       </div>

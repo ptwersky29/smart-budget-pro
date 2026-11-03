@@ -80,7 +80,7 @@ export default function MorePage() {
         <div className="space-y-4">
           <Surface className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-emerald text-base font-semibold text-white shadow-md shadow-emerald/20">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary text-base font-semibold text-white shadow-md shadow-emerald/20">
                 {initials}
               </span>
               <div className="min-w-0">

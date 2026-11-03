@@ -53,7 +53,7 @@ export default React.memo(function AppearanceSettings() {
               disabled={saving}
               className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border text-sm transition-all ${
                 settings.theme === value
-                  ? "border-emerald bg-emerald/5 text-emerald ring-1 ring-emerald/20"
+                  ? "border-primary bg-primary/5 text-primary ring-1 ring-primary/20"
                   : "border-border bg-card/50 text-muted-foreground hover:border-muted-foreground/30"
               }`}
             >
@@ -91,7 +91,7 @@ export default React.memo(function AppearanceSettings() {
           className="space-y-2"
         >
           {DENSITIES.map(({ value, label, desc }) => (
-            <div key={value} className="flex items-start gap-3 p-3 rounded-xl border border-border has-[:checked]:border-emerald/30 has-[:checked]:bg-emerald/5 transition-colors">
+            <div key={value} className="flex items-start gap-3 p-3 rounded-xl border border-border has-[:checked]:border-primary/30 has-[:checked]:bg-primary/5 transition-colors">
               <RadioGroupItem value={value} id={`density-${value}`} className="mt-0.5" />
               <Label htmlFor={`density-${value}`} className="flex flex-col cursor-pointer">
                 <span className="text-sm font-medium">{label}</span>
@@ -113,7 +113,7 @@ export default React.memo(function AppearanceSettings() {
           className="space-y-2"
         >
           {FONT_SIZES.map(({ value, label, desc }) => (
-            <div key={value} className="flex items-start gap-3 p-3 rounded-xl border border-border has-[:checked]:border-emerald/30 has-[:checked]:bg-emerald/5 transition-colors">
+            <div key={value} className="flex items-start gap-3 p-3 rounded-xl border border-border has-[:checked]:border-primary/30 has-[:checked]:bg-primary/5 transition-colors">
               <RadioGroupItem value={value} id={`font-${value}`} className="mt-0.5" />
               <Label htmlFor={`font-${value}`} className="flex flex-col cursor-pointer">
                 <span className="text-sm font-medium">{label}</span>
