@@ -144,3 +144,14 @@
 @media(prefers-reduced-motion:reduce) {
   .penni-v2 *,.penni-v2 *::before,.penni-v2 *::after {animation-duration:.01ms!important;transition-duration:.01ms!important;}
 }
+
+/* At tablet/desktop sizes the global 68px sticky header owns the page title.
+ * Keep each page's own buttons, back navigation and filters in the workspace. */
+@media(min-width:768px) {
+  .penni-v2 .penni-inner-page-header .penni-inner-title,
+  .penni-v2 .penni-inner-page-header .penni-inner-description,
+  .penni-v2 .penni-inner-page-header .penni-inner-eyebrow { display:none; }
+  .penni-v2 .penni-inner-page-header { align-items:center; min-height:0; }
+  .penni-v2 .penni-inner-page-header .min-w-0:empty { display:none; }
+  .penni-v2 .app-main-scroll { padding-bottom:24px; }
+}
