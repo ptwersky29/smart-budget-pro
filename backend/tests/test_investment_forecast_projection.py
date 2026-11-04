@@ -1,7 +1,7 @@
 """Investment forecast financial correctness: independent monthly recurrence."""
-from investments import calculate_projection
-
 import pytest
+
+from investments import calculate_projection
 
 
 def expected_balance(principal, monthly, annual_rate, months):
