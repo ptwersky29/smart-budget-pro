@@ -23,6 +23,21 @@ describe("Penni consistent workspace and overlay contracts", () => {
     expect(css).toContain(".penni-v2.penni-menu-content { z-index: var(--penni-z-menu); }");
   });
 
+  test("action toolbars cannot collapse underneath account summary cards", () => {
+    const page = src("components/ui/page.jsx");
+    const workspace = src("components/ui/workspace.jsx");
+    const css = src("design-system/penni-reference.css");
+    expect(page).toContain("penni-inner-page-header flex shrink-0");
+    expect(workspace).toContain("min-h-10 shrink-0");
+    expect(css).toContain("min-height:44px; flex-shrink:0;");
+    expect(src("pages/AccountsPage.jsx")).toContain('className="penni-accounts-toolbar"');
+  });
+  test("transaction add control is one primary button plus a separate options menu", () => {
+    const tx = src("pages/Transactions.jsx");
+    expect(tx).toContain("penni-primary-action inline-flex");
+    expect(tx).not.toContain('items-stretch overflow-hidden rounded-[10px] bg-emerald');
+    expect(tx).toContain('aria-label="Transaction options"');
+  });
   test("select controls advertise listbox semantics and use usable popover widths", () => {
     const select = src("components/PenniSelect.jsx");
     const category = src("components/CategoryCombobox.jsx");

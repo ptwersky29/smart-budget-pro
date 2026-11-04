@@ -5,7 +5,7 @@ import { LayoutGrid, List } from "lucide-react";
 // remain page-specific; spacing, controls and accessible states do not.
 export function WorkspaceHeader({ title, description, actions }) {
   return (
-    <header className="penni-inner-page-header workspace-page-header flex shrink-0 flex-wrap items-start justify-between gap-3">
+    <header className="penni-inner-page-header workspace-page-header relative z-[1] flex min-h-10 shrink-0 flex-wrap items-center justify-between gap-3">
       <div className="min-w-0">
         <h1 className="penni-inner-title text-[26px] font-semibold leading-tight tracking-[-0.035em]">{title}</h1>
         {description && <p className="penni-inner-description mt-2 text-[13px] leading-relaxed text-muted-foreground">{description}</p>}

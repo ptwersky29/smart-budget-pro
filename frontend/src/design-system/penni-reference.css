@@ -147,13 +147,34 @@
   .penni-v2 *,.penni-v2 *::before,.penni-v2 *::after {animation-duration:.01ms!important;transition-duration:.01ms!important;}
 }
 
+/* Prevent page controls collapsing underneath the next scrollable panel. */
+.penni-v2 .penni-inner-page-header {
+  position:relative;
+  z-index:2;
+  flex:0 0 auto;
+  min-height:44px;
+}
+.penni-v2 .penni-accounts-toolbar {
+  flex:0 0 auto;
+  min-height:44px;
+  isolation:isolate;
+}
+.penni-v2 .penni-accounts-toolbar > :last-child {
+  min-height:40px;
+  max-width:100%;
+}
+.penni-v2 .accounts-workspace > .accounts-panels {
+  position:relative;
+  z-index:0;
+  min-height:0;
+}
 /* At tablet/desktop sizes the global 68px sticky header owns the page title.
  * Keep each page's own buttons, back navigation and filters in the workspace. */
 @media(min-width:768px) {
   .penni-v2 .penni-inner-page-header .penni-inner-title,
   .penni-v2 .penni-inner-page-header .penni-inner-description,
   .penni-v2 .penni-inner-page-header .penni-inner-eyebrow { display:none; }
-  .penni-v2 .penni-inner-page-header { align-items:center; min-height:0; }
+  .penni-v2 .penni-inner-page-header { align-items:center; min-height:44px; flex-shrink:0; }
   .penni-v2 .penni-inner-page-header .min-w-0:empty { display:none; }
   .penni-v2 .app-main-scroll { padding-bottom:24px; }
 }
@@ -282,7 +303,7 @@
 .penni-v2 .transactions-primary button[data-testid="add-transaction"],
 .penni-v2 .budget-workspace .workspace-page-header .bg-emerald {
   background:var(--penni-accent);
-  border-radius:14px;
+  border-radius:12px;
   color:white;
   box-shadow:0 8px 24px -12px var(--penni-accent);
 }
@@ -592,6 +613,20 @@ html.dark[data-penni-accent="violet"] .penni-v2 {--penni-accent:#a07bff;}
 .penni-v2 .accounts-workspace .penni-account-history-list {
   max-height:none;
   overflow:visible;
+}
+/* Keep actions in their own row when the viewport narrows. */
+@media (max-width:767px) {
+ .penni-v2 .penni-accounts-toolbar {align-items:stretch;gap:10px;}
+ .penni-v2 .penni-accounts-toolbar > :last-child {
+   display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-start;
+ }
+ .penni-v2 .transactions-primary .workspace-page-header > :last-child {
+   width:100%;justify-content:flex-start;
+ }
+}
+@media (min-width:768px) {
+ .penni-v2 .penni-accounts-toolbar > :first-child {display:none;}
+ .penni-v2 .penni-accounts-toolbar > :last-child {margin-left:auto;}
 }
 /* Only transaction form fields scroll inside the NativePopup: title and action
    bar stay visible when the virtual keyboard or 200% zoom shrinks the viewport. */

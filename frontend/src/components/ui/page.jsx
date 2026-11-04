@@ -91,7 +91,7 @@ export function PageHeader({
 
   return (
     <div className={cn(
-        "penni-inner-page-header flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between",
+        "penni-inner-page-header flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between",
         !actions && !backTo && !onBack && !children && "penni-page-heading-only",
         className
       )}>

@@ -334,6 +334,7 @@ export default function AccountsPage() {
   return (
     <div className="accounts-workspace page-stack pb-4">
       <PageHeader
+        className="penni-accounts-toolbar"
         eyebrow="Accounts & Import"
         title="Accounts"
         description="All your bank accounts, savings and manual balances, kept in one place."
