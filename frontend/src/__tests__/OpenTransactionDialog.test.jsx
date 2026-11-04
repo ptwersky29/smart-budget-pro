@@ -68,6 +68,8 @@ test("Add transaction shows actionable errors instead of silently doing nothing"
   render(<ActionProvider><NewTransactionLauncher/><GlobalActionHost/></ActionProvider>);
   fireEvent.click(screen.getByRole("button",{name:"New transaction"}));
   await screen.findByRole("dialog",{name:"New transaction"});
+  // The single account is selected asynchronously after the dialog opens.
+  await waitFor(() => expect(screen.getByRole("button",{name:"Choose option"})).toHaveTextContent("Current"));
   fireEvent.click(screen.getByTestId("tx-submit"));
   expect(await screen.findByRole("alert")).toHaveTextContent("Enter an amount greater than zero.");
   expect(api.post).not.toHaveBeenCalled();
