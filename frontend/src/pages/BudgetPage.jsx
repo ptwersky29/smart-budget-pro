@@ -34,7 +34,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "../components/ui/sheet";
-import TransactionForm from "../components/TransactionForm";
 import CategoryPieChart from "../components/CategoryPieChart";
 import TransactionInspectorPanel from "../components/TransactionInspectorPanel";
 import { WorkspaceHeader, WorkspaceMetric, WorkspaceMetrics, WorkspaceTabs, WorkspaceViewToggle, WorkspaceBlank, WorkspaceSkeleton } from "../components/ui/workspace";
@@ -447,7 +446,6 @@ export default React.memo(function BudgetPage() {
   budgetsRef.current = budgets;
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
-  const [editingId, setEditingId] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null); // { type: 'budget'|'group', id }
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkSelected, setBulkSelected] = useState(new Set());
@@ -483,8 +481,6 @@ export default React.memo(function BudgetPage() {
   const [budgetTxLoading, setBudgetTxLoading] = useState(false);
   const [inspectedBudgetTx, setInspectedBudgetTx] = useState(null);
   const [accountOptions, setAccountOptions] = useState([]);
-  const [txEditForm, setTxEditForm] = useState(null);
-  const [txEditId, setTxEditId] = useState(null);
 
   const openBudgetTransactions = useCallback(async (budget) => {
     setBudgetTxCategory(budget.category);
@@ -501,31 +497,13 @@ export default React.memo(function BudgetPage() {
     finally { setBudgetTxLoading(false); }
   }, [month, year, mNum]);
 
-  const openTxEdit = useCallback((tx) => {
+  // The same app-wide editor is used in Transactions and from budget details.
+  const openTxEdit = useCallback((transaction) => {
     setBudgetTxOpen(false);
-    setTxEditId(tx.transaction_id);
-    setTxEditForm({
-      description: tx.description || "",
-      date: tx.date?.slice(0, 10) || "",
-      amount: String(Math.abs(tx.amount)),
-      category: tx.category || "",
-      account_id: tx.account_id || "",
-      entry_mode: "standard",
-      is_income: tx.amount > 0,
-      is_transfer: false,
-      exclude_from_maaser: tx.exclude_from_maaser || false,
-      budget_type: "",
-      occasion: "",
-      merchant: tx.merchant || "",
-      notes: tx.notes || "",
-    });
-  }, []);
+    setInspectedBudgetTx(null);
+    openAction("transaction-edit", { transaction });
+  }, [openAction]);
 
-  const closeTxEdit = useCallback(() => {
-    setTxEditId(null);
-    setTxEditForm(null);
-    setBudgetTxOpen(true);
-  }, []);
   const monthLabel = `${MONTH_NAMES[mNum - 1]} ${year}`;
   const isCurrentMonth = month === fmtMonth(now.getFullYear(), now.getMonth() + 1);
   const daysInMonth = useMemo(() => getDaysInMonth(new Date(year, mNum - 1)), [year, mNum]);
@@ -656,34 +634,6 @@ export default React.memo(function BudgetPage() {
     }
   }, [month]);
 
-  const handleTxEditSubmit = useCallback(async (e) => {
-    e.preventDefault();
-    if (!txEditForm || !txEditId) return;
-    const payload = {
-      description: txEditForm.description,
-      amount: txEditForm.is_income ? Math.abs(parseFloat(txEditForm.amount)) : -Math.abs(parseFloat(txEditForm.amount)),
-      category: txEditForm.category,
-      date: txEditForm.date,
-      merchant: txEditForm.merchant || undefined,
-      notes: txEditForm.notes || undefined,
-      is_income: txEditForm.is_income,
-      account_id: txEditForm.account_id || undefined,
-    };
-    try {
-      await api.patch(`/transactions/${txEditId}`, payload);
-      toast.success("Transaction updated");
-      closeTxEdit();
-      const lastDay = getDaysInMonth(new Date(year, mNum - 1));
-      const { data } = await api.get("/transactions", {
-        params: { category: budgetTxCategory, date_from: `${month}-01`, date_to: `${month}-${String(lastDay).padStart(2, "0")}` },
-      });
-      setBudgetTxList(data.transactions || []);
-      await fetchData();
-    } catch (err) {
-      toast.error(err.response?.data?.detail || "Could not update");
-    }
-  }, [txEditForm, txEditId, budgetTxCategory, month, year, mNum, closeTxEdit, fetchData]);
-
   const fetchCategories = useCallback(async () => {
     try {
       const { data } = await api.get("/categories");
@@ -728,6 +678,10 @@ export default React.memo(function BudgetPage() {
   const resetForm = () => setForm({ category: "", limit: "", budget_type: "everyday", event_date: "", event_group_id: "", event_group_name: "" });
   const resetQuickForm = () => setQuickForm({ amount: "", description: "", category: "", showDesc: false });
   const openAddBudget = (budgetType = "everyday", category = "") => {
+    if (budgetType !== "event") {
+      openAction("budget-new", { category, month });
+      return;
+    }
     resetForm();
     setAddTab("budget");
     setForm((prev) => ({ ...prev, budget_type: budgetType, category }));
@@ -818,38 +772,9 @@ export default React.memo(function BudgetPage() {
     }
   };
 
-  const startEdit = useCallback((b) => {
-    setEditingId(b.budget_id);
-    setForm({
-      category: b.category,
-      limit: String(b.limit),
-      budget_type: b.budget_type || "everyday",
-      event_date: b.event_date ? b.event_date.slice(0, 10) : "",
-      event_group_id: b.event_group_id || "",
-      event_group_name: b.event_group_name || "",
-    });
-  }, []);
-
-  const cancelEdit = useCallback(() => { setEditingId(null); resetForm(); }, []);
-
-  const handleUpdate = useCallback(async (id) => {
-    if (!form.category.trim() || !form.limit) { toast.error("Enter a category and amount"); return; }
-    const payload = { category: form.category.toLowerCase().trim(), limit: parseFloat(form.limit) };
-    if (form.budget_type === "event") payload.event_date = form.event_date || null;
-    const old = budgetsRef.current.find(b => b.budget_id === id);
-    setBudgets(prev => prev.map(b => b.budget_id === id ? { ...b, ...payload } : b));
-    cancelEdit();
-    withUndo({
-      action: () => api.patch(`/budgets/${id}`, payload),
-      undo: async () => {
-        if (old) setBudgets(prev => prev.map(b => b.budget_id === id ? old : b));
-        await fetchData();
-      },
-      onError: () => { if (old) setBudgets(prev => prev.map(b => b.budget_id === id ? old : b)); },
-      successMsg: "Budget updated",
-      errorMsg: "Could not update",
-    });
-  }, [form, cancelEdit, fetchData]);
+  const startEdit = useCallback((budget) => {
+    openAction("budget-edit", { budget });
+  }, [openAction]);
 
   const handleDelete = async (item) => {
     if (item.type === "group") {
@@ -1083,7 +1008,7 @@ export default React.memo(function BudgetPage() {
           <h3 className="text-xl font-medium">No budgets yet</h3>
           <p className="text-sm text-muted-foreground mt-1.5 mb-6 max-w-sm mx-auto">Create your first spending limit or planned event to start tracking.</p>
           <div className="flex items-center justify-center gap-3">
-            <Button variant="primary" size="pill" onClick={() => { setAddTab("budget"); setShowAdd(true); }}>
+            <Button variant="primary" size="pill" onClick={() => openAddBudget("everyday")}>
               <Plus className="h-4 w-4 mr-1.5" /> Create budget
             </Button>
             <Button variant="outlinePill" size="pill" onClick={handleSeedDefaults} disabled={seeding}>
@@ -1518,29 +1443,6 @@ export default React.memo(function BudgetPage() {
       )}
 
 
-      {/* Keep budget editing available in the desktop workspace, where cards are hidden. */}
-      <Sheet open={Boolean(editingId)} onOpenChange={(open) => { if (!open) cancelEdit(); }}>
-        <SheetContent side="right" className="w-full sm:max-w-md">
-          <SheetHeader>
-            <SheetTitle>Edit budget</SheetTitle>
-          </SheetHeader>
-          <form className="mt-6 space-y-5" onSubmit={(event) => { event.preventDefault(); if (editingId) handleUpdate(editingId); }}>
-            <div className="space-y-2">
-              <label className="block text-sm font-medium" htmlFor="budget-edit-category">Category</label>
-              <Input id="budget-edit-category" value={form.category} onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))} required />
-            </div>
-            <div className="space-y-2">
-              <label className="block text-sm font-medium" htmlFor="budget-edit-limit">Monthly limit (£)</label>
-              <Input id="budget-edit-limit" type="number" min="0" step="0.01" value={form.limit} onChange={(event) => setForm((prev) => ({ ...prev, limit: event.target.value }))} required />
-            </div>
-            <div className="flex justify-end gap-2 border-t border-border pt-4">
-              <Button type="button" variant="outlinePill" onClick={cancelEdit}>Cancel</Button>
-              <Button type="submit" variant="primary">Save changes</Button>
-            </div>
-          </form>
-        </SheetContent>
-      </Sheet>
-
       <ConfirmModal
         open={!!confirmDelete}
         title={confirmDelete?.type === "group" ? "Delete this event?" : "Remove this budget?"}
@@ -1621,20 +1523,6 @@ export default React.memo(function BudgetPage() {
           />
         </SheetContent>
       </Sheet>
-      {/* Transaction Edit Modal */}
-      {txEditForm && (
-        <TransactionForm
-          open={!!txEditForm}
-          editingId={txEditId}
-          form={txEditForm}
-          setForm={setTxEditForm}
-          onClose={closeTxEdit}
-          onSubmit={handleTxEditSubmit}
-          selectedCats={allCats}
-          accounts={accountOptions}
-          accountsLoading={false}
-        />
-      )}
     </div>
   );
 });

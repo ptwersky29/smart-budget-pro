@@ -20,6 +20,7 @@ export function BudgetActionForm({ budget, category, month, categories, onSaved 
   const [eventDate, setEventDate] = useState(budget?.event_date?.slice(0, 10) || "");
   const [eventName, setEventName] = useState(budget?.event_group_name || "");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   useEffect(() => {
     setCategoryName(budget?.category || category || "");
     setAmount(budget?.limit == null ? "" : String(budget.limit));
@@ -27,8 +28,15 @@ export function BudgetActionForm({ budget, category, month, categories, onSaved 
   }, [budget, category]);
   const submit = async e => {
     e.preventDefault();
-    if (!categoryName.trim() || !Number.isFinite(Number(amount)) || Number(amount) < 0 || amount === "") { toast.error("Enter a category and valid budget amount"); return; }
-    if (type === "event" && !budget && !eventName.trim()) { toast.error("Enter an event name"); return; }
+    if (!categoryName.trim() || !Number.isFinite(Number(amount)) || Number(amount) < 0 || amount === "") {
+      setError("Choose a category and enter a valid budget amount.");
+      return;
+    }
+    if (type === "event" && !budget && !eventName.trim()) {
+      setError("Enter a name for this event.");
+      return;
+    }
+    setError("");
     setSaving(true);
     try {
       if (budget?.budget_id) {
@@ -41,23 +49,60 @@ export function BudgetActionForm({ budget, category, month, categories, onSaved 
       }
       toast.success(budget ? "Budget updated" : "Budget created");
       onSaved?.();
-    } catch (error) { toast.error(formatApiError(error.response?.data?.detail) || "Could not save budget"); }
-    finally { setSaving(false); }
+    } catch (requestError) {
+      const message = formatApiError(requestError) || "Could not save budget.";
+      setError(message);
+      toast.error(message);
+    } finally { setSaving(false); }
   };
-  return <form onSubmit={submit} className="space-y-4">
-    {!budget && <div className="flex rounded-xl bg-secondary/60 p-1 text-xs font-medium">
-      <button type="button" onClick={()=>setType("everyday")} className={`flex-1 rounded-lg p-2 ${type==="everyday"?"bg-card text-foreground shadow-sm":"text-muted-foreground"}`}>Monthly</button>
-      <button type="button" onClick={()=>setType("event")} className={`flex-1 rounded-lg p-2 ${type==="event"?"bg-card text-foreground shadow-sm":"text-muted-foreground"}`}>Event</button>
-    </div>}
-    {type==="event" && !budget && <div><label className="mb-1.5 block text-xs font-medium">Event name</label><input required value={eventName} onChange={e=>setEventName(e.target.value)} placeholder="e.g. Pesach" className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"/></div>}
-    {type==="event" && <div><label className="mb-1.5 block text-xs font-medium">Event date</label><input type="date" value={eventDate} onChange={e=>setEventDate(e.target.value)} className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"/></div>}
-    <div><label className="mb-1.5 block text-xs font-medium">Category</label>
-      <CategoryCombobox value={categoryName} onChange={setCategoryName} categories={categories} placeholder="Choose a category"/>
+  return <form onSubmit={submit} className="penni-native-form space-y-5 px-1 pb-1" noValidate>
+    {!budget && (
+      <div className="grid grid-cols-2 gap-1 rounded-2xl border border-border bg-secondary/30 p-1" role="group" aria-label="Budget type">
+        <button type="button" aria-pressed={type === "everyday"} onClick={() => { setType("everyday"); setError(""); }}
+          className={`rounded-xl px-4 py-2.5 text-sm font-medium transition-all ${type === "everyday" ? "bg-card text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:text-foreground"}`}>
+          Monthly
+        </button>
+        <button type="button" aria-pressed={type === "event"} onClick={() => { setType("event"); setError(""); }}
+          className={`rounded-xl px-4 py-2.5 text-sm font-medium transition-all ${type === "event" ? "bg-card text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:text-foreground"}`}>
+          Event
+        </button>
+      </div>
+    )}
+    {type === "event" && !budget && (
+      <div className="space-y-1.5">
+        <label htmlFor="penni-budget-event-name" className="block text-xs font-medium text-muted-foreground">Event name</label>
+        <input id="penni-budget-event-name" required value={eventName}
+          onChange={e => { setEventName(e.target.value); setError(""); }} placeholder="e.g. Pesach"
+          className="h-11 w-full rounded-xl border border-border bg-secondary/30 px-3 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/25"/>
+      </div>
+    )}
+    {type === "event" && (
+      <div className="space-y-1.5">
+        <label htmlFor="penni-budget-event-date" className="block text-xs font-medium text-muted-foreground">Event date</label>
+        <input id="penni-budget-event-date" type="date" value={eventDate}
+          onChange={e => setEventDate(e.target.value)}
+          className="h-11 w-full rounded-xl border border-border bg-secondary/30 px-3 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/25"/>
+      </div>
+    )}
+    <div className="space-y-1.5">
+      <span className="block text-xs font-medium text-muted-foreground">Category <span aria-hidden="true">*</span></span>
+      <CategoryCombobox value={categoryName} onChange={value => { setCategoryName(value); setError(""); }}
+        categories={categories} placeholder="Choose a category" />
     </div>
-    <div><label className="mb-1.5 block text-xs font-medium">Budget limit (£)</label>
-      <input type="number" min="0" step="0.01" required value={amount} onChange={e=>setAmount(e.target.value)} className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm" placeholder="0.00"/>
+    <div className="space-y-1.5">
+      <label htmlFor="penni-budget-limit" className="block text-xs font-medium text-muted-foreground">Budget limit (£) <span aria-hidden="true">*</span></label>
+      <input id="penni-budget-limit" type="number" inputMode="decimal" min="0" step="0.01" required
+        value={amount} onChange={e => { setAmount(e.target.value); setError(""); }}
+        className="h-11 w-full rounded-xl border border-border bg-secondary/30 px-3 text-sm tabular-nums outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/25"
+        placeholder="0.00"/>
     </div>
-    <Button type="submit" variant="primary" disabled={saving} className="w-full">{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}{budget ? "Save changes" : "Create budget"}</Button>
+    {error && <p role="alert" className="rounded-xl border border-ruby/30 bg-ruby/5 px-3 py-2.5 text-sm text-ruby">{error}</p>}
+    <div className="flex justify-end gap-2 border-t border-border/60 pt-4">
+      <Button type="submit" variant="primary" disabled={saving} className="min-w-[160px]">
+        {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+        {budget ? "Save changes" : "Create budget"}
+      </Button>
+    </div>
   </form>;
 }
 

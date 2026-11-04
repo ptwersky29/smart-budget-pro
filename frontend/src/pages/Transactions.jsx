@@ -38,7 +38,7 @@ import TransactionRow from "../components/TransactionRow";
 import TransactionInspectorPanel from "../components/TransactionInspectorPanel";
 import { getBankLogoOrFallback, pickBankInstitution } from "../data/bankLogos";
 const CategoryPieChart = React.lazy(() => import("../components/CategoryPieChart"));
-import TransactionForm from "../components/TransactionForm";
+import { useActions } from "../contexts/ActionContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { useSwipe } from "../hooks/useSwipe";
@@ -48,7 +48,6 @@ import CategoryCombobox from "../components/CategoryCombobox";
 import CategoryBadge from "../components/CategoryBadge";
 
 const SOURCE_LABELS = { manual: "Manual", csv: "CSV", pdf: "PDF", statement: "Statement", sms: "SMS" };
-const emptyForm = { description: "", date: today(), amount: "", category: "", entry_mode: "standard", is_income: false, is_transfer: false, budget_type: "", occasion: "", merchant: "", notes: "", account_id: "", exclude_from_maaser: false };
 
 function today() {
   const d = new Date();
@@ -243,20 +242,14 @@ function TransactionInspector({ transaction, onClose, onEdit, onDelete, onApprov
 const Transactions = React.memo(function Transactions() {
   useEffect(() => { document.title = "Transactions | Penni"; }, []);
   const { openAssistant } = useAssistant();
+  const { openAction } = useActions();
   const [txs, setTxs] = useState([]);
   const [total, setTotal] = useState(0);
   const [incomeTotal, setIncomeTotal] = useState(0);
   const [expenseTotal, setExpenseTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState(emptyForm);
   const [selectedCats, setSelectedCats] = useState({ categories: [], hierarchy: {} });
   const [accounts, setAccounts] = useState([]);
-  const [accountsLoading, setAccountsLoading] = useState(false);
-  const [classifying, setClassifying] = useState(false);
-  const [classification, setClassification] = useState(null);
-  const [saveAsRecurring, setSaveAsRecurring] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState("ledger");
@@ -443,7 +436,7 @@ const Transactions = React.memo(function Transactions() {
 
   const handleMaaserGive = () => {
     if (!maaserSum || maaserSum.balance_owed <= 0) {
-      toast.success("Nothing owed â€” you're up to date!");
+      toast.success("Nothing owed — you're up to date!");
       return;
     }
     setMaaserGiveAmount(maaserSum.balance_owed.toFixed(2));
@@ -632,12 +625,10 @@ const Transactions = React.memo(function Transactions() {
   useEffect(() => { loadCats(); }, [loadCats]);
 
   const loadAccounts = useCallback(async () => {
-    setAccountsLoading(true);
     try {
       const { data } = await api.get("/accounts");
       setAccounts(data.accounts || []);
     } catch { toast.error("Could not load accounts"); }
-    finally { setAccountsLoading(false); }
   }, []);
   useEffect(() => { loadAccounts(); }, [loadAccounts]);
 
@@ -756,39 +747,15 @@ const Transactions = React.memo(function Transactions() {
 
   const totalPages = Math.ceil(total / limit);
   const currentPage = Math.floor(offset / limit) + 1;
-  const defaultAccountId = useMemo(() => {
-    const manual = accounts.find((a) => a.is_offline || a.provider === "manual");
-    return manual?.account_id || accounts[0]?.account_id || "";
-  }, [accounts]);
-
+  // Every Add/Edit entry point opens the shared native transaction editor.
   const openAdd = useCallback(() => {
-    setEditingId(null);
-    setForm({ ...emptyForm, date: today(), account_id: filters.account_id || defaultAccountId });
-    setOpen(true);
-  }, [defaultAccountId, filters.account_id]);
-  const openEdit = useCallback((t) => {
-    setEditingId(t.transaction_id);
-    setForm({ description: t.description || "", date: t.date?.slice(0, 10) || today(), amount: String(Math.abs(t.amount)), category: t.category || "", account_id: t.account_id || "", entry_mode: t.is_transfer ? "transfer" : t.is_split ? "split" : "standard", is_income: t.amount > 0, is_transfer: t.is_transfer || false, exclude_from_maaser: t.exclude_from_maaser || false, budget_type: "", occasion: "", merchant: t.merchant || "", notes: t.notes || "" });
-    setOpen(true);
-  }, []);
-  const closeForm = useCallback(() => { setOpen(false); setEditingId(null); setForm({ ...emptyForm, date: today() }); setClassification(null); setSaveAsRecurring(false); }, []);
-
-  const handleClassify = useCallback(async ({ description, amount }) => {
-    if (!description.trim() || !amount) return;
-    setClassifying(true);
-    setClassification(null);
-    try {
-      const { data } = await api.post("/budget-system/classify", { description: description.trim(), amount });
-      setClassification(data);
-      // Auto-fill category from top suggestion if very confident (â‰¥ 95%)
-      const top = data.suggestions?.[0];
-      if (top && top.confidence >= 0.95 && !form.category) {
-        setForm(prev => ({ ...prev, category: top.category, budget_type: top.budget_type || "", occasion: top.occasion || "", merchant: top.merchant || "" }));
-      }
-      if (top?.recurring) setSaveAsRecurring(true);
-    } catch { toast.error("Classification failed"); }
-    finally { setClassifying(false); }
-  }, [form.category]);
+    openAction("transaction-new", filters.account_id ? { accountId: filters.account_id } : {});
+  }, [openAction, filters.account_id]);
+  const openEdit = useCallback((transaction) => {
+    setInspectorOpen(false);
+    setInspectTx(null);
+    openAction("transaction-edit", { transaction });
+  }, [openAction]);
 
   const allDisplayed = aiResults?.transactions || txs;
   const splitTx = useCallback(async (t) => {
@@ -825,100 +792,6 @@ const Transactions = React.memo(function Transactions() {
     setTransferTargetId(selectedOtherId || "");
     setTransferOpen(true);
   }, [selectedIds, allDisplayed]);
-
-  const submit = useCallback(async (e) => {
-    e.preventDefault();
-    const amt = parseFloat(form.amount);
-    const signed = form.is_income ? Math.abs(amt) : -Math.abs(amt);
-    const shouldOpenSplit = form.entry_mode === "split" && !editingId;
-    const shouldOpenTransferPair = form.entry_mode === "transfer" && !editingId;
-    if (editingId) {
-      const payload = { description: form.description, amount: signed, category: form.category || undefined, date: form.date || today(), merchant: form.merchant || undefined, notes: form.notes || undefined, is_income: form.is_income, is_transfer: form.is_transfer || undefined, exclude_from_maaser: form.exclude_from_maaser || undefined, account_id: form.account_id || undefined };
-      const old = txsRef.current.find(t => t.transaction_id === editingId);
-      setTxs(prev => prev.map(t => t.transaction_id === editingId ? { ...t, ...payload } : t));
-      setOpen(false); setEditingId(null);
-      console.log("[DEBUG_EDIT] PATCH /transactions/" + editingId, JSON.stringify(payload));
-      withUndo({
-        action: async () => {
-          const res = await api.patch(`/transactions/${editingId}`, payload);
-          console.log("[DEBUG_EDIT] PATCH response status:", res.status, "data:", JSON.stringify(res.data));
-        },
-        undo: async () => {
-          if (old) { await api.patch(`/transactions/${editingId}`, { description: old.description, amount: old.amount, category: old.category || undefined, is_income: old.is_income, account_id: old.account_id || undefined }); }
-          await load();
-        },
-        onError: () => { if (old) setTxs(prev => prev.map(t => t.transaction_id === editingId ? old : t)); load(); },
-        successMsg: "Transaction updated",
-        errorMsg: "Could not update",
-      });
-    } else if ((classification || form.budget_type) && !shouldOpenSplit && !shouldOpenTransferPair) {
-      if (!form.account_id) { toast.error("Select an account first"); return; }
-      const suggestions = classification?.suggestions || [];
-      const chosenIdx = suggestions.findIndex(s => s.category === form.category);
-      setOpen(false); setEditingId(null);
-      const optimisticTx = { transaction_id: `optimistic-${Date.now()}`, description: form.description, amount: signed, category: form.category, date: form.date || today(), source: "manual", approval_status: "approved", category_approval_status: "approved", notes: form.notes, account_id: form.account_id };
-      setTxs(prev => [optimisticTx, ...prev]);
-      setTotal(prev => prev + 1);
-      if (signed > 0) setIncomeTotal(prev => Number(prev || 0) + signed);
-      else setExpenseTotal(prev => Number(prev || 0) + Math.abs(signed));
-      try {
-        const { data } = await api.post("/budget-system/approve", {
-          description: form.description.trim(), amount: signed,
-          budget_type: form.budget_type || suggestions[0]?.budget_type || "day_to_day",
-          occasion: form.occasion || suggestions[0]?.occasion || "Monthly Living",
-          category: form.category || suggestions[0]?.category || "uncategorized",
-          merchant: form.merchant || suggestions[0]?.merchant || "",
-          account_id: form.account_id,
-          suggestion_id: classification?.suggestion_id || null,
-          suggestion_index: chosenIdx >= 0 ? chosenIdx : null,
-          save_as_recurring: saveAsRecurring,
-        });
-        setTxs(prev => prev.map(t => t.transaction_id === optimisticTx.transaction_id ? data : t));
-        toast.success("Transaction added");
-      } catch {
-        setTxs(prev => prev.filter(t => t.transaction_id !== optimisticTx.transaction_id));
-        setTotal(prev => Math.max(0, prev - 1));
-        if (signed > 0) setIncomeTotal(prev => Math.max(0, Number(prev || 0) - signed));
-        else setExpenseTotal(prev => Math.max(0, Number(prev || 0) - Math.abs(signed)));
-        toast.error("Could not add");
-      }
-    } else {
-      if (!form.account_id) { toast.error("Select an account first"); return; }
-      const payload = { description: form.description, amount: signed, category: form.category || undefined, date: form.date || today(), merchant: form.merchant || undefined, notes: form.notes || undefined, account_id: form.account_id, is_income: form.is_income, is_transfer: form.is_transfer || undefined, exclude_from_maaser: form.exclude_from_maaser || undefined };
-      setOpen(false); setEditingId(null);
-      const optimisticTx = { transaction_id: `optimistic-${Date.now()}`, ...payload, date: payload.date, source: "manual", approval_status: "approved", category_approval_status: "approved" };
-      setTxs(prev => [optimisticTx, ...prev]);
-      if (!payload.is_transfer) {
-        setTotal(prev => prev + 1);
-        if (signed > 0) setIncomeTotal(prev => Number(prev || 0) + signed);
-        else setExpenseTotal(prev => Number(prev || 0) + Math.abs(signed));
-      }
-      withUndo({
-        action: async () => {
-          const { data } = await api.post("/transactions", payload);
-          setTxs(prev => prev.map(t => t.transaction_id === optimisticTx.transaction_id ? data : t));
-          if (shouldOpenSplit) splitTx(data);
-          if (shouldOpenTransferPair) pairTransfer(data);
-        },
-        undo: async () => {
-          await load();
-        },
-        onError: () => {
-          setTxs(prev => prev.filter(t => t.transaction_id !== optimisticTx.transaction_id));
-          if (!payload.is_transfer) {
-            setTotal(prev => Math.max(0, prev - 1));
-            if (signed > 0) setIncomeTotal(prev => Math.max(0, Number(prev || 0) - signed));
-            else setExpenseTotal(prev => Math.max(0, Number(prev || 0) - Math.abs(signed)));
-          }
-        },
-        successMsg: "Transaction added",
-        errorMsg: "Could not add",
-      });
-    }
-    setForm(emptyForm); setClassification(null); setSaveAsRecurring(false);
-  }, [editingId, form, load, classification, saveAsRecurring, pairTransfer, splitTx]);
-
-  const clearClassification = useCallback(() => { setClassification(null); setSaveAsRecurring(false); }, []);
 
   const transferCandidates = useMemo(() => {
     if (!transferTx) return [];
@@ -1690,8 +1563,8 @@ const Transactions = React.memo(function Transactions() {
                           <option value="">All sources</option>
                           {Object.entries(SOURCE_LABELS).map(([key, value]) => <option key={key} value={key}>{value}</option>)}
                         </PenniSelect>
-                        <Input type="number" min="0" step="0.01" placeholder="Min Â£" value={filters.amount_min} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, amount_min: event.target.value })); }} className="h-10 text-sm" />
-                        <Input type="number" min="0" step="0.01" placeholder="Max Â£" value={filters.amount_max} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, amount_max: event.target.value })); }} className="h-10 text-sm" />
+                        <Input type="number" min="0" step="0.01" placeholder="Min £" value={filters.amount_min} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, amount_min: event.target.value })); }} className="h-10 text-sm" />
+                        <Input type="number" min="0" step="0.01" placeholder="Max £" value={filters.amount_max} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, amount_max: event.target.value })); }} className="h-10 text-sm" />
                         <Input type="date" value={filters.date_from} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, date_from: event.target.value })); }} className="h-10 text-sm" />
                         <Input type="date" value={filters.date_to} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, date_to: event.target.value })); }} className="h-10 text-sm" />
                       </div>
@@ -2121,8 +1994,8 @@ const Transactions = React.memo(function Transactions() {
             const extraCharity = maaserTzedakahTxs.filter(t => !txIds.has(t.transaction_id));
             const all = [
               ...maaserLedger.map(e => ({ ...e, _type: "ledger" })),
-              ...extraIncome.map(t => ({ _type: "income", entry_id: `inc_${t.transaction_id}`, date: t.date, income_description: t.description || t.merchant || "â€”", income_category: t.category, income_amount: t.amount, maaser_due: 0, maaser_paid: 0, status: "income", transaction_id: t.transaction_id })),
-              ...extraCharity.map(t => ({ _type: "charity", entry_id: `tzd_${t.transaction_id}`, date: t.date, income_description: t.description || t.merchant || "â€”", income_category: t.category || t.merchant || "Tzedakah", income_amount: 0, maaser_due: 0, maaser_paid: Math.abs(t.amount), status: "given", transaction_id: t.transaction_id, paid_to: t.merchant || "Tzedakah" })),
+              ...extraIncome.map(t => ({ _type: "income", entry_id: `inc_${t.transaction_id}`, date: t.date, income_description: t.description || t.merchant || "—", income_category: t.category, income_amount: t.amount, maaser_due: 0, maaser_paid: 0, status: "income", transaction_id: t.transaction_id })),
+              ...extraCharity.map(t => ({ _type: "charity", entry_id: `tzd_${t.transaction_id}`, date: t.date, income_description: t.description || t.merchant || "—", income_category: t.category || t.merchant || "Tzedakah", income_amount: 0, maaser_due: 0, maaser_paid: Math.abs(t.amount), status: "given", transaction_id: t.transaction_id, paid_to: t.merchant || "Tzedakah" })),
             ].sort((a, b) => {
               const da = a.date || a.income_date || "";
               const db = b.date || b.income_date || "";
@@ -2235,7 +2108,7 @@ const Transactions = React.memo(function Transactions() {
               </div>
               <div className="space-y-4">
                 <div>
-                  <label className="label-overline">Amount (Â£)</label>
+                  <label className="label-overline">Amount (£)</label>
                   <Input type="number" step="0.01" value={maaserEditAmount}
                     onChange={(e) => setMaaserEditAmount(e.target.value)} className="mt-1 w-full" />
                 </div>
@@ -2268,7 +2141,7 @@ const Transactions = React.memo(function Transactions() {
               </div>
               <div className="space-y-4">
                 <div>
-                  <label className="label-overline">Amount (Â£)</label>
+                  <label className="label-overline">Amount (£)</label>
                   <Input type="number" step="0.01" value={maaserGiveAmount}
                     onChange={(e) => setMaaserGiveAmount(e.target.value)} className="mt-1 w-full" />
                 </div>
@@ -2292,14 +2165,6 @@ const Transactions = React.memo(function Transactions() {
           message="Clear the auto-Maaser audit log? Manual ledger entries are kept."
           onConfirm={handleMaaserDoReset} onCancel={() => setMaaserConfirmReset(false)} />
       </>}
-
-      <TransactionForm open={open} editingId={editingId} form={form} setForm={setForm}
-        selectedCats={selectedCats.categories || selectedCats} onClose={closeForm} onSubmit={submit}
-        onClassify={handleClassify} classifying={classifying} classification={classification}
-        onClearClassification={clearClassification}
-        saveAsRecurring={saveAsRecurring} setSaveAsRecurring={setSaveAsRecurring}
-        onCategoryCreated={loadCats}
-        accounts={accounts} accountsLoading={accountsLoading} />
 
       <TransactionActionPanel
         open={reviewOpen}
@@ -2607,7 +2472,7 @@ function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, o
           </div>
           <div className="flex shrink-0 flex-col items-end justify-between self-stretch pl-0.5">
             <span className={`whitespace-nowrap text-[13px] font-semibold leading-5 tabular-nums ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}>
-              {t.amount > 0 ? "+" : ""}Â£{Math.abs(t.amount).toFixed(2)}
+              {t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}
             </span>
             <DropdownMenu>
               <DropdownMenuTrigger className="-mb-1 -mr-1 grid h-10 w-10 place-items-center rounded-xl text-muted-foreground transition-transform hover:bg-secondary/50 hover:text-foreground active:scale-95" aria-label="Transaction actions">

@@ -32,6 +32,7 @@ export default function CategoryCombobox({
   categories: categoriesProp,
   placeholder = "Select category…",
   className,
+  label = "Category",
   allowClear = false,
   onCategoryCreated,
 }) {
@@ -121,6 +122,7 @@ export default function CategoryCombobox({
           <button
             type="button"
             role="combobox"
+            aria-label={label}
             aria-expanded={open}
             className={cn(
               "flex h-12 w-full items-center justify-between gap-3 rounded-2xl border border-transparent bg-secondary/50 px-4 text-left text-[15px] transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50",

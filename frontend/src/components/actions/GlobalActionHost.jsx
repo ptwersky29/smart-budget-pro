@@ -9,6 +9,7 @@ import { Button } from "../ui/button";
 import TransactionForm from "../TransactionForm";
 import TransactionInspectorPanel from "../TransactionInspectorPanel";
 import AccountFormModal from "../AccountFormModal";
+import NativePopup from "../ui/NativePopup";
 import NotificationSettings from "../settings/NotificationSettings";
 import StatementAction from "./StatementAction";
 import { BudgetActionForm, BudgetActionPreview, AccountActionPreview, ReportsActionPreview, SearchTransactionsAction, SplitTransactionAction, PairTransferAction } from "./FinanceActions";
@@ -157,6 +158,18 @@ export default function GlobalActionHost() {
     saveAsRecurring={saveAsRecurring} setSaveAsRecurring={setSaveAsRecurring} saving={savingTransaction}
     validationError={transactionError}/>;
   if (isAccountForm) return <AccountFormModal key={active.key} open onClose={closeAction} onCreated={()=>changed("accounts")} />;
+  // Creation and editing use the same native modal on every page. Information
+  // inspectors remain slide-out panels, so the two interaction types are clear.
+  if (type === "budget-new" || type === "budget-edit") {
+    return <NativePopup key={active.key} open onClose={closeAction}
+      title={type === "budget-edit" ? "Edit budget" : "Create budget"}
+      description={type === "budget-edit" ? "Update the category and spending limit." : "Set a spending limit for a category."}
+      showHeader size="md" bodyClassName="penni-native-form">
+      <BudgetActionForm budget={type === "budget-edit" ? payload.budget : undefined}
+        category={payload.category} month={payload.month} categories={categories}
+        onSaved={() => afterSave("budgets")} />
+    </NativePopup>;
+  }
 
   return <Sheet open={Boolean(active)} onOpenChange={open=>{if(!open)closeAction()}}>
     <SheetContent side="right" variant={isInfo || type==="accounts-overview" || type==="transaction-search" ? "panel" : "modal"} size={isLarge?"lg":"md"} className={`flex w-full flex-col overflow-hidden p-0 ${isLarge?"sm:max-w-[min(940px,92vw)]":isInfo?"sm:max-w-[440px]":"sm:max-w-lg"}`}>
@@ -170,8 +183,6 @@ export default function GlobalActionHost() {
         {type==="transaction-info" && <TransactionInspectorPanel transaction={item}
           account={accounts.find(a=>a.account_id===item?.account_id)}
           onClose={closeAction} onEdit={transaction=>openAction("transaction-edit",{transaction})}/>}
-        {type==="budget-new" && <BudgetActionForm category={payload.category} month={payload.month} categories={categories} onSaved={()=>afterSave("budgets")}/>}
-        {type==="budget-edit" && <BudgetActionForm budget={payload.budget} categories={categories} onSaved={()=>afterSave("budgets")}/>}
         {type==="budget-info" && <BudgetActionPreview budget={payload.budget}
           onEdit={()=>openAction("budget-edit",{budget:payload.budget})}
           onCreate={()=>openAction("budget-new")}/>}
