@@ -163,7 +163,7 @@ export function StatCard({
         ) : null}
       </div>
       <div className="mt-2 flex min-w-0 items-baseline gap-2">
-        <p className="money-tabular truncate text-[clamp(1.35rem,2.4vw,1.8rem)] font-semibold leading-none">
+        <p title={String(value)} className="money-tabular min-w-0 truncate whitespace-nowrap text-[clamp(14px,3.25vw,28px)] font-semibold leading-tight sm:text-[clamp(20px,2.4vw,29px)]">
           {value}
         </p>
         {delta ? (

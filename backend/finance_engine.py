@@ -3742,14 +3742,25 @@ Output ONLY valid JSON, no markdown, no explanation:
     ):
         sm = request.app.state.db
         async with sm() as session:
-            budget_result = await session.execute(
-                select(Budget).where(Budget.user_id == user["user_id"])
-            )
-            budgets = budget_result.scalars().all()
             now = datetime.now(timezone.utc)
             month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            month_key = month_start.strftime("%Y-%m")
+            next_month = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
+            # This panel explicitly represents CURRENT-MONTH everyday budgets.
+            # Selecting every historical/event budget was showing duplicates and
+            # comparing old limits against this month's spending.
+            budget_result = await session.execute(
+                select(Budget)
+                .where(
+                    Budget.user_id == user["user_id"],
+                    Budget.month == month_key,
+                    Budget.budget_type == "everyday",
+                )
+                .order_by(Budget.category)
+            )
+            budgets = budget_result.scalars().all()
             lines = await _effective_transaction_lines(
-                session, user["user_id"], date_from=month_start
+                session, user["user_id"], date_from=month_start, date_to=next_month
             )
             comparisons = []
             for b in budgets:
@@ -3763,9 +3774,9 @@ Output ONLY valid JSON, no markdown, no explanation:
                         "category": b.category,
                         "budget": round(b.amount, 2),
                         "spent": round(spent, 2),
-                        "remaining": round(max(0, b.amount - spent), 2),
+                        "remaining": round(float(b.amount) - spent, 2),
                         "progress_pct": round(
-                            min(100, spent / b.amount * 100) if b.amount else 0, 1
+                            spent / float(b.amount) * 100 if b.amount else 0, 1
                         ),
                     }
                 )

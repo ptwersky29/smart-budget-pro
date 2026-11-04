@@ -412,7 +412,7 @@ const Transactions = React.memo(function Transactions() {
       if (data.enabled === false) {
         toast.error("Turn auto-Maaser on first");
       } else {
-        const parts = [`Accrued maaser for ${data.created} income tx Â· ${fmt(data.total_amount)}`];
+        const parts = [`Accrued maaser for ${data.created} income tx · ${fmt(data.total_amount)}`];
         if (data.charity_applied > 0) {
           parts.push(`\nApplied ${data.charity_applied} charity tx (${fmt(data.charity_amount)}) against obligation`);
         }
@@ -1683,7 +1683,7 @@ const Transactions = React.memo(function Transactions() {
           <button onClick={() => setShowPie(!showPie)} className="flex items-center justify-between w-full text-left">
             <h3 className="flex items-center gap-2 text-[13px] font-semibold text-foreground sm:text-sm">
               <span className="grid h-5 w-5 place-items-center rounded-md bg-muted/70 sm:h-6 sm:w-6"><PieChartIcon className="h-3 w-3 text-muted-foreground/80" /></span>
-              Spend breakdown <span className="hidden text-xs font-normal text-muted-foreground min-[360px]:inline">Â· {monthLabel}</span>
+              Spend breakdown <span className="hidden text-xs font-normal text-muted-foreground min-[360px]:inline">· {monthLabel}</span>
             </h3>
             <div className="flex items-center gap-2">
               <span className="hidden text-xs text-muted-foreground min-[360px]:inline">{categorySpend.length} categories</span>
@@ -1691,7 +1691,7 @@ const Transactions = React.memo(function Transactions() {
             </div>
           </button>
           {showPie && (
-            <React.Suspense fallback={<div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">Loading chartâ€¦</div>}>
+            <React.Suspense fallback={<div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">Loading chart…</div>}>
               <CategoryPieChart data={categorySpend} />
             </React.Suspense>
           )}
@@ -2482,7 +2482,7 @@ function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, o
           <div className="min-w-0 flex-1 pt-0.5">
             <p
               className="truncate text-[13px] font-medium leading-5 text-foreground"
-              title={t.normalized_merchant && t.normalized_merchant !== t.description ? `${t.description} Â· ${t.normalized_merchant}` : t.description}
+              title={t.normalized_merchant && t.normalized_merchant !== t.description ? `${t.description} · ${t.normalized_merchant}` : t.description}
             >
               {t.description}
             </p>

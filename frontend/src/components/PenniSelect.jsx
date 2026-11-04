@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
@@ -14,6 +14,8 @@ export default function PenniSelect({
   const [uncontrolled, setUncontrolled] = useState(defaultValue);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const listboxRef = useRef(null);
+  const searchRef = useRef(null);
   const listboxId = React.useId();
   const options = useMemo(() => {
     const items = [];
@@ -58,17 +60,35 @@ export default function PenniSelect({
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" side="bottom" collisionPadding={12} avoidCollisions sideOffset={5}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          requestAnimationFrame(() => {
+            if (options.length > 7 && searchRef.current) {
+              searchRef.current.focus();
+            } else {
+              const selectedOption = listboxRef.current?.querySelector('[role="option"][aria-selected="true"]');
+              (selectedOption || listboxRef.current?.querySelector('[role="option"]:not(:disabled)'))?.focus();
+            }
+          });
+        }}
         className="z-[100] w-[var(--radix-popover-trigger-width)] min-w-[min(200px,90vw)] max-w-[min(90vw,360px)] max-h-[min(75dvh,var(--radix-popover-content-available-height))] overflow-y-auto rounded-xl border border-border bg-popover p-1.5 shadow-xl">
         {options.length > 7 && (
           <div className="mb-1 flex h-9 items-center gap-2 rounded-lg border border-border bg-secondary/40 px-2.5">
             <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={(event) => event.stopPropagation()} placeholder="Search options..."
+            <input ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "ArrowDown") {
+                  event.preventDefault();
+                  listboxRef.current?.querySelector('[role="option"]:not(:disabled)')?.focus();
+                } else if (event.key !== "Escape") {
+                  event.stopPropagation();
+                }
+              }} placeholder="Search options..."
               aria-label="Search options"
               className="w-full min-w-0 bg-transparent text-xs outline-none placeholder:text-muted-foreground" />
           </div>
         )}
-        <div id={listboxId} role="listbox" aria-label={ariaLabel || title || name || "Options"}
+        <div ref={listboxRef} id={listboxId} role="listbox" aria-label={ariaLabel || title || name || "Options"}
           onKeyDown={(event) => {
             if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
             const items = Array.from(event.currentTarget.querySelectorAll('[role="option"]:not([disabled])'));
@@ -81,7 +101,7 @@ export default function PenniSelect({
             event.preventDefault();
             items[nextIndex]?.focus();
           }}
-          className="subtle-scroll max-h-[min(55vh,340px)] overflow-y-auto overscroll-contain">
+          className="subtle-scroll max-h-[min(55dvh,340px)] overflow-y-auto overscroll-contain">
           {visible.map((option, index) => (
             <React.Fragment key={option.value + ":" + index}>
               {option.group && (index === 0 || option.group !== visible[index - 1].group) &&

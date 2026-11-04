@@ -17,6 +17,7 @@ export default function Settings() {
   const [searchParams, setSearchParams] = useSearchParams();
   const sectionFromUrl = searchParams.get("section") || "appearance";
   const [activeSection, setActiveSection] = useState(sectionFromUrl);
+  useEffect(() => setActiveSection(sectionFromUrl), [sectionFromUrl]);
 
   const setSection = (key) => {
     setActiveSection(key);

@@ -87,8 +87,8 @@ export default function TransactionForm({
           id="penni-transaction-form"
           noValidate
           onSubmit={onSubmit}
-          className="penni-transaction-fields flex-1 overflow-y-auto px-6 pb-6 pt-2 space-y-5"
-          aria-labelledby="transaction-form-title"
+          className="penni-transaction-fields min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-2 space-y-5 sm:px-6"
+          aria-label={editingId ? "Edit transaction details" : "New transaction details"}
         >
           {/* Type Toggle: Expense vs Income */}
           <div>
@@ -125,7 +125,7 @@ export default function TransactionForm({
                     entry_mode: entryMode === "transfer" ? "standard" : entryMode,
                   })
                 }
-                className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition ${
+                className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-medium transition-all ${
                   form.is_income && !form.is_transfer
                     ? "bg-card text-foreground shadow-sm ring-1 ring-border"
                     : "text-muted-foreground hover:text-foreground"
@@ -157,7 +157,7 @@ export default function TransactionForm({
                   setForm({ ...form, amount: e.target.value });
                   onClearClassification?.();
                 }}
-                className="w-[190px] max-w-[65vw] bg-transparent text-center text-5xl font-semibold tracking-tight text-foreground outline-none placeholder:text-muted-foreground/35 tabular-nums sm:text-[56px]"
+                className="w-[min(210px,60vw)] min-w-0 bg-transparent text-center text-[clamp(28px,7vw,50px)] font-semibold tracking-tight text-foreground outline-none placeholder:text-muted-foreground/35 tabular-nums sm:text-[56px]"
               />
             </div>
           </div>

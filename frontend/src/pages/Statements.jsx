@@ -11,6 +11,7 @@ import Skeleton from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
 import CategoryCombobox from "../components/CategoryCombobox";
 import { useCategories } from "../contexts/CategoriesContext";
+import { humanizeCategoryName } from "../lib/categories";
 
 function getDisplayName(a) {
   if (!a) return "";
@@ -28,6 +29,7 @@ export default function Statements() {
   const [pendingRemovalId, setPendingRemovalId] = useState(null);
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState(false);
   const [accounts, setAccounts] = useState([]);
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [dragging, setDragging] = useState(false);
@@ -46,10 +48,11 @@ export default function Statements() {
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
+    setHistoryError(false);
     try {
       const { data } = await api.get("/statements");
       setHistory(data.statements || []);
-    } catch (err) { toast.error("Could not load statement history"); }
+    } catch (err) { setHistoryError(true); toast.error("Could not load statement history"); }
     finally { setHistoryLoading(false); }
   }, []);
 
@@ -237,7 +240,7 @@ export default function Statements() {
                     ) : (
                       <button type="button" aria-label={`Edit category for ${t.description || "transaction"}`} className="text-xs px-2 py-0.5 rounded-full bg-secondary capitalize cursor-pointer hover:text-emerald flex items-center gap-1"
                             onClick={() => setEditingCell({ idx: i, field: "category" })}>
-                        {t.category} <Pencil className="h-3 w-3 opacity-40" />
+                        {humanizeCategoryName(t.category)} <Pencil className="h-3 w-3 opacity-40" />
                       </button>
                     )}
                     <span className="text-xs text-muted-foreground">{Math.round((t.confidence || 0) * 100)}%</span>
@@ -293,7 +296,7 @@ export default function Statements() {
                       ) : (
                         <button type="button" aria-label={`Edit category for ${t.description || "transaction"}`} className="text-xs px-2 py-1 rounded-full bg-secondary capitalize cursor-pointer hover:text-emerald flex items-center gap-1 inline-flex"
                               onClick={() => setEditingCell({ idx: i, field: "category" })}>
-                          {t.category} <Pencil className="h-3 w-3 opacity-30" />
+                          {humanizeCategoryName(t.category)} <Pencil className="h-3 w-3 opacity-30" />
                         </button>
                       )}
                       </td>
@@ -327,6 +330,11 @@ export default function Statements() {
       <SectionCard eyebrow="History" title={historyLoading ? "Loading statement history…" : `${history.length} previous upload${history.length !== 1 ? "s" : ""}`} contentClassName="p-0">
         {historyLoading ? (
           <div role="status" className="px-6 py-5 text-sm text-muted-foreground">Loading uploaded statements…</div>
+        ) : historyError && history.length === 0 ? (
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 px-6 py-5 text-sm text-muted-foreground">
+            <span>Could not load statement history.</span>
+            <Button type="button" variant="outlinePill" size="sm" onClick={loadHistory}>Retry</Button>
+          </div>
         ) : history.length === 0 ? (
           <div className="px-6 py-5 text-sm text-muted-foreground">No statements uploaded yet.</div>
         ) : (

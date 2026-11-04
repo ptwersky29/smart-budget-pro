@@ -56,7 +56,7 @@ export default function AppLayout() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [moreExpanded, setMoreExpanded] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
-  const [routeLoading, setRouteLoading] = useState(false);
+
   const [tourLoaded, setTourLoaded] = useState(false);
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -65,7 +65,7 @@ export default function AppLayout() {
       return false;
     }
   });
-  const prevPath = useRef(location.pathname);
+
   const leaderBuffer = useRef([]);
   const [tablet, setTablet] = useState(false);
   useEffect(() => {
@@ -102,14 +102,6 @@ export default function AppLayout() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  useEffect(() => {
-    if (prevPath.current !== location.pathname) {
-      setRouteLoading(true);
-      prevPath.current = location.pathname;
-      const timer = setTimeout(() => setRouteLoading(false), 160);
-      return () => clearTimeout(timer);
-    }
-  }, [location.pathname]);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -164,7 +156,7 @@ export default function AppLayout() {
   const coreRoutes = ["/dashboard","/accounts","/transactions","/budgets","/analytics"];
   const onCoreRoute = coreRoutes.some(to=>isActivePath(location.pathname,to));
   useEffect(()=>{if(!onCoreRoute && !settingsActive)setMoreExpanded(true);},[onCoreRoute,settingsActive]);
-  const moreActive = location.pathname === "/more" || !["/dashboard", "/accounts", "/transactions"].some((path) => isActivePath(location.pathname, path));
+  const moreActive = location.pathname === "/more" || !["/dashboard", "/accounts", "/transactions", "/budgets"].some((path) => isActivePath(location.pathname, path));
   const initials = (user?.name?.[0] || user?.email?.[0] || "P").toUpperCase();
 
   const toggleTheme = () => setTheme(dark ? "light" : "dark");
@@ -202,7 +194,7 @@ export default function AppLayout() {
   };
 
   return (
-    <div className={`penni-v2 app-shell relative flex min-h-screen text-foreground md:h-[100dvh] md:min-h-0 md:overflow-hidden ${privacy ? "penni-private" : ""}`} data-penni-accent={accent}>
+    <div className={`penni-v2 app-shell relative flex min-h-[100dvh] text-foreground md:h-[100dvh] md:min-h-0 md:overflow-hidden ${privacy ? "penni-private" : ""}`} data-penni-accent={accent}>
       <aside
         data-tour="sidebar"
         className={`penni-sidebar sticky top-0 z-40 hidden h-[100dvh] shrink-0 flex-col overflow-hidden transition-[width] duration-300 md:flex ${
@@ -246,7 +238,7 @@ export default function AppLayout() {
           {NAV_SECTIONS.filter((section) => (!section.adminOnly || user?.role === "admin") && (section.label === "Main" || moreExpanded)).map((section) => (
             <div key={section.label} className="space-y-1">
               {!sidebarCompact ? (
-                <p className="px-2.5 pb-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
+                <p className="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-[0.13em] text-muted-foreground/70">
                   {section.label}
                 </p>
               ) : null}
@@ -276,9 +268,9 @@ export default function AppLayout() {
               })}
             </div>
           ))}
-          <button type="button" onClick={()=>setMoreExpanded(value=>!value)} aria-expanded={moreExpanded}
+          <button type="button" onClick={()=>setMoreExpanded(value=>!value)} aria-expanded={moreExpanded} aria-label={moreExpanded ? "Collapse more tools" : "Expand more tools"}
             className="penni-side-link flex w-full items-center gap-2.5 rounded-2xl px-3 py-3 text-[13px] font-medium"
-            title="More tools">
+            title={moreExpanded ? "Collapse more tools" : "Expand more tools"}>
             <Compass className="h-[19px] w-[19px] shrink-0"/>
             {!sidebarCompact && <><span className="flex-1 text-left">More tools</span><ChevronDown className={`h-4 w-4 transition-transform ${moreExpanded?"rotate-180":""}`}/></>}
           </button>
@@ -309,7 +301,7 @@ export default function AppLayout() {
               <>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[12px] font-medium">{user?.name || user?.email}</span>
-                  <span className="block truncate text-[10.5px] capitalize text-muted-foreground">{user?.tier || "free"} plan</span>
+                  <span className="block truncate text-[12px] capitalize text-muted-foreground">{user?.tier || "free"} plan</span>
                 </span>
                 <button
                   type="button"
@@ -340,19 +332,14 @@ export default function AppLayout() {
 
       <div className="penni-main-panel relative min-w-0 flex-1 md:flex md:min-h-0 md:flex-col md:overflow-hidden">
         <header data-tour="route-header" className="penni-route-header sticky top-0 z-30 md:shrink-0">
-          {routeLoading ? (
-            <div className="absolute left-0 right-0 top-0 z-50 h-0.5 overflow-hidden">
-              <div className={`h-full bg-emerald ${noAnim ? "" : "animate-[routeProgress_0.4s_ease-out_forwards]"}`} />
-            </div>
-          ) : null}
-          <h1 className="sr-only">{routeMeta.title} - {APP_NAME}</h1>
+          {location.pathname === "/dashboard" ? <h1 className="sr-only md:hidden">{routeMeta.title} - {APP_NAME}</h1> : null}
           <div className="flex h-[62px] items-center justify-between gap-3 px-4 md:h-[68px] md:px-8">
             <div className="flex min-w-0 flex-1 items-center gap-2.5">
               <Link to="/dashboard" className="grid h-9 w-9 shrink-0 place-items-center md:hidden" aria-label={`${APP_NAME} home`}>
                 <Logo size="sm" />
               </Link>
               <div className="hidden min-w-0 flex-1 md:block">
-                <p className="truncate text-[21px] font-semibold leading-tight tracking-[-0.035em]">{routeMeta.title}</p>
+                <h1 className="truncate text-[21px] font-semibold leading-tight tracking-[-0.035em]">{routeMeta.title}</h1>
                 {location.pathname === "/dashboard" && <p className="mt-1 text-[12px] leading-tight text-muted-foreground">{new Date().toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}</p>}
               </div>
               <button
@@ -365,7 +352,7 @@ export default function AppLayout() {
               >
                 <Search className="h-4 w-4 shrink-0" />
                 <span className="truncate">Search or jump to…</span>
-                <kbd className="ml-auto shrink-0 rounded-[6px] border border-border/70 bg-secondary/45 px-1.5 py-0.5 text-[9.5px] font-medium text-muted-foreground">
+                <kbd className="ml-auto shrink-0 rounded-[6px] border border-border/70 bg-secondary/45 px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
                   {shortcutHint}
                 </kbd>
               </button>
@@ -476,7 +463,7 @@ export default function AppLayout() {
                 }`}>
                   <Icon className="h-[20px] w-[20px]" strokeWidth={active ? 2.2 : 1.9} />
                 </span>
-                <span className={`w-full text-center text-[10px] leading-none ${active ? "font-semibold" : "font-medium"}`}>
+                <span className={`w-full text-center text-[11px] leading-none ${active ? "font-semibold" : "font-medium"}`}>
                   {label}
                 </span>
               </Link>

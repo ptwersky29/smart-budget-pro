@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { Check, ChevronDown, Plus, Search } from "lucide-react";
+import { Check, ChevronDown, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "../lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
@@ -7,6 +7,7 @@ import {
   Command,
   CommandEmpty,
   CommandGroup,
+  CommandInput,
   CommandItem,
   CommandList,
   CommandSeparator,
@@ -153,16 +154,10 @@ export default function CategoryCombobox({
           avoidCollisions
         >
           <Command shouldFilter={false} className="flex min-h-0 flex-col overflow-hidden">
-            <div className="flex items-center border-b px-3">
-              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-              <input
-                aria-label="Search categories"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search categories…"
-                className="flex h-11 w-full rounded-md bg-transparent py-3 text-[15px] outline-none placeholder:text-muted-foreground"
-              />
-            </div>
+            <CommandInput aria-label="Search categories"
+              value={search} onValueChange={setSearch}
+              placeholder="Search categories…"
+              className="h-11 text-sm" />
             <CommandList className="min-h-0 max-h-[min(50dvh,240px)] overflow-y-auto overscroll-contain">
               <CommandEmpty>
                 {search ? "No categories found" : "No categories yet"}

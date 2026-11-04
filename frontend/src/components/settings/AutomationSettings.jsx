@@ -107,13 +107,13 @@ export default React.memo(function AutomationSettings() {
         <form onSubmit={addProvider} className="space-y-3">
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div>
-              <label className="label-overline">Nickname *</label>
-              <Input required placeholder="My OpenAI key" value={form.name}
+              <label htmlFor="penni-auto-name" className="label-overline">Nickname *</label>
+              <Input id="penni-auto-name" required placeholder="My OpenAI key" value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1 w-full" />
             </div>
             <div>
-              <label className="label-overline">Provider *</label>
-              <PenniSelect value={form.provider}
+              <label htmlFor="penni-auto-provider" className="label-overline">Provider *</label>
+              <PenniSelect id="penni-auto-provider" aria-label="AI provider" value={form.provider}
                 onChange={(e) => setForm({ ...form, provider: e.target.value })}
                 className="mt-1 w-full h-11 rounded-xl bg-secondary/50 border border-transparent px-4 text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none"
               >
@@ -121,13 +121,13 @@ export default React.memo(function AutomationSettings() {
               </PenniSelect>
             </div>
             <div>
-              <label className="label-overline">Model *</label>
-              <Input required placeholder="gpt-4o" value={form.model}
+              <label htmlFor="penni-auto-model" className="label-overline">Model *</label>
+              <Input id="penni-auto-model" required placeholder="gpt-4o" value={form.model}
                 onChange={(e) => setForm({ ...form, model: e.target.value })} className="mt-1 w-full" />
             </div>
             <div>
-              <label className="label-overline">API Key</label>
-              <Input placeholder="sk-…" type="password" value={form.api_key}
+              <label htmlFor="penni-auto-key" className="label-overline">API key</label>
+              <Input id="penni-auto-key" placeholder="sk-…" type="password" value={form.api_key}
                 onChange={(e) => setForm({ ...form, api_key: e.target.value })} className="mt-1 w-full" />
             </div>
             <div className="flex items-end pb-1">
@@ -139,7 +139,7 @@ export default React.memo(function AutomationSettings() {
               </label>
             </div>
           </div>
-          <Button variant="primary" size="pill">
+          <Button variant="primary" size="pill" type="submit">
             <Plus className="h-4 w-4" /> Save provider
           </Button>
         </form>

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useActions } from "../contexts/ActionContext";
 import {
@@ -183,6 +183,7 @@ export default function AccountsPage() {
   }, []);
   const [searchParams, setSearchParams] = useSearchParams();
   const [accounts, setAccounts] = useState([]);
+  const accountStripRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editAccount, setEditAccount] = useState(null);
@@ -422,14 +423,16 @@ export default function AccountsPage() {
       {accounts.length > 0 ? (
         <>
           <section className="penni-reference-account-select" aria-label="Select an account">
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-[18px] font-semibold tracking-[-.035em]">Your accounts</h2>
-              <button type="button" onClick={()=>{setEditAccount(null);setShowCreateModal(true);}}
-                className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary">
-                <Plus className="h-4 w-4"/> Add account
-              </button>
+              {accounts.length > 1 && <div role="group" aria-label="Browse account cards" className="flex items-center gap-1">
+                <button type="button" aria-label="Previous account" onClick={() => accountStripRef.current?.scrollBy({left:-310,behavior:"smooth"})}
+                  className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-card text-muted-foreground hover:bg-secondary">‹</button>
+                <button type="button" aria-label="Next account" onClick={() => accountStripRef.current?.scrollBy({left:310,behavior:"smooth"})}
+                  className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-card text-muted-foreground hover:bg-secondary">›</button>
+              </div>}
             </div>
-            <div className="penni-account-selector flex min-w-0 gap-4 overflow-x-auto pb-3">
+            <div ref={accountStripRef} role="region" tabIndex={0} aria-label="Select an account. Scroll horizontally for more." className="penni-account-selector flex min-w-0 gap-4 overflow-x-auto pb-3">
               {accounts.map(account=>(
                 <div key={account.account_id}
                   className={`penni-selected-account w-[290px] min-w-[290px] shrink-0 rounded-[27px] p-[2px] ${String(selectedId)===String(account.account_id)?"is-selected":""}`}>
@@ -456,7 +459,7 @@ export default function AccountsPage() {
                 <div className="mt-5">
                   {transactionLoading?<Skeleton className="h-36 w-full rounded-xl"/>:<Sparkline values={selectedHistory} height={155} stroke="var(--penni-accent)" />}
                 </div>
-                <p className="mt-1 text-[10px] text-muted-foreground">Estimated 90-day balance movement based on recorded transactions.</p>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Estimated 90-day balance movement based on recorded transactions, not a bank statement.</p>
                 <div className="mt-5 grid grid-cols-2 gap-3">
                   <div className="rounded-2xl bg-secondary/60 p-4">
                     <p className="text-xs text-muted-foreground">In this month</p>
@@ -481,7 +484,7 @@ export default function AccountsPage() {
               <div className="flex flex-wrap items-center justify-between gap-2 p-5 pb-3">
                 <div>
                   <h2 className="text-[17px] font-semibold tracking-[-.03em]">Transaction history</h2>
-                  <p className="mt-1 text-xs text-muted-foreground">{accountTransactions.length} recent transactions</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{transactionLoading ? "Loading recent transactions…" : `${accountTransactions.length} recent transactions`}</p>
                 </div>
                 <button type="button" onClick={()=>openAction("transaction-new",{accountId:selectedId})}
                   className="inline-flex h-9 items-center gap-1 rounded-xl bg-primary/10 px-3 text-xs font-semibold text-primary">
@@ -499,7 +502,7 @@ export default function AccountsPage() {
                       className={`h-8 rounded-lg px-3 text-xs ${transactionType===x.v?"bg-card font-semibold shadow-sm":"text-muted-foreground"}`}>{x.t}</button>)}
                 </div>
               </div>
-              <div className="penni-account-history-list min-h-0 flex-1 overflow-y-auto border-t border-border/60">
+              <div className="penni-account-history-list min-h-0 flex-1 overflow-visible border-t border-border/60">
                 {transactionLoading?<p className="p-5 text-xs text-muted-foreground">Loading transactions…</p>:
                 filteredTransactions.length ? filteredTransactions.map((t,i)=>
                   <button type="button" key={t.transaction_id||i}

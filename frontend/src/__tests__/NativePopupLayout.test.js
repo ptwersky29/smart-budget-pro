@@ -7,13 +7,13 @@ const css = fs.readFileSync(path.join(__dirname, "../design-system/penni-referen
 test("native backdrop covers the screen", () => {
   expect(css).toMatch(/\.penni-native-backdrop\s*\{\s*position:\s*fixed;/);
   expect(css).toMatch(/inset:\s*0;/);
-  expect(css).toMatch(/z-index:\s*9990;/);
+  expect(css).toMatch(/z-index:\s*var\(--penni-z-backdrop\);/);
 });
 
 test("native popup is fixed, centered and stacked over its backdrop", () => {
   expect(css).toMatch(/\.penni-native-popup\s*\{\s*position:\s*fixed;/);
   expect(css).toMatch(/top:\s*50%;\s*left:\s*50%;/);
-  expect(css).toMatch(/z-index:\s*9991;/);
+  expect(css).toMatch(/z-index:\s*var\(--penni-z-dialog\);/);
   expect(css).toMatch(/max-height:\s*min\(90dvh/);
   expect(css).toMatch(/\.penni-native-body\s*\{[\s\S]*?overflow-y:\s*auto;/);
 });

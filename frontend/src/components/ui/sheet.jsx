@@ -25,7 +25,7 @@ const SheetOverlay = React.forwardRef(({ className, ...props }, ref) => (
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName
 
 const sheetVariants = cva(
-  "fixed z-50 gap-4 glass-sheet p-6 transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=open]:animate-in data-[state=closed]:animate-out overflow-y-auto",
+  "fixed z-50 gap-4 glass-sheet p-6 transition ease-in-out data-[state=closed]:duration-200 data-[state=open]:duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out overflow-y-auto",
   {
     variants: {
       side: {
@@ -44,7 +44,7 @@ const sheetVariants = cva(
 )
 
 const SheetContent = React.forwardRef(function SheetContent({ side = "right", variant = "panel", size = "md", className, overlayClassName, children, ...props }, ref) {
-  const [mobile, setMobile] = React.useState(false);
+  const [mobile, setMobile] = React.useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches);
   React.useEffect(() => {
     const query = window.matchMedia("(max-width: 767px)");
     const update = () => setMobile(query.matches);

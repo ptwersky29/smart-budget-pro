@@ -5,6 +5,7 @@
   --penni-ink: #0d0f14; --penni-muted: #667085; --penni-faint: #a3a9b8;
   --penni-line: rgba(13,15,20,.08); --penni-accent: #5b5cf0;
   --penni-glow: rgba(91,92,240,.12);
+  --penni-promo-bg: #26245f;
   --penni-shadow: 0 1px 2px rgba(16,24,40,.04),0 14px 32px -18px rgba(16,24,40,.16);
   --background: 240 13% 96%; --foreground: 225 21% 6%;
   --card: 0 0% 100%; --card-foreground: 225 21% 6%;
@@ -30,6 +31,7 @@
   --penni-ink: #f3f4f7; --penni-muted: #8d94a5; --penni-faint: #545b6b;
   --penni-line: rgba(255,255,255,.07); --penni-accent: #7476ff;
   --penni-glow: rgba(124,125,255,.1);
+  --penni-promo-bg: #26245f;
   --penni-shadow: 0 1px 0 rgba(255,255,255,.03) inset,0 18px 36px -20px rgba(0,0,0,.8);
   --background: 225 22% 4%; --foreground: 220 11% 96%;
   --card: 225 15% 7%; --card-foreground: 220 11% 96%;
@@ -157,9 +159,9 @@
 }
 
 /* Shared overlay layers sit above the fixed app shell; menus above dialogs. */
-.penni-shared-backdrop { z-index: 9490; }
-.penni-v2.penni-overlay-content { z-index: 9491; }
-.penni-v2.penni-menu-content { z-index: 10020; }
+.penni-shared-backdrop { z-index: var(--penni-z-backdrop); background: var(--penni-overlay-backdrop); }
+.penni-v2.penni-overlay-content { z-index: var(--penni-z-dialog); }
+.penni-v2.penni-menu-content { z-index: var(--penni-z-menu); }
 /* Portalled Radix overlays carry penni-v2 because they render outside AppLayout. */
 .penni-overlay-content.penni-v2 {
   color:var(--penni-ink);
@@ -373,8 +375,8 @@ html.dark[data-penni-accent="violet"] .penni-v2 {--penni-accent:#a07bff;}
 
 
 /* Exact Penny type rhythm, space, warm logo and spring-like navigation. */
-.penni-v2{font-family:"Inter","Inter Variable",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;letter-spacing:-.007em;font-feature-settings:"cv11","ss01";-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
-.penni-v2 .penni-route-header{height:68px;display:flex;flex-direction:column;justify-content:center;}
+.penni-v2{font-family:var(--font-body);font-size:14px;letter-spacing:-.007em;font-feature-settings:"cv11","ss01";-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+.penni-v2 .penni-route-header{height:68px;min-height:68px;display:flex;flex-direction:column;justify-content:center;}
 .penni-v2 .penni-side-link{min-height:43px;font-size:13px;font-weight:500;}
 .penni-v2 .penni-side-link[aria-current="page"]{animation:penni-nav-select .3s cubic-bezier(.22,1,.36,1) both;}
 .penni-v2 .penni-sidebar{background:color-mix(in srgb,var(--penni-surface) 72%,var(--penni-bg));}
@@ -391,7 +393,7 @@ html.dark[data-penni-accent="violet"] .penni-v2 {--penni-accent:#a07bff;}
 .penni-v2 .penni-account-card{transition:transform .25s cubic-bezier(.22,1,.36,1),box-shadow .25s;}
 .penni-v2 .penni-account-card:hover{transform:translateY(-3px);box-shadow:0 25px 45px -22px rgba(0,0,0,.45);}
 @keyframes penni-nav-select{from{opacity:.8;transform:scale(.985)}to{opacity:1;transform:scale(1)}}
-@media(max-width:767px){.penni-v2 .penni-route-header{height:62px;}}
+@media(max-width:767px){.penni-v2 .penni-route-header{height:62px;min-height:62px;}}
 @media(prefers-reduced-motion:reduce){.penni-v2 .penni-side-link[aria-current="page"]{animation:none;}}
 
 /* 2.1 regression fix: new Dashboard/Accounts exceeded the old short fixed workspace.
@@ -455,8 +457,8 @@ html.dark[data-penni-accent="violet"] .penni-v2 {--penni-accent:#a07bff;}
 .penni-native-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 9990;
-  background: rgba(12, 18, 30, .48);
+  z-index: var(--penni-z-backdrop);
+  background: var(--penni-overlay-backdrop);
   backdrop-filter: blur(5px);
   animation: penni-native-fade-in .18s ease-out both;
 }
@@ -465,7 +467,7 @@ html.dark[data-penni-accent="violet"] .penni-v2 {--penni-accent:#a07bff;}
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 9991;
+  z-index: var(--penni-z-dialog);
   display: flex;
   flex-direction: column;
   width: min(560px, calc(100vw - 32px));
@@ -540,16 +542,69 @@ html.dark[data-penni-accent="violet"] .penni-v2 {--penni-accent:#a07bff;}
    Their default Tailwind z-50 / z-100 is BELOW NativePopup's z-index 9991,
    making account and category options appear inaccessible. All dropdown
    portals must be stacked above the native dialog, without clipping. */
+/* Radix popper wrappers create independent stacking contexts; keep menus above dialogs. */
 .penni-native-popover,
 [data-radix-popper-content-wrapper]:has(.penni-native-popover) {
-  z-index: 10020 !important;
+  z-index: var(--penni-z-menu) !important;
 }
 .penni-native-popup [data-radix-select-trigger] { cursor: pointer; }
 [data-radix-popper-content-wrapper]:has([role="listbox"]),
 [data-radix-popper-content-wrapper]:has([data-radix-select-viewport]) {
-  z-index: 10020 !important;
+  z-index: var(--penni-z-menu) !important;
 }
 .penni-native-popover {
   max-height: min(65dvh, 420px);
   overflow: auto;
+}
+
+/* Shared layout contract: the Dashboard, not its individual columns, owns its scroll. */
+@media(min-width:1024px) {
+ .penni-v2 .dashboard-reference {
+   min-height:0; overflow-x:hidden; overflow-y:auto;
+   overscroll-behavior:contain; scrollbar-width:thin;
+   padding-right:clamp(0px,.3vw,6px);
+ }
+ .penni-v2 .dashboard-reference > .dashboard-panels {
+   display:grid; flex:none; min-height:auto; overflow:visible;
+ }
+ .penni-v2 .dashboard-reference > .dashboard-panels > div {
+   min-height:auto; overflow:visible; padding-right:0;
+ }
+}
+@media(max-width:767px) {
+ .penni-v2 .app-main-scroll {padding-bottom:calc(80px + env(safe-area-inset-bottom,0px));}
+ .penni-v2 .penni-account-selector .penni-selected-account {
+   width:min(290px,calc(100vw - 40px));min-width:min(290px,calc(100vw - 40px));
+ }
+}
+.penni-v2 .label-overline {font-size:11px;line-height:1.45;}
+.penni-v2 .penni-data-table th {font-size:12px;}
+.penni-v2 .penni-ref-account-row .penni-account-card {min-height:175px;}
+.penni-v2.penni-private [data-sensitive-amount] {filter:blur(7px);user-select:none;}
+
+/* The Accounts overview owns vertical scroll: do not trap a second independent
+   scroller inside the transaction-history card. */
+.penni-v2 .accounts-workspace .penni-account-history {
+  min-height:0;
+  max-height:none;
+  overflow:visible;
+}
+.penni-v2 .accounts-workspace .penni-account-history-list {
+  max-height:none;
+  overflow:visible;
+}
+/* Only transaction form fields scroll inside the NativePopup: title and action
+   bar stay visible when the virtual keyboard or 200% zoom shrinks the viewport. */
+.penni-native-popup .penni-transaction-body {
+  overflow:hidden;
+}
+.penni-native-popup .penni-transaction-fields {
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+}
+@media (hover:none) {
+  .penni-v2 .surface-hover:hover, .penni-v2 .penni-interactive:hover {
+    transform:none;
+  }
 }

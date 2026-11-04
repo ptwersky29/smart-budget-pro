@@ -38,7 +38,7 @@ export const MetricCard = React.memo(function MetricCard({ label, value, icon: I
         <p className="label-overline">{label}</p>
         {Icon && <span className={`grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-xl ${toneClasses}`}><Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></span>}
       </div>
-      <p className="mt-2 sm:mt-3 text-2xl font-bold tracking-[-0.04em] leading-none tabular-nums">{value}</p>
+      <p title={String(value)} className="money-tabular mt-2 min-w-0 truncate whitespace-nowrap text-[clamp(14px,3.4vw,26px)] font-semibold tracking-[-0.04em] leading-tight sm:mt-3">{value}</p>
       {detail && <div className="mt-2 text-xs text-muted-foreground leading-relaxed">{detail}</div>}
     </div>
   );

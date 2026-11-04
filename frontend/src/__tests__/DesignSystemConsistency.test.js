@@ -19,8 +19,8 @@ describe("Penni consistent workspace and overlay contracts", () => {
   test("dashboard and accounts no longer reverse their contained overflow rules", () => {
     const css = src("design-system/penni-reference.css");
     expect(css).not.toMatch(/\.penni-v2 \.dashboard-reference,\s*\.penni-v2 \.accounts-workspace\s*\{\s*height:\s*auto/);
-    expect(css).toContain(".penni-shared-backdrop { z-index: 9490; }");
-    expect(css).toContain(".penni-v2.penni-menu-content { z-index: 10020; }");
+    expect(css).toContain(".penni-shared-backdrop { z-index: var(--penni-z-backdrop);");
+    expect(css).toContain(".penni-v2.penni-menu-content { z-index: var(--penni-z-menu); }");
   });
 
   test("select controls advertise listbox semantics and use usable popover widths", () => {

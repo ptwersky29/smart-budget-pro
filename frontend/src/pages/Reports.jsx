@@ -272,9 +272,9 @@ export default function Reports() {
             )}
           </span>
           <span>
-            Subscriptions:{" "}
+            Subscription category:{" "}
             <span className="font-medium">
-              {subs ? `£${subs.value.toFixed(2)}/mo` : "None detected"}
+              {subs ? `${formatCurrency(subs.value)}/mo tagged` : "No tagged spending"}
             </span>
           </span>
           <span>

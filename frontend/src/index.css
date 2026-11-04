@@ -17,6 +17,10 @@
   --surface-solid: #ffffff;
   --surface-muted: rgba(246, 248, 245, 0.86);
   --content-max: 1360px;
+  --penni-overlay-backdrop: rgba(12, 18, 30, .43);
+  --penni-z-backdrop: 9490;
+  --penni-z-dialog: 9500;
+  --penni-z-menu: 10020;
 }
 
 html, body, #root { height: 100%; }
@@ -53,7 +57,7 @@ body {
     --input: 225 16% 91%;
     --ring: 240 84% 65%;
     --radius: 1rem;
-    --emerald: 240 84% 65%;
+    --emerald: 160 72% 35%;
     --topaz: 36 92% 52%;
     --ruby: 356 72% 53%;
     --chart-1: 158 70% 38%;
@@ -85,7 +89,7 @@ body {
     --border: 220 10% 16%;
     --input: 220 10% 16%;
     --ring: 239 100% 73%;
-    --emerald: 239 100% 73%;
+    --emerald: 160 70% 53%;
     --topaz: 36 92% 56%;
     --ruby: 356 72% 62%;
     --chart-1: 158 70% 45%;
@@ -154,7 +158,7 @@ body {
   box-shadow: var(--shadow-modal);
 }
 .dark .glass-panel {
-  background: rgba(19, 25, 23, 0.9);
+  background: rgba(18, 20, 27, 0.94);
   border-color: rgba(255, 255, 255, 0.08);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 24px 60px -38px rgba(0, 0, 0, 0.9);
 }
@@ -170,7 +174,7 @@ body {
 }
 .dark .glass-popover,
 .dark .glass-sheet {
-  background: rgba(23, 30, 27, 0.98);
+  background: rgba(18, 20, 27, 0.98);
   border-color: rgba(255, 255, 255, 0.09);
   box-shadow: var(--shadow-modal);
 }
@@ -179,7 +183,7 @@ body {
 .label-overline {
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  font-size: 0.66rem;
+  font-size: 0.7rem;
   line-height: 1.2;
   font-weight: 650;
   color: hsl(var(--muted-foreground));
@@ -192,7 +196,7 @@ body {
   box-shadow: var(--shadow-card);
 }
 .dark .surface {
-  background: rgba(19, 25, 23, 0.9);
+  background: rgba(18, 20, 27, 0.94);
   border-color: rgba(255, 255, 255, 0.08);
 }
 .surface-muted {
@@ -229,7 +233,7 @@ body {
 .gradient-emerald {
   background:
     linear-gradient(180deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0) 46%),
-    linear-gradient(135deg, hsl(var(--emerald)) 0%, hsl(168 72% 33%) 100%);
+    linear-gradient(135deg, hsl(var(--emerald)) 0%, hsl(158 76% 29%) 100%);
 }
 .gradient-topaz {
   background:
@@ -248,7 +252,7 @@ body {
   background-image:
     radial-gradient(52rem 34rem at 4% -12%, hsl(var(--emerald) / 0.07) 0%, transparent 65%),
     radial-gradient(40rem 30rem at 104% -8%, hsl(var(--topaz) / 0.055) 0%, transparent 66%),
-    linear-gradient(180deg, hsl(var(--background)) 0%, hsl(120 12% 96%) 100%);
+    linear-gradient(180deg, hsl(var(--background)) 0%, hsl(232 14% 96%) 100%);
   background-attachment: scroll;
 }
 .dark .app-shell {
@@ -256,7 +260,7 @@ body {
   background-image:
     radial-gradient(52rem 34rem at 4% -12%, hsl(var(--emerald) / 0.06) 0%, transparent 65%),
     radial-gradient(40rem 30rem at 104% -8%, hsl(var(--topaz) / 0.035) 0%, transparent 66%),
-    linear-gradient(180deg, hsl(var(--background)) 0%, hsl(160 16% 7%) 100%);
+    linear-gradient(180deg, hsl(var(--background)) 0%, hsl(230 18% 6%) 100%);
   background-attachment: scroll;
 }
 
@@ -270,7 +274,7 @@ body {
   box-shadow: 0 2px 4px rgba(15, 23, 42, 0.025), 0 26px 54px -40px rgba(15, 23, 42, 0.28);
 }
 .dark .app-shell .shadow-card {
-  background: rgba(19, 25, 23, 0.9);
+  background: rgba(18, 20, 27, 0.94);
   border-color: rgba(255, 255, 255, 0.08);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 24px 60px -40px rgba(0, 0, 0, 0.9);
 }
@@ -495,12 +499,12 @@ input, select, textarea, button, a { touch-action: manipulation; }
 }
 
 /* Font size presets */
-[data-font-size="small"] { --fs-base: 0.8125rem; }
-[data-font-size="medium"] { --fs-base: 0.875rem; }
-[data-font-size="large"] { --fs-base: 1rem; }
+[data-font-size="small"] { --fs-base: 0.9375rem; }
+[data-font-size="medium"] { --fs-base: 1rem; }
+[data-font-size="large"] { --fs-base: 1.125rem; }
 
 /* Font scaling (--fs-multiplier set by JS, e.g. 1.0 for 100%) */
-html { font-size: calc(var(--fs-base, 0.875rem) * var(--fs-multiplier, 1)); }
+html { font-size: calc(var(--fs-base, 1rem) * var(--fs-multiplier, 1)); }
 
 /* High contrast: stronger borders and text */
 [data-high-contrast="true"] {
@@ -796,7 +800,7 @@ html { font-size: calc(var(--fs-base, 0.875rem) * var(--fs-multiplier, 1)); }
 .workspace-page-header { min-width: 0; }
 .workspace-metric { min-height: 92px; }
 .workspace-metric > .flex { min-width: 0; }
-.workspace-table-panel { border-radius: 16px; }
+.workspace-table-panel { border-radius: var(--radius-panel); }
 .workspace-table { border-collapse: separate; border-spacing: 0; }
 .workspace-table thead th { position: sticky; top: 0; z-index: 3; background: hsl(var(--card)); color: hsl(var(--muted-foreground)); font-weight: 500; border-bottom: 1px solid hsl(var(--border)); }
 .workspace-table tbody tr { transition: background-color 140ms ease; }

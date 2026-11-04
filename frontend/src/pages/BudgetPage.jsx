@@ -121,7 +121,7 @@ const BudgetCard = React.memo(({ budget, isCurrentMonth, currentDay, monthElapse
   };
   const CatIcon = CATEGORY_ICONS[budget.category.toLowerCase().trim()] || (pct >= 100 ? TrendingDown : Target);
   return (
-    <div key={budget.budget_id} role="button" tabIndex={0} aria-label={`View ${budget.category} budget transactions`} onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget) { event.preventDefault(); openBudgetTransactions(budget); } }} onClick={handleCardClick} className={`group rounded-xl border ${isSelected ? "border-emerald bg-emerald/[0.03] ring-1 ring-emerald/30" : "border-border/50 bg-background/40"} backdrop-blur-xl p-3 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-border transition-all duration-300 relative overflow-hidden border-l-[3px] cursor-pointer ${over ? "border-l-ruby" : pct >= 80 ? "border-l-topaz" : "border-l-emerald"}`}>
+    <div key={budget.budget_id} role="button" tabIndex={0} aria-label={`View ${budget.category} budget transactions`} onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget) { event.preventDefault(); openBudgetTransactions(budget); } }} onClick={handleCardClick} className={`group rounded-xl border ${isSelected ? "border-emerald bg-emerald/[0.03] ring-1 ring-emerald/30" : "border-border/50 bg-background/40"} backdrop-blur-xl p-3 shadow-sm hover:shadow-lg hover:translate-y-0 hover:border-border transition-all duration-300 relative overflow-hidden border-l-[3px] cursor-pointer ${over ? "border-l-ruby" : pct >= 80 ? "border-l-topaz" : "border-l-emerald"}`}>
       <div className="flex items-start gap-2 mb-2">
         <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${over ? "from-ruby to-ruby/70" : pct >= 80 ? "from-topaz to-topaz/70" : "from-emerald to-emerald/70"} flex items-center justify-center text-white shrink-0 shadow-sm`}>
           <CatIcon className="h-3.5 w-3.5" />
@@ -131,7 +131,7 @@ const BudgetCard = React.memo(({ budget, isCurrentMonth, currentDay, monthElapse
           const next = new Set(bulkSelected);
           if (isSelected) next.delete(budget.budget_id); else next.add(budget.budget_id);
           setBulkSelected(next);
-        }} className="shrink-0 w-3.5 h-3.5 rounded border-border text-emerald focus:ring-emerald/30 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity mt-1" onClick={(e) => e.stopPropagation()} />
+        }} className="shrink-0 w-3.5 h-3.5 rounded border-border text-emerald focus:ring-emerald/30 opacity-100 sm:opacity-70 sm:group-hover:opacity-100 focus:opacity-100 transition-opacity mt-1" onClick={(e) => e.stopPropagation()} />
         <div className="flex items-center gap-1 mt-1">
           <span className={`w-1.5 h-1.5 rounded-full ${over ? "bg-ruby" : pct >= 80 ? "bg-topaz" : "bg-emerald"} shrink-0`} />
           <span className={`text-[10px] font-semibold ${over ? "text-ruby" : pct >= 80 ? "text-topaz" : "text-emerald"} hidden sm:inline`}>{statusLabel}</span>
@@ -186,7 +186,7 @@ const EventGroupCard = React.memo(({ group, setConfirmDelete, fetchData }) => {
   const [showAdd, setShowAdd] = useState(false);
   const parsedDate = group.event_date ? parseISO(group.event_date) : null;
   return (
-    <div key={group.event_group_id} className={`rounded-xl border border-border/50 bg-background/40 backdrop-blur-xl p-3 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-border transition-all duration-300 relative overflow-hidden border-l-[3px] ${over ? "border-l-ruby" : pct >= 80 ? "border-l-topaz" : "border-l-emerald"}`}>
+    <div key={group.event_group_id} className={`rounded-xl border border-border/50 bg-background/40 backdrop-blur-xl p-3 shadow-sm hover:shadow-lg hover:translate-y-0 hover:border-border transition-all duration-300 relative overflow-hidden border-l-[3px] ${over ? "border-l-ruby" : pct >= 80 ? "border-l-topaz" : "border-l-emerald"}`}>
       <div className="flex items-start gap-2.5 mb-2">
         {parsedDate ? (
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-muted-foreground/30 to-muted-foreground/10 flex flex-col items-center justify-center text-[8px] font-bold text-muted-foreground leading-tight shrink-0 shadow-sm">
@@ -1078,7 +1078,7 @@ export default React.memo(function BudgetPage() {
                 {unbudgetedCategories.map((cat, idx) => {
                   const UnCatIcon = CATEGORY_ICONS[cat.name.toLowerCase().trim()] || AlertCircle;
                   return (
-                  <div key={cat.name} className={`rounded-xl border border-dashed border-topaz/30 bg-background/40 backdrop-blur-xl p-3 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-topaz/50 transition-all duration-300 relative overflow-hidden border-l-[3px] border-l-topaz fade-up delay-${Math.min(idx, 5)}`}>
+                  <div key={cat.name} className={`rounded-xl border border-dashed border-topaz/30 bg-background/40 backdrop-blur-xl p-3 shadow-sm hover:shadow-lg hover:translate-y-0 hover:border-topaz/50 transition-all duration-300 relative overflow-hidden border-l-[3px] border-l-topaz fade-up delay-${Math.min(idx, 5)}`}>
                     <div className="flex items-start gap-2.5 mb-2">
                       <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-topaz to-topaz/70 flex items-center justify-center text-white shrink-0 shadow-sm">
                         <UnCatIcon className="h-3.5 w-3.5" />

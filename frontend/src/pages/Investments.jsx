@@ -83,7 +83,7 @@ export default function Investments() {
           </button>
         </div>
         {priceTab === "crypto" ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-3">
             {livePrices.length > 0 ? livePrices.map((p) => {
               const up = (p.change_24h_pct || 0) >= 0;
               return (
@@ -121,7 +121,7 @@ export default function Investments() {
         <p className="text-xs text-muted-foreground mt-3">Select an asset quote to populate the starting amount field. A single-unit market quote is not your actual portfolio value.</p>
       </div>
 
-      <form onSubmit={run} className="rounded-2xl border border-border bg-card p-4 sm:p-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 items-end">
+      <form onSubmit={run} className="rounded-2xl border border-border bg-card p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-3 sm:gap-4 items-end">
         <div>
           <label htmlFor="invest-symbol" className="label-overline">Symbol</label>
           <PenniSelect id="invest-symbol" aria-label="Investment symbol" data-testid="inv-symbol" value={form.symbol} onChange={(e)=>setForm({...form, symbol:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none">

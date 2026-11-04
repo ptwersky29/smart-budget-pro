@@ -110,17 +110,18 @@ export default function Analytics() {
               data.comparisons.length ? (
                 <div className="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-3">
                   {data.comparisons.slice(0, 9).map((row, index) => {
-                    const pct = Math.min(100, Math.max(0, Number(row.progress_pct) || 0));
+                    const actualPct = Math.max(0, Number(row.progress_pct) || 0);
+                    const pct = Math.min(100, actualPct);
                     return <div key={row.category + index} className="rounded-2xl border border-border bg-secondary/30 p-4">
                       <div className="flex items-center justify-between gap-2">
                         <p className="truncate text-sm font-semibold" title={resolveCategory(row.category)?.label || row.category}>{resolveCategory(row.category)?.label || row.category}</p>
-                        <span className="money-tabular text-xs text-muted-foreground">{Math.round(pct)}%</span>
+                        <span className={`money-tabular text-xs font-semibold ${actualPct > 100 ? "text-ruby" : "text-muted-foreground"}`}>{Math.round(actualPct)}%</span>
                       </div>
                       <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary" role="progressbar"
                         aria-label={(resolveCategory(row.category)?.label || row.category) + " budget used"} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-                        <div className="h-full rounded-full" style={{ width: pct + "%", background: pct > 90 ? "#e5484d" : "var(--penni-accent)" }} />
+                        <div className="h-full rounded-full" style={{ width: pct + "%", background: actualPct > 100 ? "hsl(var(--ruby))" : "var(--penni-accent)" }} />
                       </div>
-                      <p className="money-tabular mt-2 text-xs text-muted-foreground">{formatCurrency(row.spent)} of {formatCurrency(row.budget)}</p>
+                      <p className="money-tabular mt-2 text-xs text-muted-foreground">{formatCurrency(row.spent)} of {formatCurrency(row.budget)}{actualPct > 100 ? " · Over budget" : ""}</p>
                     </div>;
                   })}
                 </div>

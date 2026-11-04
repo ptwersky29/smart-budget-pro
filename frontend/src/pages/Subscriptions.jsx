@@ -11,6 +11,7 @@ import { PageHeader, Surface, StatCard } from "../components/ui/page";
 import CategoryCombobox from "../components/CategoryCombobox";
 import { useCategories } from "../contexts/CategoriesContext";
 import { formatCurrency } from "../lib/format";
+import { annualSubscriptionAmount, monthlySubscriptionAmount } from "../lib/subscriptionAmounts";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -32,6 +33,7 @@ export default function Subscriptions() {
   subsRef.current = subs;
   const [detected, setDetected] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [open, setOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -40,10 +42,11 @@ export default function Subscriptions() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const { data } = await api.get("/subscriptions");
       setSubs(data.subscriptions);
-    } catch (err) { console.error("subs load", err); }
+    } catch (err) { console.error("subs load", err); setLoadError(true); }
     finally { setLoading(false); }
   }, []);
 
@@ -142,27 +145,18 @@ export default function Subscriptions() {
     }
   };
 
-  const monthlyTotal = useMemo(() => {
-    return subs.filter((s) => s.active).reduce((sum, s) => sum + Math.abs(s.amount), 0);
-  }, [subs]);
-  const annualTotal = useMemo(() => {
-    return subs.filter((s) => s.active).reduce((sum, s) => {
-      switch (s.frequency) {
-        case "weekly": return sum + Math.abs(s.amount) * 52;
-        case "biweekly": return sum + Math.abs(s.amount) * 26;
-        case "monthly": return sum + Math.abs(s.amount) * 12;
-        case "quarterly": return sum + Math.abs(s.amount) * 4;
-        case "annually": return sum + Math.abs(s.amount);
-        default: return sum + Math.abs(s.amount) * 12;
-      }
-    }, 0);
-  }, [subs]);
+  const annualTotal = useMemo(
+    () => subs.filter((subscription) => subscription.active)
+      .reduce((sum, subscription) => sum + annualSubscriptionAmount(subscription), 0),
+    [subs],
+  );
+  const monthlyTotal = annualTotal / 12;
 
   const categoryBreakdown = useMemo(() => {
     const map = {};
     subs.filter((s) => s.active).forEach((s) => {
       const cat = s.category || "uncategorized";
-      map[cat] = (map[cat] || 0) + Math.abs(s.amount);
+      map[cat] = (map[cat] || 0) + monthlySubscriptionAmount(s);
     });
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
   }, [subs]);
@@ -179,7 +173,7 @@ export default function Subscriptions() {
       {/* Summary toolbar */}
       <PageToolbar className="justify-between">
         <p className="mr-auto text-sm text-muted-foreground">
-          {loading ? "Loading subscriptions…" : `${subs.filter((s) => s.active).length} active · ${formatCurrency(monthlyTotal)} / month · ${formatCurrency(annualTotal)} / year`}
+          {loading ? "Loading subscriptions…" : loadError ? "Could not refresh subscriptions" : `${subs.filter((s) => s.active).length} active · ${formatCurrency(monthlyTotal)} / month · ${formatCurrency(annualTotal)} / year`}
         </p>
         <Button type="button" aria-label="Refresh subscriptions" variant="outlinePill" size="pillSm" onClick={load}><RefreshCw className="h-3.5 w-3.5" /></Button>
         <DropdownMenu>
@@ -202,14 +196,14 @@ export default function Subscriptions() {
 
       {/* Summary cards follow the same visual vocabulary as the main dashboard. */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Active" value={loading ? "—" : subs.filter((subscription) => subscription.active).length} />
-        <StatCard label="Monthly" value={loading ? "—" : formatCurrency(monthlyTotal)} />
-        <StatCard label="Annual" value={loading ? "—" : formatCurrency(annualTotal)} />
-        <StatCard label="Paused" value={loading ? "—" : subs.filter((subscription) => !subscription.active).length} tone="topaz" />
+        <StatCard label="Active" value={loading || loadError ? "—" : subs.filter((subscription) => subscription.active).length} />
+        <StatCard label="Monthly" value={loading || loadError ? "—" : formatCurrency(monthlyTotal)} />
+        <StatCard label="Annual" value={loading || loadError ? "—" : formatCurrency(annualTotal)} />
+        <StatCard label="Paused" value={loading || loadError ? "—" : subs.filter((subscription) => !subscription.active).length} tone="topaz" />
       </div>
 
       {/* Category breakdown */}
-      {!loading && categoryBreakdown.length > 0 && (
+      {!loading && !loadError && categoryBreakdown.length > 0 && (
         <Surface className="p-5">
           <p className="text-xs font-medium text-muted-foreground mb-2">Spending by category (active)</p>
           <div className="space-y-1.5">
@@ -239,7 +233,7 @@ export default function Subscriptions() {
                 <div key={item.merchant + item.amount + i} className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
                   <div>
                     <p className="font-medium">{item.normalized_merchant || item.description}</p>
-                    <p className="text-xs text-muted-foreground">£{item.amount.toFixed(2)} / {item.frequency} &middot; {item.occurrences} occurrences</p>
+                    <p className="text-xs text-muted-foreground">{formatCurrency(item.amount)} / {item.frequency} &middot; {item.occurrences} occurrences</p>
                   </div>
                   <Button variant="outlinePill" size="pillSm" onClick={() => addFromDetected(item)}>Save</Button>
                 </div>
@@ -252,6 +246,11 @@ export default function Subscriptions() {
             <Skeleton className="h-14" />
             <Skeleton className="h-14" />
             <Skeleton className="h-14" />
+          </div>
+        ) : loadError && subs.length === 0 ? (
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 p-5 text-sm">
+            <span className="text-muted-foreground">Could not load subscriptions. Your saved records have not been changed.</span>
+            <Button type="button" variant="outlinePill" size="sm" onClick={load}>Retry</Button>
           </div>
         ) : subs.length === 0 ? (
             <EmptyState icon={Bell}
@@ -275,7 +274,7 @@ export default function Subscriptions() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="tabular-nums font-medium">£{Math.abs(s.amount).toFixed(2)}</span>
+                    <span className="money-tabular font-semibold">{formatCurrency(Math.abs(s.amount))}</span>
                     <span className="text-xs text-muted-foreground capitalize">/ {s.frequency}</span>
                   </div>
                   <button onClick={() => toggleActive(s)} className={`text-xs px-2 py-1 rounded-full ${s.active ? "bg-emerald/10 text-emerald" : "bg-muted text-muted-foreground"}`}>
@@ -295,7 +294,7 @@ export default function Subscriptions() {
                 {subs.map((s) => (
                   <tr key={s.subscription_id}>
                     <td className="min-w-[190px] font-medium">{s.name}{s.merchant && <span className="text-xs text-muted-foreground ml-2">{s.merchant}</span>}</td>
-                    <td className="money-tabular whitespace-nowrap font-semibold">£{Math.abs(s.amount).toFixed(2)}</td>
+                    <td className="money-tabular whitespace-nowrap font-semibold">{formatCurrency(Math.abs(s.amount))}</td>
                     <td className="capitalize text-muted-foreground">{s.frequency}</td>
                     <td>
                   <button onClick={() => toggleActive(s)} className={`text-xs px-3 py-2 rounded-full ${s.active ? "bg-emerald/10 text-emerald" : "bg-muted text-muted-foreground"}`}>

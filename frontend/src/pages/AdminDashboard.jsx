@@ -28,6 +28,7 @@ function UserRow({ u, busy, onToggleDisable, onSetRole, onSetTier, onDeleteUser 
         <td className="px-6 py-3 text-muted-foreground">{u.name || "—"}</td>
         <td className="px-6 py-3">
           <PenniSelect
+            aria-label={`Change role for ${u.email}`}
             value={u.role}
             onChange={(e) => onSetRole(u.user_id, e.target.value)}
             disabled={busy[`role-${u.user_id}`]}
@@ -40,6 +41,7 @@ function UserRow({ u, busy, onToggleDisable, onSetRole, onSetTier, onDeleteUser 
         </td>
         <td className="px-6 py-3">
           <PenniSelect
+            aria-label={`Change subscription for ${u.email}`}
             value={u.tier}
             onChange={(e) => onSetTier(u.user_id, e.target.value)}
             disabled={busy[`tier-${u.user_id}`]}
@@ -298,6 +300,7 @@ export default function AdminDashboard() {
             <div className="relative w-full min-w-0 sm:w-auto sm:flex-none">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
+                aria-label="Search users by name or email"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by email or name..."
@@ -305,6 +308,7 @@ export default function AdminDashboard() {
               />
             </div>
             <PenniSelect
+              aria-label="Filter users by role"
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
               className="h-11 shrink-0 rounded-xl bg-secondary/50 border border-transparent px-3 text-xs font-medium focus:border-ring focus:outline-none"
@@ -314,6 +318,7 @@ export default function AdminDashboard() {
               <option value="admin">Admins</option>
             </PenniSelect>
             <PenniSelect
+              aria-label="Filter users by status"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="h-11 shrink-0 rounded-xl bg-secondary/50 border border-transparent px-3 text-xs font-medium focus:border-ring focus:outline-none"
@@ -325,8 +330,8 @@ export default function AdminDashboard() {
           </div>
         }
       >
-        <div className="overflow-x-auto -mx-6 -mb-4">
-          <table className="w-full text-sm">
+        <div role="region" tabIndex={0} aria-label="User management table" className="overflow-x-auto -mx-6 -mb-4">
+          <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="text-left text-xs text-muted-foreground border-b border-border bg-secondary/30">
                 <th className="px-6 py-3 font-medium w-10"></th>
@@ -411,15 +416,15 @@ export default function AdminDashboard() {
       )}
 
       <SectionCard eyebrow="Security" title="Login History" description="Recent login attempts across all users.">
-        <div className="overflow-x-auto -mx-6 -mb-4">
-          <table className="w-full text-xs">
+        <div role="region" tabIndex={0} aria-label="Security login history" className="overflow-x-auto -mx-6 -mb-4">
+          <table className="w-full min-w-[760px] text-xs">
             <thead>
               <tr className="border-b border-border text-muted-foreground">
                 <th className="text-left font-medium px-4 py-2">User</th>
                 <th className="text-left font-medium px-4 py-2">Action</th>
                 <th className="text-left font-medium px-4 py-2">Result</th>
                 <th className="text-left font-medium px-4 py-2">IP</th>
-                <th className="text-left font-medium px-4 py-2 hidden md:table-cell">User Agent</th>
+                <th className="text-left font-medium px-4 py-2">User Agent</th>
                 <th className="text-right font-medium px-4 py-2">Time</th>
               </tr>
             </thead>
@@ -443,11 +448,11 @@ export default function AdminDashboard() {
                     )}
                   </td>
                   <td className="px-4 py-2.5 font-mono">{l.ip_address || "—"}</td>
-                  <td className="px-4 py-2.5 hidden md:table-cell text-muted-foreground truncate max-w-[160px]">
+                  <td className="px-4 py-2.5 text-muted-foreground max-w-[240px] break-words">
                     {l.user_agent || "—"}
                   </td>
                   <td className="px-4 py-2.5 text-right text-muted-foreground">
-                    {l.created_at?.slice(0, 16).replace("T", " ")}
+                    {l.created_at ? new Date(l.created_at).toLocaleString("en-GB", {day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) : ""}
                   </td>
                 </tr>
               ))}
@@ -462,10 +467,10 @@ export default function AdminDashboard() {
       </SectionCard>
 
       <SectionCard eyebrow="Configuration" title="Feature Flags" description="Toggle features on/off globally or per-user.">
-        <form onSubmit={createFlag} className="flex items-end gap-3 mb-6 pb-6 border-b border-border">
+        <form onSubmit={createFlag} className="mb-6 flex flex-col gap-3 border-b border-border pb-6 sm:flex-row sm:items-end">
           <div className="flex-1">
-            <label className="label-overline text-xs mb-1 block">Flag name</label>
-            <Input
+            <label htmlFor="penni-flag-name" className="label-overline text-xs mb-1 block">Flag name</label>
+            <Input id="penni-flag-name"
               value={newFlag.flag}
               onChange={(e) => setNewFlag((p) => ({ ...p, flag: e.target.value }))}
               placeholder="e.g. bank_sync"
@@ -474,8 +479,8 @@ export default function AdminDashboard() {
             />
           </div>
           <div className="flex-1">
-            <label className="label-overline text-xs mb-1 block">Description</label>
-            <Input
+            <label htmlFor="penni-flag-description" className="label-overline text-xs mb-1 block">Description</label>
+            <Input id="penni-flag-description"
               value={newFlag.description}
               onChange={(e) => setNewFlag((p) => ({ ...p, description: e.target.value }))}
               placeholder="Optional description"

@@ -345,7 +345,7 @@ export default function Dashboard() {
               onSelect={selected=>openAction("account-info",{accountId:selected.account_id,account:selected})}/>
           ))}
           <button type="button" onClick={()=>openAction("account-new")}
-            className="flex min-h-[170px] w-[200px] flex-shrink-0 flex-col items-center justify-center gap-3 rounded-[26px] border border-dashed border-border text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary">
+            className="flex min-h-[175px] w-[292px] min-w-[292px] flex-shrink-0 flex-col items-center justify-center gap-3 rounded-[26px] border border-dashed border-border text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary">
             <Plus className="h-6 w-6"/><span className="text-sm font-medium">Add account</span>
           </button>
         </div>
@@ -398,16 +398,16 @@ export default function Dashboard() {
         ) : null}
       </div>
 
-      <div className="dashboard-panels grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_288px]">
+      <div className="dashboard-panels grid min-h-0 gap-4 2xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <Surface className="min-w-0 p-4 sm:p-5">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[13px] font-semibold tracking-[-0.02em]">Spending breakdown</p>
-                  <p className="mt-0.5 text-[10.5px] text-muted-foreground">This month by category</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">This month by category</p>
                 </div>
-                <button type="button" onClick={() => openAction("reports")} className="text-[10.5px] font-semibold text-emerald">Details</button>
+                <Link to="/reports" className="inline-flex min-h-9 items-center text-sm font-semibold text-primary hover:underline">Details</Link>
               </div>
               <CategoryDonut data={categories} total={spend} size={146} />
             </Surface>
@@ -417,9 +417,9 @@ export default function Dashboard() {
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[13px] font-semibold tracking-[-0.02em]">Cash flow</p>
-                    <p className="mt-0.5 text-[10.5px] text-muted-foreground">Income vs spending</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">Income vs spending</p>
                   </div>
-                  <button type="button" onClick={() => openAction("reports")} className="text-[10.5px] font-semibold text-emerald">Reports</button>
+                  <Link to="/reports" className="inline-flex min-h-9 items-center text-sm font-semibold text-primary hover:underline">Reports</Link>
                 </div>
                 {monthlyFlow.length ? (
                   <div>
@@ -435,7 +435,7 @@ export default function Dashboard() {
                               <div className="w-[42%] rounded-t-md bg-emerald/80 transition group-hover:bg-emerald" style={{ height: `${incomeHeight}%` }} title={`Income ${formatCurrency(month.income)}`} />
                               <div className="w-[42%] rounded-t-md bg-topaz/45 transition group-hover:bg-topaz/65" style={{ height: `${spendHeight}%` }} title={`Spending ${formatCurrency(month.spend)}`} />
                             </div>
-                            <span className="text-center text-[9px] text-muted-foreground">{monthLabel(month.month)}</span>
+                            <span className="text-center text-[11px] text-muted-foreground">{monthLabel(month.month)}</span>
                           </div>
                         );
                       })}
