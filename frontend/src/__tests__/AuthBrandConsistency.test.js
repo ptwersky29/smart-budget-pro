@@ -16,7 +16,7 @@ describe("Penni premium authentication pages", () => {
     expect(s).toContain("No Penni subscription required");
     expect(s).not.toContain("14-day free trial");
   });
-  test("login retains password reset, session, Google, offline and sign-in routes", () => {
+  test("login retains password reset, session and Google, with public demo entry", () => {
     const s = read("pages/Login.jsx");
     expect(s).toContain("penni-auth grid");
     expect(s).toContain('data-testid="login-submit"');
@@ -24,7 +24,8 @@ describe("Penni premium authentication pages", () => {
     expect(s).toContain('data-testid="login-google"');
     expect(s).toContain('to="/forgot-password"');
     expect(s).toContain("await login(email, password, rememberMe)");
-    expect(s).toContain("continueOffline()");
+    expect(s).toContain('to="/demo" data-testid="login-offline"');
+    expect(s).not.toContain("continueOffline()");
     expect(s).not.toContain("256-bit encrypted");
   });
   test("both pages share the branded shell, visual and reduced-motion styles", () => {
