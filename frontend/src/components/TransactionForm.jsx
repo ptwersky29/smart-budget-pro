@@ -79,52 +79,15 @@ export default function TransactionForm({
 
   return (
     <NativePopup open={open} onClose={onClose} title={editingId ? "Edit transaction" : "New transaction"}
-      size="md" className="penni-transaction-popup" bodyClassName="penni-transaction-body">
+      size="md" className="penni-transaction-popup" bodyClassName="penni-transaction-body" showHeader
+      description={editingId ? "Balances, budgets and analytics update instantly." : "Log money in or out of any account."}>
       <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
-        {/* Header */}
-        <div className="penni-transaction-header flex items-center justify-between border-b border-border px-5 py-4 bg-card/90">
-          <div className="flex items-center gap-3">
-            <span
-              className={`grid h-9 w-9 place-items-center rounded-xl ${
-                editingId ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"
-              }`}
-            >
-              {editingId ? (
-                <Pencil className="h-4 w-4" />
-              ) : (
-                <Plus className="h-4 w-4" />
-              )}
-            </span>
-            <div>
-              <h3
-                className="text-base font-semibold tracking-tight text-foreground"
-                id="transaction-form-title"
-              >
-                {editingId ? "Edit Transaction" : "New Transaction"}
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                {editingId
-                  ? "Update transaction details in your ledger"
-                  : "Record an income, expense, or transfer"}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-            aria-label="Close dialog"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
         {/* Scrollable Form Body */}
         <form
           id="penni-transaction-form"
           noValidate
           onSubmit={onSubmit}
-          className="penni-transaction-fields flex-1 overflow-y-auto p-5 sm:p-6 space-y-4"
+          className="penni-transaction-fields flex-1 overflow-y-auto px-6 pb-6 pt-2 space-y-5"
           aria-labelledby="transaction-form-title"
         >
           {/* Type Toggle: Expense vs Income */}
@@ -132,7 +95,7 @@ export default function TransactionForm({
             <label className="sr-only">
               Transaction Type
             </label>
-            <div className="penni-ref-segment grid grid-cols-2 gap-2 rounded-xl border border-border bg-secondary/25 p-1" role="group" aria-label="Transaction type">
+            <div className="grid grid-cols-2 gap-1 rounded-2xl border border-border bg-secondary/30 p-1" role="group" aria-label="Transaction type">
               <button
                 type="button"
                 onClick={() =>
@@ -143,9 +106,9 @@ export default function TransactionForm({
                     entry_mode: entryMode === "transfer" ? "standard" : entryMode,
                   })
                 }
-                className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition ${
+                className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-medium transition-all ${
                   !form.is_income && !form.is_transfer
-                    ? "bg-card text-ruby shadow-sm border border-ruby/20"
+                    ? "bg-card text-foreground shadow-sm ring-1 ring-border"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -164,7 +127,7 @@ export default function TransactionForm({
                 }
                 className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition ${
                   form.is_income && !form.is_transfer
-                    ? "bg-card text-emerald shadow-sm border border-emerald/20"
+                    ? "bg-card text-foreground shadow-sm ring-1 ring-border"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -174,31 +137,27 @@ export default function TransactionForm({
             </div>
           </div>
 
-          {/* Amount input with currency symbol */}
-          <div>
-            <label
-              htmlFor="tx-amount"
-              className="text-xs font-medium text-muted-foreground block mb-1.5"
-            >
-              Amount <span className="text-ruby">*</span>
-            </label>
-            <div className="penni-amount-field relative">
-              <span className="penni-currency-sign pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">
-                £
-              </span>
-              <Input
+          {/* Original ZIP: large, centered amount instead of a cramped input. */}
+          <div className="py-2 text-center">
+            <label htmlFor="tx-amount" className="sr-only">Amount</label>
+            <div className="inline-flex max-w-full items-baseline justify-center gap-1">
+              <span className="text-3xl font-semibold tracking-tight text-muted-foreground">{form.is_income ? "+" : "−"}£</span>
+              <input
                 id="tx-amount"
                 data-testid="tx-amount"
                 required
                 type="number"
+                min="0"
                 step="0.01"
+                inputMode="decimal"
+                aria-label="Amount"
                 placeholder="0.00"
                 value={form.amount}
                 onChange={(e) => {
                   setForm({ ...form, amount: e.target.value });
-                  if (onClearClassification) onClearClassification();
+                  onClearClassification?.();
                 }}
-                className="penni-ref-amount h-11 pl-8 text-base font-bold tabular-nums"
+                className="w-[190px] max-w-[65vw] bg-transparent text-center text-5xl font-semibold tracking-tight text-foreground outline-none placeholder:text-muted-foreground/35 tabular-nums sm:text-[56px]"
               />
             </div>
           </div>
@@ -209,7 +168,7 @@ export default function TransactionForm({
               htmlFor="tx-desc"
               className="text-xs font-medium text-muted-foreground block mb-1.5"
             >
-              Description <span className="text-ruby">*</span>
+              {form.is_income ? "Received from" : "Merchant / description"} <span className="text-ruby">*</span>
             </label>
             <Input
               id="tx-desc"
@@ -258,25 +217,31 @@ export default function TransactionForm({
             </div>
 
 
-            {/* Reference quick-pick tiles, bound to existing categories. */}
+            {/* Original ZIP: defined category cards, never unstyled inline text. */}
             {Array.isArray(selectedCats) && selectedCats.some(c => c && typeof c === "object") && (
-              <div className="penni-ref-category-grid" role="group" aria-label="Quick categories">
-                {selectedCats.filter(c => c && typeof c === "object" && !c.is_archived).slice(0,11).map(c => {
-                  const name = c.name || c.slug || c.label;
-                  const selected = form.category === name;
-                  return (
-                    <button key={c.category_id || name} type="button" aria-pressed={selected}
-                      className={`penni-ref-category-tile ${selected ? "selected" : ""}`}
-                      onClick={() => setForm({ ...form, category:name })}>
-                      <span className="penni-ref-category-icon" style={{ background:(c.color || "#5b5cf0") + "1b",color:c.color || "#5b5cf0" }}>
-                        {c.emoji || c.icon || "•"}
-                      </span>
-                      <span className="truncate">{c.display_name || c.label || String(name).replace(/_/g," ")}</span>
-                    </button>
-                  );
-                })}
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="group" aria-label="Quick categories">
+                {selectedCats.filter(c => c && typeof c === "object" && !c.is_archived)
+                  .slice(0, 9).map(c => {
+                    const name = c.name || c.slug || c.label;
+                    const selected = form.category === name;
+                    return (
+                      <button key={c.category_id || name} type="button" aria-pressed={selected}
+                        className={`relative flex min-w-0 items-center gap-2 rounded-2xl border px-2.5 py-2.5 text-left text-[13px] font-medium transition-all ${selected
+                          ? "border-primary bg-primary/10 text-foreground ring-1 ring-primary/20"
+                          : "border-border bg-secondary/30 text-muted-foreground hover:bg-secondary/60 hover:text-foreground"}`}
+                        onClick={() => setForm({ ...form, category: name })}>
+                        <span aria-hidden="true" className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-base"
+                          style={{ backgroundColor: (c.color || "#6366f1") + "18" }}>
+                          {c.emoji || "•"}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate">{c.display_name || c.label || String(name).replace(/_/g, " ")}</span>
+                        {selected && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                      </button>
+                    );
+                  })}
               </div>
             )}
+            <div className="mt-2">
             <CategoryCombobox
               value={form.category}
               onChange={(val) => setForm({ ...form, category: val })}
@@ -288,6 +253,8 @@ export default function TransactionForm({
               }
               onCategoryCreated={onCategoryCreated}
             />
+
+              </div>
 
             {/* Source badges for selected category */}
             {form.category && (
@@ -612,13 +579,13 @@ export default function TransactionForm({
           </p>
         ) : null}
         {/* Modal Footer */}
-        <div className="penni-transaction-footer border-t border-border px-5 py-3.5 bg-card/90 flex items-center justify-end gap-2.5">
+        <div className="penni-transaction-footer border-t border-border bg-card px-6 py-4 flex items-center gap-3">
           <Button
             type="button"
             variant="outlinePill"
             size="sm"
             onClick={onClose}
-            className="text-xs"
+            className="flex-1 text-sm"
           >
             Cancel
           </Button>
@@ -630,7 +597,7 @@ export default function TransactionForm({
             data-testid="tx-submit"
             disabled={saving}
             aria-describedby={validationError ? "penni-transaction-save-error" : undefined}
-            className="text-xs font-semibold px-4"
+            className="flex-[1.4] text-sm font-semibold px-4"
           >
             {saving ? "Saving…" : editingId ? "Save changes" : "Add transaction"}
           </Button>
