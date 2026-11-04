@@ -502,3 +502,21 @@ html.dark[data-penni-accent="violet"] .penni-v2 {--penni-accent:#a07bff;}
 @media (prefers-reduced-motion: reduce) {
   .penni-native-popup, .penni-native-backdrop { animation: none; }
 }
+
+/* Radix popover/select menus portal to document.body, outside the dialog.
+   Their default Tailwind z-50 / z-100 is BELOW NativePopup's z-index 9991,
+   making account and category options appear inaccessible. All dropdown
+   portals must be stacked above the native dialog, without clipping. */
+.penni-native-popover,
+[data-radix-popper-content-wrapper]:has(.penni-native-popover) {
+  z-index: 10020 !important;
+}
+.penni-native-popup [data-radix-select-trigger] { cursor: pointer; }
+[data-radix-popper-content-wrapper]:has([role="listbox"]),
+[data-radix-popper-content-wrapper]:has([data-radix-select-viewport]) {
+  z-index: 10020 !important;
+}
+.penni-native-popover {
+  max-height: min(65dvh, 420px);
+  overflow: auto;
+}
