@@ -7,7 +7,8 @@ import { withUndo } from "../lib/undo";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import { Loader2, Plus, Trash2, Pencil, RefreshCcw, Sparkles, Bell, ChevronDown, RefreshCw } from "lucide-react";
 import { EmptyState, PageToolbar, SectionCard } from "../components/ui/layout";
-import { PageHeader, Surface } from "../components/ui/page";
+import { PageHeader, Surface, StatCard } from "../components/ui/page";
+import CategoryCombobox from "../components/CategoryCombobox";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -177,7 +178,7 @@ export default function Subscriptions() {
         <p className="mr-auto text-sm text-muted-foreground">
           {subs.filter((s) => s.active).length} active · £{monthlyTotal.toFixed(2)} / month · £{annualTotal.toLocaleString()} / year
         </p>
-        <Button variant="outlinePill" size="pillSm" onClick={load}><RefreshCw className="h-3.5 w-3.5" /></Button>
+        <Button type="button" aria-label="Refresh subscriptions" variant="outlinePill" size="pillSm" onClick={load}><RefreshCw className="h-3.5 w-3.5" /></Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="primary" size="pillSm">
@@ -196,24 +197,12 @@ export default function Subscriptions() {
         </DropdownMenu>
       </PageToolbar>
 
-      {/* Mini stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="surface p-3 text-center">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Active</p>
-          <p className="text-lg font-semibold mt-0.5">{subs.filter((s) => s.active).length}</p>
-        </div>
-        <div className="surface p-3 text-center">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Monthly</p>
-          <p className="text-lg font-semibold mt-0.5 tabular-nums">£{monthlyTotal.toFixed(2)}</p>
-        </div>
-        <div className="surface p-3 text-center">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Annual</p>
-          <p className="text-lg font-semibold mt-0.5 tabular-nums">£{annualTotal.toLocaleString()}</p>
-        </div>
-        <div className="surface p-3 text-center">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Paused</p>
-          <p className="text-lg font-semibold mt-0.5">{subs.filter((s) => !s.active).length}</p>
-        </div>
+      {/* Summary cards follow the same visual vocabulary as the main dashboard. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard label="Active" value={subs.filter((subscription) => subscription.active).length} />
+        <StatCard label="Monthly" value={`£${monthlyTotal.toFixed(2)}`} />
+        <StatCard label="Annual" value={`£${annualTotal.toLocaleString()}`} />
+        <StatCard label="Paused" value={subs.filter((subscription) => !subscription.active).length} tone="topaz" />
       </div>
 
       {/* Category breakdown */}
@@ -238,13 +227,13 @@ export default function Subscriptions() {
         </Surface>
       )}
 
-      <SectionCard eyebrow="Managed" title={`${subs.length} subscription${subs.length !== 1 ? "s" : ""}`}>
+      <SectionCard eyebrow="Managed" title={`${subs.length} subscription${subs.length !== 1 ? "s" : ""}`} contentClassName="p-0">
         {detected.length > 0 && (
           <div className="border-b border-border/50">
-            <div className="px-6 py-2 text-xs font-medium text-emerald">AI detected — review and save</div>
+            <div className="px-4 py-3 text-xs font-medium text-emerald sm:px-5">AI detected — review and save</div>
             <div className="divide-y divide-border/40 text-sm">
               {detected.map((item, i) => (
-                <div key={item.merchant + item.amount + i} className="px-6 py-3 flex items-center justify-between gap-3">
+                <div key={item.merchant + item.amount + i} className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
                   <div>
                     <p className="font-medium">{item.normalized_merchant || item.description}</p>
                     <p className="text-xs text-muted-foreground">£{item.amount.toFixed(2)} / {item.frequency} &middot; {item.occurrences} occurrences</p>
@@ -277,8 +266,8 @@ export default function Subscriptions() {
                     {s.merchant && <p className="text-xs text-muted-foreground truncate">{s.merchant}</p>}
                   </div>
                   <div className="flex gap-1 shrink-0">
-                    <button onClick={() => openEdit(s)} className="p-2 text-muted-foreground hover:text-emerald" aria-label={`Edit ${s.name}`}><Pencil className="h-4 w-4" /></button>
-                    <button onClick={() => del(s.subscription_id)} className="p-2 text-muted-foreground hover:text-ruby" aria-label={`Delete ${s.name}`}><Trash2 className="h-4 w-4" /></button>
+                    <button onClick={() => openEdit(s)} className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary" aria-label={`Edit ${s.name}`}><Pencil className="h-4 w-4" /></button>
+                    <button onClick={() => del(s.subscription_id)} className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-ruby/5 hover:text-ruby focus-visible:outline-2 focus-visible:outline-primary" aria-label={`Delete ${s.name}`}><Trash2 className="h-4 w-4" /></button>
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
@@ -295,24 +284,24 @@ export default function Subscriptions() {
           </div>
           {/* Desktop table */}
           <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead><tr className="text-left text-xs text-muted-foreground border-b border-border">
-                <th className="px-6 py-3">Name</th><th className="px-6 py-3">Amount</th><th className="px-6 py-3">Frequency</th><th className="px-6 py-3">Status</th><th className="px-6 py-3 w-24"></th>
+            <table className="penni-data-table">
+              <thead><tr>
+                <th scope="col">Name</th><th scope="col">Amount</th><th scope="col">Frequency</th><th scope="col">Status</th><th scope="col" className="w-24"><span className="sr-only">Actions</span></th>
               </tr></thead>
               <tbody>
                 {subs.map((s) => (
-                  <tr key={s.subscription_id} className="border-b border-border last:border-0 hover:bg-secondary/30">
-                    <td className="px-6 py-3 font-medium">{s.name}{s.merchant && <span className="text-xs text-muted-foreground ml-2">{s.merchant}</span>}</td>
-                    <td className="px-6 py-3 tabular-nums">£{Math.abs(s.amount).toFixed(2)}</td>
-                    <td className="px-6 py-3 text-xs capitalize">{s.frequency}</td>
-                    <td className="px-6 py-3">
+                  <tr key={s.subscription_id}>
+                    <td className="min-w-[190px] font-medium">{s.name}{s.merchant && <span className="text-xs text-muted-foreground ml-2">{s.merchant}</span>}</td>
+                    <td className="money-tabular whitespace-nowrap font-semibold">£{Math.abs(s.amount).toFixed(2)}</td>
+                    <td className="capitalize text-muted-foreground">{s.frequency}</td>
+                    <td>
                   <button onClick={() => toggleActive(s)} className={`text-xs px-3 py-2 rounded-full ${s.active ? "bg-emerald/10 text-emerald" : "bg-muted text-muted-foreground"}`}>
                         {s.active ? "Active" : "Paused"}
                       </button>
                     </td>
-                    <td className="px-6 py-3 text-right whitespace-nowrap">
-                      <button onClick={() => openEdit(s)} className="p-2 text-muted-foreground hover:text-emerald" aria-label={`Edit ${s.name}`}><Pencil className="h-4 w-4" /></button>
-                      <button onClick={() => del(s.subscription_id)} className="p-2 text-muted-foreground hover:text-ruby" aria-label={`Delete ${s.name}`}><Trash2 className="h-4 w-4" /></button>
+                    <td className="whitespace-nowrap">
+                      <button onClick={() => openEdit(s)} className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary" aria-label={`Edit ${s.name}`}><Pencil className="h-4 w-4" /></button>
+                      <button onClick={() => del(s.subscription_id)} className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-ruby/5 hover:text-ruby focus-visible:outline-2 focus-visible:outline-primary" aria-label={`Delete ${s.name}`}><Trash2 className="h-4 w-4" /></button>
                     </td>
                   </tr>
                 ))}
@@ -327,26 +316,55 @@ export default function Subscriptions() {
       </SectionCard>
 
       {open && (
-        <NativePopup open={open} title={editingId ? "Edit subscription" : "New subscription"} onClose={() => setOpen(false)} size="md">
-          <div className="penni-native-form space-y-4">
-            <h3 className="text-xl tracking-tight font-medium mb-4">{editingId ? "Edit subscription" : "New subscription"}</h3>
-            <form onSubmit={submit} className="space-y-3">
-              <Input required placeholder="Name (e.g. Netflix)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full" />
-              <Input required type="number" step="0.01" placeholder="Amount (£)" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="w-full" />
-              <Input placeholder="Merchant (optional)" value={form.merchant} onChange={(e) => setForm({ ...form, merchant: e.target.value })} className="w-full" />
-              <div className="grid grid-cols-2 gap-2">
-                <PenniSelect value={form.frequency} onChange={(e) => setForm({ ...form, frequency: e.target.value })} className="h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors w-full">
-                  <option value="monthly">Monthly</option><option value="yearly">Yearly</option><option value="weekly">Weekly</option>
+        <NativePopup open={open} showHeader title={editingId ? "Edit subscription" : "New subscription"}
+          description="Manage a recurring payment without leaving your workspace."
+          onClose={() => setOpen(false)} size="md" bodyClassName="penni-native-form">
+          <form onSubmit={submit} className="space-y-4" aria-label="Subscription details">
+            <div className="space-y-1.5">
+              <label htmlFor="penni-sub-name" className="block text-xs font-medium text-muted-foreground">Name</label>
+              <Input id="penni-sub-name" required placeholder="Subscription name" value={form.name}
+                onChange={(event) => setForm({ ...form, name: event.target.value })} />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label htmlFor="penni-sub-amount" className="block text-xs font-medium text-muted-foreground">Amount (£)</label>
+                <Input id="penni-sub-amount" required type="number" min="0.01" inputMode="decimal" step="0.01"
+                  placeholder="0.00" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })}
+                  className="tabular-nums" />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="penni-sub-frequency" className="block text-xs font-medium text-muted-foreground">Frequency</label>
+                <PenniSelect id="penni-sub-frequency" aria-label="Billing frequency" value={form.frequency}
+                  onChange={(event) => setForm({ ...form, frequency: event.target.value })}
+                  className="h-11 w-full rounded-xl border border-border bg-secondary/50 px-3 text-sm">
+                  <option value="monthly">Monthly</option>
+                  <option value="yearly">Yearly</option>
+                  <option value="weekly">Weekly</option>
                 </PenniSelect>
-                <Input placeholder="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full" />
               </div>
-              <textarea placeholder="Notes (optional)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full rounded-xl bg-secondary/50 border border-transparent px-4 py-3 text-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors resize-none" rows={2} />
-              <div className="flex gap-2 pt-2">
-                <Button variant="outlinePill" size="pill" className="flex-1" onClick={() => setOpen(false)}>Cancel</Button>
-                <Button variant="primary" size="pill" className="flex-1">{editingId ? "Save" : "Add"}</Button>
-              </div>
-            </form>
-          </div>
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="penni-sub-merchant" className="block text-xs font-medium text-muted-foreground">Merchant (optional)</label>
+              <Input id="penni-sub-merchant" placeholder="Merchant" value={form.merchant}
+                onChange={(event) => setForm({ ...form, merchant: event.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <span className="block text-xs font-medium text-muted-foreground">Category</span>
+              <CategoryCombobox value={form.category} onChange={(value) => setForm({ ...form, category: value })}
+                label="Subscription category" placeholder="Choose a category" allowClear />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="penni-sub-notes" className="block text-xs font-medium text-muted-foreground">Notes (optional)</label>
+              <textarea id="penni-sub-notes" placeholder="Add a note" value={form.notes}
+                onChange={(event) => setForm({ ...form, notes: event.target.value })}
+                className="w-full resize-none rounded-xl border border-border bg-secondary/50 px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                rows={2} />
+            </div>
+            <div className="flex justify-end gap-2 border-t border-border/60 pt-4">
+              <Button type="button" variant="outlinePill" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button type="submit" variant="primary">{editingId ? "Save subscription" : "Add subscription"}</Button>
+            </div>
+          </form>
         </NativePopup>
       )}
       <ConfirmModal

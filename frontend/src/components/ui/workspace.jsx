@@ -30,9 +30,9 @@ export function WorkspaceMetric({ label, value, note, icon: Icon, tone = "emeral
       <div className="flex min-h-[58px] items-center gap-3">
         {Icon && <span className={`grid h-[38px] w-[38px] shrink-0 place-items-center rounded-xl ${toneStyle}`}><Icon className="h-[18px] w-[18px]" /></span>}
         <div className="min-w-0">
-          <p className="text-[10.5px] text-muted-foreground">{label}</p>
+          <p className="text-xs font-medium text-muted-foreground">{label}</p>
           <p className="money-tabular mt-0.5 break-words text-[23px] font-semibold leading-none tracking-[-0.03em]">{value}</p>
-          {note && <p className="mt-1.5 text-[10px] text-muted-foreground">{note}</p>}
+          {note && <p className="mt-1.5 text-[11px] text-muted-foreground">{note}</p>}
         </div>
       </div>
       {progress != null && <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.max(0,Math.min(100,Number(progress)||0))} aria-label={label}>
@@ -46,8 +46,8 @@ export function WorkspaceTabs({ tabs, active, onChange, label = "View", classNam
   return (
     <div role="tablist" aria-label={label} className={`no-scrollbar flex min-h-[44px] min-w-0 flex-1 items-center gap-4 overflow-x-auto overflow-y-hidden whitespace-nowrap border-b border-border ${className}`}>
       {tabs.map(tab => <button key={tab.key} role="tab" aria-selected={active === tab.key} type="button" onClick={() => onChange(tab.key)}
-        className={`inline-flex h-10 shrink-0 items-center gap-1.5 border-b-2 text-[12px] transition-colors ${active === tab.key ? "font-semibold text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-        {tab.label}<span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active === tab.key ? "bg-emerald/10 text-emerald" : "bg-secondary text-muted-foreground"}`}>{tab.count}</span>
+        className={`inline-flex h-10 shrink-0 items-center gap-1.5 border-b-2 text-[12px] transition-colors ${active === tab.key ? "border-primary font-semibold text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+        {tab.label}{tab.count != null && <span className={`rounded-full px-1.5 py-0.5 text-[11px] ${active === tab.key ? "bg-emerald/10 text-emerald" : "bg-secondary text-muted-foreground"}`}>{tab.count}</span>}
       </button>)}
     </div>
   );

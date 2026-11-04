@@ -324,10 +324,10 @@ export default function Connections() {
                       )}
                     </div>
                     {c.last_sync_at && !editingNickname && (
-                      <p className="text-[10px] text-muted-foreground mt-1">synced {new Date(c.last_sync_at).toLocaleString()}</p>
+                      <p className="text-[11px] text-muted-foreground mt-1">synced {new Date(c.last_sync_at).toLocaleString()}</p>
                     )}
                     {c.last_error && !editingNickname && (
-                      <p className="text-[10px] text-ruby mt-1 truncate" title={c.last_error}>{c.last_error}</p>
+                      <p className="text-[11px] text-ruby mt-1 truncate" title={c.last_error}>{c.last_error}</p>
                     )}
                     {/* Action buttons */}
                     <div className="mt-2 flex items-center gap-2">
@@ -395,7 +395,7 @@ export default function Connections() {
                     )}
                   </div>
                   {c.balance_updated_at && (
-                    <p className="text-[10px] text-muted-foreground mt-1">updated {new Date(c.balance_updated_at).toLocaleString()}</p>
+                    <p className="text-[11px] text-muted-foreground mt-1">updated {new Date(c.balance_updated_at).toLocaleString()}</p>
                   )}
                   <div className="mt-2 flex items-center gap-2">
                     <button onClick={() => removeManual(c.connection_id)}

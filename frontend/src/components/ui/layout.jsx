@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { Button } from "./button";
+import { cn } from "../../lib/utils";
 
 export const PageToolbar = React.memo(function PageToolbar({ children, className = "", ...props }) {
   return (
@@ -13,18 +14,18 @@ export const PageToolbar = React.memo(function PageToolbar({ children, className
 
 export const SectionCard = React.memo(function SectionCard({ eyebrow, title, description, actions, children, className = "", contentClassName = "", ...props }) {
   return (
-    <section {...props} className={`surface rounded-2xl ${className}`}>
+    <section {...props} className={cn("surface min-w-0 overflow-hidden rounded-2xl", className)}>
       {(eyebrow || title || description || actions) && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between p-5 sm:p-6 border-b border-white/40 dark:border-white/5">
+        <div className="flex flex-col gap-2.5 border-b border-border/60 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
           <div className="max-w-2xl space-y-1">
             {eyebrow && <p className="label-overline">{eyebrow}</p>}
-            {title && <h2 className="text-lg sm:text-xl lg:text-2xl tracking-[-0.03em] font-semibold">{title}</h2>}
+            {title && <h2 className="text-[15px] font-semibold tracking-[-0.025em] sm:text-base">{title}</h2>}
             {description && <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>}
           </div>
           {actions && <div className="flex flex-wrap items-center gap-2 shrink-0">{actions}</div>}
         </div>
       )}
-      <div className={`p-5 sm:p-6 ${contentClassName}`}>{children}</div>
+      <div className={cn("min-w-0", contentClassName?.split(/\s+/).includes("p-0") ? "p-0" : "p-4 sm:p-5", contentClassName)}>{children}</div>
     </section>
   );
 });

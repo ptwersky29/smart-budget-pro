@@ -94,13 +94,22 @@ const TransactionRow = React.memo(
                 : isFocused
                   ? "bg-topaz/5"
                   : "hover:bg-secondary/30"
-            } ${isFocused ? "ring-1 ring-inset ring-topaz/30" : ""}`}
+            } ${isFocused ? "ring-1 ring-inset ring-topaz/30" : ""} focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary`}
             onClick={(event) => {
               onSetFocus?.();
               if (event.target.closest("button, input, label, a, [role='menuitem'], [data-radix-collection-item]")) return;
               onSelectRow?.(t);
             }}
             onDoubleClick={() => onEdit?.(t)}
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.target !== event.currentTarget) return;
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onSetFocus?.();
+                onSelectRow?.(t);
+              }
+            }}
           >
             <td className="px-2.5 py-2">
               <label
@@ -117,7 +126,7 @@ const TransactionRow = React.memo(
                 />
               </label>
             </td>
-            <td className="whitespace-nowrap px-3 py-2 text-[11px] text-muted-foreground">
+            <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">
               {dateLabel}
             </td>
             <td className="px-1.5 py-2">
@@ -137,9 +146,9 @@ const TransactionRow = React.memo(
                   )}
                 </span>
                 <div className="min-w-0">
-                  <div className="truncate text-[12px] font-medium leading-tight">{description}</div>
+                  <div className="truncate text-[13px] font-medium leading-tight">{description}</div>
                   {displaySubtitle ? (
-                    <div className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground">{displaySubtitle}</div>
+                    <div className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">{displaySubtitle}</div>
                   ) : null}
                 </div>
               </div>
@@ -152,20 +161,20 @@ const TransactionRow = React.memo(
                   truncate
                   showIcon
                 />
-                {t.is_split ? <span className="shrink-0 rounded-full bg-violet/10 px-1.5 py-0.5 text-[9px] font-medium text-violet">Split</span> : null}
+                {t.is_split ? <span className="shrink-0 rounded-full bg-violet/10 px-1.5 py-0.5 text-[11px] font-medium text-violet">Split</span> : null}
               </div>
             </td>
             <td className="px-1 py-2">
-              <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-foreground">
+              <span className="flex min-w-0 items-center gap-1.5 text-xs text-foreground">
                 {brandLogo ? <img src={brandLogo} alt="" className="h-5 w-5 shrink-0 rounded-full object-contain" /> : <Wallet className="h-4 w-4 shrink-0 text-muted-foreground" />}
                 <span className="truncate">{accountName}</span>
               </span>
             </td>
-            <td className={`money-tabular px-2 py-2 text-right text-[11.5px] font-semibold ${negative ? "text-ruby" : "text-emerald"}`}>
+            <td className={`money-tabular px-2 py-2 text-right text-[13px] font-semibold ${negative ? "text-ruby" : "text-emerald"}`}>
               {amount > 0 ? "+" : "-"}{formatCurrency(Math.abs(amount))}
             </td>
             <td className="px-1.5 py-2">
-              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
                 failed
                   ? "bg-ruby/10 text-ruby"
                   : unapproved

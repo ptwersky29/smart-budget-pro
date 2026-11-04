@@ -9,6 +9,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useActions } from "../contexts/ActionContext";
 import { Button } from "../components/ui/button";
+import { PageHeader } from "../components/ui/page";
 import ConfirmModal from "../components/ui/ConfirmModal";
 
 const PROVIDERS = [
@@ -117,7 +118,9 @@ export default function Integrations({ embedded }) {
   const providerMeta = PROVIDERS.find(p => p.value === aiForm.provider) || PROVIDERS[0];
 
   return (
-    <div className="space-y-6" data-testid="integrations-root">
+    <div className="page-stack pb-4" data-testid="integrations-root">
+      {!embedded && <PageHeader eyebrow="Connected services" title="Integrations"
+        description="Manage AI providers, bank connections and messaging from one workspace." />}
       {/* AI Provider — bring your own key (works for free tier too) */}
       <Card icon={Sparkles} title="AI Provider"
             subtitle={activeAi
@@ -134,23 +137,23 @@ export default function Integrations({ embedded }) {
                   <p className="text-xs text-muted-foreground truncate">{p.provider} · {p.model}</p>
                 </div>
                 {p.is_default && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald/10 text-emerald">Default</span>}
-                <button onClick={()=>removeAi(p.provider_id)} aria-label={`Remove ${p.name || p.provider} provider`} data-testid={`ai-remove-${p.provider_id}`} className="p-2 text-muted-foreground hover:text-ruby"><Trash2 className="h-4 w-4"/></button>
+                <button onClick={()=>removeAi(p.provider_id)} aria-label={`Remove ${p.name || p.provider} provider`} data-testid={`ai-remove-${p.provider_id}`} className="rounded-lg p-2 text-muted-foreground hover:bg-ruby/5 hover:text-ruby focus-visible:outline-2 focus-visible:outline-primary"><Trash2 className="h-4 w-4"/></button>
               </div>
             ))}
           </div>
         )}
         <form onSubmit={saveAi} className="grid sm:grid-cols-2 gap-3">
           <div>
-            <label className="label-overline">Provider</label>
-            <PenniSelect data-testid="ai-provider" value={aiForm.provider}
+            <label htmlFor="penni-ai-provider" className="label-overline">Provider</label>
+            <PenniSelect id="penni-ai-provider" aria-label="AI provider" data-testid="ai-provider" value={aiForm.provider}
                     onChange={(e)=>{ const p = PROVIDERS.find(x=>x.value===e.target.value); setAiForm({...aiForm, provider:e.target.value, model: p?.models[0] || ""}); }}
                     className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none">
               {PROVIDERS.map((p)=><option key={p.value} value={p.value}>{p.label}</option>)}
             </PenniSelect>
           </div>
           <div>
-            <label className="label-overline">Model</label>
-            <PenniSelect data-testid="ai-model" value={aiForm.model} onChange={(e)=>setAiForm({...aiForm, model:e.target.value})}
+            <label htmlFor="penni-ai-model" className="label-overline">Model</label>
+            <PenniSelect id="penni-ai-model" aria-label="AI model" data-testid="ai-model" value={aiForm.model} onChange={(e)=>setAiForm({...aiForm, model:e.target.value})}
                     className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none">
               {providerMeta.models.map((m)=><option key={m}>{m}</option>)}
             </PenniSelect>
@@ -200,9 +203,9 @@ export default function Integrations({ embedded }) {
           <Field testid="tw-number" label="Twilio phone number" placeholder="+447700900123"
                  value={twForm.phone_number} onChange={(v)=>setTwForm({...twForm, phone_number:v})} mono />
           <div className="space-y-1">
-            <label className="label-overline">Webhook URL</label>
+            <label htmlFor="penni-tw-webhook" className="label-overline">Webhook URL</label>
             <div className="flex gap-2">
-              <input readOnly value={tw?.webhook_url || ""} className="flex-1 h-11 px-4 rounded-xl bg-secondary/30 text-xs font-mono" />
+              <input id="penni-tw-webhook" readOnly value={tw?.webhook_url || ""} className="flex-1 h-11 px-4 rounded-xl bg-secondary/30 text-xs font-mono" />
               <button type="button" onClick={()=>copy(tw?.webhook_url)} aria-label="Copy Twilio webhook URL" data-testid="tw-copy-webhook" className="h-11 w-11 rounded-xl border border-border hover:bg-secondary grid place-items-center"><Copy className="h-4 w-4"/></button>
             </div>
             <p className="text-xs text-muted-foreground">Twilio Console → your number → A MESSAGE COMES IN → HTTP POST.</p>
@@ -274,11 +277,11 @@ const Card = ({ icon: Icon, title, subtitle, status, testid, children }) => {
     info: { label: "Managed", color: "bg-secondary text-muted-foreground", Icon: ShieldCheck },
   }[status] || { label: status, color: "bg-secondary text-muted-foreground", Icon: AlertCircle };
   return (
-    <div className="rounded-2xl border border-border bg-card p-6" data-testid={testid}>
+    <div className="surface min-w-0 p-4 sm:p-5" data-testid={testid}>
       <div className="flex items-center gap-3 mb-1">
         <div className="w-10 h-10 rounded-xl bg-secondary grid place-items-center"><Icon className="h-5 w-5 text-emerald" /></div>
         <div className="flex-1">
-          <p className="text-lg tracking-tight font-medium">{title}</p>
+          <p className="text-base font-semibold tracking-tight">{title}</p>
           <p className="text-xs text-muted-foreground">{subtitle}</p>
         </div>
         <span className={`text-xs px-2.5 py-1 rounded-full inline-flex items-center gap-1 ${badge.color}`}><badge.Icon className="h-3 w-3" /> {badge.label}</span>
@@ -288,14 +291,18 @@ const Card = ({ icon: Icon, title, subtitle, status, testid, children }) => {
   );
 };
 
-const Field = ({ testid, label, value, onChange, type = "text", placeholder, mono, required }) => (
-  <div>
-    <label className="label-overline">{label}</label>
-    <input data-testid={testid} type={type} required={required} value={value} onChange={(e)=>onChange(e.target.value)}
-           placeholder={placeholder}
-           className={`mt-1 w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none ${mono ? "font-mono text-sm" : ""}`} />
-  </div>
-);
+const Field = ({ testid, label, value, onChange, type = "text", placeholder, mono, required }) => {
+  const fieldId = React.useId();
+  return (
+    <div>
+      <label htmlFor={fieldId} className="label-overline">{label}</label>
+      <input id={fieldId} data-testid={testid} type={type} required={required}
+        value={value} onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className={`mt-1 h-11 w-full rounded-xl border border-transparent bg-secondary/50 px-4 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-primary/20 ${mono ? "font-mono" : ""}`} />
+    </div>
+  );
+};
 
 const TestResult = ({ ok, text }) => (
   <div className={`mt-4 p-3 rounded-xl text-sm flex items-center gap-2 ${ok ? "bg-emerald/10 text-emerald" : "bg-ruby/10 text-ruby"}`}>
@@ -311,11 +318,19 @@ const LinkCard = ({ icon: Icon, title, subtitle, status, statusLabel, href, navi
     info: { label: statusLabel || "Loading…", color: "bg-secondary text-muted-foreground", Icon: ShieldCheck },
   }[status] || { label: statusLabel || status, color: "bg-secondary text-muted-foreground", Icon: AlertCircle };
   return (
-    <div className="rounded-2xl border border-border bg-card p-6 cursor-pointer hover:border-emerald/50 transition-colors" onClick={() => onSelect ? onSelect() : navigate(href)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect ? onSelect() : navigate(href); } }} role="button" tabIndex={0}>
+    <div className="surface min-w-0 cursor-pointer p-4 transition-colors hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:p-5"
+      onClick={() => onSelect ? onSelect() : navigate(href)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect ? onSelect() : navigate(href);
+        }
+      }}
+      role="button" aria-label={`Open ${title}`} tabIndex={0}>
       <div className="flex items-center gap-3 mb-1">
         <div className="w-10 h-10 rounded-xl bg-secondary grid place-items-center"><Icon className="h-5 w-5 text-emerald" /></div>
         <div className="flex-1">
-          <p className="text-lg tracking-tight font-medium">{title}</p>
+          <p className="text-base font-semibold tracking-tight">{title}</p>
           <p className="text-xs text-muted-foreground">{subtitle}</p>
         </div>
         <span className={`text-xs px-2.5 py-1 rounded-full inline-flex items-center gap-1 ${badge.color}`}><badge.Icon className="h-3 w-3" /> {badge.label}</span>

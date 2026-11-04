@@ -31,21 +31,21 @@ function SettingRow({ to, icon: Icon, title, description, badge, onSelect }) {
     <Link
       to={to}
       onClick={onSelect ? event => { event.preventDefault(); onSelect(); } : undefined}
-      className="group flex items-center gap-3 border-b border-border/50 px-4 py-3 last:border-0 transition hover:bg-secondary/35 sm:px-5"
+      className="group flex items-center gap-3 border-b border-border/50 px-4 py-3.5 last:border-0 transition-colors hover:bg-secondary/35 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary sm:px-5"
     >
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-secondary/70 text-muted-foreground transition group-hover:bg-emerald/10 group-hover:text-emerald">
         <Icon className="h-4 w-4" />
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2">
-          <span className="truncate text-[13px] font-medium">{title}</span>
+          <span className="truncate text-sm font-medium">{title}</span>
           {badge ? (
-            <span className="rounded-full bg-topaz/12 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-topaz">
+            <span className="rounded-full bg-topaz/12 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-topaz">
               {badge}
             </span>
           ) : null}
         </span>
-        <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{description}</span>
+        <span className="mt-0.5 block truncate text-xs text-muted-foreground">{description}</span>
       </span>
       <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
     </Link>
@@ -56,7 +56,7 @@ function Section({ title, children }) {
   return (
     <Surface className="overflow-hidden">
       <SurfaceHeader title={title} compact />
-      <div className="mt-2 border-t border-border/50">{children}</div>
+      <div className="border-t border-border/50">{children}</div>
     </Surface>
   );
 }

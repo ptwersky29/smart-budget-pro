@@ -90,7 +90,11 @@ export function PageHeader({
   ) : null;
 
   return (
-    <div className={cn("penni-inner-page-header flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between", className)}>
+    <div className={cn(
+        "penni-inner-page-header flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between",
+        !actions && !backTo && !onBack && !children && "penni-page-heading-only",
+        className
+      )}>
       <div className="flex min-w-0 items-start gap-3">
         {backControl}
         <div className="min-w-0">
@@ -149,7 +153,7 @@ export function StatCard({
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           {label}
         </p>
         {Icon ? (
@@ -169,7 +173,7 @@ export function StatCard({
         ) : null}
       </div>
       {detail ? (
-        <p className="mt-1.5 truncate text-[11px] text-muted-foreground">{detail}</p>
+        <p className="mt-1.5 truncate text-xs text-muted-foreground">{detail}</p>
       ) : null}
       {children ? <div className="mt-auto pt-3">{children}</div> : null}
     </div>
