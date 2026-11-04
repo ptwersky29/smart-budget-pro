@@ -16,7 +16,7 @@
   --surface: rgba(255, 255, 255, 0.82);
   --surface-solid: #ffffff;
   --surface-muted: rgba(246, 248, 245, 0.86);
-  --content-max: 1580px;
+  --content-max: 1360px;
 }
 
 html, body, #root { height: 100%; }
@@ -708,8 +708,20 @@ html { font-size: calc(var(--fs-base, 0.875rem) * var(--fs-multiplier, 1)); }
   }
 }
 
-/* At short desktop heights or large browser zoom, preserve access to every control. */
-@media (min-width: 1024px) and (max-height: 690px) {
+/* Use a denser contained workspace on ordinary short laptop screens. */
+@media (min-width: 1024px) and (min-height: 521px) and (max-height: 690px) {
+  .workspace-main { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+  .workspace-route-view > .page-stack { gap: 0.65rem; }
+  .workspace-metric { min-height: 76px; }
+  .dashboard-reference > .dashboard-panels,
+  .accounts-workspace > .accounts-panels,
+  .transactions-ledger .transaction-table-scroll,
+  .budgets-route .budget-ledger-scroll,
+  .budget-workspace .budget-insights-sidebar,
+  .account-detail-workspace .account-detail-list { overscroll-behavior: contain; }
+}
+/* Allow document scrolling only at extreme zoom/very short viewports. */
+@media (min-width: 1024px) and (max-height: 520px) {
   .workspace-main {
     overflow-y: auto !important;
   }

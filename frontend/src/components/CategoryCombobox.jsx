@@ -144,7 +144,7 @@ export default function CategoryCombobox({
           </button>
         </PopoverTrigger>
         <PopoverContent
-          className="w-[--radix-popover-trigger-width] p-0"
+          className="w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-24px)] p-0"
           align="start"
         >
           <Command shouldFilter={false}>

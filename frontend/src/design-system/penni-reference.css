@@ -156,6 +156,10 @@
   .penni-v2 .app-main-scroll { padding-bottom:24px; }
 }
 
+/* Shared overlay layers sit above the fixed app shell; menus above dialogs. */
+.penni-shared-backdrop { z-index: 9490; }
+.penni-v2.penni-overlay-content { z-index: 9491; }
+.penni-v2.penni-menu-content { z-index: 10020; }
 /* Portalled Radix overlays carry penni-v2 because they render outside AppLayout. */
 .penni-overlay-content.penni-v2 {
   color:var(--penni-ink);
@@ -244,12 +248,6 @@
 .penni-v2 .penni-account-card .border-border { border-color:rgba(255,255,255,.17); }
 .penni-v2 .penni-account-card .money-tabular { color:#fff; }
 .penni-v2 .penni-inner-page-header .penni-inner-title { letter-spacing:-.035em; }
-@media(min-width:768px) {
-  .penni-v2 .penni-inner-page-header .penni-inner-title,
-  .penni-v2 .penni-inner-page-header .penni-inner-description,
-  .penni-v2 .penni-inner-page-header .penni-inner-eyebrow { display:none; }
-  .penni-v2 .penni-inner-page-header {gap:0;}
-}
 @media(min-width:768px) and (max-width:1023px) {
   .penni-v2 .penni-main-panel { min-height:0; height:100dvh; }
   .penni-v2 .penni-bottom-nav {display:none;}
@@ -326,7 +324,7 @@ html.dark[data-penni-accent="violet"] .penni-v2 {--penni-accent:#a07bff;}
 
 /* Exact Penny type rhythm, space, warm logo and spring-like navigation. */
 .penni-v2{font-family:"Inter","Inter Variable",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;letter-spacing:-.007em;font-feature-settings:"cv11","ss01";-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
-.penni-v2 .penni-route-header{height:73px;display:flex;flex-direction:column;justify-content:center;}
+.penni-v2 .penni-route-header{height:68px;display:flex;flex-direction:column;justify-content:center;}
 .penni-v2 .penni-side-link{min-height:43px;font-size:13px;font-weight:500;}
 .penni-v2 .penni-side-link[aria-current="page"]{animation:penni-nav-select .3s cubic-bezier(.22,1,.36,1) both;}
 .penni-v2 .penni-sidebar{background:color-mix(in srgb,var(--penni-surface) 72%,var(--penni-bg));}
@@ -360,22 +358,7 @@ html.dark[data-penni-accent="violet"] .penni-v2 {--penni-accent:#a07bff;}
     height: auto;
     min-height: min-content;
   }
-  .penni-v2 .dashboard-reference,
-  .penni-v2 .accounts-workspace {
-    height: auto;
-    min-height: 0;
-    overflow: visible;
-  }
-  .penni-v2 .dashboard-reference > .dashboard-panels,
-  .penni-v2 .accounts-workspace > .accounts-panels {
-    flex: 0 0 auto;
-    min-height: 0;
-    overflow: visible;
-  }
-  .penni-v2 .dashboard-reference > .dashboard-panels > div {
-    min-height: 0;
-    overflow: visible;
-  }
+
 }
 .penni-v2 .penni-hero-grid,
 .penni-v2 .penni-reference-balance-card,

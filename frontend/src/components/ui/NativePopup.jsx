@@ -13,7 +13,7 @@ export default function NativePopup({ open, onClose, title = "Penni", descriptio
       <Dialog.Portal>
         <Dialog.Overlay className="penni-native-backdrop" />
         <Dialog.Content className={cn("penni-v2 penni-native-popup", className)} data-size={size}
-          data-testid="penni-native-popup" aria-describedby={description ? undefined : undefined}>
+          data-testid="penni-native-popup">
           <div aria-hidden="true" className="penni-native-handle-zone"
             onTouchStart={e => { swipeStart.current = e.touches[0]?.clientY ?? null; }}
             onTouchEnd={e => {

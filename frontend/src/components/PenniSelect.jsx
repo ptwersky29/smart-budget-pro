@@ -14,6 +14,7 @@ export default function PenniSelect({
   const [uncontrolled, setUncontrolled] = useState(defaultValue);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const listboxId = React.useId();
   const options = useMemo(() => {
     const items = [];
     const walk = (nodes, group = "") => {
@@ -47,6 +48,7 @@ export default function PenniSelect({
     <Popover open={open} onOpenChange={(next) => { setOpen(next); if (!next) setQuery(""); }}>
       <PopoverTrigger asChild>
         <button type="button" id={id} name={name} title={title} disabled={disabled}
+          role="combobox" aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? listboxId : undefined}
           aria-label={ariaLabel || title || name || "Choose option"}
           aria-required={required || undefined}
           className={`flex min-w-0 items-center justify-between gap-2 text-left ${className || "h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"}`}
@@ -66,7 +68,20 @@ export default function PenniSelect({
               className="w-full min-w-0 bg-transparent text-xs outline-none placeholder:text-muted-foreground" />
           </div>
         )}
-        <div role="listbox" aria-label={ariaLabel || title || name || "Options"} className="subtle-scroll max-h-[min(55vh,340px)] overflow-y-auto overscroll-contain">
+        <div id={listboxId} role="listbox" aria-label={ariaLabel || title || name || "Options"}
+          onKeyDown={(event) => {
+            if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+            const items = Array.from(event.currentTarget.querySelectorAll('[role="option"]:not([disabled])'));
+            if (!items.length) return;
+            const currentIndex = items.indexOf(document.activeElement);
+            const nextIndex = event.key === "Home" ? 0 :
+              event.key === "End" ? items.length - 1 :
+              event.key === "ArrowDown" ? Math.min(currentIndex + 1, items.length - 1) :
+              Math.max(currentIndex - 1, 0);
+            event.preventDefault();
+            items[nextIndex]?.focus();
+          }}
+          className="subtle-scroll max-h-[min(55vh,340px)] overflow-y-auto overscroll-contain">
           {visible.map((option, index) => (
             <React.Fragment key={option.value + ":" + index}>
               {option.group && (index === 0 || option.group !== visible[index - 1].group) &&

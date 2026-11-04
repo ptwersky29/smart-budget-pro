@@ -36,7 +36,7 @@ import {
 
 const ProductTour = lazy(() => import("../components/ProductTour"));
 const SIDEBAR_KEY = "penni.sidebar.collapsed";
-const FIXED_WORKSPACE_ROUTES = new Set(["/transactions", "/budgets"]); // long Dashboard and Accounts pages scroll in the shell
+const FIXED_WORKSPACE_ROUTES = new Set(["/dashboard", "/accounts", "/transactions", "/budgets"]); // shared contained-scroll workspaces
 
 function isActivePath(pathname, to) {
   if (to === "/dashboard") return pathname === "/dashboard";
@@ -78,6 +78,7 @@ export default function AppLayout() {
   const sidebarCompact = collapsed || tablet;
   const dark = resolvedTheme === "dark";
   const accent = settings.preferences?.appearance?.accent || "indigo";
+  const shortcutHint = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘ K" : "Ctrl K";
   const [privacy, setPrivacy] = useState(() => {
     try { return localStorage.getItem("penni.privacy") === "true"; }
     catch { return false; }
@@ -204,7 +205,7 @@ export default function AppLayout() {
     <div className={`penni-v2 app-shell relative flex min-h-screen text-foreground md:h-[100dvh] md:min-h-0 md:overflow-hidden ${privacy ? "penni-private" : ""}`} data-penni-accent={accent}>
       <aside
         data-tour="sidebar"
-        className={`penni-sidebar sticky top-0 z-40 hidden h-screen shrink-0 flex-col overflow-hidden transition-[width] duration-300 md:flex ${
+        className={`penni-sidebar sticky top-0 z-40 hidden h-[100dvh] shrink-0 flex-col overflow-hidden transition-[width] duration-300 md:flex ${
           sidebarCompact ? "w-[84px]" : "w-[264px]"
         }`}
       >
@@ -323,7 +324,7 @@ export default function AppLayout() {
               </>
             ) : null}
           </div>
-          {sidebarCompact ? (
+          {sidebarCompact && !tablet ? (
             <button
               type="button"
               onClick={toggleSidebar}
@@ -345,7 +346,7 @@ export default function AppLayout() {
             </div>
           ) : null}
           <h1 className="sr-only">{routeMeta.title} - {APP_NAME}</h1>
-          <div className="flex h-[68px] items-center justify-between gap-3 px-4 md:px-8">
+          <div className="flex h-[62px] items-center justify-between gap-3 px-4 md:h-[68px] md:px-8">
             <div className="flex min-w-0 flex-1 items-center gap-2.5">
               <Link to="/dashboard" className="grid h-9 w-9 shrink-0 place-items-center md:hidden" aria-label={`${APP_NAME} home`}>
                 <Logo size="sm" />
@@ -365,7 +366,7 @@ export default function AppLayout() {
                 <Search className="h-4 w-4 shrink-0" />
                 <span className="truncate">Search or jump to…</span>
                 <kbd className="ml-auto shrink-0 rounded-[6px] border border-border/70 bg-secondary/45 px-1.5 py-0.5 text-[9.5px] font-medium text-muted-foreground">
-                  ⌘ K
+                  {shortcutHint}
                 </kbd>
               </button>
               <button
@@ -446,8 +447,8 @@ export default function AppLayout() {
           </div>
         </header>
 
-        <main data-tour="main-content" className={`app-main-scroll relative mx-auto w-full max-w-[1360px] px-4 pb-24 pt-5 md:px-8 md:min-h-0 md:flex-1 md:overflow-y-auto md:overscroll-contain md:pb-6 lg:pt-7 ${workspaceRoute ? "workspace-main lg:overflow-hidden" : ""}`}>
-          <div key={location.pathname} className={[noAnim ? "" : "page-in", workspaceRoute ? "workspace-route-view" : ""].filter(Boolean).join(" ")}>
+        <main data-tour="main-content" className={`app-main-scroll relative mx-auto w-full max-w-[var(--content-max)] px-4 pt-5 md:px-8 md:min-h-0 md:flex-1 md:overflow-y-auto md:overscroll-contain lg:pt-7 ${workspaceRoute ? "workspace-main lg:overflow-hidden" : ""}`}>
+          <div className={[noAnim ? "" : "page-in", workspaceRoute ? "workspace-route-view" : ""].filter(Boolean).join(" ")}>
             <Outlet />
           </div>
         </main>
