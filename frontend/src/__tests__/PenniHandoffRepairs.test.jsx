@@ -52,7 +52,7 @@ describe("Penni audit: core source contracts", () => {
   });
 
   test("secondary pages do not show false empty counts while loading", () => {
-    expect(sourceOf("pages/Subscriptions.jsx")).toContain('loading ? "—" : formatCurrency(monthlyTotal)');
+    expect(sourceOf("pages/Subscriptions.jsx")).toContain('loading || loadError ? "—" : formatCurrency(monthlyTotal)');
     expect(sourceOf("pages/Statements.jsx")).toContain('historyLoading ? (');
   });
 
