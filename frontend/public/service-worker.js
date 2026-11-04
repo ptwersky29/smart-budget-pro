@@ -1,5 +1,5 @@
-const CACHE_NAME = "penni-v1";
-const STATIC_CACHE = "penni-static-v1";
+const CACHE_NAME = "penni-v2";
+const STATIC_CACHE = "penni-static-v2";
 const API_CACHE = "penni-api-v1";
 
 const STATIC_EXTENSIONS = [

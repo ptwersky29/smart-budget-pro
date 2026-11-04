@@ -207,7 +207,7 @@ export default function AppLayout() {
             {!sidebarCompact ? (
               <span className="min-w-0">
                 <span className="flex items-center gap-1.5">
-                  <span className="truncate text-[21px] font-semibold tracking-[-0.04em]">{APP_NAME}</span>
+                  <span className="truncate bg-gradient-to-r from-indigo-950 via-indigo-800 to-violet-600 bg-clip-text text-[21px] font-bold tracking-[-0.045em] text-transparent dark:from-indigo-100 dark:via-indigo-200 dark:to-violet-300">{APP_NAME}</span>
 
                 </span>
               </span>
