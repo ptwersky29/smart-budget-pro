@@ -1,220 +1,165 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Sparkles, Building2, MessagesSquare, TrendingUp, ShieldCheck, Star, Check, ArrowRight, Landmark, Menu, X, Sun, MoonStar } from "lucide-react";
+import { ArrowRight, ArrowDownLeft, ArrowUpRight, BarChart3, BookOpen, Check, CheckCircle2, ChevronDown, CreditCard, FileText, Landmark, Menu, MoonStar, ShieldCheck, Sparkles, Sun, TrendingUp, Wallet, X } from "lucide-react";
 import { useTheme } from "next-themes";
-import { Button } from "../components/ui/button";
 import Logo from "../components/Logo";
+import "./Landing.css";
 
-const HERO_IMG = "https://static.prod-images.emergentagent.com/jobs/a8ffc4f3-0824-40c4-a74c-b4e5c8fbcb66/images/9ec1a41a2ae49b3da963b26e9d76ff276824ad745a2dc7b71aee9227d794347c.png";
-
-const FEATURES = [
-  { icon: Sparkles, title: "AI Financial Coach", desc: "Claude Sonnet 4.5 understands your spend, your goals, and your halachic priorities." },
-  { icon: Building2, title: "UK Bank Sync", desc: "Connect any UK bank through TrueLayer in 30 seconds. Live balances, instant categorisation." },
-  { icon: TrendingUp, title: "Forecast Engine", desc: "Project VUAG, FTSE, S&P 500 or crypto portfolios. See your future net worth, not your past." },
-  { icon: Star, title: "Jewish Lifestyle Tools", desc: "Maaser calculator, Tzedakah ledger, Yom Tov forecasting, and Hebrew-date budgeting." },
-  { icon: Landmark, title: "UK Universal Credit", desc: "Estimate UC, HMRC tax, and benefits the way HMRC actually calculates them." },
-  { icon: MessagesSquare, title: "SMS Finance", desc: "Snap a receipt or forward a payment SMS — AI logs it before you blink." },
+const features = [
+  { icon: Wallet, title: "Everything in one place", description: "Bring accounts, balances, and everyday transactions together in a workspace that actually feels organised.", tags: ["Accounts", "Transactions"] },
+  { icon: Sparkles, title: "Insights that make sense", description: "Explore spending patterns, ask questions, and get AI-assisted guidance when you need a clearer perspective.", tags: ["AI", "Analytics"] },
+  { icon: BarChart3, title: "Plan what comes next", description: "Build budgets, understand recurring costs, and explore illustrative financial scenarios with confidence.", tags: ["Budgets", "Forecasts"] },
+];
+const tools = [
+  { icon: CreditCard, title: "Transactions", description: "Filter, categorise, and keep every entry clear." },
+  { icon: Landmark, title: "Bank connections", description: "Connect supported UK banks when you're ready." },
+  { icon: FileText, title: "Statement imports", description: "Import and review account activity." },
+  { icon: TrendingUp, title: "Investments", description: "Explore long-term financial scenarios." },
+  { icon: BookOpen, title: "Maaser & tzedakah", description: "Keep giving in your financial picture." },
+  { icon: CheckCircle2, title: "Subscriptions", description: "See your recurring commitments together." },
+];
+const periods = {
+  "1M": { gain: "+£1,240.80", percent: "+11.0%", points: [150,145,155,132,140,124,132,105,117,100,91,95,81,87,68,61,72,51,58,44,48,32,41,27], labels: ["1 Nov","10 Nov","20 Nov","Today"] },
+  "3M": { gain: "+£2,130.35", percent: "+20.6%", points: [173,163,166,148,155,137,142,123,130,111,116,100,105,87,91,72,79,61,66,53,58,41,46,27], labels: ["Sep","Oct","Nov","Today"] },
+  "1Y": { gain: "+£4,820.10", percent: "+62.9%", points: [188,181,184,161,169,155,146,153,130,125,136,112,118,96,103,81,87,64,74,53,59,42,47,27], labels: ["Jan","Apr","Aug","Today"] },
+};
+const faq = [
+  { q: "Is Penni free?", a: "Yes. Penni currently offers its features free of charge. Optional third-party connections may depend on provider availability." },
+  { q: "Do I have to connect my bank?", a: "No. You can use manual transactions, budgets and other planning tools without connecting a bank." },
+  { q: "Can I connect UK banks?", a: "Penni offers optional UK bank connections. Availability varies by institution and the connected provider." },
+  { q: "Are investment projections guaranteed?", a: "No. They are illustrative scenarios based on assumptions, not guaranteed returns or financial advice." },
 ];
 
-export default function Landing() {
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const { theme, setTheme } = useTheme();
-  const dark = theme === "dark";
-  useEffect(() => { document.title = "Penni | Premium AI Personal Finance"; }, []);
+function Reveal({ children, className = "", delay = 0, as: Tag = "div" }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (!("IntersectionObserver" in window) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { el.classList.add("pl-visible"); return; }
+    const ob = new IntersectionObserver(entries => {
+      for (const item of entries) if (item.isIntersecting) { el.classList.add("pl-visible"); ob.unobserve(el); }
+    }, { threshold: 0.08, rootMargin: "0px 0px 50px 0px" });
+    ob.observe(el);
+    return () => ob.disconnect();
+  }, []);
+  return <Tag ref={ref} className={`pl-reveal ${className}`} style={{ "--pl-delay": `${delay}ms` }}>{children}</Tag>;
+}
+function PrimaryLink({ to = "/register", children, testId, className = "" }) {
+  return <Link to={to} data-testid={testId} className={`pl-button pl-button-primary ${className}`}>{children}</Link>;
+}
+function Preview() {
+  const [range, setRange] = useState("3M");
+  const data = periods[range];
+  const line = data.points.map((v, i) => `${i === 0 ? "M" : "L"}${20 + i * 19.5} ${v}`).join(" ");
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* Nav */}
-      <header className="sticky top-0 z-40 backdrop-blur-xl bg-background/70 border-b border-border">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2" data-testid="landing-logo">
-            <Logo size="sm" />
-            <span className="font-semibold tracking-tight text-lg">Penni</span>
-          </Link>
-          <nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
-            <a href="#features" className="hover:text-foreground">Features</a>
-            <a href="#pricing" className="hover:text-foreground">Pricing</a>
-            <a href="#jewish" className="hover:text-foreground">Jewish Tools</a>
-            <Link to="/login" className="px-4 py-2 hover:text-foreground">Sign in</Link>
-            <Button variant="primary" size="pill" asChild>
-              <Link to="/register" data-testid="nav-register">Get started <ArrowRight className="h-4 w-4" /></Link>
-            </Button>
-          </nav>
-          <button onClick={() => setTheme(dark ? "light" : "dark")} className="p-3 text-muted-foreground hover:text-foreground" aria-label="Toggle theme">
-            {dark ? <Sun className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
-          </button>
-          <button className="md:hidden p-3 text-foreground" onClick={() => setMobileNavOpen(true)} aria-label="Open navigation menu">
-            <Menu className="h-5 w-5" />
-          </button>
-        </div>
-      </header>
-
-      {mobileNavOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMobileNavOpen(false)} />
-          <div className="fixed top-0 right-0 h-full w-3/4 max-w-sm bg-card border-l border-border p-6 shadow-2xl animate-[fadeUp_0.2s_ease-out]">
-            <div className="flex items-center justify-between mb-8">
-              <span className="font-semibold tracking-tight text-lg">Penni</span>
-              <button className="p-3" onClick={() => setMobileNavOpen(false)} aria-label="Close navigation menu">
-                <X className="h-5 w-5" />
-              </button>
+    <div className="pl-product-wrap">
+      <div className="pl-product-surface">
+        <aside className="pl-product-rail" aria-hidden="true">
+          <Logo size="sm"/>
+          <span className="pl-rail-active"><Wallet size={18}/></span>
+          <span><CreditCard size={18}/></span><span><BarChart3 size={18}/></span><span><Landmark size={18}/></span>
+          <span className="pl-rail-last"><Sparkles size={18}/></span>
+        </aside>
+        <div className="pl-product-main">
+          <div className="pl-product-bar"><div><small>YOUR WORKSPACE</small><strong>Financial overview</strong></div><span className="pl-product-avatar">P</span></div>
+          <div className="pl-product-balance">
+            <div className="pl-product-balance-head"><span>Combined balance</span><span className="pl-product-live"><span/> Overview</span></div>
+            <strong className="pl-product-amount">£12,480.50</strong>
+            <span className="pl-product-growth"><ArrowUpRight size={14}/>{data.gain} ({data.percent}) over {range}</span>
+            <div className="pl-product-range" role="group" aria-label="Sample dashboard chart period">
+              {Object.keys(periods).map(p => <button key={p} type="button" aria-pressed={range === p} className={range === p ? "pl-range-selected" : ""} onClick={() => setRange(p)}>{p}</button>)}
             </div>
-            <nav className="flex flex-col gap-2">
-              <a href="#features" onClick={() => setMobileNavOpen(false)} className="px-4 py-4 rounded-xl text-foreground hover:bg-secondary text-base font-medium">Features</a>
-              <a href="#pricing" onClick={() => setMobileNavOpen(false)} className="px-4 py-4 rounded-xl text-foreground hover:bg-secondary text-base font-medium">Pricing</a>
-              <a href="#jewish" onClick={() => setMobileNavOpen(false)} className="px-4 py-4 rounded-xl text-foreground hover:bg-secondary text-base font-medium">Jewish Tools</a>
-              <hr className="my-2 border-border" />
-              <Link to="/login" onClick={() => setMobileNavOpen(false)} className="px-4 py-4 rounded-xl text-foreground hover:bg-secondary text-base font-medium">Sign in</Link>
-              <Button variant="primary" size="pill" asChild className="mt-2 w-full">
-                <Link to="/register" onClick={() => setMobileNavOpen(false)}>Get started <ArrowRight className="h-4 w-4" /></Link>
-              </Button>
-            </nav>
+            <svg viewBox="0 0 490 216" className="pl-product-chart" preserveAspectRatio="none" role="img" aria-label={`Illustrative balance history over ${range}`}>
+              <defs><linearGradient id="pl-chart-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#7468f3" stopOpacity=".3"/><stop offset="100%" stopColor="#7468f3" stopOpacity="0"/></linearGradient></defs>
+              {[55,112,169,207].map(y=><line key={y} x1="20" x2="475" y1={y} y2={y} stroke="#e6e8f1" strokeDasharray="4 7"/>)}
+              <path d={line+" L468.5 216 L20 216 Z"} fill="url(#pl-chart-fill)"/>
+              <path d={line} fill="none" stroke="#6255ec" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
+              <circle cx="468.5" cy={data.points[23]} r="5" fill="#6255ec" stroke="white" strokeWidth="3"/>
+            </svg>
+            <div className="pl-product-labels">{data.labels.map(l=><span key={l}>{l}</span>)}</div>
           </div>
-        </div>
-      )}
-
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-6 pt-20 pb-32 grid lg:grid-cols-12 gap-12 items-center">
-          <div className="lg:col-span-7 space-y-8 fade-up">
-            <span className="inline-flex items-center gap-2 label-overline text-primary"><span className="w-1.5 h-1.5 rounded-full bg-primary"></span> Premium AI Personal Finance</span>
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl tracking-tight leading-[0.95] font-medium break-words">
-              Your money,<br />reading <span className="italic text-primary" style={{fontFamily:'Fraunces'}}>your mind.</span>
-            </h1>
-            <p className="text-lg text-muted-foreground max-w-xl leading-relaxed">
-              Penni sees every penny you spend, every bracha you make, every bill you forgot — and quietly keeps your budget, your forecasts, and your maaser in line.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <Button variant="primary" size="pill" asChild>
-                <Link to="/register" data-testid="hero-cta-start">Start free <ArrowRight className="h-4 w-4" /></Link>
-              </Button>
-              <Button variant="outlinePill" size="pill" asChild>
-                <Link to="/pricing" data-testid="hero-cta-pricing">See pricing</Link>
-              </Button>
-            </div>
-            <div className="flex gap-8 pt-6 border-t border-border">
-              <div><p className="text-2xl font-medium tracking-tight">£5</p><p className="text-xs text-muted-foreground uppercase tracking-wider">per month, premium</p></div>
-              <div><p className="text-2xl font-medium tracking-tight">2,400+</p><p className="text-xs text-muted-foreground uppercase tracking-wider">UK banks supported</p></div>
-              <div><p className="text-2xl font-medium tracking-tight">10%</p><p className="text-xs text-muted-foreground uppercase tracking-wider">Auto-Maaser</p></div>
-            </div>
+          <div className="pl-product-metrics">
+            <div><span className="pl-sample-income"><ArrowDownLeft size={18}/></span><span><small>Income</small><strong>£4,250</strong></span><em>+8.2%</em></div>
+            <div><span className="pl-sample-expense"><ArrowUpRight size={18}/></span><span><small>Spending</small><strong>£1,860</strong></span></div>
           </div>
-          <div className="lg:col-span-5 relative fade-up delay-2">
-            <div className="relative rounded-3xl overflow-hidden border border-border shadow-2xl">
-              <img src={HERO_IMG} alt="Penni" className="w-full h-auto" />
-            </div>
-            <div className="absolute -bottom-6 -left-6 glass rounded-2xl p-4 w-56 hidden sm:block">
-              <p className="label-overline">Cash Flow</p>
-              <p className="text-2xl font-medium tracking-tight mt-1">£12,408</p>
-              <p className="text-xs text-primary mt-1">↑ 8.4% this month</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Social proof */}
-      <div className="max-w-7xl mx-auto px-6 py-12 text-center border-y border-border">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-6">Trusted by users across the UK</p>
-        <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-4 text-sm text-muted-foreground">
-          <span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" /> 2,400+ UK banks supported</span>
-          <span className="flex items-center gap-2"><Star className="h-4 w-4 text-primary" /> 14-day free trial</span>
-          <span className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> TLS 1.3 encrypted</span>
         </div>
       </div>
-
-      {/* Features grid */}
-      <section id="features" className="max-w-7xl mx-auto px-6 py-24">
-        <div className="grid lg:grid-cols-12 gap-8 mb-16">
-          <div className="lg:col-span-5">
-            <p className="label-overline text-primary">What's inside</p>
-            <h2 className="text-4xl lg:text-5xl tracking-tight mt-3 font-medium">Six tools, one premium brain.</h2>
-          </div>
-          <div className="lg:col-span-6 lg:col-start-7 text-muted-foreground leading-relaxed">
-            Most finance apps show you numbers. Penni explains them, predicts the next ones, and quietly takes action — from your inbox, your SMS, and your bank.
-          </div>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {FEATURES.map(({ icon: Icon, title, desc }) => (
-            <div key={title} data-testid={`feature-${title.toLowerCase().replace(/\s+/g, "-")}`} className="rounded-2xl border border-border p-6 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 bg-card">
-              <div className="w-10 h-10 rounded-xl bg-secondary grid place-items-center mb-4"><Icon className="h-5 w-5 text-primary" /></div>
-              <h3 className="text-lg tracking-tight font-medium mb-2">{title}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Jewish strip */}
-      <section id="jewish" className="border-y border-border bg-secondary/30 py-24">
-        <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-12 gap-12 items-center">
-          <div className="lg:col-span-6">
-            <p className="label-overline text-topaz">Built for our community</p>
-            <h2 className="text-4xl lg:text-5xl tracking-tight mt-3 font-medium">Maaser, Pesach, Yom Tov — handled.</h2>
-            <p className="text-muted-foreground mt-4 leading-relaxed">Penni is the only platform that natively understands Jewish life. Auto-calculates Maaser on every paycheck, forecasts Pesach 6 weeks ahead, and tracks every penny of Tzedakah for the year-end.</p>
-            <ul className="mt-6 space-y-2 text-sm">
-              {["10% Maaser automation", "Tzedakah ledger with receipts", "Yom Tov spending forecasts", "Hebrew calendar integration"].map((t) => (
-                <li key={t} className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> {t}</li>
-              ))}
-            </ul>
-          </div>
-          <div className="lg:col-span-6 rounded-3xl border border-border p-8 bg-card">
-            <p className="label-overline">Tzedakah ledger · Tishrei 5786</p>
-            {[{n:"Yeshiva Beis Aaron", a:120},{n:"Hatzolah London", a:50},{n:"Chesed Fund", a:36},{n:"Local Shul", a:80}].map((r)=>(
-              <div key={r.n} className="flex items-center justify-between py-3 border-b border-border last:border-0">
-                <span className="text-sm">{r.n}</span><span className="text-sm font-medium">£{r.a.toFixed(2)}</span>
-              </div>
-            ))}
-            <div className="flex items-center justify-between pt-4 mt-2 border-t border-border">
-              <span className="label-overline">Total Given</span>
-              <span className="text-xl font-medium tracking-tight text-primary">£286.00</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing */}
-      <section id="pricing" className="max-w-5xl mx-auto px-6 py-24">
-        <div className="text-center mb-12">
-          <p className="label-overline text-primary">Pricing</p>
-          <h2 className="text-4xl lg:text-5xl tracking-tight mt-3 font-medium">Simple. Honest. Premium when you need it.</h2>
-        </div>
-        <div className="grid md:grid-cols-2 gap-6">
-          <div className="rounded-3xl border border-border p-8 bg-card">
-            <p className="label-overline">Free</p>
-            <p className="text-4xl tracking-tight mt-2 font-medium">£0<span className="text-base text-muted-foreground">/mo</span></p>
-            <p className="text-sm text-muted-foreground mt-2">Manual budgeting & light AI.</p>
-            <ul className="mt-6 space-y-2 text-sm">
-              {["Manual transactions","CSV uploads","5 AI messages/day","Basic reports"].map((t)=>(
-                <li key={t} className="flex items-center gap-2"><Check className="h-4 w-4 text-muted-foreground" /> {t}</li>
-              ))}
-            </ul>
-            <Button variant="outlinePill" size="pill" asChild className="mt-8 w-full">
-              <Link to="/register" data-testid="pricing-free">Start free</Link>
-            </Button>
-          </div>
-          <div className="rounded-3xl border-2 border-emerald p-8 bg-card relative overflow-hidden">
-            <span className="absolute top-4 right-4 text-xs px-3 py-1 rounded-full gradient-emerald text-white">Most popular</span>
-            <p className="label-overline text-primary">Premium</p>
-            <p className="text-4xl tracking-tight mt-2 font-medium">£5<span className="text-base text-muted-foreground">/mo</span></p>
-            <p className="text-sm text-muted-foreground mt-2">Everything you'll ever need.</p>
-            <ul className="mt-6 space-y-2 text-sm">
-              {["Unlimited Claude Sonnet 4.5 AI","UK bank sync (TrueLayer)","PDF & SMS parsing","Investment forecasting","Premium reports + PDF","Auto-Maaser & Tzedakah"].map((t)=>(
-                <li key={t} className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> {t}</li>
-              ))}
-            </ul>
-            <Button variant="primary" size="pill" asChild className="mt-8 w-full">
-              <Link to="/pricing" data-testid="pricing-premium">Upgrade to Premium</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      <footer className="border-t border-border py-12 text-center text-sm text-muted-foreground">
-        <p>© {new Date().getFullYear()} Penni. Built for the UK & the heimishe community.</p>
-        <div className="flex items-center justify-center gap-4 mt-2">
-          <a href="/privacy" className="hover:text-foreground">Privacy Policy</a>
-          <a href="/login" className="hover:text-foreground">Sign In</a>
-          <a href="/pricing" className="hover:text-foreground">Pricing</a>
-        </div>
-      </footer>
+      <div className="pl-float pl-float-one" aria-hidden="true"><Sparkles size={19}/><span><strong>Clearer insights</strong><small>Understand your spending</small></span></div>
+      <div className="pl-float pl-float-two" aria-hidden="true"><CheckCircle2 size={19}/><span><strong>Stay on track</strong><small>Budget with confidence</small></span></div>
+      <span className="pl-product-note">Illustrative preview · Sample data</span>
     </div>
   );
+}
+function Ledger() {
+  const rows = [
+    { icon: ArrowDownLeft, name: "Salary", category: "Income", amount: "+£3,800.00", positive: true },
+    { icon: Wallet, name: "Groceries", category: "Everyday spending", amount: "−£58.40" },
+    { icon: BookOpen, name: "Tzedakah", category: "Giving", amount: "−£36.00" },
+    { icon: CreditCard, name: "Subscriptions", category: "Recurring", amount: "−£14.99" },
+  ];
+  return <div className="pl-ledger">
+    <div className="pl-ledger-header"><span>YOUR MONEY, ORGANISED</span><h3>Recent activity</h3></div>
+    {rows.map(({icon:Icon,...r})=><div className="pl-ledger-row" key={r.name}>
+      <span className="pl-ledger-icon"><Icon size={20}/></span><span className="pl-ledger-label"><strong>{r.name}</strong><small>{r.category}</small></span>
+      <strong className={r.positive ? "pl-ledger-positive" : ""}>{r.amount}</strong>
+    </div>)}
+    <div className="pl-ledger-foot"><span><ShieldCheck size={16}/> One clear financial picture</span><small>Sample data</small></div>
+  </div>;
+}
+
+export default function Landing() {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [openFaq, setOpenFaq] = useState(0);
+  const { theme, setTheme } = useTheme();
+  useEffect(() => { document.title = "Penni — Make sense of your money"; return () => { document.title = "Penni"; }; }, []);
+  useEffect(() => { if (!mobileOpen) return; const key=e=>{if(e.key==="Escape")setMobileOpen(false)}; document.addEventListener("keydown",key); return ()=>document.removeEventListener("keydown",key); }, [mobileOpen]);
+  const links=[["Features","#features"],["How it works","#how-it-works"],["Jewish tools","#jewish"],["Pricing","#pricing"]];
+  return <div className="penni-landing" id="top">
+    <div className="pl-announcement"><span><i/> A calmer way to manage your money</span><a href="#features">Explore Penni <ArrowRight size={14}/></a></div>
+    <header className="pl-header"><div className="pl-container pl-nav">
+      <Link className="pl-brand" to="/" data-testid="landing-logo" aria-label="Penni home"><Logo size="md"/><strong>Penni</strong></Link>
+      <nav className="pl-nav-links" aria-label="Main navigation">{links.map(([label,href])=><a key={href} href={href}>{label}</a>)}</nav>
+      <div className="pl-nav-actions">
+        <button type="button" className="pl-theme-toggle" aria-label="Toggle colour theme" onClick={()=>setTheme(theme==="dark"?"light":"dark")}>{theme==="dark"?<Sun size={18}/>:<MoonStar size={18}/>}</button>
+        <Link className="pl-signin" to="/login">Sign in</Link>
+        <PrimaryLink className="pl-nav-cta" testId="nav-register">Get started <ArrowRight size={16}/></PrimaryLink>
+        <button type="button" className="pl-nav-menu" aria-label={mobileOpen?"Close menu":"Open menu"} aria-controls="pl-mobile-links" aria-expanded={mobileOpen} onClick={()=>setMobileOpen(v=>!v)}>{mobileOpen?<X size={22}/>:<Menu size={22}/>}</button>
+      </div>
+    </div>
+    {mobileOpen&&<nav className="pl-mobile-links" id="pl-mobile-links" aria-label="Mobile navigation">{links.map(([label,href])=><a key={href} href={href} onClick={()=>setMobileOpen(false)}>{label}<ArrowRight size={16}/></a>)}<Link to="/login" onClick={()=>setMobileOpen(false)}>Sign in <ArrowRight size={16}/></Link><Link to="/register" onClick={()=>setMobileOpen(false)}>Create a free account <ArrowRight size={16}/></Link></nav>}
+    </header>
+    <main>
+      <section className="pl-hero"><div className="pl-hero-orb" aria-hidden="true"/><div className="pl-container pl-hero-grid">
+        <Reveal className="pl-hero-copy">
+          <span className="pl-eyebrow"><Sparkles size={15}/> YOUR MONEY, MADE CLEARER</span>
+          <h1>Feel better about <span>every penny.</span></h1>
+          <p>One beautifully simple place for your accounts, spending, budgets and plans. Everything you need to understand where your money is going—and where it could take you.</p>
+          <div className="pl-hero-buttons"><PrimaryLink testId="hero-cta-start">Start with Penni <ArrowRight size={18}/></PrimaryLink><a className="pl-button pl-button-secondary" href="#how-it-works">See how it works <ArrowRight size={17}/></a></div>
+          <div className="pl-hero-reassurance"><span><CheckCircle2 size={16}/> Free to get started</span><span><CheckCircle2 size={16}/> No bank connection required</span></div>
+        </Reveal>
+        <Reveal className="pl-hero-visual" delay={140}><Preview/></Reveal>
+      </div><div className="pl-container pl-hero-foot"><span>ONE WORKSPACE. YOUR FINANCIAL LIFE.</span><div><span><Wallet size={16}/> Accounts</span><span><BarChart3 size={16}/> Budgets</span><span><Sparkles size={16}/> Insights</span><span><BookOpen size={16}/> Giving</span></div></div></section>
+      <section id="features" className="pl-section pl-features"><div className="pl-container">
+        <Reveal className="pl-heading pl-heading-center"><span className="pl-kicker">THE PENNI DIFFERENCE</span><h2>A clearer picture. <span>More confident decisions.</span></h2><p>Thoughtful tools brought together in a workspace that feels easy to use.</p></Reveal>
+        <div className="pl-feature-grid">{features.map((f,i)=><Reveal as="article" className="pl-feature" delay={i*90} key={f.title}><div className="pl-feature-head"><span className="pl-feature-symbol"><f.icon size={24}/></span><small>0{i+1} / 03</small></div><h3>{f.title}</h3><p>{f.description}</p><div className="pl-tags">{f.tags.map(t=><span key={t}>{t}</span>)}</div></Reveal>)}</div>
+      </div></section>
+      <section id="how-it-works" className="pl-section pl-showcase"><div className="pl-container pl-showcase-grid">
+        <Reveal className="pl-showcase-copy"><span className="pl-kicker">YOUR MONEY, ORGANISED</span><h2>Less chasing numbers. <span>More seeing the whole picture.</span></h2><p>Penni makes the everyday details easier to follow, so accounts, budgets and transactions feel connected.</p>
+          <div className="pl-steps">{[
+            ["01","Bring your money together","Start manually, or connect a supported bank when you’re ready."],
+            ["02","Understand your spending","Sort transactions and see your categories and trends."],
+            ["03","Make a plan that lasts","Set budgets and explore different financial scenarios."],
+          ].map(([n,title,desc])=><div className="pl-step" key={n}><span>{n}</span><div><strong>{title}</strong><p>{desc}</p></div></div>)}</div>
+          <a className="pl-text-link" href="#pricing">Everything you need to begin <ArrowRight size={18}/></a>
+        </Reveal>
+        <Reveal className="pl-ledger-wrap" delay={130}><Ledger/></Reveal>
+      </div></section>
+      <section className="pl-section pl-tools"><div className="pl-container"><Reveal className="pl-tools-heading"><div><span className="pl-kicker">MADE FOR REAL LIFE</span><h2>The details are taken care of.</h2></div><p>Powerful when you need it. Uncomplicated the rest of the time.</p></Reveal><div className="pl-tools-grid">{tools.map((t,i)=><Reveal as="article" key={t.title} className="pl-tool" delay={i*45}><span className="pl-tool-symbol"><t.icon size={21}/></span><div><h3>{t.title}</h3><p>{t.description}</p></div><ArrowUpRight size={18} className="pl-tool-arrow"/></Reveal>)}</div></div></section>
+      <section id="jewish" className="pl-section pl-community"><div className="pl-container pl-community-grid"><Reveal className="pl-community-copy"><span className="pl-kicker">FINANCE WITH YOUR VALUES IN MIND</span><h2>Your finances. <span>Your way of life.</span></h2><p>Ordinary money apps don't always account for what matters to you. Penni brings budgeting together with Jewish financial tools—including maaser and tzedakah tracking.</p><div className="pl-checks"><span><Check size={17}/> Maaser planning</span><span><Check size={17}/> Tzedakah tracking</span><span><Check size={17}/> Jewish calendar tools</span></div><PrimaryLink>Explore Penni <ArrowRight size={17}/></PrimaryLink></Reveal><Reveal delay={120} className="pl-giving-wrap"><div className="pl-giving"><div className="pl-giving-head"><div><small>GIVING OVERVIEW</small><h3>A little more meaning in every pound.</h3></div><BookOpen size={25}/></div><div className="pl-giving-highlight"><span>Example giving total</span><strong>£286.00</strong><em><CheckCircle2 size={15}/> Neatly accounted for</em></div><div className="pl-giving-row"><span>Maaser</span><strong>Track what matters</strong></div><div className="pl-giving-row"><span>Tzedakah</span><strong>Keep giving organised</strong></div><small>Illustrative data · Not a live account</small></div></Reveal></div></section>
+      <section id="pricing" className="pl-section pl-pricing"><div className="pl-container pl-pricing-grid"><Reveal><span className="pl-kicker">SIMPLE BY DESIGN</span><h2>A better money app. <span>Without the price tag.</span></h2><p>Start using Penni without a subscription. Everything on the current Penni plan is available for free.</p><Link className="pl-text-link" to="/pricing">See what's included <ArrowRight size={18}/></Link></Reveal><Reveal delay={130} className="pl-price-card"><div className="pl-price-top"><span><Sparkles size={15}/> ALL FEATURES</span><small>PENNI</small></div><div className="pl-price-number"><strong>£0</strong><span>/month</span></div><p>Everything you need to get started.</p><div className="pl-price-features">{["Accounts and transactions","Budgets and spending insights","AI-assisted finance tools","Giving and specialist features"].map(t=><span key={t}><Check size={17}/>{t}</span>)}</div><PrimaryLink testId="pricing-free">Get started for free <ArrowRight size={18}/></PrimaryLink><small>No Penni subscription required.</small></Reveal></div></section>
+      <section className="pl-section pl-faq"><div className="pl-container pl-faq-grid"><Reveal><span className="pl-kicker">GOOD TO KNOW</span><h2>Questions? <span>We have answers.</span></h2><p>A few useful things to know before you begin.</p></Reveal><Reveal className="pl-faq-list" delay={90}>{faq.map((f,i)=><div className="pl-faq-item" key={f.q}><button type="button" aria-expanded={openFaq===i} aria-controls={`pl-faq-${i}`} onClick={()=>setOpenFaq(openFaq===i?-1:i)}>{f.q}<ChevronDown size={19} className={openFaq===i?"pl-chevron-open":""}/></button><div id={`pl-faq-${i}`} hidden={openFaq!==i}><p>{f.a}</p></div></div>)}</Reveal></div></section>
+      <section className="pl-bottom-cta"><div className="pl-container"><Reveal className="pl-bottom-panel"><span><Sparkles size={18}/> YOUR MONEY. YOUR MOMENT.</span><h2>See your money differently.</h2><p>Everything in one beautiful place. Get started with Penni today.</p><PrimaryLink>Create your free account <ArrowRight size={18}/></PrimaryLink></Reveal></div></section>
+    </main>
+    <footer className="pl-footer"><div className="pl-container pl-footer-content"><div><Link className="pl-brand" to="/"><Logo size="sm"/><strong>Penni</strong></Link><p>Make sense of your money.</p></div><nav aria-label="Footer navigation"><a href="#features">Features</a><a href="#pricing">Pricing</a><Link to="/privacy">Privacy</Link><Link to="/login">Sign in</Link></nav></div><div className="pl-container pl-footer-base"><span>© {new Date().getFullYear()} Penni. All rights reserved.</span><span>Designed for clarity.</span></div></footer>
+  </div>;
 }

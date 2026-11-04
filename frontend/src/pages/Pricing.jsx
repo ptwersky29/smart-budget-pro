@@ -1,46 +1,51 @@
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Check, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Sparkles } from "lucide-react";
 import Logo from "../components/Logo";
+import "./Landing.css";
 
-const FEATURES = [
-  "Unlimited Claude Sonnet 4.5 AI","UK bank sync via TrueLayer","Investment forecasting",
-  "Auto-Maaser & Tzedakah ledger","UK UC & HMRC estimators","PDF reports","SMS finance parsing",
-  "Manual transactions","CSV & PDF statement uploads",
+const includes = [
+  "Accounts and manual transactions",
+  "Budgets and spending analytics",
+  "AI-assisted financial tools",
+  "Bank connections where supported",
+  "Statement imports and recurring payments",
+  "Investment scenarios and forecasts",
+  "Maaser, tzedakah and Jewish tools",
 ];
 
 export default function Pricing() {
-  useEffect(() => { document.title = "Pricing | Penni"; }, []);
-
-  return (
-    <div className="min-h-screen bg-background p-4 sm:p-8">
-      <div className="max-w-5xl mx-auto pt-6 sm:pt-12">
-        <Link to="/" className="inline-flex items-center gap-2 mb-6 sm:mb-8">
-          <Logo size="sm" />
-          <span className="font-semibold tracking-tight text-lg">Penni</span>
-        </Link>
-        <div className="text-center mb-8 sm:mb-12">
-          <p className="label-overline text-emerald">Pricing</p>
-          <h1 className="text-3xl sm:text-5xl tracking-tight font-medium mt-2 sm:mt-3">Everything included.</h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-2 sm:mt-3">All features are available to every user. No upgrade needed.</p>
-        </div>
-        <div className="max-w-lg mx-auto">
-          <div className="rounded-3xl border-2 border-emerald bg-card p-5 sm:p-8 relative">
-            <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-xs px-3 py-1 rounded-full gradient-emerald text-white flex items-center gap-1 whitespace-nowrap">
-              <Sparkles className="h-3 w-3"/> All features
-            </span>
-            <p className="text-3xl sm:text-5xl tracking-tight mt-2 font-medium">&pound;0<span className="text-sm sm:text-base text-muted-foreground"> forever</span></p>
-            <ul className="mt-4 sm:mt-6 space-y-2 text-sm">
-              {FEATURES.map((t) => (
-                <li key={t} className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald"/>{t}</li>
-              ))}
-            </ul>
-            <Link to="/register" data-testid="free-cta" className="mt-6 sm:mt-8 w-full inline-flex items-center justify-center h-11 px-8 rounded-full gradient-emerald text-white text-sm font-medium hover:opacity-90 transition-opacity">
-              Get started free
-            </Link>
-          </div>
+  useEffect(() => { document.title = "Pricing — Penni"; return () => { document.title = "Penni"; }; }, []);
+  return <div className="penni-landing">
+    <header className="pl-header">
+      <div className="pl-container pl-nav">
+        <Link to="/" className="pl-brand" aria-label="Penni home"><Logo size="md"/><strong>Penni</strong></Link>
+        <div className="pl-nav-actions">
+          <Link to="/" className="pl-signin" style={{display:"inline-flex",alignItems:"center",gap:8}}><ArrowLeft size={15}/> Back home</Link>
+          <Link to="/login" className="pl-button pl-button-secondary" style={{minHeight:42}}>Sign in</Link>
         </div>
       </div>
-    </div>
-  );
+    </header>
+    <main className="pl-section">
+      <div className="pl-container">
+        <div className="pl-heading pl-heading-center">
+          <span className="pl-kicker">A SIMPLER KIND OF PRICING</span>
+          <h1 style={{fontSize:"clamp(38px,5vw,61px)",fontWeight:750,letterSpacing:"-.065em",lineHeight:1.15,margin:"16px 0"}}>
+            Everything you need. <span style={{color:"var(--pl-accent)"}}>One free plan.</span>
+          </h1>
+          <p>All features in Penni's current plan are available for free. Get started in minutes.</p>
+        </div>
+        <div className="pl-price-card" style={{maxWidth:530,margin:"0 auto"}}>
+          <div className="pl-price-top"><span><Sparkles size={15}/> ALL FEATURES INCLUDED</span><small>PENNI</small></div>
+          <div className="pl-price-number"><strong>£0</strong><span>/month</span></div>
+          <p>No Penni subscription required.</p>
+          <div className="pl-price-features">
+            {includes.map(item=><span key={item}><Check size={17}/>{item}</span>)}
+          </div>
+          <Link to="/register" data-testid="free-cta" className="pl-button pl-button-primary">Create a free account <ArrowRight size={17}/></Link>
+          <small>Some integrations depend on third-party availability.</small>
+        </div>
+      </div>
+    </main>
+  </div>;
 }
