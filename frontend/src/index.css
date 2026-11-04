@@ -708,8 +708,32 @@ html { font-size: calc(var(--fs-base, 0.875rem) * var(--fs-multiplier, 1)); }
   }
 }
 
-/* At short desktop heights or large browser zoom, preserve access to every control. */
-@media (min-width: 1024px) and (max-height: 690px) {
+/* Keep the app shell fixed on common 13-inch laptops (short browser viewports).
+   Condense spacing and metrics rather than returning to full-document scrolling. */
+@media (min-width: 1024px) and (min-height: 521px) and (max-height: 690px) {
+  .workspace-main {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+  .workspace-route-view > .page-stack {
+    gap: 0.65rem;
+  }
+  .workspace-metric {
+    min-height: 76px;
+  }
+  .dashboard-reference > .dashboard-panels,
+  .accounts-workspace > .accounts-panels,
+  .transactions-ledger .transaction-table-scroll,
+  .budgets-route .budget-ledger-scroll,
+  .budgets-route .budget-insights-sidebar,
+  .account-detail-workspace .account-detail-list {
+    overscroll-behavior: contain;
+  }
+}
+
+/* Only extremely short desktop viewports / heavy zoom may scroll the document,
+   so the user can still reach all actions with a keyboard or at 400% zoom. */
+@media (min-width: 1024px) and (max-height: 520px) {
   .workspace-main {
     overflow-y: auto !important;
   }
