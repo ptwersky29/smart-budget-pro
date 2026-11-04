@@ -3,10 +3,11 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { BACKEND_URL, formatApiError } from "../lib/api";
 import { toast } from "sonner";
-import { Loader2, ShieldCheck, Eye, EyeOff, Check } from "lucide-react";
+import { Loader2, ShieldCheck, Eye, EyeOff, Check, ArrowLeft, Sparkles } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import AuthVisual from "../components/AuthVisual";
+import "./AuthPages.css";
 import Logo from "../components/Logo";
 
 function PasswordStrength({ password }) {
@@ -17,7 +18,7 @@ function PasswordStrength({ password }) {
   ];
   if (!password) return null;
   return (
-    <div className="mt-2 space-y-1">
+    <div className="auth-password-checks mt-2 grid gap-1.5">
       {checks.map(({ label, ok }) => (
         <p key={label} className={`text-xs flex items-center gap-1.5 ${ok ? "text-primary" : "text-muted-foreground"}`}>
           <Check className={`h-3 w-3 shrink-0 ${ok ? "text-primary" : "text-border"}`} />
@@ -48,7 +49,8 @@ export default function Register() {
     else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = "Enter a valid email address";
     if (!form.password) e.password = "Password is required";
     else if (form.password.length < 8) e.password = "Password must be at least 8 characters";
-    if (form.password !== confirmPassword) e.confirm = "Passwords do not match";
+    if (!confirmPassword) e.confirm = "Please confirm your password";
+    else if (form.password !== confirmPassword) e.confirm = "Passwords do not match";
     if (!agreeTerms) e.terms = "You must agree to the Privacy Policy to continue";
     return e;
   };
@@ -56,7 +58,11 @@ export default function Register() {
   const onSubmit = async (e) => {
     e.preventDefault();
     const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      requestAnimationFrame(() => document.getElementById(errs.name ? "register-name" : errs.email ? "register-email" : errs.password ? "register-password" : errs.confirm ? "register-confirm" : "register-terms")?.focus());
+      return;
+    }
     setErrors({});
     setBusy(true);
     try {
@@ -78,67 +84,72 @@ export default function Register() {
   });
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2">
+    <div className="penni-auth grid min-h-[100dvh] lg:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)]">
       {/* Form side */}
-      <div className="flex items-center justify-center p-8">
-        <div className="w-full max-w-sm">
-          <Link to="/" className="flex items-center gap-2.5 mb-10">
+      <main className="auth-form-side flex min-w-0 items-center justify-center p-5 sm:p-8 lg:px-10">
+        <div className="auth-form-panel w-full max-w-[440px]">
+          <Link to="/" aria-label="Penni home" className="auth-brand mb-8 inline-flex items-center gap-2.5">
             <Logo size="md" />
-            <span className="font-semibold tracking-tight text-lg">Penni</span>
+            <span className="auth-wordmark text-xl font-bold tracking-[-0.05em]">Penni</span>
           </Link>
 
-          <h1 className="text-3xl tracking-tight font-semibold">Create your account.</h1>
-          <p className="text-sm text-muted-foreground mt-2">Free forever. Premium when you need it.</p>
+          <Link to="/" className="auth-back-link"><ArrowLeft size={15} /> Back to home</Link>
+          <span className="auth-kicker"><Sparkles size={14} /> YOUR MONEY, MADE CLEARER</span>
+          <h1 className="auth-heading text-4xl font-bold">Create your free account<span className="auth-heading-dot">.</span></h1>
+          <p className="auth-subtitle mt-3 text-sm text-muted-foreground">One place for your accounts, budgets and plans. No Penni subscription required.</p>
 
-          <form onSubmit={onSubmit} noValidate className="space-y-5 mt-8">
+          <form onSubmit={onSubmit} noValidate className="auth-form mt-7 space-y-4 sm:space-y-5">
             {/* Name */}
             <div>
-              <label htmlFor="register-name" className="label-overline">Full name *</label>
+              <label htmlFor="register-name" className="auth-field-label">Full name *</label>
               <Input
                 id="register-name"
+                aria-invalid={Boolean(errors.name)}
                 data-testid="register-name"
                 autoComplete="name"
                 required
                 {...field("name")}
-                className={`mt-1 w-full ${errors.name ? "border-ruby" : ""}`}
+                className={`auth-input mt-1.5 w-full ${errors.name ? "border-ruby" : ""}`}
               />
               {errors.name && <p className="text-xs text-ruby mt-1" role="alert">{errors.name}</p>}
             </div>
 
             {/* Email */}
             <div>
-              <label htmlFor="register-email" className="label-overline">Email address *</label>
+              <label htmlFor="register-email" className="auth-field-label">Email address *</label>
               <Input
                 id="register-email"
+                aria-invalid={Boolean(errors.email)}
                 data-testid="register-email"
                 type="email"
                 autoComplete="email"
                 required
                 {...field("email")}
-                className={`mt-1 w-full ${errors.email ? "border-ruby" : ""}`}
+                className={`auth-input mt-1.5 w-full ${errors.email ? "border-ruby" : ""}`}
               />
               {errors.email && <p className="text-xs text-ruby mt-1" role="alert">{errors.email}</p>}
             </div>
 
             {/* Password */}
             <div>
-              <label htmlFor="register-password" className="label-overline">Password *</label>
-              <div className="relative mt-1">
+              <label htmlFor="register-password" className="auth-field-label">Password *</label>
+              <div className="relative mt-1.5">
                 <Input
                   id="register-password"
-                  data-testid="register-password"
+                  aria-invalid={Boolean(errors.password)}
+                data-testid="register-password"
                   type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
                   required
                   minLength={8}
                   value={form.password}
                   onChange={(e) => { setForm({ ...form, password: e.target.value }); setErrors((p) => ({ ...p, password: "" })); }}
-                  className={`w-full pr-11 ${errors.password ? "border-ruby" : ""}`}
+                  className={`auth-input w-full pr-11 ${errors.password ? "border-ruby" : ""}`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+                  className="auth-password-toggle absolute right-2 top-1/2 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -150,22 +161,23 @@ export default function Register() {
 
             {/* Confirm password */}
             <div>
-              <label htmlFor="register-confirm" className="label-overline">Confirm password *</label>
-              <div className="relative mt-1">
+              <label htmlFor="register-confirm" className="auth-field-label">Confirm password *</label>
+              <div className="relative mt-1.5">
                 <Input
                   id="register-confirm"
-                  data-testid="register-confirm"
+                  aria-invalid={Boolean(errors.confirm)}
+                data-testid="register-confirm"
                   type={showConfirm ? "text" : "password"}
                   autoComplete="new-password"
                   required
                   value={confirmPassword}
                   onChange={(e) => { setConfirmPassword(e.target.value); setErrors((p) => ({ ...p, confirm: "" })); }}
-                  className={`w-full pr-11 ${errors.confirm ? "border-ruby" : ""}`}
+                  className={`auth-input w-full pr-11 ${errors.confirm ? "border-ruby" : ""}`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirm((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+                  className="auth-password-toggle absolute right-2 top-1/2 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
                   aria-label={showConfirm ? "Hide password" : "Show password"}
                 >
                   {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -176,12 +188,14 @@ export default function Register() {
 
             {/* Terms */}
             <div>
-              <label className="flex items-start gap-2.5 text-sm text-muted-foreground cursor-pointer">
+              <label className="auth-checkbox-row flex min-h-11 items-start gap-3 text-sm text-muted-foreground cursor-pointer">
                 <input
+                  id="register-terms"
+                  aria-invalid={Boolean(errors.terms)}
                   type="checkbox"
                   checked={agreeTerms}
                   onChange={(e) => { setAgreeTerms(e.target.checked); setErrors((p) => ({ ...p, terms: "" })); }}
-                  className="mt-0.5 rounded border-border accent-emerald"
+                  className="mt-1 h-4 w-4 rounded border-border accent-indigo-600"
                 />
                 <span>
                   I agree to the{" "}
@@ -205,7 +219,8 @@ export default function Register() {
               disabled={busy}
               variant="primary"
               size="pill"
-              className="w-full"
+              className="auth-submit w-full"
+              type="submit"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create free account"}
             </Button>
@@ -216,12 +231,12 @@ export default function Register() {
                 <span className="w-full border-t border-border" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                <span className="auth-divider-label bg-background px-3 text-muted-foreground">Or continue with</span>
               </div>
             </div>
 
             {/* Google */}
-            <Button variant="outlinePill" size="pill" className="w-full" asChild>
+            <Button variant="outlinePill" size="pill" className="auth-oauth-button w-full" asChild>
               <a href={`${BACKEND_URL}/api/auth/google`}>
                 <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
@@ -234,20 +249,19 @@ export default function Register() {
             </Button>
           </form>
 
-          <p className="text-xs text-muted-foreground mt-6 text-center">
+          <p className="auth-switch mt-7 text-center text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link to="/login" className="text-primary hover:underline">Sign in</Link>
+            <Link to="/login" className="auth-inline-link text-primary hover:underline">Sign in</Link>
           </p>
 
           {/* Trust bar */}
-          <div className="mt-8 flex items-center justify-center gap-4 text-xs text-muted-foreground border-t border-border pt-6">
-            <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-primary" /> 14-day free trial</span>
-            <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-primary" /> Cancel anytime</span>
-            <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-primary" /> TLS 1.3</span>
+          <div className="auth-trust-bar mt-8 flex flex-wrap items-center justify-center gap-4 border-t border-border pt-6 text-xs text-muted-foreground">
+            <span><Check className="h-3.5 w-3.5" /> Free Penni account</span>
+            <span><ShieldCheck className="h-3.5 w-3.5" /> No bank connection required</span>
           </div>
         </div>
-      </div>
-      <AuthVisual title="A finance workspace that respects your time, your tax band, and your community." />
+      </main>
+      <AuthVisual title="Clarity for your money. Confidence for what comes next." />
     </div>
   );
 }

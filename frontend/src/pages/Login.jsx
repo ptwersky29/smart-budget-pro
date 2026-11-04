@@ -3,10 +3,11 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { api, BACKEND_URL, formatApiError } from "../lib/api";
 import { toast } from "sonner";
-import { Loader2, ShieldCheck, Eye, EyeOff, WifiOff } from "lucide-react";
+import { Loader2, ShieldCheck, Eye, EyeOff, WifiOff, ArrowLeft, Sparkles, Check } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import AuthVisual from "../components/AuthVisual";
+import "./AuthPages.css";
 import Logo from "../components/Logo";
 
 export default function Login() {
@@ -42,7 +43,11 @@ export default function Login() {
   const onSubmit = async (e) => {
     e.preventDefault();
     const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      requestAnimationFrame(() => document.getElementById(errs.email ? "login-email" : "login-password")?.focus());
+      return;
+    }
     setErrors({});
     setBusy(true);
     try {
@@ -71,31 +76,34 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2">
+    <div className="penni-auth grid min-h-[100dvh] lg:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)]">
       {/* Form side */}
-      <div className="flex items-center justify-center p-8">
-        <div className="w-full max-w-sm">
-          <Link to="/" className="flex items-center gap-2.5 mb-10">
+      <main className="auth-form-side flex min-w-0 items-center justify-center p-5 sm:p-8 lg:px-10">
+        <div className="auth-form-panel w-full max-w-[440px]">
+          <Link to="/" aria-label="Penni home" className="auth-brand mb-8 inline-flex items-center gap-2.5">
             <Logo size="md" />
-            <span className="font-semibold tracking-tight text-lg">Penni</span>
+            <span className="auth-wordmark text-xl font-bold tracking-[-0.05em]">Penni</span>
           </Link>
 
-          <h1 className="text-3xl tracking-tight font-semibold">Welcome back.</h1>
-          <p className="text-sm text-muted-foreground mt-2">Sign in to your premium finance workspace.</p>
+          <Link to="/" className="auth-back-link"><ArrowLeft size={15} /> Back to home</Link>
+          <span className="auth-kicker"><Sparkles size={14} /> YOUR MONEY, MADE CLEARER</span>
+          <h1 className="auth-heading text-4xl font-bold">Welcome back<span className="auth-heading-dot">.</span></h1>
+          <p className="auth-subtitle mt-3 text-sm text-muted-foreground">Your money, your plans, all in one beautifully clear workspace.</p>
 
-          <form onSubmit={onSubmit} noValidate className="space-y-5 mt-8">
+          <form onSubmit={onSubmit} noValidate className="auth-form mt-7 space-y-4 sm:space-y-5">
             {/* Email */}
             <div>
-              <label htmlFor="login-email" className="label-overline">Email</label>
+              <label htmlFor="login-email" className="auth-field-label">Email</label>
               <Input
                 id="login-email"
+                aria-invalid={Boolean(errors.email)}
                 data-testid="login-email"
                 type="email"
                 autoComplete="email"
                 required
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); setErrors((p) => ({ ...p, email: "" })); }}
-                className={`mt-1 w-full ${errors.email ? "border-ruby focus:border-ruby" : ""}`}
+                className={`auth-input mt-1.5 w-full ${errors.email ? "border-ruby focus:border-ruby" : ""}`}
               />
               {errors.email && <p className="text-xs text-ruby mt-1" role="alert">{errors.email}</p>}
             </div>
@@ -103,24 +111,25 @@ export default function Login() {
             {/* Password */}
             <div>
               <div className="flex items-center justify-between">
-                <label htmlFor="login-password" className="label-overline">Password</label>
-                <Link to="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>
+                <label htmlFor="login-password" className="auth-field-label">Password</label>
+                <Link to="/forgot-password" className="auth-inline-link text-xs text-primary hover:underline">Forgot password?</Link>
               </div>
-              <div className="relative mt-1">
+              <div className="relative mt-1.5">
                 <Input
                   id="login-password"
-                  data-testid="login-password"
+                  aria-invalid={Boolean(errors.password)}
+                data-testid="login-password"
                   type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
                   required
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setErrors((p) => ({ ...p, password: "" })); }}
-                  className={`w-full pr-11 ${errors.password ? "border-ruby focus:border-ruby" : ""}`}
+                  className={`auth-input w-full pr-11 ${errors.password ? "border-ruby focus:border-ruby" : ""}`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+                  className="auth-password-toggle absolute right-2 top-1/2 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -130,12 +139,12 @@ export default function Login() {
             </div>
 
             {/* Remember me */}
-            <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+            <label className="auth-checkbox-row flex min-h-11 items-center gap-3 text-sm text-muted-foreground cursor-pointer">
               <input
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="rounded border-border accent-emerald"
+                className="h-4 w-4 rounded border-border accent-indigo-600"
               />
               Remember me for 30 days
             </label>
@@ -152,7 +161,8 @@ export default function Login() {
               disabled={busy}
               variant="primary"
               size="pill"
-              className="w-full"
+              className="auth-submit w-full"
+              type="submit"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign in"}
             </Button>
@@ -163,7 +173,7 @@ export default function Login() {
                 <span className="w-full border-t border-border" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                <span className="auth-divider-label bg-background px-3 text-muted-foreground">Or continue with</span>
               </div>
             </div>
 
@@ -171,19 +181,19 @@ export default function Login() {
               type="button"
               variant="outlinePill"
               size="pill"
-              className="w-full"
+              className="auth-oauth-button w-full"
               onClick={onContinueOffline}
               data-testid="login-offline"
             >
               <WifiOff className="h-4 w-4" />
               Continue offline
             </Button>
-            <p className="-mt-2 text-center text-xs text-muted-foreground">
+            <p className="-mt-2 text-center text-xs leading-relaxed text-muted-foreground">
               Opens data saved on this device. Sign in online later to sync your cloud account.
             </p>
 
             {/* Google */}
-            <Button variant="outlinePill" size="pill" className="w-full" asChild>
+            <Button variant="outlinePill" size="pill" className="auth-oauth-button w-full" asChild>
               <a href={`${BACKEND_URL}/api/auth/google`} data-testid="login-google">
                 <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
@@ -196,21 +206,19 @@ export default function Login() {
             </Button>
           </form>
 
-          <p className="text-xs text-muted-foreground mt-6 text-center">
+          <p className="auth-switch mt-7 text-center text-sm text-muted-foreground">
             No account?{" "}
-            <Link to="/register" className="text-primary hover:underline">Create one free</Link>
+            <Link to="/register" className="auth-inline-link text-primary hover:underline">Create one free</Link>
           </p>
 
           {/* Trust bar */}
-          <div className="mt-8 flex items-center justify-center gap-4 text-xs text-muted-foreground border-t border-border pt-6">
-            <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-primary" /> 256-bit encrypted</span>
-            <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-primary" /> TLS 1.3</span>
-            <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-primary" /> Cancel anytime</span>
+          <div className="auth-trust-bar mt-8 flex flex-wrap items-center justify-center gap-4 border-t border-border pt-6 text-xs text-muted-foreground">
+            <span><ShieldCheck className="h-3.5 w-3.5" /> Secure sign-in</span>
+            <span><Check className="h-3.5 w-3.5" /> Your existing workspace</span>
           </div>
         </div>
-      </div>
-
-      <AuthVisual title="Premium money, quietly automated." />
+      </main>
+      <AuthVisual title="Good to have you back. Your money is right where you left it." />
     </div>
   );
 }

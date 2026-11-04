@@ -1,0 +1,133 @@
+/* Shared premium design for Sign in and Register. Scoped to public auth pages. */
+.penni-auth {
+  --auth-indigo:#6255eb;
+  --auth-ink:#1e2040;
+  --auth-subtle:#6b7087;
+  --auth-line:#e6e7f1;
+  background:radial-gradient(ellipse at 8% 2%,rgba(117,103,244,.08),transparent 48%),#fdfdff;
+  color:var(--auth-ink);
+  font-family:Inter,ui-sans-serif,system-ui,sans-serif;
+  overflow-x:clip;
+}
+.dark .penni-auth {
+  --auth-indigo:#9c91ff;
+  --auth-ink:#f5f3ff;
+  --auth-subtle:#b0b1c9;
+  --auth-line:#34354b;
+  background:radial-gradient(ellipse at 0% 0%,rgba(112,92,235,.12),transparent 55%),#12131f;
+}
+.penni-auth .auth-form-side {align-self:stretch;}
+.penni-auth .auth-form-panel {
+  padding-block:42px;
+  animation:auth-panel-in .65s cubic-bezier(.2,.8,.2,1) both;
+}
+.penni-auth .auth-brand {color:var(--auth-ink);text-decoration:none;}
+.penni-auth .auth-brand img {filter:drop-shadow(0 4px 8px rgba(90,70,209,.22));}
+.penni-auth .auth-wordmark {letter-spacing:-.05em;}
+.penni-auth .auth-back-link {
+  display:inline-flex;align-items:center;gap:7px;margin:0 0 20px;
+  color:var(--auth-subtle);font-size:12px;font-weight:600;text-decoration:none;
+  transition:color .2s,transform .2s;
+}
+.penni-auth .auth-back-link:hover {color:var(--auth-indigo);transform:translateX(-2px);}
+.penni-auth .auth-kicker {
+  display:flex;align-items:center;gap:9px;color:var(--auth-indigo);
+  font-size:10px;font-weight:800;letter-spacing:.14em;margin-bottom:14px;
+}
+.penni-auth .auth-kicker svg {flex-shrink:0;}
+.penni-auth .auth-heading {
+  margin:0;max-width:450px;font-size:clamp(30px,3vw,42px);
+  line-height:1.14;letter-spacing:-.055em;color:var(--auth-ink);
+}
+.penni-auth .auth-heading-dot {color:var(--auth-indigo);}
+.penni-auth .auth-subtitle {color:var(--auth-subtle);font-size:13.5px;line-height:1.7;max-width:410px;}
+.penni-auth .auth-field-label {
+  display:block;color:var(--auth-ink);font-size:12px;font-weight:700;
+  letter-spacing:-.005em;margin-bottom:7px;line-height:1.4;text-transform:none;
+}
+.penni-auth .auth-form input:not([type="checkbox"]) {
+  height:47px;border:1px solid var(--auth-line);border-radius:12px;
+  background:rgba(245,246,253,.84);color:var(--auth-ink);
+  transition:border-color .2s,box-shadow .2s,background .2s;
+}
+.dark .penni-auth .auth-form input:not([type="checkbox"]) {background:rgba(255,255,255,.035);}
+.penni-auth .auth-form input:not([type="checkbox"]):hover {border-color:color-mix(in srgb,var(--auth-indigo) 28%,var(--auth-line));}
+.penni-auth .auth-form input:not([type="checkbox"]):focus {
+  border-color:var(--auth-indigo);box-shadow:0 0 0 3px rgba(111,94,242,.14);outline:none;
+}
+.penni-auth .auth-form input[aria-invalid="true"]:not([type="checkbox"]) {border-color:#e05876;}
+.penni-auth .auth-form input[aria-invalid="true"]:focus {box-shadow:0 0 0 3px rgba(224,88,118,.13);}
+.penni-auth .auth-password-toggle {z-index:2;}
+.penni-auth .auth-password-toggle:focus-visible,
+.penni-auth a:focus-visible,
+.penni-auth button:focus-visible,
+.penni-auth input[type="checkbox"]:focus-visible {outline:3px solid #9385ff;outline-offset:3px;}
+.penni-auth .auth-password-checks {padding:7px 0 0;}
+.penni-auth .auth-checkbox-row {line-height:1.6;}
+.penni-auth .auth-checkbox-row input {accent-color:#6255eb;}
+.penni-auth .auth-submit {
+  display:inline-flex;align-items:center;justify-content:center;
+  min-height:48px;border-radius:13px;color:#fff!important;
+  background:linear-gradient(115deg,#5147e2,#7764f4)!important;
+  font-size:14px;font-weight:740;box-shadow:0 11px 24px -13px rgba(95,72,226,.85);
+  transition:box-shadow .22s,transform .22s,filter .22s;
+}
+.penni-auth .auth-submit:hover:not(:disabled) {
+  filter:brightness(1.06);transform:translateY(-1px);
+  box-shadow:0 16px 28px -13px rgba(95,72,226,.82);
+}
+.penni-auth .auth-oauth-button {
+  min-height:47px;border:1px solid var(--auth-line)!important;
+  border-radius:13px;background:transparent;color:var(--auth-ink);
+  font-size:13px;font-weight:650;box-shadow:none;
+}
+.penni-auth .auth-oauth-button:hover:not(:disabled) {
+  border-color:color-mix(in srgb,var(--auth-indigo) 38%,var(--auth-line))!important;
+  background:color-mix(in srgb,var(--auth-indigo) 5%,transparent);
+}
+.penni-auth .auth-divider {margin-top:5px;}
+.penni-auth .auth-divider-label {font-size:10px;letter-spacing:.09em;font-weight:700;text-transform:uppercase;background:transparent;color:var(--auth-subtle);}
+.penni-auth .auth-switch {line-height:1.6;}
+.penni-auth .auth-inline-link {font-weight:750;text-decoration:none;color:var(--auth-indigo);}
+.penni-auth .auth-inline-link:hover {text-decoration:underline;}
+.penni-auth .auth-trust-bar span {display:inline-flex;align-items:center;gap:6px;color:var(--auth-subtle);font-weight:500;}
+.penni-auth .auth-trust-bar svg {color:var(--auth-indigo);flex-shrink:0;}
+.penni-auth .penni-auth-visual {
+  position:sticky;top:0;height:100dvh;align-self:start;
+  background:linear-gradient(142deg,#111328,#241f50 68%,#392973);
+  isolation:isolate;
+}
+.penni-auth .penni-auth-visual::after {
+  content:"";position:absolute;inset:auto -120px -180px auto;width:540px;height:540px;
+  background:radial-gradient(circle,rgba(144,116,247,.19),transparent 66%);
+  animation:auth-orb 12s ease-in-out infinite alternate;pointer-events:none;
+}
+.penni-auth .auth-visual-content {min-height:0;}
+.penni-auth .auth-visual-preview {
+  position:relative;z-index:1;animation:auth-preview-in .9s .12s cubic-bezier(.2,.8,.2,1) both;
+  transition:transform .35s,border-color .35s;
+}
+.penni-auth .auth-visual-preview:hover {transform:translateY(-4px);border-color:rgba(255,255,255,.25);}
+.penni-auth .auth-visual-bottom {position:relative;z-index:1;}
+@keyframes auth-panel-in {from{opacity:0;transform:translateY(17px)}to{opacity:1;transform:translateY(0)}}
+@keyframes auth-preview-in {from{opacity:0;transform:translateY(28px) scale(.975)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes auth-orb {from{transform:translate(0,0)}to{transform:translate(-55px,-32px)}}
+@media(max-width:1023px){
+ .penni-auth .auth-form-panel {padding-block:30px;}
+ .penni-auth .auth-form-side {min-height:100dvh;}
+}
+@media(max-width:520px){
+ .penni-auth .auth-form-side {align-items:flex-start;padding:20px;}
+ .penni-auth .auth-form-panel {padding-block:10px 30px;}
+ .penni-auth .auth-brand {margin-bottom:24px;}
+ .penni-auth .auth-heading {font-size:33px;}
+ .penni-auth .auth-subtitle {font-size:13px;}
+ .penni-auth .auth-trust-bar {gap:10px;justify-content:flex-start;}
+}
+@media(prefers-reduced-motion:reduce) {
+ .penni-auth .auth-form-panel,.penni-auth .auth-visual-preview {
+   animation:none!important;opacity:1!important;transform:none!important;
+ }
+ .penni-auth .penni-auth-visual::after {animation:none!important;}
+ .penni-auth .auth-submit:hover,.penni-auth .auth-visual-preview:hover,.penni-auth .auth-back-link:hover {transform:none!important;}
+}

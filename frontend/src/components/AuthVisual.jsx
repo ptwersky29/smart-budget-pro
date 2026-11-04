@@ -10,21 +10,21 @@ const rows = [
 
 export default function AuthVisual({ title = "Premium money, quietly automated." }) {
   return (
-    <div className="hidden lg:flex relative overflow-hidden bg-slate-950 p-12 text-white">
+    <div className="penni-auth-visual relative hidden min-w-0 overflow-hidden bg-slate-950 p-10 text-white lg:flex xl:p-12">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(99,89,233,0.35),transparent_42%),radial-gradient(circle_at_80%_10%,rgba(171,128,245,0.16),transparent_36%)]" />
-      <div className="relative z-10 flex h-full w-full flex-col justify-between">
+      <div className="auth-visual-content relative z-10 flex h-full w-full flex-col justify-between gap-8">
         <div className="flex items-center gap-3">
           <Logo size="md" />
           <div>
             <p className="text-sm font-semibold">Penni</p>
-            <p className="text-xs text-white/60">Live money workspace</p>
+            <p className="text-xs text-white/60">Your financial workspace</p>
           </div>
         </div>
 
-        <div className="mx-auto w-full max-w-lg rounded-[2rem] border border-white/10 bg-white/10 p-5 shadow-2xl backdrop-blur">
+        <div className="auth-visual-preview mx-auto w-full max-w-lg rounded-[1.75rem] border border-white/10 bg-white/10 p-5 shadow-2xl backdrop-blur">
           <div className="mb-5 flex items-center justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-white/55">Total balance</p>
+              <p className="text-xs uppercase tracking-[0.16em] text-white/60">Sample combined balance</p>
               <p className="mt-2 text-4xl font-semibold tracking-tight">&pound;12,408.32</p>
             </div>
             <div className="grid h-12 w-12 place-items-center rounded-2xl bg-indigo-500/20 text-indigo-300">
@@ -64,10 +64,10 @@ export default function AuthVisual({ title = "Premium money, quietly automated."
           </div>
         </div>
 
-        <div>
-          <p className="max-w-lg text-4xl font-medium leading-tight tracking-tight">{title}</p>
+        <div className="auth-visual-bottom">
+          <p className="max-w-lg text-[clamp(28px,3vw,43px)] font-semibold leading-[1.14] tracking-[-0.045em]">{title}</p>
           <div className="mt-6 flex flex-wrap gap-3 text-xs text-white/70">
-            {["Bank sync", "AI budgets", "Maaser tracking"].map((item) => (
+            {["Accounts", "Budgets", "Maaser tracking"].map((item) => (
               <span key={item} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-2">
                 <CheckCircle2 className="h-3.5 w-3.5 text-violet-300" />
                 {item}
