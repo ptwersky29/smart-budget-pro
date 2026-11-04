@@ -377,10 +377,10 @@ def build_router() -> APIRouter:
             nominal_proj = calculate_projection(current_value, monthly_contribution,
                                                 annual_return_pct, years)
             return {
-                "current_value": round(principal, 2),
+                "current_value": round(current_value, 2),
                 "weighted_return_pct": annual_return_pct,
                 "years": years,
-                "monthly_contribution": monthly,
+                "monthly_contribution": monthly_contribution,
                 "final_value": nominal_proj[-1]["value"],
                 "projection": nominal_proj,
                 "holdings_used": len(rows),
