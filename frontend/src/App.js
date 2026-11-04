@@ -15,9 +15,10 @@ import ConsentBanner from "./components/ConsentBanner";
 import PageLoader from "./components/PageLoader";
 import { ActionProvider } from "./contexts/ActionContext";
 import GlobalActionHost from "./components/actions/GlobalActionHost";
+import { isPublicDemo, exitPublicDemo } from "./lib/demoSession";
 
 const Landing = lazy(() => import("./pages/Landing"));
-const DemoApp = lazy(() => import("./pages/DemoApp"));
+const DemoEntry = lazy(() => import("./pages/DemoEntry"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
@@ -55,6 +56,11 @@ const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 function AppRouter() {
   const location = useLocation();
   const authHash = location.hash || "";
+  React.useEffect(() => {
+    if (isPublicDemo() && ["/login", "/register", "/forgot-password", "/reset-password", "/pricing", "/privacy", "/"].includes(location.pathname)) {
+      exitPublicDemo(location.pathname);
+    }
+  }, [location.pathname]);
 
   if (
     authHash.includes("access_token=") ||
@@ -67,7 +73,7 @@ function AppRouter() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
-      <Route path="/demo/*" element={<DemoApp />} />
+      <Route path="/demo/*" element={<DemoEntry />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -134,8 +140,8 @@ export default function App() {
                     </Suspense>
                     <GlobalActionHost />
                   </ActionProvider>
-                  <AssistantPanel />
-                  <ConsentBanner />
+                  {!isPublicDemo() && <AssistantPanel />}
+                  {!isPublicDemo() && <ConsentBanner />}
                   <Toaster richColors position="top-right" />
                 </ErrorBoundary>
               </CategoriesProvider>

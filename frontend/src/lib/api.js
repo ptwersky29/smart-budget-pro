@@ -1,6 +1,7 @@
 import axios from "axios";
 import { cacheGet, cacheSet, cacheInvalidate, dedupe } from "./cache";
 import { getToken, setToken, clearTokens } from "./storage";
+import { isPublicDemo } from "./demoSession";
 
 // Always use the configured backend URL (Render), even when running locally.
 // This avoids needing a local backend server to use the deployed app.
@@ -132,7 +133,11 @@ function offlineDemoResponse(config) {
       source_breakdown: [{ source: "offline-demo", count: transactions.length }],
     };
   }
-  if (url === "/transactions") return { transactions, total: transactions.length, offset: 0, limit: 100 };
+  if (url === "/transactions") {
+    const requestedAccount = config?.params?.account_id;
+    const matches = requestedAccount ? transactions.filter(t => t.account_id === requestedAccount) : transactions;
+    return { transactions: matches, total: matches.length, offset: 0, limit: 100 };
+  }
   if (url === "/budgets") return { budgets, event_groups: {} };
   if (url === "/accounts") return { accounts };
   if (url === "/categories") return { categories: budgets.map((budget) => ({ name: budget.category })) };
@@ -140,6 +145,14 @@ function offlineDemoResponse(config) {
   if (url === "/budget-system/upcoming") return { upcoming: [] };
   if (url === "/budgets/insights") return { insights: [] };
   if (url === "/truelayer/connections") return { connections: [], total_transactions: transactions.length };
+  if (url === "/notifications") return [];
+  if (url === "/analytics/spending-by-category") return { categories: budgets.map(b=>({category:b.category,value:b.spent})) };
+  if (url === "/analytics/spending-trends") return { trends:[] };
+  if (url === "/analytics/period-comparison") return { current:{income:3200,spend:249.49},previous:{income:0,spend:0} };
+  if (url === "/analytics/budget-comparison") return { comparisons:budgets.map(b=>({category:b.category,budget:b.limit,spent:b.spent,remaining:b.remaining,progress_pct:b.progress_pct})) };
+  if (url === "/subscriptions") return { subscriptions:[] };
+  if (url === "/investments") return { investments:[],accounts:[] };
+  if (url === "/statements/history") return { history:[],statements:[] };
   return null;
 }
 
@@ -158,7 +171,41 @@ async function _ensureCsrf() {
 
 const SAFE_METHODS = new Set(["get", "head", "options"]);
 
+export function demoReadOnlyError() {
+  const error = new Error("This is a read-only demo. Create a free account to save changes.");
+  error.code = "PENNI_DEMO_READ_ONLY";
+  error.response = { status: 403, data: { detail: error.message } };
+  return error;
+}
+
+function demoResponse(config) {
+  const url = String(config.url || "").split("?")[0];
+  const mock = offlineDemoResponse(config);
+  // Fail closed: never fall through to the real backend, even for an
+  // unfamiliar endpoint. No authenticated or cached user information leaks.
+  const data = mock !== null ? mock : (
+    url === "/settings/app" ? { theme:"light", currency:"GBP", preferences:{} } :
+    url === "/notifications" ? [] :
+    url === "/jewish/maaser/summary" ? { balance: 0, total_due:0, total_given:0 } :
+    url === "/jewish/maaser/ledger" ? { ledger:[], entries:[] } :
+    url === "/jewish/maaser/settings" ? { settings:{} } :
+    url === "/analytics/spending-by-category" ? { categories:[] } :
+    { transactions:[], accounts:[], budgets:[], categories:[], items:[], rows:[], data:[], connections:[], history:[], alerts:[], upcoming:[] }
+  );
+  return { data: JSON.parse(JSON.stringify(data)), status:200, statusText:"Offline demo", headers:{ "x-penni-demo":"read-only" }, config, request:{} };
+}
+
+
 api.interceptors.request.use(async (config) => {
+  if (isPublicDemo()) {
+    const method = String(config.method || "get").toLowerCase();
+    if (method !== "get" && method !== "head" && method !== "options")
+      return Promise.reject(demoReadOnlyError());
+    config.adapter = async request => demoResponse(request);
+    config.withCredentials = false;
+    delete config.headers.Authorization;
+    return config;
+  }
   const token = getToken("access_token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -174,6 +221,7 @@ api.interceptors.request.use(async (config) => {
 
 api.interceptors.response.use(
   (response) => {
+    if (isPublicDemo()) return response;
     const method = response.config?.method?.toLowerCase();
     cacheOfflineResponse(response.config, response.data);
     if (method && !SAFE_METHODS.has(method)) {
@@ -182,6 +230,7 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
+    if (isPublicDemo()) return Promise.reject(error);
     const originalRequest = error.config || {};
     const requestUrl = String(originalRequest.url || "");
     if (!error?.response && originalRequest.method?.toLowerCase() === "get") {
@@ -247,6 +296,7 @@ api.interceptors.response.use(
 );
 
 api.cachedGet = async (url, params = {}, ttl) => {
+  if (isPublicDemo()) return (await api.get(url, {params})).data;
   const cached = cacheGet(url, params);
   if (cached) return cached;
   const { data } = await dedupe(url, params, () => api.get(url, { params }));

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { api } from "../lib/api";
 import { setToken, clearTokens, isTokenExpired } from "../lib/storage";
+import { isPublicDemo, DEMO_USER } from "../lib/demoSession";
 
 const AuthCtx = createContext(null);
 const OFFLINE_PROFILE_KEY = "penni.offline-profile.v1";
@@ -44,6 +45,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const checkAuth = useCallback(async () => {
+    if (isPublicDemo()) { setUser(DEMO_USER); setLoading(false); return; }
     try {
       const { data } = await api.get("/auth/me");
       const profile = stripTokens(data);
@@ -58,7 +60,7 @@ export const AuthProvider = ({ children }) => {
   }, [stripTokens]);
 
   useEffect(() => {
-    syncTokensFromLocation();
+    if (!isPublicDemo()) syncTokensFromLocation();
     checkAuth();
   }, [checkAuth, syncTokensFromLocation]);
 
@@ -96,6 +98,11 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const logout = useCallback(async () => {
+    if (isPublicDemo()) {
+      try { window.sessionStorage.removeItem("penni.public-demo.readonly.v1"); } catch {}
+      window.location.assign("/");
+      return;
+    }
     try { await api.post("/auth/logout"); } catch { /* server logout best-effort */ }
     clearTokens();
     localStorage.removeItem(OFFLINE_PROFILE_KEY);

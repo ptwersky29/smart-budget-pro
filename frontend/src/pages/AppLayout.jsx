@@ -12,6 +12,7 @@ import NotificationCenter from "../components/NotificationCenter";
 import Logo from "../components/Logo";
 import { BOTTOM_NAV, NAV_SECTIONS, SETTINGS_NAV_ITEM, getRouteMeta, KEYBOARD_GOTO } from "../data/navigation";
 import { APP_NAME } from "../data/constants";
+import { isPublicDemo, exitPublicDemo } from "../lib/demoSession";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -45,6 +46,7 @@ function isActivePath(pathname, to) {
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
+  const demoMode = isPublicDemo();
   const { settings } = useSettings();
   const { openAssistant } = useAssistant();
   const { openAction } = useActions();
@@ -227,9 +229,9 @@ export default function AppLayout() {
         </div>
 
         <div className={`mb-3 ${sidebarCompact ? "px-3" : "px-4"}`}>
-          <button type="button" onClick={() => openAction("transaction-new")}
+          <button type="button" disabled={demoMode} onClick={() => openAction("transaction-new")}
             className="penni-accent-button flex h-11 w-full items-center justify-center gap-2 text-sm font-semibold"
-            aria-label="New transaction" title="New transaction">
+            aria-label="New transaction" title={demoMode ? "Disabled in read-only demo" : "New transaction"}>
             <Plus className="h-4 w-4" />
             {!sidebarCompact && <span>New transaction</span>}
           </button>
@@ -367,7 +369,8 @@ export default function AppLayout() {
               </button>
               <button
                 type="button"
-                onClick={() => openAssistant()}
+                onClick={() => { if (!demoMode) openAssistant(); }}
+                disabled={demoMode}
                 data-tour="assistant-launch-mobile"
                 data-testid="assistant-open-mobile"
                 className="grid h-9 w-9 place-items-center rounded-full text-emerald transition hover:bg-emerald/10 md:hidden"
@@ -408,7 +411,7 @@ export default function AppLayout() {
                     <p className="truncate text-xs font-medium">{user?.name || "Penni member"}</p>
                     <p className="truncate text-[10px] text-muted-foreground">{user?.email}</p>
                   </div>
-                  <DropdownMenuItem onClick={() => openAssistant()} data-testid="assistant-open">
+                  <DropdownMenuItem onClick={() => { if (!demoMode) openAssistant(); }} disabled={demoMode} data-testid="assistant-open">
                     <Sparkles className="mr-2 h-4 w-4" />
                     Ask Penni
                   </DropdownMenuItem>
@@ -434,6 +437,10 @@ export default function AppLayout() {
           </div>
         </header>
 
+        {demoMode && <div data-testid="actual-app-demo-banner" role="status" className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-900 md:px-8">
+          <span>Penni demo · Real app layout · Fictional data · Read-only (no saving or deleting)</span>
+          <span className="flex items-center gap-3"><button type="button" className="underline" onClick={() => exitPublicDemo("/register")}>Create free account</button><button type="button" className="underline" onClick={() => exitPublicDemo("/")}>Exit demo</button></span>
+        </div>}
         <main data-tour="main-content" className={`app-main-scroll relative mx-auto w-full max-w-[var(--content-max)] px-4 pt-5 md:px-8 md:min-h-0 md:flex-1 md:overflow-y-auto md:overscroll-contain lg:pt-7 ${workspaceRoute ? "workspace-main lg:overflow-hidden" : ""}`}>
           <div className={[noAnim ? "" : "page-in", workspaceRoute ? "workspace-route-view" : ""].filter(Boolean).join(" ")}>
             <Outlet />

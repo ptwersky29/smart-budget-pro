@@ -3,6 +3,7 @@ import { api } from "../lib/api";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { useAuth } from "./AuthContext";
+import { isPublicDemo } from "../lib/demoSession";
 
 const LS_KEY = "financeai_settings";
 
@@ -80,7 +81,7 @@ function applyToDOM(preferences) {
 export function SettingsProvider({ children }) {
   const { setTheme } = useTheme();
   const { user, loading: authLoading } = useAuth();
-  const cached = useMemo(() => loadFromStorage(), []);
+  const cached = useMemo(() => isPublicDemo() ? null : loadFromStorage(), []);
   const [settings, setSettings] = useState(cached || {
     language: "en", theme: "system", currency: "GBP",
     onboarding_completed: false, preferences: DEFAULTS,
@@ -117,6 +118,7 @@ export function SettingsProvider({ children }) {
   useEffect(() => { load(); }, [load]);
 
   const updateSettings = useCallback(async (patch) => {
+    if (isPublicDemo()) return Promise.reject(new Error("Settings cannot be changed in the read-only demo."));
     const prev = settingsRef.current;
     const merged = { ...prev, ...patch, preferences: mergePreferences(prev.preferences, patch.preferences) };
     setSettings(merged);
