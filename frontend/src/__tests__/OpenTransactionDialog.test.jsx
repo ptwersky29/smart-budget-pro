@@ -51,7 +51,7 @@ test("Add transaction submits a signed amount to the real transactions API route
   render(<ActionProvider><NewTransactionLauncher/><GlobalActionHost/></ActionProvider>);
   fireEvent.click(screen.getByRole("button", {name:"New transaction"}));
   await screen.findByRole("dialog", {name:"New transaction"});
-  await waitFor(() => expect(screen.getByRole("button", {name:"Choose option"})).toHaveTextContent("Current"));
+  await waitFor(() => expect(screen.getByRole("combobox", {name: "Choose option"})).toHaveTextContent("Current"));
   fireEvent.change(screen.getByTestId("tx-amount"), {target:{value:"23.40"}});
   fireEvent.change(screen.getByTestId("tx-desc"), {target:{value:"Groceries"}});
   fireEvent.click(screen.getByTestId("tx-submit"));
@@ -69,7 +69,7 @@ test("Add transaction shows actionable errors instead of silently doing nothing"
   fireEvent.click(screen.getByRole("button",{name:"New transaction"}));
   await screen.findByRole("dialog",{name:"New transaction"});
   // The single account is selected asynchronously after the dialog opens.
-  await waitFor(() => expect(screen.getByRole("button",{name:"Choose option"})).toHaveTextContent("Current"));
+  await waitFor(() => expect(screen.getByRole("combobox", {name: "Choose option"})).toHaveTextContent("Current"));
   fireEvent.click(screen.getByTestId("tx-submit"));
   expect(await screen.findByRole("alert")).toHaveTextContent("Enter an amount greater than zero.");
   expect(api.post).not.toHaveBeenCalled();
@@ -87,7 +87,7 @@ test("Failed transaction requests keep the form open and display the server erro
   render(<ActionProvider><NewTransactionLauncher/><GlobalActionHost/></ActionProvider>);
   fireEvent.click(screen.getByRole("button",{name:"New transaction"}));
   await screen.findByRole("dialog",{name:"New transaction"});
-  await waitFor(() => expect(screen.getByRole("button", {name:"Choose option"})).toHaveTextContent("Current"));
+  await waitFor(() => expect(screen.getByRole("combobox", {name: "Choose option"})).toHaveTextContent("Current"));
   fireEvent.change(screen.getByTestId("tx-amount"),{target:{value:"17.00"}});
   fireEvent.change(screen.getByTestId("tx-desc"),{target:{value:"Groceries"}});
   fireEvent.click(screen.getByTestId("tx-submit"));
