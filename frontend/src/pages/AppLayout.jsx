@@ -242,7 +242,7 @@ export default function AppLayout() {
             {!sidebarCompact && <span>New transaction</span>}
           </button>
         </div>
-        <div className={`subtle-scroll flex-1 space-y-5 overflow-y-auto ${sidebarCompact ? "px-3" : "px-4"} py-2`}>
+        <div className={`subtle-scroll flex-1 space-y-5 overflow-y-auto scroll-smooth ${sidebarCompact ? "px-3" : "px-4"} py-2`}>
           {NAV_SECTIONS.filter((section) => (!section.adminOnly || user?.role === "admin") && (section.label === "Main" || moreExpanded)).map((section) => (
             <div key={section.label} className="space-y-1">
               {!sidebarCompact ? (

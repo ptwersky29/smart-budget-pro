@@ -1,4 +1,4 @@
-@tailwind base;
+﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -293,7 +293,7 @@ body {
   gap: 1.25rem;
 }
 .app-main-scroll {
-  scroll-behavior: auto;
+  scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
 }
 /* Penni budgets: scroll the ledger, not an arbitrary nth child.
@@ -345,6 +345,8 @@ body {
   letter-spacing: -0.025em;
 }
 .subtle-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--border)) transparent;
 }
@@ -362,6 +364,7 @@ body {
 .safe-bottom { padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0.75rem)); }
 .safe-top { padding-top: max(0.75rem, env(safe-area-inset-top, 0.75rem)); }
 .safe-bottom-fixed { bottom: max(0px, env(safe-area-inset-bottom, 0px)); }
+html { scroll-behavior: smooth; }
 body { -webkit-tap-highlight-color: transparent; touch-action: manipulation; overscroll-behavior: none; }
 input, select, textarea, button, a { touch-action: manipulation; }
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
