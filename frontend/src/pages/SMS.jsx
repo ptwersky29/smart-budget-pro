@@ -7,6 +7,7 @@ import { SectionCard } from "../components/ui/layout";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { PageHeader } from "../components/ui/page";
+import ConfirmModal from "../components/ui/ConfirmModal";
 
 const SAMPLE = "Tesco: You spent £42.50 at TESCO EXPRESS on 03/05/26. Available balance £812.40.";
 
@@ -27,6 +28,7 @@ export default function SMS({ embedded }) {
   const [pendingPhone, setPendingPhone] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [verifyBusy, setVerifyBusy] = useState(false);
+  const [pendingSenderRemoval, setPendingSenderRemoval] = useState(null);
 
   const loadSenders = useCallback(async () => {
     try {
@@ -130,15 +132,16 @@ export default function SMS({ embedded }) {
       {!embedded && <PageHeader eyebrow="Capture" title="SMS transactions" description="Turn bank text messages into transactions in a couple of taps." />}
       <SectionCard eyebrow="Your Phone" title={senders.length ? `${senders.length} phone${senders.length !== 1 ? "s" : ""} registered` : "Register your phone"} data-testid="phone-card">
         <p className="text-xs text-muted-foreground mb-4">Register your mobile number so the system recognises your SMS messages and can send automatic replies.</p>
+        <label htmlFor="sms-phone-number" className="mb-1.5 block text-xs font-medium text-muted-foreground">Phone number</label>
         <form onSubmit={registerPhone} className="flex items-center gap-3 mb-4">
-          <Input value={phoneInput} onChange={(e) => setPhoneInput(e.target.value)} placeholder="+447700900123" className="flex-1 font-mono text-sm" />
+          <Input id="sms-phone-number" type="tel" inputMode="tel" autoComplete="tel" value={phoneInput} onChange={(e) => setPhoneInput(e.target.value)} placeholder="+447700900123" className="flex-1 font-mono text-sm" />
           <Button type="submit" disabled={regBusy || !phoneInput.trim()} variant="primary" size="pill" className="shrink-0">
             {regBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Register"}
           </Button>
         </form>
         {pendingPhone && (
           <form onSubmit={verifyPhone} className="flex items-center gap-3 mb-4" data-testid="sms-verify-form">
-            <Input value={otpCode} onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder={`6-digit code sent to ${pendingPhone}`} inputMode="numeric" autoComplete="one-time-code" className="flex-1 font-mono text-sm" />
+            <Input aria-label="SMS verification code" value={otpCode} onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder={`6-digit code sent to ${pendingPhone}`} inputMode="numeric" autoComplete="one-time-code" className="flex-1 font-mono text-sm" />
             <Button type="submit" disabled={verifyBusy || otpCode.length !== 6} variant="primary" size="pill" className="shrink-0">
               {verifyBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
             </Button>
@@ -151,7 +154,7 @@ export default function SMS({ embedded }) {
                 {s.verified ? <CheckCircle2 className="h-4 w-4 text-emerald shrink-0" /> : <AlertTriangle className="h-4 w-4 text-topaz shrink-0" />}
                 <span className="text-sm font-mono">{s.phone_number}</span>
                 <span className="text-xs text-muted-foreground">{s.verified_at ? `verified ${s.verified_at.slice(0, 10)}` : "pending"}</span>
-                <button onClick={() => deleteSender(s.id)} className="ml-auto p-3 text-muted-foreground hover:text-ruby" title="Remove">
+                <button type="button" onClick={() => setPendingSenderRemoval(s.id)} aria-label={`Remove phone number ${s.phone_number}`} className="ml-auto p-3 text-muted-foreground hover:text-ruby" title="Remove">
                   <Trash2 className="h-4 w-4" />
                 </button>
               </li>
@@ -161,8 +164,9 @@ export default function SMS({ embedded }) {
       </SectionCard>
 
       <SectionCard eyebrow="Parse" title="Paste a transaction SMS" contentClassName="pt-0">
-        <div className="flex items-center gap-2 mb-3"><MessageSquare className="h-4 w-4 text-emerald" /><p className="label-overline">Paste a transaction SMS</p></div>
-        <textarea data-testid="sms-text" rows={4} value={text} onChange={(e)=>setText(e.target.value)} placeholder={SAMPLE} className="w-full p-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none text-sm leading-relaxed" />
+        <div className="mb-3 flex items-center gap-2"><MessageSquare className="h-4 w-4 text-emerald" /><label htmlFor="sms-message-text" className="label-overline">Bank SMS message</label></div>
+        <p id="sms-parse-description" className="mb-3 text-xs text-muted-foreground">Use Parse with AI to review extracted details; Parse & save also creates a transaction. Your SMS text is sent to the configured parsing service only when you select an action.</p>
+        <textarea id="sms-message-text" aria-describedby="sms-parse-description" data-testid="sms-text" rows={4} value={text} onChange={(e)=>setText(e.target.value)} placeholder={SAMPLE} className="w-full p-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none text-sm leading-relaxed" />
         <div className="flex flex-wrap gap-2 mt-3">
           <Button onClick={()=>setText(SAMPLE)} data-testid="sms-sample" variant="outlinePill" size="pill">Try a sample</Button>
           <div className="flex-1" />
@@ -228,24 +232,28 @@ export default function SMS({ embedded }) {
           <form onSubmit={saveTw} className="grid sm:grid-cols-2 gap-3">
             <div>
               <label className="label-overline">Account SID</label>
-              <Input data-testid="tw-sid" value={twForm.account_sid} onChange={(e)=>setTwForm({...twForm, account_sid:e.target.value})} placeholder="ACxxxxxxxxxxxxxxxx" className="mt-1 w-full font-mono text-sm" />
+              <Input aria-label="Twilio account SID" data-testid="tw-sid" value={twForm.account_sid} onChange={(e)=>setTwForm({...twForm, account_sid:e.target.value})} placeholder="ACxxxxxxxxxxxxxxxx" className="mt-1 w-full font-mono text-sm" />
             </div>
             <div>
               <label className="label-overline">Auth Token {tw?.has_token && <span className="ml-1 normal-case tracking-normal text-muted-foreground">(set)</span>}</label>
-              <Input data-testid="tw-token" type="password" value={twForm.auth_token} onChange={(e)=>setTwForm({...twForm, auth_token:e.target.value})} placeholder={tw?.has_token ? "•••••••••• (unchanged)" : "Paste token"} className="mt-1 w-full font-mono text-sm" />
+              <Input aria-label="Twilio auth token" data-testid="tw-token" type="password" value={twForm.auth_token} onChange={(e)=>setTwForm({...twForm, auth_token:e.target.value})} placeholder={tw?.has_token ? "•••••••••• (unchanged)" : "Paste token"} className="mt-1 w-full font-mono text-sm" />
             </div>
             <div>
               <label className="label-overline">Twilio phone number</label>
-              <Input data-testid="tw-number" value={twForm.phone_number} onChange={(e)=>setTwForm({...twForm, phone_number:e.target.value})} placeholder="+447700900123" className="mt-1 w-full font-mono text-sm" />
+              <Input aria-label="Twilio phone number" data-testid="tw-number" value={twForm.phone_number} onChange={(e)=>setTwForm({...twForm, phone_number:e.target.value})} placeholder="+447700900123" className="mt-1 w-full font-mono text-sm" />
             </div>
             <div>
               <label className="label-overline">Webhook URL</label>
-              <input readOnly value={tw?.webhook_url || ""} className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/30 text-xs font-mono cursor-not-allowed" />
+              <input aria-label="Twilio webhook URL" readOnly value={tw?.webhook_url || ""} className="mt-1 w-full h-11 px-4 rounded-xl bg-secondary/30 text-xs font-mono cursor-not-allowed" />
             </div>
             <Button data-testid="tw-save" variant="primary" size="pill">Save Twilio settings</Button>
           </form>
         </SectionCard>
       )}
+      <ConfirmModal open={pendingSenderRemoval != null} title="Remove this phone number?"
+        message="This phone will no longer be recognised as a registered SMS sender."
+        confirmLabel="Remove number" onCancel={() => setPendingSenderRemoval(null)}
+        onConfirm={async () => { const id = pendingSenderRemoval; setPendingSenderRemoval(null); if (id != null) await deleteSender(id); }} />
     </div>
   );
 }

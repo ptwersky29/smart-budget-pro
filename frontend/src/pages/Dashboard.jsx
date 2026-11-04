@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -104,6 +104,7 @@ export default function Dashboard() {
   const { version: categoriesVersion } = useCategories();
   const { openAssistant } = useAssistant();
   const { openAction } = useActions();
+  const accountsStripRef = useRef(null);
   const [overview, setOverview] = useState(null);
   const [budgets, setBudgets] = useState([]);
   const [alerts, setAlerts] = useState([]);
@@ -327,9 +328,17 @@ export default function Dashboard() {
       <section className="penni-ref-accounts" aria-label="Your accounts">
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="text-[18px] font-semibold tracking-[-.035em]">Accounts</h2>
-          <Link to="/accounts" className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary">Manage <ArrowRight className="h-4 w-4"/></Link>
+          <div className="flex items-center gap-2">
+            {accounts.length > 1 && <div role="group" aria-label="Scroll account cards" className="flex gap-1">
+              <button type="button" aria-label="Previous accounts" onClick={() => accountsStripRef.current?.scrollBy({ left: -308, behavior: "smooth" })}
+                className="grid h-9 w-9 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-secondary">‹</button>
+              <button type="button" aria-label="Next accounts" onClick={() => accountsStripRef.current?.scrollBy({ left: 308, behavior: "smooth" })}
+                className="grid h-9 w-9 place-items-center rounded-lg border border-border text-muted-foreground hover:bg-secondary">›</button>
+            </div>}
+            <Link to="/accounts" className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary">Manage <ArrowRight className="h-4 w-4"/></Link>
+          </div>
         </div>
-        <div className="penni-ref-account-row flex gap-4 overflow-x-auto pb-3">
+        <div ref={accountsStripRef} tabIndex={0} role="region" aria-label="Your accounts. Scroll horizontally to see more." className="penni-ref-account-row flex gap-4 overflow-x-auto pb-3 focus-visible:outline-2 focus-visible:outline-primary">
           {accounts.map(account=>(
             <AccountTile key={account.account_id||account.id} account={account}
               className="w-[292px] min-w-[292px] max-w-[340px] flex-shrink-0"

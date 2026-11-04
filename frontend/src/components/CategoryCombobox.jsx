@@ -146,20 +146,24 @@ export default function CategoryCombobox({
           </button>
         </PopoverTrigger>
         <PopoverContent
-          className="w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-24px)] p-0"
+          className="flex w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-24px)] max-h-[min(75dvh,var(--radix-popover-content-available-height))] flex-col overflow-hidden p-0"
           align="start"
+          side="bottom"
+          collisionPadding={12}
+          avoidCollisions
         >
-          <Command shouldFilter={false}>
+          <Command shouldFilter={false} className="flex min-h-0 flex-col overflow-hidden">
             <div className="flex items-center border-b px-3">
               <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
               <input
+                aria-label="Search categories"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search categories…"
                 className="flex h-11 w-full rounded-md bg-transparent py-3 text-[15px] outline-none placeholder:text-muted-foreground"
               />
             </div>
-            <CommandList>
+            <CommandList className="min-h-0 max-h-[min(50dvh,240px)] overflow-y-auto overscroll-contain">
               <CommandEmpty>
                 {search ? "No categories found" : "No categories yet"}
               </CommandEmpty>

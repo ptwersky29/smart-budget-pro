@@ -52,7 +52,7 @@ function UsageChips({ usage }) {
           key={label}
           className="rounded-full bg-secondary/70 px-2 py-1 text-[11px] text-muted-foreground"
         >
-          {count} {label}
+          {count} {count === 1 ? label.replace(/s$/, "") : label}
         </span>
       ))}
     </div>
@@ -208,7 +208,7 @@ export default function CategoryManager() {
               <div>
                 <h2 className="text-sm font-semibold">{section}</h2>
                 <p className="text-xs text-muted-foreground">
-                  {items.length} categories
+                  {items.length} {items.length === 1 ? "category" : "categories"}
                 </p>
               </div>
             </div>

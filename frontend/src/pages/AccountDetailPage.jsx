@@ -21,6 +21,8 @@ import TransactionInspectorPanel from "../components/TransactionInspectorPanel";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu";
 import { withUndo } from "../lib/undo";
 import { useCategories } from "../contexts/CategoriesContext";
+import { formatCurrency, formatShortDate, formatDateTime } from "../lib/format";
+import { humanizeCategoryName } from "../lib/categories";
 
 const ACCOUNT_TYPE_META = {
   current: { icon: Wallet, label: "Current Account", color: "text-emerald", bg: "bg-emerald/10" },
@@ -406,7 +408,7 @@ export default function AccountDetailPage() {
                 </div>
                 {account.balance_updated_at && (
                   <p className="text-[10px] text-muted-foreground mb-1">
-                    Updated {new Date(account.balance_updated_at).toLocaleDateString()}
+                    Updated {formatDateTime(account.balance_updated_at)}
                   </p>
                 )}
               </div>
@@ -448,24 +450,24 @@ export default function AccountDetailPage() {
           <SectionCard eyebrow="Transactions" title={`${totalTx} transaction${totalTx !== 1 ? "s" : ""}`} className="account-detail-transaction-section" contentClassName="account-detail-transaction-content">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 pb-4">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            <span>Income <strong className="text-emerald font-medium tabular-nums">{CURRENCY_SYMBOL}{incomeTotal.toFixed(2)}</strong></span>
+            <span>Income <strong className="text-emerald font-medium tabular-nums">{formatCurrency(incomeTotal)}</strong></span>
             <span className="text-muted-foreground/30">·</span>
-            <span>Expenses <strong className="text-ruby font-medium tabular-nums">{CURRENCY_SYMBOL}{expenseTotal.toFixed(2)}</strong></span>
+            <span>Expenses <strong className="text-ruby font-medium tabular-nums">{formatCurrency(expenseTotal)}</strong></span>
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
-            <button onClick={() => setShowSearch((s) => !s)}
+            <button type="button" aria-label="Search account transactions" aria-expanded={showSearch} onClick={() => setShowSearch((s) => !s)}
               className={`h-8 w-8 rounded-full grid place-items-center transition-all ${showSearch || filters.search ? "bg-emerald text-white" : "text-muted-foreground hover:bg-secondary/60"}`}>
               <Search className="h-3.5 w-3.5" />
             </button>
 
-            <PenniSelect value={filters.sort} onChange={(e) => setFilter("sort", e.target.value)}
+            <PenniSelect aria-label="Sort account transactions" value={filters.sort} onChange={(e) => setFilter("sort", e.target.value)}
               className="h-8 px-2 rounded-lg bg-secondary/50 border border-border/50 text-[11px] font-medium focus:outline-none focus:border-ring">
               <option value="date">Date</option>
               <option value="amount">Amount</option>
               <option value="description">Description</option>
             </PenniSelect>
-            <button onClick={() => setFilter("order", filters.order === "desc" ? "asc" : "desc")}
+            <button type="button" aria-label="Reverse sort order" aria-pressed={filters.order === "asc"} onClick={() => setFilter("order", filters.order === "desc" ? "asc" : "desc")}
               className="h-8 w-7 grid place-items-center rounded-lg bg-secondary/50 border border-border/50 hover:bg-secondary/80">
               {filters.order === "desc" ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
             </button>
@@ -480,16 +482,16 @@ export default function AccountDetailPage() {
                 <SheetHeader><SheetTitle>Filters</SheetTitle><SheetDescription>Refine transactions for this account</SheetDescription></SheetHeader>
                 <div className="mt-6 space-y-4">
                   <div className="grid grid-cols-2 gap-3">
-                    <PenniSelect value={filters.tx_type} onChange={(e) => setFilter("tx_type", e.target.value)}
+                    <PenniSelect aria-label="Filter account transaction type" value={filters.tx_type} onChange={(e) => setFilter("tx_type", e.target.value)}
                       className="h-10 px-4 rounded-xl bg-secondary/50 border border-transparent text-sm">
                       <option value="">All types</option><option value="income">Income</option><option value="expense">Expense</option>
                     </PenniSelect>
-                    <CategoryCombobox value={filters.category} onChange={(val) => setFilter("category", val)}
+                    <CategoryCombobox label="Filter account transaction category" value={filters.category} onChange={(val) => setFilter("category", val)}
                       categories={selectedCats} placeholder="All categories" allowClear />
-                    <Input type="number" placeholder={`Min ${CURRENCY_SYMBOL}`} value={filters.amount_min} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_min: e.target.value })); }} className="text-sm h-10" />
-                    <Input type="number" placeholder={`Max ${CURRENCY_SYMBOL}`} value={filters.amount_max} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_max: e.target.value })); }} className="text-sm h-10" />
-                    <Input type="date" value={filters.date_from} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_from: e.target.value })); }} className="text-sm h-10" />
-                    <Input type="date" value={filters.date_to} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_to: e.target.value })); }} className="text-sm h-10" />
+                    <Input aria-label="Minimum amount" type="number" inputMode="decimal" placeholder={`Min ${CURRENCY_SYMBOL}`} value={filters.amount_min} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_min: e.target.value })); }} className="text-sm h-10" />
+                    <Input aria-label="Maximum amount" type="number" inputMode="decimal" placeholder={`Max ${CURRENCY_SYMBOL}`} value={filters.amount_max} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, amount_max: e.target.value })); }} className="text-sm h-10" />
+                    <Input aria-label="From date" type="date" value={filters.date_from} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_from: e.target.value })); }} className="text-sm h-10" />
+                    <Input aria-label="To date" type="date" value={filters.date_to} onChange={(e) => { setOffset(0); setFilters(p => ({ ...p, date_to: e.target.value })); }} className="text-sm h-10" />
                   </div>
                   <div className="border-t border-border pt-4 flex justify-end">
                     <button onClick={() => { setSearchInput(""); setFilters(defaultFilters); setOffset(0); }} className="text-sm text-muted-foreground hover:text-foreground">Clear all filters</button>
@@ -503,7 +505,7 @@ export default function AccountDetailPage() {
         {showSearch && (
           <div className="flex items-center gap-2 rounded-full border border-border bg-card/70 backdrop-blur-xl px-4 h-9 shadow-sm mb-3">
             <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <input value={searchInput} onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
+            <input aria-label="Search account transactions" value={searchInput} onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
               placeholder="Search transactions..." className="w-full bg-transparent outline-none text-xs" />
             {filters.search && <button onClick={() => { setSearchInput(""); setFilter("search", ""); }}><X className="h-3.5 w-3.5" /></button>}
           </div>
@@ -531,14 +533,14 @@ export default function AccountDetailPage() {
           ) : (
             <>
 
-              <div ref={scrollRef} className="account-detail-list subtle-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain" role="list" aria-label="Account transactions">
+              <div ref={scrollRef} className="account-detail-list subtle-scroll min-h-0 flex-1 overflow-y-visible overflow-x-hidden lg:overflow-y-auto lg:overscroll-contain" role="list" aria-label="Account transactions">
                 {txs.map((t) => {
                   const amount = Number(t.amount) || 0;
                   const description = t.description || t.merchant || "Transaction";
                   const dateLabel = t.date ? new Date(`${String(t.date).slice(0, 10)}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "No date";
                   const merchant = t.merchant || t.normalized_merchant;
                   const status = t.approval_status === "failed" ? "Failed" : t.pending ? "Pending" : (t.approval_status === "unapproved" || t.category_approval_status === "unapproved") ? "Unapproved" : "Approved";
-                  const detail = [merchant && merchant.toLowerCase() !== description.toLowerCase() ? merchant : null, t.category || "Uncategorised", t.source_label || t.source].filter(Boolean).join(" · ");
+                  const detail = [merchant && merchant.toLowerCase() !== description.toLowerCase() ? merchant : null, humanizeCategoryName(t.category), t.source_label || t.source].filter(Boolean).join(" · ");
                   return (
                     <div role="listitem" key={t.transaction_id} className={`flex min-w-0 items-center gap-2 border-b border-border/60 px-3 py-3 last:border-0 hover:bg-secondary/25 ${inspectedTransaction?.transaction_id === t.transaction_id ? "bg-emerald/10" : ""}`}>
                       <button type="button" onClick={() => setInspectedTransaction(t)} className="flex min-w-0 flex-1 items-start gap-2.5 text-left" aria-label={`View details for ${description}`}>
@@ -550,7 +552,7 @@ export default function AccountDetailPage() {
                         </span>
                       </button>
                       <span className="flex max-w-[39%] shrink-0 flex-col items-end gap-1">
-                        <span className={`money-tabular break-all text-right text-[12px] font-semibold ${amount < 0 ? "text-ruby" : "text-emerald"}`}>
+                        <span className={`money-tabular whitespace-nowrap text-right text-[12px] font-semibold ${amount < 0 ? "text-ruby" : "text-emerald"}`}>
                           {amount > 0 ? "+" : amount < 0 ? "−" : ""}{CURRENCY_SYMBOL}{Math.abs(amount).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                         <span className="text-[10px] text-muted-foreground">{status}</span>
@@ -642,7 +644,7 @@ export default function AccountDetailPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="truncate text-xs font-medium">{s.filename || `Statement ${i + 1}`}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{s.created_at ? new Date(s.created_at).toLocaleDateString() : ""}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{s.created_at ? formatShortDate(s.created_at, { year: "numeric" }) : ""}</p>
                     </div>
                     {s.transaction_count && <span className="text-xs font-medium px-2 py-1 rounded-full bg-secondary text-muted-foreground shrink-0">{s.transaction_count} txns</span>}
                   </div>

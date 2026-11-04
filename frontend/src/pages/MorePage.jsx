@@ -110,6 +110,7 @@ export default function MorePage() {
           </Surface>
 
           <Section title="Money & planning">
+            <SettingRow to="/budgets" icon={CreditCard} title="Budgets" description="Manage spending limits and monthly plans" />
             <SettingRow to="/analytics" icon={BarChart3} title="Analytics" description="Interactive income, spending and budget trends" />
             <SettingRow to="/reports" icon={FileText} title="Reports" description="Financial reports and exportable documents" />
             <SettingRow to="/subscriptions" icon={RefreshCcw} title="Subscriptions" description="Recurring payments and renewals" />

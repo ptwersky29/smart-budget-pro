@@ -1,12 +1,13 @@
 import PenniSelect from "../components/PenniSelect";
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
-import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, Area, AreaChart } from "recharts";
+import { Line, ResponsiveContainer, XAxis, YAxis, Tooltip, Area, AreaChart, Legend } from "recharts";
 import { TrendingUp, Loader2, ArrowUpRight, ArrowDownRight, RefreshCw, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import AIInsightPanel from "../components/AIInsightPanel";
 import { Button } from "../components/ui/button";
 import { PageHeader } from "../components/ui/page";
+import { formatCurrency } from "../lib/format";
 
 const SYMBOLS = ["VUSA","VWRL","VUKE","VFEM","IWDA","EQQQ","ISF","IUSA","VHVG","SP500","FTSE","NASDAQ","BRK.B","BTC","ETH"];
 const CRYPTO_TICKERS = "BTC,ETH,SOL,ADA,XRP,DOGE";
@@ -117,32 +118,33 @@ export default function Investments() {
             }) : <p className="col-span-full text-sm text-muted-foreground py-8 text-center">No stock prices available</p>}
           </div>
         )}
-        <p className="text-xs text-muted-foreground mt-3">Tap any asset to use its live price as your initial investment value.</p>
+        <p className="text-xs text-muted-foreground mt-3">Select an asset quote to populate the starting amount field. A single-unit market quote is not your actual portfolio value.</p>
       </div>
 
       <form onSubmit={run} className="rounded-2xl border border-border bg-card p-4 sm:p-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 items-end">
         <div>
-          <label className="label-overline">Symbol</label>
-          <PenniSelect data-testid="inv-symbol" value={form.symbol} onChange={(e)=>setForm({...form, symbol:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none">
+          <label htmlFor="invest-symbol" className="label-overline">Symbol</label>
+          <PenniSelect id="invest-symbol" aria-label="Investment symbol" data-testid="inv-symbol" value={form.symbol} onChange={(e)=>setForm({...form, symbol:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none">
             {SYMBOLS.map(s=><option key={s}>{s}</option>)}
           </PenniSelect>
         </div>
         <div>
-          <label className="label-overline">Initial (£)</label>
-          <input data-testid="inv-initial" type="number" value={form.initial_value} onChange={(e)=>setForm({...form, initial_value:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
+          <label htmlFor="invest-initial" className="label-overline">Starting investment (£)</label>
+          <input id="invest-initial" data-testid="inv-initial" type="number" min="0" step="0.01" inputMode="decimal" required value={form.initial_value} onChange={(e)=>setForm({...form, initial_value:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
         </div>
         <div>
-          <label className="label-overline">Monthly (£)</label>
-          <input data-testid="inv-monthly" type="number" value={form.monthly_contribution} onChange={(e)=>setForm({...form, monthly_contribution:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
+          <label htmlFor="invest-monthly" className="label-overline">Monthly contribution (£)</label>
+          <input id="invest-monthly" data-testid="inv-monthly" type="number" min="0" step="0.01" inputMode="decimal" required value={form.monthly_contribution} onChange={(e)=>setForm({...form, monthly_contribution:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
         </div>
         <div>
-          <label className="label-overline">Years</label>
-          <input data-testid="inv-years" type="number" value={form.years} onChange={(e)=>setForm({...form, years:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
+          <label htmlFor="invest-years" className="label-overline">Years</label>
+          <input id="invest-years" data-testid="inv-years" type="number" min="1" max="50" step="1" required value={form.years} onChange={(e)=>setForm({...form, years:e.target.value})} className="mt-1 w-full h-11 px-3 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none" />
         </div>
         <Button data-testid="inv-run" variant="primary" size="pill" disabled={busy}>
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Forecast"}
         </Button>
       </form>
+      <p className="text-xs leading-relaxed text-muted-foreground">Illustrative projection using 7% annual return, effective monthly compounding and deposits at each month-end. Returns are assumptions, not guarantees.</p>
 
       {result && (
         <div className="grid lg:grid-cols-3 gap-4">
@@ -157,19 +159,33 @@ export default function Investments() {
                       <stop offset="100%" stopColor="hsl(var(--emerald))" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="year" stroke="hsl(var(--muted-foreground))" fontSize={11} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
-                  <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
+                  <XAxis dataKey="year" stroke="hsl(var(--muted-foreground))" fontSize={11} label={{ value: "Years", position: "insideBottom", offset: -5 }} />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} width={68} tickFormatter={(value) => formatCurrency(value, { compact: true })} />
+                  <Tooltip formatter={(value, name) => [formatCurrency(value), name === "value" ? "Projected value" : "Contributions"]} contentStyle={CHART_TOOLTIP_STYLE} />
+                  <Legend verticalAlign="top" height={32} formatter={(name) => name === "value" ? "Projected value" : "Contributions"} />
                   <Area type="monotone" dataKey="value" stroke="hsl(var(--emerald))" strokeWidth={2.5} fill="url(#emerald)" />
                   <Line type="monotone" dataKey="contributed" stroke="hsl(var(--topaz))" strokeWidth={2} dot={false} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
+            <details className="mt-3 rounded-xl border border-border/70 p-3 text-sm">
+              <summary className="cursor-pointer font-medium">View yearly projection data</summary>
+              <div className="mt-3 max-h-64 overflow-auto">
+                <table className="w-full text-xs">
+                  <thead><tr><th scope="col" className="py-2 text-left">Year</th><th scope="col" className="py-2 text-right">Contributed</th><th scope="col" className="py-2 text-right">Estimated value</th></tr></thead>
+                  <tbody>{(result.points || []).map((point) => <tr key={point.year} className="border-t border-border/50">
+                    <th scope="row" className="py-2 text-left font-medium">{point.year}</th>
+                    <td className="money-tabular py-2 text-right">{formatCurrency(point.contributed)}</td>
+                    <td className="money-tabular py-2 text-right">{formatCurrency(point.value)}</td>
+                  </tr>)}</tbody>
+                </table>
+              </div>
+            </details>
           </div>
           <div className="space-y-4">
-            <Stat label="Projected value" value={`£${result.future_value.toLocaleString()}`} accent="emerald" />
-            <Stat label="You contribute" value={`£${result.total_contributed.toLocaleString()}`} accent="topaz" />
-            <Stat label="Net gain" value={`£${result.gain.toLocaleString()}`} accent="emerald" />
+            <Stat label="Projected value" value={formatCurrency(result.future_value)} accent="emerald" />
+            <Stat label="You contribute" value={formatCurrency(result.total_contributed)} accent="topaz" />
+            <Stat label={result.gain < 0 ? "Net loss" : "Net gain"} value={formatCurrency(result.gain)} accent={result.gain < 0 ? "ruby" : "emerald"} />
           </div>
         </div>
       )}

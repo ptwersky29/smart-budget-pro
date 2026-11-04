@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { formatDateTime } from "../lib/format";
 import { Bell, AlertTriangle, CheckCircle, Info, AlertCircle, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 
 export default function NotificationCenter() {
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef(null);
   const [notifications, setNotifications] = useState([]);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -26,6 +28,19 @@ export default function NotificationCenter() {
     const interval = setInterval(fetchNotifications, 30000); // Poll every 30 seconds
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open]);
 
   const markAsRead = async (notificationId) => {
     try {
@@ -84,6 +99,10 @@ export default function NotificationCenter() {
     <div className="relative">
       {/* Bell Icon Button */}
       <button
+        ref={triggerRef}
+        type="button"
+        aria-expanded={open}
+        aria-controls="penni-notification-panel"
         onClick={() => setOpen(!open)}
         className="relative h-11 w-11 grid place-items-center rounded-full border border-border bg-card/80 hover:bg-secondary transition-colors"
         aria-label={`Notifications ${unread > 0 ? `(${unread} unread)` : ""}`}
@@ -99,7 +118,7 @@ export default function NotificationCenter() {
 
       {/* Dropdown Notification Center */}
       {open && (
-        <div className="absolute top-full right-0 mt-2 w-96 max-h-96 rounded-2xl border border-border bg-card shadow-lg z-50 flex flex-col overflow-hidden">
+        <div id="penni-notification-panel" role="region" aria-label="Notifications" className="absolute right-0 top-full z-50 mt-2 flex max-h-[min(80dvh,450px)] w-[min(90vw,384px)] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
           {/* Header */}
           <div className="flex items-center justify-between gap-2 p-4 border-b border-border/50">
             <h3 className="font-semibold">Notifications</h3>
@@ -137,7 +156,7 @@ export default function NotificationCenter() {
                         <p className="font-medium text-sm">{n.title}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">{n.message}</p>
                         <p className="text-xs text-muted-foreground/50 mt-1">
-                          {new Date(n.created_at).toLocaleDateString()} {new Date(n.created_at).toLocaleTimeString()}
+                          {formatDateTime(n.created_at)}
                         </p>
                       </div>
                       <button
@@ -145,7 +164,7 @@ export default function NotificationCenter() {
                           e.stopPropagation();
                           deleteNotification(n.id);
                         }}
-                        className="opacity-0 group-hover:opacity-100 p-1 transition-opacity"
+                        className="rounded-md p-1 opacity-100 transition-opacity hover:bg-secondary sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
                         aria-label="Delete notification"
                       >
                         <Trash2 className="h-4 w-4 text-muted-foreground hover:text-foreground" />

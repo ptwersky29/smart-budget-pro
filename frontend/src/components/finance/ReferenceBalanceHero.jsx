@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis } from "recharts";
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ArrowDownLeft, ArrowRight, ArrowUpRight, RefreshCw, Sparkles } from "lucide-react";
 import { fetchAllTransactions } from "../../lib/transactionsQuery";
 import { formatCurrency } from "../../lib/format";
@@ -79,12 +79,13 @@ export default function ReferenceBalanceHero({
     </div>
     <div className="penni-balance-chart relative mt-5 h-[225px]" aria-label="Estimated balance history chart">
       {activeData ? <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={history} margin={{top:12,right:5,left:4,bottom:0}}>
+        <AreaChart data={history} margin={{top:12,right:9,left:3,bottom:0}}>
          <defs><linearGradient id="penniBalanceGradient" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#5b5cf0" stopOpacity={0.19}/>
           <stop offset="100%" stopColor="#5b5cf0" stopOpacity={0}/>
          </linearGradient></defs>
          <CartesianGrid vertical={false} stroke="var(--penni-line)" strokeDasharray="3 5" />
+         <YAxis dataKey="balance" axisLine={false} tickLine={false} width={66} tick={{ fontSize: 10, fill: "var(--penni-faint)" }} tickFormatter={value => formatCurrency(value, { compact: true })} />
          <XAxis dataKey="date" minTickGap={50} axisLine={false} tickLine={false} tick={{fontSize:10,fill:"var(--penni-faint)"}}
           tickFormatter={value=>{const d=new Date(value+"T12:00:00");return d.toLocaleDateString("en-GB",{day:"numeric",month:"short"});}}/>
          <Tooltip formatter={v=>[formatCurrency(v),"Est. balance"]}
@@ -100,6 +101,19 @@ export default function ReferenceBalanceHero({
         <><p className="text-sm font-medium text-muted-foreground">{failure?"Balance trend unavailable":"No transactions in this period"}</p><p className="text-xs text-muted-foreground">Your current balance is shown above.</p></>}
        </div>}
     </div>
+    {activeData && (
+      <details className="mt-2 text-xs text-muted-foreground">
+        <summary className="cursor-pointer font-medium">View balance history as a table</summary>
+        <div className="mt-2 max-h-52 overflow-auto rounded-lg border border-border">
+          <table className="w-full text-xs"><thead><tr><th scope="col" className="px-3 py-2 text-left">Date</th><th scope="col" className="px-3 py-2 text-right">Estimated balance</th></tr></thead>
+            <tbody>{history.map((point) => <tr key={point.date} className="border-t border-border/50">
+              <td className="px-3 py-1.5">{point.date}</td>
+              <td className="money-tabular px-3 py-1.5 text-right">{formatCurrency(point.balance)}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+      </details>
+    )}
     <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
       <p className="text-[10px] text-muted-foreground">{activeData?"Estimates based on recorded transactions and current balances":"Balance chart uses your recorded transactions"}</p>
       <div className="flex items-center gap-2">
@@ -108,7 +122,7 @@ export default function ReferenceBalanceHero({
       </div>
     </div>
    </div>
-   <div className="penni-month-summary surface flex min-w-0 flex-col p-6">
+   <div className="penni-month-summary surface flex min-w-0 flex-col self-start p-6">
     <h2 className="text-[19px] font-semibold tracking-[-.03em]">{month}</h2>
     <p className="mt-1 text-[12px] text-muted-foreground">{pace.daysLeft} days left this month</p>
     <div className="mt-7 flex justify-between gap-4">
@@ -127,7 +141,7 @@ export default function ReferenceBalanceHero({
      <p className="money-tabular mt-1 text-[24px] font-semibold">{formatCurrency(pace.projected)}</p>
      <p className="mt-1 text-[11px] text-muted-foreground">Simple estimate based on this month's spending pace.</p>
     </div>
-    <Link to="/budgets" className="penni-safe-card mt-auto flex items-center justify-between rounded-2xl p-4 text-white">
+    <Link to="/budgets" className="penni-safe-card mt-5 flex items-center justify-between rounded-2xl p-4 text-white">
       <div><p className="text-[11px] font-semibold uppercase tracking-wider text-white/70">Safe to spend today</p>
       <p className="money-tabular mt-1 text-[24px] font-semibold">{dailySafe===null?"Set budgets":formatCurrency(dailySafe)}</p></div>
       <span className="grid h-9 w-9 place-items-center rounded-full bg-white/15 transition-transform group-hover:translate-x-1"><ArrowRight className="h-4 w-4"/></span>

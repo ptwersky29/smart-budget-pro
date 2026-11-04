@@ -78,6 +78,7 @@ export default function CommandPalette({ open, onOpenChange }) {
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
       <CommandInput
+        aria-label="Search Penni"
         placeholder="Search pages, settings or actions..."
         value={search}
         onValueChange={setSearch}

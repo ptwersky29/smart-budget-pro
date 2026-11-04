@@ -120,6 +120,31 @@ async def _seed_market_data(session):
             logger.error("Failed to seed market data for %s: %s", ticker, e)
 
 
+def calculate_projection(current_value: float, monthly_contribution: float,
+                         annual_return_pct: float, years: int) -> list[dict]:
+    """End-of-month deposits, effective monthly compounding, annual snapshots.
+
+    A 7% annual return means the balance earns exactly 7% over 12 months when
+    there are no additional deposits. Contributions are deposited after each
+    month's growth. No account balances are read or modified.
+    """
+    if not (0 <= years <= 50) or annual_return_pct <= -100:
+        raise ValueError("Years must be 0–50 and the annual return must exceed -100%")
+    if current_value < 0 or monthly_contribution < 0:
+        raise ValueError("Current value and contributions cannot be negative")
+    monthly_rate = (1 + annual_return_pct / 100) ** (1 / 12) - 1
+    balance = float(current_value)
+    deposited = float(current_value)
+    points = [{"year": 0, "value": round(balance, 2), "contributed": round(deposited, 2)}]
+    for year in range(1, years + 1):
+        for _ in range(12):
+            balance = balance * (1 + monthly_rate) + monthly_contribution
+            deposited += monthly_contribution
+        points.append({"year": year, "value": round(balance, 2),
+                       "contributed": round(deposited, 2)})
+    return points
+
+
 def build_router() -> APIRouter:
     router = APIRouter(prefix="/investments", tags=["investments"])
 
@@ -284,20 +309,21 @@ def build_router() -> APIRouter:
     async def investment_forecast(payload: ForecastIn, user: dict = Depends(get_current_user)):
         if payload.years < 1 or payload.years > 50:
             raise HTTPException(400, "Years must be between 1 and 50")
-        r = payload.annual_return_pct / 100
-        i = payload.inflation_pct / 100
-        monthly = payload.monthly_contribution
+        if payload.annual_return_pct <= -100 or payload.inflation_pct <= -100:
+            raise HTTPException(400, "Annual return and inflation must exceed -100%")
+        if payload.current_value < 0 or payload.monthly_contribution < 0:
+            raise HTTPException(400, "Current value and monthly contribution must be non-negative")
         principal = payload.current_value
+        monthly = payload.monthly_contribution
         years = payload.years
-        nominal_proj = []
-        real_proj = []
-        for y in range(years + 1):
-            n = y * 12
-            fv_nominal = principal * (1 + r) ** y + monthly * (((1 + r) ** y - 1) / r) if r > 0 else principal + monthly * n
-            fv_real = fv_nominal / ((1 + i) ** y)
-            contributed_so_far = principal + monthly * n
-            nominal_proj.append({"year": y, "value": round(fv_nominal, 2), "contributed": round(contributed_so_far, 2)})
-            real_proj.append({"year": y, "value": round(fv_real, 2)})
+        i = payload.inflation_pct / 100
+        nominal_proj = calculate_projection(principal, monthly,
+                                            payload.annual_return_pct, years)
+        real_proj = [
+            {"year": point["year"],
+             "value": round(point["value"] / ((1 + i) ** point["year"]), 2)}
+            for point in nominal_proj
+        ]
         final_nominal = nominal_proj[-1]["value"]
         final_real = real_proj[-1]["value"]
         total_contributions = principal + monthly * 12 * years
@@ -346,15 +372,10 @@ def build_router() -> APIRouter:
                 gr = DEFAULT_GROWTH_RATES.get(h.type, 0.07)
                 weighted_return += (mv / current_value) * gr if current_value else 0
             annual_return_pct = round(weighted_return * 100, 2)
-            r = weighted_return
-            i = 0.025
-            monthly = monthly_contribution
-            principal = current_value
-            nominal_proj = []
-            for y in range(years + 1):
-                n = y * 12
-                fv = principal * (1 + r) ** y + monthly * (((1 + r) ** y - 1) / r) if r > 0 else principal + monthly * n
-                nominal_proj.append({"year": y, "value": round(fv, 2)})
+            if years < 1 or years > 50 or monthly_contribution < 0:
+                raise HTTPException(400, "Years must be 1–50 and contributions cannot be negative")
+            nominal_proj = calculate_projection(current_value, monthly_contribution,
+                                                annual_return_pct, years)
             return {
                 "current_value": round(principal, 2),
                 "weighted_return_pct": annual_return_pct,

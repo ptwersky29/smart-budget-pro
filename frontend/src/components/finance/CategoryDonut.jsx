@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { formatCurrency } from "../../lib/format";
+import { humanizeCategoryName } from "../../lib/categories";
 
 const COLORS = ["#5b5cf0", "#0ea371", "#d9772f", "#e23d68", "#0d93e8", "#8b5cf6", "#94a3b8", "#34d399"];
 
@@ -9,7 +10,7 @@ export default function CategoryDonut({ data = [], total, size = 168 }) {
     () =>
       data
         .map((item) => ({
-          name: item.name || "Uncategorized",
+          name: humanizeCategoryName(item.name),
           value: Math.abs(Number(item.value) || 0),
         }))
         .filter((item) => item.value > 0)
@@ -74,7 +75,7 @@ export default function CategoryDonut({ data = [], total, size = 168 }) {
               className="h-2.5 w-2.5 shrink-0 rounded-full"
               style={{ background: COLORS[index % COLORS.length] }}
             />
-            <span className="min-w-0 flex-1 truncate text-xs capitalize text-muted-foreground">{item.name}</span>
+            <span className="min-w-0 flex-1 break-words text-xs text-muted-foreground">{item.name}</span>
             <span className="money-tabular shrink-0 text-xs font-medium">{formatCurrency(item.value)}</span>
           </div>
         ))}

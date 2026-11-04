@@ -57,8 +57,8 @@ export default function PenniSelect({
           <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" sideOffset={5}
-        className="z-[100] w-[var(--radix-popover-trigger-width)] min-w-[200px] max-w-[min(90vw,360px)] rounded-xl border border-border bg-popover p-1.5 shadow-xl">
+      <PopoverContent align="start" side="bottom" collisionPadding={12} avoidCollisions sideOffset={5}
+        className="z-[100] w-[var(--radix-popover-trigger-width)] min-w-[min(200px,90vw)] max-w-[min(90vw,360px)] max-h-[min(75dvh,var(--radix-popover-content-available-height))] overflow-y-auto rounded-xl border border-border bg-popover p-1.5 shadow-xl">
         {options.length > 7 && (
           <div className="mb-1 flex h-9 items-center gap-2 rounded-lg border border-border bg-secondary/40 px-2.5">
             <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />

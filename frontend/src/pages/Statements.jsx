@@ -27,6 +27,7 @@ export default function Statements() {
   const [current, setCurrent] = useState(null);
   const [pendingRemovalId, setPendingRemovalId] = useState(null);
   const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
   const [accounts, setAccounts] = useState([]);
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [dragging, setDragging] = useState(false);
@@ -44,10 +45,12 @@ export default function Statements() {
   }, [location.state]);
 
   const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
     try {
       const { data } = await api.get("/statements");
       setHistory(data.statements || []);
     } catch (err) { toast.error("Could not load statement history"); }
+    finally { setHistoryLoading(false); }
   }, []);
 
   const loadAccounts = useCallback(async () => {
@@ -321,9 +324,11 @@ export default function Statements() {
         </div>
       )}
 
-      <SectionCard eyebrow="History" title={`${history.length} previous upload${history.length !== 1 ? "s" : ""}`} contentClassName="p-0">
-        {history.length === 0 ? (
-          <div className="px-6 pb-6 text-sm text-muted-foreground">No statements uploaded yet.</div>
+      <SectionCard eyebrow="History" title={historyLoading ? "Loading statement history…" : `${history.length} previous upload${history.length !== 1 ? "s" : ""}`} contentClassName="p-0">
+        {historyLoading ? (
+          <div role="status" className="px-6 py-5 text-sm text-muted-foreground">Loading uploaded statements…</div>
+        ) : history.length === 0 ? (
+          <div className="px-6 py-5 text-sm text-muted-foreground">No statements uploaded yet.</div>
         ) : (
           <ul className="divide-y divide-border">
             {history.map((s) => (

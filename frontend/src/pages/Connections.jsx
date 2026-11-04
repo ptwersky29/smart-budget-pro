@@ -7,6 +7,7 @@ import { EmptyState, MetricCard, PageToolbar, SectionCard } from "../components/
 import Skeleton from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { formatShortDate, formatDateTime } from "../lib/format";
 import BankCardMockup from "../components/BankCardMockup";
 import AddManualAccountModal from "../components/AddManualAccountModal";
 import { PageHeader, Surface } from "../components/ui/page";
@@ -319,15 +320,15 @@ export default function Connections() {
                           </button>
                           <span className="text-xs text-muted-foreground/40">·</span>
                           {c.status === "active" && !isTokenExpired(c) ? <span className="text-[11px] text-emerald font-medium">● Active</span> : needsReconnectConn(c) ? <span className="text-[11px] text-ruby font-medium">● Reconnect</span> : <span className="text-[11px] text-topaz">● {c.status}</span>}
-                          {c.import_from_date && <><span className="text-xs text-muted-foreground/40">·</span><span className="text-[11px] text-muted-foreground">from {new Date(c.import_from_date).toLocaleDateString()}</span></>}
+                          {c.import_from_date && <><span className="text-xs text-muted-foreground/40">·</span><span className="text-[11px] text-muted-foreground">from {formatShortDate(c.import_from_date, { year: "numeric" })}</span></>}
                         </div>
                       )}
                     </div>
                     {c.last_sync_at && !editingNickname && (
-                      <p className="text-[11px] text-muted-foreground mt-1">synced {new Date(c.last_sync_at).toLocaleString()}</p>
+                      <p className="text-[11px] text-muted-foreground mt-1">synced {formatDateTime(c.last_sync_at)}</p>
                     )}
                     {c.last_error && !editingNickname && (
-                      <p className="text-[11px] text-ruby mt-1 truncate" title={c.last_error}>{c.last_error}</p>
+                      <p className="mt-1 text-[11px] text-ruby">{needsReconnectConn(c) ? "Bank access needs renewing. Select Reconnect to resume syncing." : "The last bank sync failed. Retry or reconnect to update your balance."}</p>
                     )}
                     {/* Action buttons */}
                     <div className="mt-2 flex items-center gap-2">
@@ -395,7 +396,7 @@ export default function Connections() {
                     )}
                   </div>
                   {c.balance_updated_at && (
-                    <p className="text-[11px] text-muted-foreground mt-1">updated {new Date(c.balance_updated_at).toLocaleString()}</p>
+                    <p className="text-[11px] text-muted-foreground mt-1">updated {formatDateTime(c.balance_updated_at)}</p>
                   )}
                   <div className="mt-2 flex items-center gap-2">
                     <button onClick={() => removeManual(c.connection_id)}
@@ -422,7 +423,7 @@ export default function Connections() {
                  <span className="h-4 w-4 rounded-full bg-muted shrink-0" />}
                 <div className="flex-1 min-w-0">
                   <p className="truncate">{l.message || l.event}</p>
-                  <p className="text-xs text-muted-foreground">{l.created_at ? new Date(l.created_at).toLocaleString() : ""}</p>
+                  <p className="text-xs text-muted-foreground">{formatDateTime(l.created_at)}</p>
                 </div>
               </div>
             ))}

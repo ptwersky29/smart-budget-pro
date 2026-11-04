@@ -9,6 +9,8 @@ import { Loader2, Plus, Trash2, Pencil, RefreshCcw, Sparkles, Bell, ChevronDown,
 import { EmptyState, PageToolbar, SectionCard } from "../components/ui/layout";
 import { PageHeader, Surface, StatCard } from "../components/ui/page";
 import CategoryCombobox from "../components/CategoryCombobox";
+import { useCategories } from "../contexts/CategoriesContext";
+import { formatCurrency } from "../lib/format";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -24,6 +26,7 @@ const emptyForm = { name: "", amount: "", category: "", frequency: "monthly", me
 
 export default function Subscriptions() {
   useEffect(() => { document.title = "Subscriptions | Penni"; }, []);
+  const { resolveCategory } = useCategories();
   const [subs, setSubs] = useState([]);
   const subsRef = useRef(subs);
   subsRef.current = subs;
@@ -176,7 +179,7 @@ export default function Subscriptions() {
       {/* Summary toolbar */}
       <PageToolbar className="justify-between">
         <p className="mr-auto text-sm text-muted-foreground">
-          {subs.filter((s) => s.active).length} active · £{monthlyTotal.toFixed(2)} / month · £{annualTotal.toLocaleString()} / year
+          {loading ? "Loading subscriptions…" : `${subs.filter((s) => s.active).length} active · ${formatCurrency(monthlyTotal)} / month · ${formatCurrency(annualTotal)} / year`}
         </p>
         <Button type="button" aria-label="Refresh subscriptions" variant="outlinePill" size="pillSm" onClick={load}><RefreshCw className="h-3.5 w-3.5" /></Button>
         <DropdownMenu>
@@ -199,14 +202,14 @@ export default function Subscriptions() {
 
       {/* Summary cards follow the same visual vocabulary as the main dashboard. */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Active" value={subs.filter((subscription) => subscription.active).length} />
-        <StatCard label="Monthly" value={`£${monthlyTotal.toFixed(2)}`} />
-        <StatCard label="Annual" value={`£${annualTotal.toLocaleString()}`} />
-        <StatCard label="Paused" value={subs.filter((subscription) => !subscription.active).length} tone="topaz" />
+        <StatCard label="Active" value={loading ? "—" : subs.filter((subscription) => subscription.active).length} />
+        <StatCard label="Monthly" value={loading ? "—" : formatCurrency(monthlyTotal)} />
+        <StatCard label="Annual" value={loading ? "—" : formatCurrency(annualTotal)} />
+        <StatCard label="Paused" value={loading ? "—" : subs.filter((subscription) => !subscription.active).length} tone="topaz" />
       </div>
 
       {/* Category breakdown */}
-      {categoryBreakdown.length > 0 && (
+      {!loading && categoryBreakdown.length > 0 && (
         <Surface className="p-5">
           <p className="text-xs font-medium text-muted-foreground mb-2">Spending by category (active)</p>
           <div className="space-y-1.5">
@@ -214,11 +217,11 @@ export default function Subscriptions() {
               const pct = (amt / monthlyTotal) * 100;
               return (
                 <div key={cat} className="flex items-center gap-2 text-xs">
-                  <span className="w-24 truncate capitalize text-muted-foreground">{cat}</span>
+                  <span className="min-w-[110px] max-w-[38%] break-words text-muted-foreground" title={resolveCategory(cat)?.label || cat}>{resolveCategory(cat)?.label || cat}</span>
                   <div className="flex-1 h-1.5 rounded-full bg-muted/40 overflow-hidden">
                     <div className="h-full rounded-full bg-gradient-to-r from-emerald to-topaz" style={{ width: `${pct}%` }} />
                   </div>
-                  <span className="tabular-nums text-muted-foreground w-16 text-right">£{amt.toFixed(2)}</span>
+                  <span className="money-tabular shrink-0 text-right text-muted-foreground" title={formatCurrency(amt)}>{formatCurrency(amt, { compact: true })}</span>
                   <span className="tabular-nums text-muted-foreground w-8 text-right">{Math.round(pct)}%</span>
                 </div>
               );

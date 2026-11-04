@@ -95,10 +95,26 @@ export default function GlobalActionHost() {
     if (savingRef.current) return;
     const amount = Number(transactionForm.amount);
     const description = String(transactionForm.description || "").trim();
-    if (!transactionForm.account_id) {setTransactionError("Choose an account before saving.");return;}
-    if (!Number.isFinite(amount) || amount<=0) {setTransactionError("Enter an amount greater than zero.");return;}
-    if (!description) {setTransactionError("Enter a transaction description.");return;}
-    if (!transactionForm.date) {setTransactionError("Choose a transaction date.");return;}
+    if (!transactionForm.account_id) {
+      setTransactionError("Choose an account before saving.");
+      requestAnimationFrame(() => document.getElementById("tx-account")?.focus());
+      return;
+    }
+    if (!Number.isFinite(amount) || amount<=0) {
+      setTransactionError("Enter an amount greater than zero.");
+      requestAnimationFrame(() => document.getElementById("tx-amount")?.focus());
+      return;
+    }
+    if (!description) {
+      setTransactionError("Enter a transaction description.");
+      requestAnimationFrame(() => document.getElementById("tx-desc")?.focus());
+      return;
+    }
+    if (!transactionForm.date) {
+      setTransactionError("Choose a transaction date.");
+      requestAnimationFrame(() => document.getElementById("tx-date")?.focus());
+      return;
+    }
     setTransactionError("");
     const body={description,amount:transactionForm.is_income?Math.abs(amount):-Math.abs(amount),
       category:transactionForm.category||undefined,date:transactionForm.date||today(),account_id:transactionForm.account_id,

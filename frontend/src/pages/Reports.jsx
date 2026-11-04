@@ -240,6 +240,11 @@ export default function Reports() {
             </span>
           </span>
         </div>
+        <details className="mt-3 rounded-xl border border-border/60 bg-secondary/20 p-3 text-xs text-muted-foreground">
+          <summary className="cursor-pointer font-medium text-foreground">What does this score mean?</summary>
+          <p className="mt-2 leading-relaxed">This score comes from Penni's financial overview service. The figures below show the available savings rate, spending category and cash-flow context for your selected period. The score is an estimate, not an assessment of your creditworthiness.</p>
+          <p className="mt-1">A precise component-by-component score breakdown is not supplied by the current service.</p>
+        </details>
         <div className="mt-3 sm:mt-4 h-2 bg-secondary rounded-full overflow-hidden">
           <div
             className="h-full gradient-emerald"

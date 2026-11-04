@@ -47,16 +47,6 @@ export default React.memo(function DashboardSettings() {
     setDashboard("widgets", next);
   }, [dashboard.widgets, setDashboard]);
 
-  const moveWidget = useCallback((widgetKey, direction) => {
-    const order = [...(dashboard.widget_order || []).filter(k => k !== widgetKey)];
-    const idx = (dashboard.widget_order || []).indexOf(widgetKey);
-    const insertAt = direction === "up" ? Math.max(0, idx - 1) : Math.min(order.length, idx);
-    order.splice(insertAt, 0, widgetKey);
-    setDashboard("widget_order", order);
-  }, [dashboard.widget_order, setDashboard]);
-
-  const visibleWidgets = (dashboard.widget_order || dashboard.widgets || []).filter(k => dashboard.widgets?.includes(k));
-
   return (
     <>
       <SectionCard
@@ -106,33 +96,9 @@ export default React.memo(function DashboardSettings() {
         </div>
       </SectionCard>
 
-      <SectionCard
-        eyebrow="Dashboard"
-        title="Widget Order"
-        description="Arrange the order widgets appear on your dashboard."
-      >
-        <div className="space-y-2">
-          {visibleWidgets.map((key, i) => {
-            const w = WIDGETS.find(w => w.key === key);
-            return (
-              <div key={key} className="flex items-center justify-between p-3 rounded-xl border border-border">
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-muted-foreground w-5">{i + 1}</span>
-                  <div>
-                    <p className="text-sm font-medium">{w?.label || key}</p>
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <Button variant="outlinePill" size="pillSm" disabled={i === 0} onClick={() => moveWidget(key, "up")}>▲</Button>
-                  <Button variant="outlinePill" size="pillSm" disabled={i === visibleWidgets.length - 1} onClick={() => moveWidget(key, "down")}>▼</Button>
-                </div>
-              </div>
-            );
-          })}
-          {visibleWidgets.length === 0 && (
-            <p className="text-sm text-muted-foreground">Enable widgets above to reorder them.</p>
-          )}
-        </div>
+      <SectionCard eyebrow="Dashboard" title="Widget arrangement"
+        description="Dashboard sections currently have fixed positions. Use the visibility switches above to choose which sections are shown.">
+        <p className="text-sm text-muted-foreground">Layout controls change dashboard density and visibility. Drag-and-drop reordering is not currently available.</p>
       </SectionCard>
 
       <SectionCard

@@ -17,22 +17,24 @@ export function WorkspaceHeader({ title, description, actions }) {
 
 export function WorkspaceMetrics({ children, columns = 3 }) {
   return (
-    <div className={`workspace-metrics grid shrink-0 grid-cols-2 gap-3 ${columns === 4 ? "lg:grid-cols-4" : "md:grid-cols-3"}`}>
+    <div className={`workspace-metrics grid shrink-0 gap-2 sm:gap-3 ${columns === 4 ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-3"}`}>
       {children}
     </div>
   );
 }
 
-export function WorkspaceMetric({ label, value, note, icon: Icon, tone = "emerald", progress, className = "" }) {
+export function WorkspaceMetric({ label, value, compactValue, note, icon: Icon, tone = "emerald", progress, className = "" }) {
   const toneStyle = tone === "ruby" ? "bg-ruby/10 text-ruby" : tone === "topaz" ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald";
   return (
-    <div className={`surface workspace-metric min-w-0 rounded-[20px] p-4 ${className}`}>
-      <div className="flex min-h-[58px] items-center gap-3">
-        {Icon && <span className={`grid h-[38px] w-[38px] shrink-0 place-items-center rounded-xl ${toneStyle}`}><Icon className="h-[18px] w-[18px]" /></span>}
+    <div className={`surface workspace-metric min-w-0 rounded-[20px] p-2.5 sm:p-4 ${className}`}>
+      <div className="flex min-h-[48px] min-w-0 items-center gap-2 sm:min-h-[58px] sm:gap-3">
+        {Icon && <span className={`hidden h-[38px] w-[38px] shrink-0 sm:grid place-items-center rounded-xl ${toneStyle}`}><Icon className="h-[18px] w-[18px]" /></span>}
         <div className="min-w-0">
-          <p className="text-xs font-medium text-muted-foreground">{label}</p>
-          <p className="money-tabular mt-0.5 break-words text-[23px] font-semibold leading-none tracking-[-0.03em]">{value}</p>
-          {note && <p className="mt-1.5 text-[11px] text-muted-foreground">{note}</p>}
+          <p className="truncate text-[11px] font-medium text-muted-foreground sm:text-xs">{label}</p>
+          <p className="money-tabular mt-1 min-w-0 truncate whitespace-nowrap text-[clamp(12px,2.9vw,20px)] font-semibold leading-tight tracking-[-0.03em] sm:text-[23px]" title={String(value)}>
+            {compactValue != null ? <><span className="sm:hidden" aria-hidden="true">{compactValue}</span><span className="sr-only sm:not-sr-only">{value}</span></> : value}
+          </p>
+          {note && <p className="mt-1.5 hidden text-[11px] text-muted-foreground sm:block">{note}</p>}
         </div>
       </div>
       {progress != null && <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.max(0,Math.min(100,Number(progress)||0))} aria-label={label}>

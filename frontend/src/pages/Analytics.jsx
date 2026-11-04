@@ -26,7 +26,7 @@ export default function Analytics() {
   const [data, setData] = useState({ trends: [], categories: [], comparisons: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const { version: categoriesVersion } = useCategories();
+  const { version: categoriesVersion, resolveCategory } = useCategories();
 
   useEffect(() => { document.title = "Analytics | Penni"; }, []);
 
@@ -100,7 +100,7 @@ export default function Analytics() {
             <Surface className="min-w-0 p-4 sm:p-6">
               <SurfaceHeader title="Spending categories" subtitle="Where your money went" compact />
               {loading ? <div className="penni-skeleton mt-5 h-[250px] rounded-2xl" role="status" aria-label="Loading categories" /> :
-                <CategoryDonut data={data.categories} total={categoryTotal} size={178} />}
+                <CategoryDonut data={data.categories.map((item) => ({ ...item, name: resolveCategory(item.name)?.label || item.name }))} total={categoryTotal} size={178} />}
             </Surface>
           </div>
           <Surface className="overflow-hidden">
@@ -113,11 +113,11 @@ export default function Analytics() {
                     const pct = Math.min(100, Math.max(0, Number(row.progress_pct) || 0));
                     return <div key={row.category + index} className="rounded-2xl border border-border bg-secondary/30 p-4">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="truncate text-sm font-semibold capitalize">{row.category}</p>
+                        <p className="truncate text-sm font-semibold" title={resolveCategory(row.category)?.label || row.category}>{resolveCategory(row.category)?.label || row.category}</p>
                         <span className="money-tabular text-xs text-muted-foreground">{Math.round(pct)}%</span>
                       </div>
                       <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary" role="progressbar"
-                        aria-label={row.category + " budget used"} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+                        aria-label={(resolveCategory(row.category)?.label || row.category) + " budget used"} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
                         <div className="h-full rounded-full" style={{ width: pct + "%", background: pct > 90 ? "#e5484d" : "var(--penni-accent)" }} />
                       </div>
                       <p className="money-tabular mt-2 text-xs text-muted-foreground">{formatCurrency(row.spent)} of {formatCurrency(row.budget)}</p>

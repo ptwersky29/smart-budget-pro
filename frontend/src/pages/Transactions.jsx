@@ -248,6 +248,7 @@ const Transactions = React.memo(function Transactions() {
   const [incomeTotal, setIncomeTotal] = useState(0);
   const [expenseTotal, setExpenseTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const ledgerRequestId = useRef(0);
   const [selectedCats, setSelectedCats] = useState({ categories: [], hierarchy: {} });
   const [accounts, setAccounts] = useState([]);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -272,6 +273,11 @@ const Transactions = React.memo(function Transactions() {
     const fromUrl = {};
     for (const k of Object.keys(defaultFilters)) {
       fromUrl[k] = searchParams.get(k) || defaultFilters[k];
+    }
+    if (!searchParams.has("date_from") && !searchParams.has("date_to")) {
+      const [y, m] = month.split("-").map(Number);
+      fromUrl.date_from = `${month}-01`;
+      fromUrl.date_to = `${month}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
     }
     return fromUrl;
   });
@@ -568,6 +574,7 @@ const Transactions = React.memo(function Transactions() {
   }, [filters, offset]);
 
   const load = useCallback(async () => {
+    const requestId = ++ledgerRequestId.current;
     setLoading(true); setAiResults(null);
     try {
       const params = { offset, limit, sort: filters.sort, order: filters.order };
@@ -583,15 +590,16 @@ const Transactions = React.memo(function Transactions() {
       if (filters.amount_max && !isNaN(filters.amount_max)) params.amount_max = parseFloat(filters.amount_max);
       if (filters.account_id) params.account_id = filters.account_id;
       const { data } = await api.get("/transactions", { params });
-      setTxs(data.transactions);
-      setTotal(data.total);
+      if (requestId !== ledgerRequestId.current) return;
+      setTxs(data.transactions || []);
+      setTotal(data.total || 0);
       setIncomeTotal(data.income_total || 0);
       setExpenseTotal(data.expense_total || 0);
       if (filters.date_from && filters.date_to) {
         const from = filters.date_from, to = filters.date_to;
         api.get("/transactions", { params: { date_from: from, date_to: to, limit: 1000, sort: "date", order: "desc" } })
           .then((res) => {
-            if (filters.date_from !== from || filters.date_to !== to) return;
+            if (requestId !== ledgerRequestId.current) return;
             const spend = {};
             (res.data.transactions || []).forEach((tx) => {
               const cat = (tx.category || "uncategorized").toLowerCase().trim();
@@ -605,8 +613,8 @@ const Transactions = React.memo(function Transactions() {
           })
           .catch(() => {});
       }
-    } catch (err) { toast.error("Could not load transactions"); }
-    finally { setLoading(false); }
+    } catch (err) { if (requestId === ledgerRequestId.current) toast.error("Could not load transactions"); }
+    finally { if (requestId === ledgerRequestId.current) setLoading(false); }
   }, [offset, limit, filters]);
 
   const loadCats = useCallback(async () => {
@@ -617,6 +625,7 @@ const Transactions = React.memo(function Transactions() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => () => { ledgerRequestId.current += 1; }, []);
   useEffect(() => {
     const onChanged = () => load();
     window.addEventListener("penni:data-changed", onChanged);
@@ -695,13 +704,7 @@ const Transactions = React.memo(function Transactions() {
     return `${format(filters.date_from)} \u2013 ${format(filters.date_to)}`;
   }, [filters.date_from, filters.date_to, monthLabel]);
 
-  // Set initial date filters to current month if no date params in URL
-  useEffect(() => {
-    const hasCustomDates = searchParams.get("date_from") || searchParams.get("date_to");
-    if (!hasCustomDates) {
-      applyGregorianMonth(month);
-    }
-  }, []);
+  // Date scope is set in the initial filter state, before the first API request.
 
   const activeFilters = useMemo(() => {
     const chips = [];
@@ -1153,7 +1156,6 @@ const Transactions = React.memo(function Transactions() {
     finally { setAiLoading(false); }
   }, [aiQuery]);
 
-  const netTotal = incomeTotal - expenseTotal;
   const [showSearch, setShowSearch] = useState(false);
 
   const revealSearch = useCallback(() => {
@@ -1229,6 +1231,15 @@ const Transactions = React.memo(function Transactions() {
     if (!previous) return null;
     return Math.round(((current - previous) / previous) * 100);
   };
+  // The totals returned by the ledger API apply to the active filter snapshot.
+  // Month trend cards are shown only for an unrefined, full calendar month.
+  const [yearForRange, numberForRange] = month.split("-").map(Number);
+  const fullMonthRange = filters.date_from === `${month}-01` &&
+    filters.date_to === `${month}-${String(new Date(yearForRange, numberForRange, 0).getDate()).padStart(2, "0")}`;
+  const filteredSummary = hasRefinements || !fullMonthRange;
+  const shownIncome = filteredSummary ? incomeTotal : monthTotals.income;
+  const shownExpenses = filteredSummary ? expenseTotal : monthTotals.expenses;
+  const shownNet = shownIncome - shownExpenses;
   const incomeDelta = deltaFor(monthTotals.income, previousMonthTotals.income);
   const expenseDelta = deltaFor(monthTotals.expenses, previousMonthTotals.expenses);
   const previousMonthName = MONTH_NAMES[Number(addMonth(month, -1).split("-")[1]) - 1];
@@ -1390,23 +1401,24 @@ const Transactions = React.memo(function Transactions() {
             <>
               <div className="xl:px-[14px]">
                 <WorkspaceMetrics columns={3}>
-                  <WorkspaceMetric label="Income" value={formatCurrency(monthTotals.income ?? incomeTotal)}
+                  <WorkspaceMetric label="Income" value={formatCurrency(shownIncome)} compactValue={formatCurrency(shownIncome, { compact: true })}
                     icon={TrendingUp} tone="emerald"
-                    note={incomeDelta === null ? monthLabel : `${incomeDelta >= 0 ? "↑" : "↓"} ${Math.abs(incomeDelta)}% vs ${previousMonthName?.slice(0,3)}`} />
-                  <WorkspaceMetric label="Expenses" value={formatCurrency(monthTotals.expenses ?? expenseTotal)}
+                    note={filteredSummary ? "Approved matching transactions" : incomeDelta === null ? monthLabel : `${incomeDelta >= 0 ? "↑" : "↓"} ${Math.abs(incomeDelta)}% vs ${previousMonthName?.slice(0,3)}`} />
+                  <WorkspaceMetric label="Expenses" value={formatCurrency(shownExpenses)} compactValue={formatCurrency(shownExpenses, { compact: true })}
                     icon={TrendingDown} tone="ruby"
-                    note={expenseDelta === null ? monthLabel : `${expenseDelta >= 0 ? "↑" : "↓"} ${Math.abs(expenseDelta)}% vs ${previousMonthName?.slice(0,3)}`} />
-                  <WorkspaceMetric label="Net" value={formatCurrency(monthTotals.net ?? netTotal, { signed: true })}
-                    icon={Calculator} tone={monthTotals.net >= 0 ? "emerald" : "ruby"} note={monthLabel} />
+                    note={filteredSummary ? "Approved matching transactions" : expenseDelta === null ? monthLabel : `${expenseDelta >= 0 ? "↑" : "↓"} ${Math.abs(expenseDelta)}% vs ${previousMonthName?.slice(0,3)}`} />
+                  <WorkspaceMetric label="Net" value={formatCurrency(shownNet, { signed: true })} compactValue={formatCurrency(shownNet, { compact: true })}
+                    icon={Calculator} tone={shownNet >= 0 ? "emerald" : "ruby"} note={filteredSummary ? "Approved totals · " + rangeLabel : monthLabel} />
                 </WorkspaceMetrics>
               </div>
 
-              <div className={`flex flex-wrap items-center gap-2 2xl:grid 2xl:gap-2 ${showSearch || filters.search ? "2xl:grid-cols-[190px_176px_110px_118px_86px_96px_104px_32px_76px]" : "2xl:grid-cols-[36px_176px_110px_118px_86px_96px_104px_32px_76px]"}`}>
+              <div className={`flex min-w-0 flex-wrap items-center gap-2 2xl:grid 2xl:gap-2 ${showSearch || filters.search ? "2xl:grid-cols-[190px_176px_110px_118px_86px_96px_104px_32px_76px]" : "2xl:grid-cols-[36px_176px_110px_118px_86px_96px_104px_32px_76px]"}`}>
                 {/* Inline search – always visible */}
                 {showSearch || filters.search ? (
-                <div className="relative w-[190px] shrink-0">
+                <div className="relative min-w-0 flex-1 sm:w-[190px] sm:flex-none">
                   <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                   <input
+                    aria-label="Search transactions"
                     ref={searchRef}
                     value={searchInput}
                     onChange={(event) => { setSearchInput(event.target.value); debouncedSetSearch(event.target.value); }}
@@ -1444,9 +1456,10 @@ const Transactions = React.memo(function Transactions() {
 
                 {/* Account */}
                 <PenniSelect
+                  aria-label="Filter account"
                   value={filters.account_id}
                   onChange={(event) => toggleFilter("account_id", event.target.value)}
-                  className={`h-9 w-[110px] shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.account_id ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
+                  className={`hidden h-9 w-[110px] shrink-0 xl:flex rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.account_id ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
                 >
                   <option value="">All Accounts</option>
                   {accounts.map((account) => <option key={account.account_id} value={account.account_id}>{account.name}</option>)}
@@ -1454,20 +1467,22 @@ const Transactions = React.memo(function Transactions() {
 
                 {/* Category */}
                 <CategoryCombobox
+                  label="Filter category"
                   value={filters.category}
                   onChange={(value) => toggleFilter("category", value)}
                   categories={selectedCats.categories || selectedCats}
                   placeholder="All Categories"
-                  className={`!h-9 !w-[118px] shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium text-foreground transition ${filters.category ? "border-emerald/30 bg-emerald/5" : "border-border"}`}
+                  className={`!hidden !h-9 !w-[118px] shrink-0 xl:!flex rounded-[9px] border bg-card px-2.5 text-[11px] font-medium text-foreground transition ${filters.category ? "border-emerald/30 bg-emerald/5" : "border-border"}`}
                   allowClear
                   onCategoryCreated={loadCats}
                 />
 
                 {/* Type */}
                 <PenniSelect
+                  aria-label="Filter transaction type"
                   value={filters.tx_type}
                   onChange={(event) => { toggleFilter("tx_type", event.target.value); setLedgerTab(event.target.value === "expense" ? "expenses" : event.target.value === "income" ? "income" : event.target.value === "transfer" ? "transfers" : "all"); }}
-                  className={`h-9 w-[86px] shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.tx_type ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
+                  className={`hidden h-9 w-[86px] shrink-0 xl:flex rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.tx_type ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
                 >
                   <option value="">All Types</option>
                   <option value="income">Income</option>
@@ -1477,9 +1492,10 @@ const Transactions = React.memo(function Transactions() {
 
                 {/* Status */}
                 <PenniSelect
+                  aria-label="Filter approval status"
                   value={filters.approval_status}
                   onChange={(event) => { toggleFilter("approval_status", event.target.value); setLedgerTab(event.target.value === "unapproved" ? "unapproved" : "all"); }}
-                  className={`h-9 w-[96px] shrink-0 rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.approval_status ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
+                  className={`hidden h-9 w-[96px] shrink-0 xl:flex rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.approval_status ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
                 >
                   <option value="">All Statuses</option>
                   <option value="approved">Approved</option>
@@ -1488,8 +1504,9 @@ const Transactions = React.memo(function Transactions() {
                 </PenniSelect>
 
                 {/* Merchant */}
-                <div className="relative shrink-0">
+                <div className="relative hidden shrink-0 xl:block">
                   <input
+                    aria-label="Filter merchant"
                     value={filters.merchant}
                     onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, merchant: event.target.value })); }}
                     placeholder="All Merchants"
@@ -1518,7 +1535,7 @@ const Transactions = React.memo(function Transactions() {
                     </SheetHeader>
                     <div className="mt-4 space-y-4 sm:mt-6 sm:space-y-5">
                       <div className="flex items-center gap-2 sm:hidden">
-                        <PenniSelect value={filters.sort} onChange={(event) => setFilter("sort", event.target.value)} className="h-10 flex-1 rounded-xl border border-transparent bg-secondary/50 px-3 text-sm outline-none focus:border-ring">
+                        <PenniSelect aria-label="Sort transactions" value={filters.sort} onChange={(event) => setFilter("sort", event.target.value)} className="h-10 flex-1 rounded-xl border border-transparent bg-secondary/50 px-3 text-sm outline-none focus:border-ring">
                           <option value="date">Sort by date</option>
                           <option value="amount">Sort by amount</option>
                           <option value="description">Sort by description</option>
@@ -1530,17 +1547,17 @@ const Transactions = React.memo(function Transactions() {
                       <div className="space-y-2">
                         <p className="text-xs font-medium text-muted-foreground">Narrow results</p>
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
-                          <PenniSelect value={filters.account_id} onChange={(event) => toggleFilter("account_id", event.target.value)} className="h-10 rounded-xl border border-transparent bg-secondary/50 px-3 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30">
+                          <PenniSelect aria-label="Filter account" value={filters.account_id} onChange={(event) => toggleFilter("account_id", event.target.value)} className="h-10 rounded-xl border border-transparent bg-secondary/50 px-3 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30">
                             <option value="">All accounts</option>
                             {accounts.map((account) => <option key={account.account_id} value={account.account_id}>{account.name}</option>)}
                           </PenniSelect>
-                          <PenniSelect value={filters.tx_type} onChange={(event) => { toggleFilter("tx_type", event.target.value); setLedgerTab(event.target.value === "expense" ? "expenses" : event.target.value === "income" ? "income" : event.target.value === "transfer" ? "transfers" : "all"); }} className="h-10 rounded-xl border border-transparent bg-secondary/50 px-3 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30">
+                          <PenniSelect aria-label="Filter transaction type" value={filters.tx_type} onChange={(event) => { toggleFilter("tx_type", event.target.value); setLedgerTab(event.target.value === "expense" ? "expenses" : event.target.value === "income" ? "income" : event.target.value === "transfer" ? "transfers" : "all"); }} className="h-10 rounded-xl border border-transparent bg-secondary/50 px-3 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30">
                             <option value="">All types</option>
                             <option value="income">Income</option>
                             <option value="expense">Expense</option>
                             <option value="transfer">Transfer</option>
                           </PenniSelect>
-                          <PenniSelect value={filters.approval_status} onChange={(event) => { toggleFilter("approval_status", event.target.value); setLedgerTab(event.target.value === "unapproved" ? "unapproved" : "all"); }} className="h-10 rounded-xl border border-transparent bg-secondary/50 px-3 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30">
+                          <PenniSelect aria-label="Filter approval status" value={filters.approval_status} onChange={(event) => { toggleFilter("approval_status", event.target.value); setLedgerTab(event.target.value === "unapproved" ? "unapproved" : "all"); }} className="h-10 rounded-xl border border-transparent bg-secondary/50 px-3 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30">
                             <option value="">All statuses</option>
                             <option value="approved">Approved</option>
                             <option value="unapproved">Unapproved</option>
@@ -1558,15 +1575,36 @@ const Transactions = React.memo(function Transactions() {
                           onCategoryCreated={loadCats}
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                        <PenniSelect value={filters.source} onChange={(event) => toggleFilter("source", event.target.value)} className="h-10 rounded-xl border border-transparent bg-secondary/50 px-4 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30">
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <span className="text-xs font-medium text-muted-foreground">Source</span>
+                          <PenniSelect aria-label="Filter source" value={filters.source} onChange={(event) => toggleFilter("source", event.target.value)} className="h-10 rounded-xl border border-transparent bg-secondary/50 px-4 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30">
                           <option value="">All sources</option>
                           {Object.entries(SOURCE_LABELS).map(([key, value]) => <option key={key} value={key}>{value}</option>)}
                         </PenniSelect>
-                        <Input type="number" min="0" step="0.01" placeholder="Min £" value={filters.amount_min} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, amount_min: event.target.value })); }} className="h-10 text-sm" />
-                        <Input type="number" min="0" step="0.01" placeholder="Max £" value={filters.amount_max} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, amount_max: event.target.value })); }} className="h-10 text-sm" />
-                        <Input type="date" value={filters.date_from} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, date_from: event.target.value })); }} className="h-10 text-sm" />
-                        <Input type="date" value={filters.date_to} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, date_to: event.target.value })); }} className="h-10 text-sm" />
+                        </div>
+                        <fieldset className="grid grid-cols-2 gap-2">
+                          <legend className="mb-1.5 text-xs font-medium text-muted-foreground">Amount (£)</legend>
+                          <label className="flex min-w-0 flex-col gap-1.5 text-xs text-muted-foreground">
+                            Minimum
+                            <Input aria-label="Minimum transaction amount" type="number" inputMode="decimal" min="0" step="0.01" placeholder="Min £" value={filters.amount_min} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, amount_min: event.target.value })); }} className="h-10 text-sm" />
+                          </label>
+                          <label className="flex min-w-0 flex-col gap-1.5 text-xs text-muted-foreground">
+                            Maximum
+                            <Input aria-label="Maximum transaction amount" type="number" inputMode="decimal" min="0" step="0.01" placeholder="Max £" value={filters.amount_max} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, amount_max: event.target.value })); }} className="h-10 text-sm" />
+                          </label>
+                        </fieldset>
+                        <fieldset className="grid grid-cols-2 gap-2">
+                          <legend className="mb-1.5 text-xs font-medium text-muted-foreground">Date range</legend>
+                          <label className="flex min-w-0 flex-col gap-1.5 text-xs text-muted-foreground">
+                            From
+                            <Input aria-label="Filter from date" type="date" value={filters.date_from} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, date_from: event.target.value })); }} className="h-10 text-sm" />
+                          </label>
+                          <label className="flex min-w-0 flex-col gap-1.5 text-xs text-muted-foreground">
+                            To
+                            <Input aria-label="Filter to date" type="date" value={filters.date_to} onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, date_to: event.target.value })); }} className="h-10 text-sm" />
+                          </label>
+                        </fieldset>
                       </div>
                       <div className="space-y-3 border-t border-border pt-4">
                         <p className="text-xs font-medium text-muted-foreground">AI search</p>
@@ -1615,20 +1653,20 @@ const Transactions = React.memo(function Transactions() {
                 </div>
               ) : null}
 
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pt-[8px]">
+              <div className="flex min-w-0 flex-col gap-2 border-b border-border pt-2 sm:flex-row sm:items-center sm:justify-between">
                 <WorkspaceTabs
                   label="Transaction categories"
                   tabs={[
-                    { key: "all", label: "All Transactions", count: tabCounts.all },
-                    { key: "expenses", label: "Expenses", count: tabCounts.expenses },
-                    { key: "income", label: "Income", count: tabCounts.income },
-                    { key: "transfers", label: "Transfers", count: tabCounts.transfers },
-                    { key: "unapproved", label: "Unapproved", count: tabCounts.unapproved },
+                    { key: "all", label: "All Transactions", count: filteredSummary ? total : tabCounts.all },
+                    { key: "expenses", label: "Expenses", count: filteredSummary ? undefined : tabCounts.expenses },
+                    { key: "income", label: "Income", count: filteredSummary ? undefined : tabCounts.income },
+                    { key: "transfers", label: "Transfers", count: filteredSummary ? undefined : tabCounts.transfers },
+                    { key: "unapproved", label: "Unapproved", count: filteredSummary ? undefined : tabCounts.unapproved },
                   ]}
-                  active={ledgerTab} onChange={selectLedgerTab} className="xl:pl-[14px]"
+                  active={ledgerTab} onChange={selectLedgerTab} className="w-full min-w-0 sm:w-auto xl:pl-[14px]"
                 />
-                <div className="flex items-center gap-2 pb-1 xl:pr-[10px]">
-                  <PenniSelect value={filters.sort} onChange={(event) => setFilter("sort", event.target.value)} className="h-8 rounded-[8px] border border-border bg-card px-2 text-[11px] font-medium outline-none">
+                <div className="flex w-full items-center justify-end gap-2 pb-1 sm:w-auto xl:pr-[10px]">
+                  <PenniSelect aria-label="Sort transactions" value={filters.sort} onChange={(event) => setFilter("sort", event.target.value)} className="h-8 rounded-[8px] border border-border bg-card px-2 text-[11px] font-medium outline-none">
                     <option value="date">Sort: Date (newest)</option>
                     <option value="amount">Sort: Amount</option>
                     <option value="description">Sort: Description</option>
@@ -1764,7 +1802,7 @@ const Transactions = React.memo(function Transactions() {
                 </div>
               ) : (
                 <div className="transaction-table-scroll hidden min-h-0 overflow-x-auto sm:block lg:flex-1 lg:overflow-auto">
-                  <table className="workspace-table w-full table-fixed text-sm">
+                  <table className="workspace-table w-full min-w-[980px] table-fixed text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-[11px] font-medium text-muted-foreground">
                         <th className="w-[40px] px-2.5 py-2.5">
@@ -1802,7 +1840,7 @@ const Transactions = React.memo(function Transactions() {
 
               {!aiResults && totalPages > 1 && (
                 <div className="px-4 py-3 border-t border-border flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Showing {offset + 1}â€“{Math.min(offset + limit, total)} of {total}</span>
+                  <span className="text-muted-foreground">Showing {offset + 1}–{Math.min(offset + limit, total)} of {total}</span>
                   <div className="flex items-center gap-1.5">
                     <button onClick={() => setOffset(Math.max(0, offset - limit))} disabled={offset === 0}
                       className="h-7 w-7 rounded-lg grid place-items-center border border-border hover:bg-secondary disabled:opacity-30 text-muted-foreground" aria-label="Previous page">

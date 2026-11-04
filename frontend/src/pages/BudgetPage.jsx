@@ -22,6 +22,8 @@ import { Input } from "../components/ui/input";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import CategoryCombobox from "../components/CategoryCombobox";
 import MonthPicker from "../components/MonthPicker";
+import { humanizeCategoryName } from "../lib/categories";
+import { formatCurrency } from "../lib/format";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -124,7 +126,7 @@ const BudgetCard = React.memo(({ budget, isCurrentMonth, currentDay, monthElapse
         <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${over ? "from-ruby to-ruby/70" : pct >= 80 ? "from-topaz to-topaz/70" : "from-emerald to-emerald/70"} flex items-center justify-center text-white shrink-0 shadow-sm`}>
           <CatIcon className="h-3.5 w-3.5" />
         </div>
-        <h3 className="text-sm font-semibold capitalize truncate leading-tight tracking-tight flex-1 pt-0.5">{budget.category}</h3>
+        <h3 className="text-sm font-semibold capitalize truncate leading-tight tracking-tight flex-1 pt-0.5">{humanizeCategoryName(budget.category)}</h3>
         <input type="checkbox" checked={isSelected} onChange={() => {
           const next = new Set(bulkSelected);
           if (isSelected) next.delete(budget.budget_id); else next.add(budget.budget_id);
@@ -146,9 +148,9 @@ const BudgetCard = React.memo(({ budget, isCurrentMonth, currentDay, monthElapse
       <div className="space-y-1.5">
         <div className="flex items-baseline gap-1.5">
           <span className={`text-2xl font-bold tabular-nums tracking-tight ${over ? "text-ruby" : "text-foreground"}`}>
-            £{budget.spent}
+            {formatCurrency(budget.spent)}
           </span>
-          <span className="text-xs text-muted-foreground font-medium">of £{budget.limit}</span>
+          <span className="text-xs text-muted-foreground font-medium">of {formatCurrency(budget.limit)}</span>
         </div>
         <div className="flex items-center gap-2">
           <span className={`text-xs font-semibold tabular-nums ${budget.remaining >= 0 ? "text-emerald" : "text-ruby"}`}>
@@ -226,7 +228,7 @@ const EventGroupCard = React.memo(({ group, setConfirmDelete, fetchData }) => {
             return (
               <div key={item.budget_id} className="flex items-center gap-2 text-[11px] py-1">
                 <div className="w-1 h-1 rounded-full bg-muted-foreground/30 shrink-0" />
-                <span className="flex-1 truncate text-muted-foreground">{item.category}</span>
+                <span className="flex-1 truncate text-muted-foreground">{humanizeCategoryName(item.category)}</span>
                 <span className="tabular-nums text-muted-foreground font-medium">£{item.spent.toFixed(2)}</span>
                 <div className="w-12 h-1 rounded-full bg-muted/40 overflow-hidden shrink-0">
                   <div className={`h-full rounded-full ${itemPct >= 100 ? "bg-ruby" : "bg-gradient-to-r from-emerald to-topaz"}`} style={{ width: `${Math.min(100, itemPct)}%` }} />
@@ -335,7 +337,7 @@ const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
               {sortOrder === "desc" ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
             </button>
           </div>
-          {loading ? <WorkspaceSkeleton /> : loadError ? <WorkspaceBlank title="Could not load budgets" description={loadError} error action={<button onClick={onRetry} className="rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white">Try again</button>} /> : displayMode === "list" ? (<div data-testid="budget-list" className="workspace-table-panel budget-ledger-scroll surface min-h-0 flex-1 overflow-auto rounded-[16px]"><table className="workspace-table w-full text-left"><thead className="sticky top-0 z-10 bg-card"><tr className="border-b border-border text-[11px] font-medium text-muted-foreground"><th className="px-4 py-3">Category</th><th className="px-3 py-3 text-right">Spent</th><th className="px-3 py-3 text-right">Budget</th><th className="w-[180px] px-3 py-3">Progress</th><th className="px-3 py-3">Status</th><th className="w-[90px]" /></tr></thead><tbody>{budgetTableRows.map((budget) => { const pct = Number(budget.progress_pct) || 0; const risk = pct >= 80; const over = pct >= 100; const Icon = CATEGORY_ICONS[budget.category.toLowerCase().trim()] || Target; return <tr key={budget.budget_id} onClick={() => openBudgetTransactions(budget)} className="cursor-pointer border-b border-border/70 last:border-0 hover:bg-secondary/30"><td className="px-4 py-2.5"><span className="flex items-center gap-2.5"><span className={`grid h-8 w-8 place-items-center rounded-xl ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}><Icon className="h-4 w-4" /></span><span className="text-[12px] font-medium capitalize">{budget.category}</span></span></td><td className="money-tabular px-3 py-2.5 text-right text-[12px]">£{Number(budget.spent || 0).toFixed(2)}</td><td className="money-tabular px-3 py-2.5 text-right text-[12px] text-muted-foreground">£{Number(budget.limit || 0).toFixed(2)}</td><td className="px-3 py-2.5"><div className="flex items-center gap-2"><div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary"><div className={`h-full rounded-full ${over ? "bg-ruby" : risk ? "bg-gradient-to-r from-topaz to-ruby/70" : "bg-gradient-to-r from-emerald to-sky"}`} style={{ width: `${Math.min(100, pct)}%` }} /></div><span className="w-7 text-right text-[10px] text-muted-foreground">{Math.round(pct)}%</span></div></td><td className="px-3 py-2.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-medium ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}>{over ? "Exceeded" : risk ? "At risk" : "On track"}</span></td><td className="px-3 py-2.5"><button type="button" aria-label={`Edit ${budget.category} budget`} onClick={(event) => { event.stopPropagation(); startEdit(budget); }} className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2 text-[11px] font-medium text-foreground hover:bg-secondary"><Pencil className="h-3 w-3" />Edit</button></td></tr>; })}</tbody></table>{budgetTableRows.length === 0 ? <WorkspaceBlank title={searchQuery || budgetView !== "all" ? "No matching budgets" : "No budgets yet"} description={searchQuery || budgetView !== "all" ? "Try clearing your search or changing the status tab." : "Create a budget to track spending, or choose a category from the unbudgeted list."} action={!searchQuery && budgetView === "all" ? <button type="button" onClick={() => onAdd()} className="rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white">Create budget</button> : null} /> : null}</div> ) : (
+          {loading ? <WorkspaceSkeleton /> : loadError ? <WorkspaceBlank title="Could not load budgets" description={loadError} error action={<button onClick={onRetry} className="rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white">Try again</button>} /> : displayMode === "list" ? (<div data-testid="budget-list" className="workspace-table-panel budget-ledger-scroll surface min-h-0 flex-1 overflow-auto rounded-[16px]"><table className="workspace-table w-full text-left"><thead className="sticky top-0 z-10 bg-card"><tr className="border-b border-border text-[11px] font-medium text-muted-foreground"><th className="px-4 py-3">Category</th><th className="px-3 py-3 text-right">Spent</th><th className="px-3 py-3 text-right">Budget</th><th className="w-[180px] px-3 py-3">Progress</th><th className="px-3 py-3">Status</th><th className="w-[90px]" /></tr></thead><tbody>{budgetTableRows.map((budget) => { const pct = Number(budget.progress_pct) || 0; const risk = pct >= 80; const over = pct >= 100; const Icon = CATEGORY_ICONS[budget.category.toLowerCase().trim()] || Target; return <tr key={budget.budget_id} onClick={() => openBudgetTransactions(budget)} className="cursor-pointer border-b border-border/70 last:border-0 hover:bg-secondary/30"><td className="px-4 py-2.5"><span className="flex items-center gap-2.5"><span className={`grid h-8 w-8 place-items-center rounded-xl ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}><Icon className="h-4 w-4" /></span><span className="text-[12px] font-medium capitalize">{humanizeCategoryName(budget.category)}</span></span></td><td className="money-tabular px-3 py-2.5 text-right text-[12px]">£{Number(budget.spent || 0).toFixed(2)}</td><td className="money-tabular px-3 py-2.5 text-right text-[12px] text-muted-foreground">£{Number(budget.limit || 0).toFixed(2)}</td><td className="px-3 py-2.5"><div className="flex items-center gap-2"><div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary"><div className={`h-full rounded-full ${over ? "bg-ruby" : risk ? "bg-gradient-to-r from-topaz to-ruby/70" : "bg-gradient-to-r from-emerald to-sky"}`} style={{ width: `${Math.min(100, pct)}%` }} /></div><span className="w-7 text-right text-[10px] text-muted-foreground">{Math.round(pct)}%</span></div></td><td className="px-3 py-2.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-medium ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}>{over ? "Exceeded" : risk ? "At risk" : "On track"}</span></td><td className="px-3 py-2.5"><button type="button" aria-label={`Edit ${budget.category} budget`} onClick={(event) => { event.stopPropagation(); startEdit(budget); }} className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2 text-[11px] font-medium text-foreground hover:bg-secondary"><Pencil className="h-3 w-3" />Edit</button></td></tr>; })}</tbody></table>{budgetTableRows.length === 0 ? <WorkspaceBlank title={searchQuery || budgetView !== "all" ? "No matching budgets" : "No budgets yet"} description={searchQuery || budgetView !== "all" ? "Try clearing your search or changing the status tab." : "Create a budget to track spending, or choose a category from the unbudgeted list."} action={!searchQuery && budgetView === "all" ? <button type="button" onClick={() => onAdd()} className="rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white">Create budget</button> : null} /> : null}</div> ) : (
             <div data-testid="budget-grid" className="budget-ledger-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 {budgetTableRows.map((budget) => {
@@ -348,7 +350,7 @@ const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-2">
                           <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}><Icon className="h-4 w-4" /></span>
-                          <h3 className="truncate text-sm font-semibold capitalize">{budget.category}</h3>
+                          <h3 className="truncate text-sm font-semibold capitalize">{humanizeCategoryName(budget.category)}</h3>
                         </div>
                         <button type="button" aria-label={`Edit ${budget.category} budget`} onClick={() => startEdit(budget)} className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border px-2 py-1.5 text-xs font-medium hover:bg-secondary"><Pencil className="h-3.5 w-3.5" />Edit</button>
                       </div>
@@ -412,7 +414,7 @@ const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
           {insights?.length > 0 && <section className="surface rounded-[16px] p-4">
             <h2 className="mb-1 text-[14px] font-semibold">Penni Coach</h2><p className="mb-3 text-xs text-muted-foreground">Budget suggestions based on your spending</p>
             <div className="space-y-2">{insights.map(insight => <div key={insight.category} className="rounded-lg border border-border/70 p-3 text-xs">
-              <p className="font-semibold capitalize">{insight.category}</p><p className="mt-1 text-muted-foreground">{insight.reason}</p>
+              <p className="font-semibold capitalize">{humanizeCategoryName(insight.category)}</p><p className="mt-1 text-muted-foreground">{insight.reason}</p>
               {insight.current_budget !== insight.suggested_budget && <button type="button" disabled={applyingInsight===insight.category} onClick={() => onApplyInsight(insight)} className="mt-2 rounded-lg bg-emerald/10 px-2.5 py-1.5 font-semibold text-emerald disabled:opacity-50">{applyingInsight===insight.category?"Updating…":`Update to £${insight.suggested_budget}`}</button>}
             </div>)}</div>
           </section>}
@@ -915,9 +917,9 @@ export default React.memo(function BudgetPage() {
         </>}
       />
       <WorkspaceMetrics columns={4}>
-        <WorkspaceMetric label="Total Budgeted" value={`£${summary.totalPlanned.toFixed(2)}`} note={`${summary.count} categories`} icon={Target} />
-        <WorkspaceMetric label="Total Spent" value={`£${summary.totalSpent.toFixed(2)}`} note={summary.totalPlanned ? `${Math.round(summary.totalSpent/summary.totalPlanned*100)}% of budget` : "No budget set"} icon={TrendingDown} tone="ruby" progress={summary.totalPlanned ? summary.totalSpent/summary.totalPlanned*100 : 0} />
-        <WorkspaceMetric label={summary.totalRemaining < 0 ? "Over budget" : "Remaining"} value={`£${Math.abs(summary.totalRemaining).toFixed(2)}`} note={summary.totalPlanned ? "Across your budgets" : "No budget set"} icon={PiggyBank} tone={summary.totalRemaining < 0 ? "ruby" : "emerald"} />
+        <WorkspaceMetric label="Total Budgeted" value={formatCurrency(summary.totalPlanned)} compactValue={formatCurrency(summary.totalPlanned, { compact: true })} note={`${summary.count} categories`} icon={Target} />
+        <WorkspaceMetric label="Total Spent" value={formatCurrency(summary.totalSpent)} compactValue={formatCurrency(summary.totalSpent, { compact: true })} note={summary.totalPlanned ? `${Math.round(summary.totalSpent/summary.totalPlanned*100)}% of budget` : "No budget set"} icon={TrendingDown} tone="ruby" progress={summary.totalPlanned ? summary.totalSpent/summary.totalPlanned*100 : 0} />
+        <WorkspaceMetric label={summary.totalRemaining < 0 ? "Over budget" : "Remaining"} value={formatCurrency(Math.abs(summary.totalRemaining))} compactValue={formatCurrency(Math.abs(summary.totalRemaining), { compact: true })} note={summary.totalPlanned ? "Across your budgets" : "No budget set"} icon={PiggyBank} tone={summary.totalRemaining < 0 ? "ruby" : "emerald"} />
         <WorkspaceMetric label="At Risk" value={String(atRiskCount)} note={atRiskCount ? "Categories over 80% spent" : "All budgets on track"} icon={AlertCircle} tone="topaz" />
       </WorkspaceMetrics>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -1194,7 +1196,7 @@ export default React.memo(function BudgetPage() {
                     return (
                       <div key={ins.category} className="rounded-xl border border-topaz/20 bg-card/60 backdrop-blur-md p-4 shadow-sm hover:border-topaz/40 transition-colors group">
                         <div className="flex items-start justify-between gap-2 mb-3">
-                          <h4 className="text-sm font-semibold capitalize text-foreground">{ins.category}</h4>
+                          <h4 className="text-sm font-semibold capitalize text-foreground">{humanizeCategoryName(ins.category)}</h4>
                           {!hasBudget && <span className="text-[10px] px-2 py-0.5 rounded-full bg-topaz/10 border border-topaz/20 text-topaz font-medium shrink-0">No budget</span>}
                         </div>
                         <div className="text-xs text-muted-foreground space-y-1.5 mb-4">
@@ -1492,7 +1494,7 @@ export default React.memo(function BudgetPage() {
                   <button type="button" onClick={() => { setBudgetTxOpen(false); setInspectedBudgetTx(tx); }} className="flex-1 min-w-0 text-left" aria-label={`View details for ${tx.description || tx.merchant || "transaction"}`}>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium truncate">{tx.description || tx.merchant || "—"}</span>
-                      {tx.category && <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-secondary capitalize">{tx.category}</span>}
+                      {tx.category && <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-secondary capitalize">{humanizeCategoryName(tx.category)}</span>}
                     </div>
                     <div className="text-[11px] text-muted-foreground">
                       {tx.date ? format(new Date(tx.date), "dd MMM yyyy") : "—"}

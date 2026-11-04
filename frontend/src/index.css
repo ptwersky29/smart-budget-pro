@@ -684,8 +684,8 @@ html { font-size: calc(var(--fs-base, 0.875rem) * var(--fs-multiplier, 1)); }
 /* Keep the account ledger accessible on smaller displays as a single contained list. */
 @media (max-width: 1023px) {
   .account-detail-workspace .account-detail-list {
-    max-height: min(60dvh, 550px);
-    overflow-y: auto;
+    max-height: none;
+    overflow-y: visible;
     overflow-x: hidden;
   }
 }
