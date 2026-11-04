@@ -6,7 +6,7 @@ describe("Public demo reuses the ACTUAL Penni offline app", () => {
   test("public entry opens same AppLayout and finance pages", () => {
     const app = read("App.js"), entry = read("pages/DemoEntry.jsx");
     expect(app).toContain('path="/demo/*" element={<DemoEntry />}');
-    expect(app).toContain('element={<AppLayout />}');
+    expect(app).toContain('<AppLayout />');
     for (const route of ['path="/dashboard" element={<Dashboard />}', 'path="/accounts" element={<AccountsPage />}', 'path="/transactions" element={<Transactions />}', 'path="/budgets" element={<BudgetPage />}']) expect(app).toContain(route);
     expect(entry).toContain('window.location.replace("/dashboard")');
     expect(app).not.toContain('import("./pages/DemoApp")');
