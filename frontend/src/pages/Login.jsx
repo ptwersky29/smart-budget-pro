@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { api, BACKEND_URL, formatApiError } from "../lib/api";
 import { toast } from "sonner";
-import { Loader2, ShieldCheck, Eye, EyeOff, WifiOff, ArrowLeft, Sparkles, Check } from "lucide-react";
+import { Loader2, ShieldCheck, Eye, EyeOff, ArrowLeft, Sparkles, Check } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import AuthVisual from "../components/AuthVisual";
@@ -11,7 +11,7 @@ import "./AuthPages.css";
 import Logo from "../components/Logo";
 
 export default function Login() {
-  const { login, continueOffline } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
@@ -69,11 +69,6 @@ export default function Login() {
     }
   };
 
-  const onContinueOffline = () => {
-    continueOffline();
-    toast.info("Offline mode is active. Local data will sync when you sign in online.");
-    navigate("/dashboard");
-  };
 
   return (
     <div className="penni-auth grid min-h-[100dvh] lg:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)]">
@@ -177,19 +172,14 @@ export default function Login() {
               </div>
             </div>
 
-            <Button
-              type="button"
-              variant="outlinePill"
-              size="pill"
-              className="auth-oauth-button w-full"
-              onClick={onContinueOffline}
-              data-testid="login-offline"
-            >
-              <WifiOff className="h-4 w-4" />
-              Continue offline
+            <Button variant="outlinePill" size="pill" className="auth-oauth-button w-full" asChild>
+              <Link to="/demo" data-testid="login-offline">
+                <ShieldCheck className="h-4 w-4" />
+                Explore the read-only demo
+              </Link>
             </Button>
             <p className="-mt-2 text-center text-xs leading-relaxed text-muted-foreground">
-              Opens data saved on this device. Sign in online later to sync your cloud account.
+              No account required. View fictional sample data only; editing and deleting are disabled.
             </p>
 
             {/* Google */}

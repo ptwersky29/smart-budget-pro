@@ -121,12 +121,12 @@ export default function Landing() {
       <nav className="pl-nav-links" aria-label="Main navigation">{links.map(([label,href])=><a key={href} href={href}>{label}</a>)}</nav>
       <div className="pl-nav-actions">
         <button type="button" className="pl-theme-toggle" aria-label="Toggle colour theme" onClick={()=>setTheme(theme==="dark"?"light":"dark")}>{theme==="dark"?<Sun size={18}/>:<MoonStar size={18}/>}</button>
-        <Link className="pl-signin" to="/login">Sign in</Link>
+        <Link className="pl-signin" to="/demo" data-testid="nav-demo">Try demo</Link><Link className="pl-signin" to="/login">Sign in</Link>
         <PrimaryLink className="pl-nav-cta" testId="nav-register">Get started <ArrowRight size={16}/></PrimaryLink>
         <button type="button" className="pl-nav-menu" aria-label={mobileOpen?"Close menu":"Open menu"} aria-controls="pl-mobile-links" aria-expanded={mobileOpen} onClick={()=>setMobileOpen(v=>!v)}>{mobileOpen?<X size={22}/>:<Menu size={22}/>}</button>
       </div>
     </div>
-    {mobileOpen&&<nav className="pl-mobile-links" id="pl-mobile-links" aria-label="Mobile navigation">{links.map(([label,href])=><a key={href} href={href} onClick={()=>setMobileOpen(false)}>{label}<ArrowRight size={16}/></a>)}<Link to="/login" onClick={()=>setMobileOpen(false)}>Sign in <ArrowRight size={16}/></Link><Link to="/register" onClick={()=>setMobileOpen(false)}>Create a free account <ArrowRight size={16}/></Link></nav>}
+    {mobileOpen&&<nav className="pl-mobile-links" id="pl-mobile-links" aria-label="Mobile navigation">{links.map(([label,href])=><a key={href} href={href} onClick={()=>setMobileOpen(false)}>{label}<ArrowRight size={16}/></a>)}<Link to="/demo" onClick={()=>setMobileOpen(false)}>Explore demo <ArrowRight size={16}/></Link><Link to="/login" onClick={()=>setMobileOpen(false)}>Sign in <ArrowRight size={16}/></Link><Link to="/register" onClick={()=>setMobileOpen(false)}>Create a free account <ArrowRight size={16}/></Link></nav>}
     </header>
     <main>
       <section className="pl-hero"><div className="pl-hero-orb" aria-hidden="true"/><div className="pl-container pl-hero-grid">
@@ -134,8 +134,8 @@ export default function Landing() {
           <span className="pl-eyebrow"><Sparkles size={15}/> YOUR MONEY, MADE CLEARER</span>
           <h1>Feel better about <span>every penny.</span></h1>
           <p>One beautifully simple place for your accounts, spending, budgets and plans. Everything you need to understand where your money is going—and where it could take you.</p>
-          <div className="pl-hero-buttons"><PrimaryLink testId="hero-cta-start">Start with Penni <ArrowRight size={18}/></PrimaryLink><a className="pl-button pl-button-secondary" href="#how-it-works">See how it works <ArrowRight size={17}/></a></div>
-          <div className="pl-hero-reassurance"><span><CheckCircle2 size={16}/> Free to get started</span><span><CheckCircle2 size={16}/> No bank connection required</span></div>
+          <div className="pl-hero-buttons"><PrimaryLink testId="hero-cta-start">Start with Penni <ArrowRight size={18}/></PrimaryLink><Link className="pl-button pl-button-secondary" to="/demo" data-testid="hero-demo">Explore live demo <ArrowRight size={17}/></Link></div>
+          <div className="pl-hero-reassurance"><span><CheckCircle2 size={16}/> Free to get started</span><span><CheckCircle2 size={16}/> Explore demo without signing up</span></div>
         </Reveal>
         <Reveal className="pl-hero-visual" delay={140}><Preview/></Reveal>
       </div><div className="pl-container pl-hero-foot"><span>ONE WORKSPACE. YOUR FINANCIAL LIFE.</span><div><span><Wallet size={16}/> Accounts</span><span><BarChart3 size={16}/> Budgets</span><span><Sparkles size={16}/> Insights</span><span><BookOpen size={16}/> Giving</span></div></div></section>
@@ -160,6 +160,6 @@ export default function Landing() {
       <section className="pl-section pl-faq"><div className="pl-container pl-faq-grid"><Reveal><span className="pl-kicker">GOOD TO KNOW</span><h2>Questions? <span>We have answers.</span></h2><p>A few useful things to know before you begin.</p></Reveal><Reveal className="pl-faq-list" delay={90}>{faq.map((f,i)=><div className="pl-faq-item" key={f.q}><button type="button" aria-expanded={openFaq===i} aria-controls={`pl-faq-${i}`} onClick={()=>setOpenFaq(openFaq===i?-1:i)}>{f.q}<ChevronDown size={19} className={openFaq===i?"pl-chevron-open":""}/></button><div id={`pl-faq-${i}`} hidden={openFaq!==i}><p>{f.a}</p></div></div>)}</Reveal></div></section>
       <section className="pl-bottom-cta"><div className="pl-container"><Reveal className="pl-bottom-panel"><span><Sparkles size={18}/> YOUR MONEY. YOUR MOMENT.</span><h2>See your money differently.</h2><p>Everything in one beautiful place. Get started with Penni today.</p><PrimaryLink>Create your free account <ArrowRight size={18}/></PrimaryLink></Reveal></div></section>
     </main>
-    <footer className="pl-footer"><div className="pl-container pl-footer-content"><div><Link className="pl-brand" to="/"><Logo size="sm"/><strong>Penni</strong></Link><p>Make sense of your money.</p></div><nav aria-label="Footer navigation"><a href="#features">Features</a><a href="#pricing">Pricing</a><Link to="/privacy">Privacy</Link><Link to="/login">Sign in</Link></nav></div><div className="pl-container pl-footer-base"><span>© {new Date().getFullYear()} Penni. All rights reserved.</span><span>Designed for clarity.</span></div></footer>
+    <footer className="pl-footer"><div className="pl-container pl-footer-content"><div><Link className="pl-brand" to="/"><Logo size="sm"/><strong>Penni</strong></Link><p>Make sense of your money.</p></div><nav aria-label="Footer navigation"><a href="#features">Features</a><a href="#pricing">Pricing</a><Link to="/privacy">Privacy</Link><Link to="/demo">Public demo</Link><Link to="/login">Sign in</Link></nav></div><div className="pl-container pl-footer-base"><span>© {new Date().getFullYear()} Penni. All rights reserved.</span><span>Designed for clarity.</span></div></footer>
   </div>;
 }

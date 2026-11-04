@@ -17,6 +17,7 @@ import { ActionProvider } from "./contexts/ActionContext";
 import GlobalActionHost from "./components/actions/GlobalActionHost";
 
 const Landing = lazy(() => import("./pages/Landing"));
+const DemoApp = lazy(() => import("./pages/DemoApp"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
@@ -66,6 +67,7 @@ function AppRouter() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
+      <Route path="/demo/*" element={<DemoApp />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />

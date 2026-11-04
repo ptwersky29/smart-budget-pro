@@ -22,7 +22,7 @@ export default function Pricing() {
         <Link to="/" className="pl-brand" aria-label="Penni home"><Logo size="md"/><strong>Penni</strong></Link>
         <div className="pl-nav-actions">
           <Link to="/" className="pl-signin" style={{display:"inline-flex",alignItems:"center",gap:8}}><ArrowLeft size={15}/> Back home</Link>
-          <Link to="/login" className="pl-button pl-button-secondary" style={{minHeight:42}}>Sign in</Link>
+          <Link to="/demo" className="pl-button pl-button-secondary" style={{minHeight:42}}>Explore demo</Link><Link to="/login" className="pl-button pl-button-secondary" style={{minHeight:42}}>Sign in</Link>
         </div>
       </div>
     </header>
