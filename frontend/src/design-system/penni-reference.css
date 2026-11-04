@@ -416,9 +416,89 @@ html.dark[data-penni-accent="violet"] .penni-v2 {--penni-accent:#a07bff;}
   .penni-v2 .penni-native-popup {max-height: calc(100dvh - max(8px, env(safe-area-inset-top)));}
 }
 
-/* Keep portal dialogs above every sticky header, action dock and sidebar.
-   Popups render under document.body, not under the route's stacking context. */
-.penni-native-backdrop { z-index: 9990; }
-.penni-native-popup { z-index: 9991; }
-.penni-native-popup .penni-transaction-body { min-height:0; }
-.penni-native-popup .penni-transaction-fields { overscroll-behavior:contain; }
+/* NativePopup renders through a Radix portal under document.body, so its
+   layout MUST be established here rather than inherited from the app shell.
+   A z-index without positioning leaves dialogs in normal document flow. */
+.penni-native-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9990;
+  background: rgba(12, 18, 30, .48);
+  backdrop-filter: blur(5px);
+  animation: penni-native-fade-in .18s ease-out both;
+}
+.penni-native-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9991;
+  display: flex;
+  flex-direction: column;
+  width: min(560px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: min(90dvh, 900px);
+  overflow: hidden;
+  color: hsl(var(--foreground));
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 24px;
+  box-shadow: 0 30px 90px -20px rgba(12, 18, 30, .4);
+  outline: none;
+  animation: penni-native-enter .22s cubic-bezier(.2,.8,.2,1) both;
+}
+.penni-native-popup[data-size="sm"] { width: min(420px, calc(100vw - 32px)); }
+.penni-native-popup[data-size="lg"] { width: min(780px, calc(100vw - 32px)); }
+.penni-native-popup[data-size="xl"] { width: min(1000px, calc(100vw - 32px)); }
+.penni-native-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.penni-native-popup .penni-transaction-body { min-height: 0; }
+.penni-native-popup .penni-transaction-fields { min-height: 0; overscroll-behavior: contain; }
+.penni-native-popup .penni-transaction-header,
+.penni-native-popup .penni-transaction-footer { flex-shrink: 0; }
+.penni-native-header,
+.penni-native-footer { display: flex; align-items: center; gap: 12px; padding: 18px 20px; }
+.penni-native-header { border-bottom: 1px solid hsl(var(--border)); }
+.penni-native-footer { border-top: 1px solid hsl(var(--border)); }
+.penni-native-title { font-size: 1rem; font-weight: 650; }
+.penni-native-description { margin-top: 4px; font-size: .8rem; opacity: .7; }
+.penni-native-close { margin-left: auto; padding: 6px; border-radius: 9px; }
+.penni-native-handle-zone { display: none; }
+@keyframes penni-native-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes penni-native-enter {
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 10px)) scale(.985); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@media (max-width: 767px) {
+  .penni-native-popup {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - env(safe-area-inset-top) - 8px);
+    border-radius: 24px 24px 0 0;
+    transform: none;
+    padding-bottom: env(safe-area-inset-bottom);
+    animation: penni-native-sheet-in .22s cubic-bezier(.2,.8,.2,1) both;
+  }
+  .penni-native-popup[data-size] { width: 100%; }
+  .penni-native-handle-zone {
+    display: flex;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 9px 0 3px;
+    touch-action: pan-y;
+  }
+  .penni-native-handle { width: 36px; height: 4px; border-radius: 999px; background: hsl(var(--muted-foreground) / .28); }
+  @keyframes penni-native-sheet-in { from { opacity: .85; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .penni-native-popup, .penni-native-backdrop { animation: none; }
+}
