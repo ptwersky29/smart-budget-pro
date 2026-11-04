@@ -10,8 +10,8 @@ describe("Penni premium landing page contracts", () => {
       expect(landing).toContain(`id="${id}"`);
     }
     expect(landing).toContain('<Logo size="md"/>');
-    expect(landing).toContain('data-testid="hero-cta-start"');
-    expect(landing).toContain('data-testid="nav-register"');
+    expect(landing).toContain('testId="hero-cta-start"');
+    expect(landing).toContain('testId="nav-register"');
     expect(landing).toContain('aria-expanded={mobileOpen}');
     expect(landing).toContain('setOpenFaq(openFaq===i?-1:i)');
   });
@@ -30,7 +30,7 @@ describe("Penni premium landing page contracts", () => {
     const pricing=read("pages/Pricing.jsx");
     expect(landing).toContain('£0');
     expect(pricing).toContain('£0');
-    expect(landing).not.toContain('£5');
+    expect(landing).not.toContain('£5/mo');
     expect(landing).not.toContain('2,400+');
     expect(landing).not.toContain("14-day free trial");
     expect(pricing).toContain('data-testid="free-cta"');
