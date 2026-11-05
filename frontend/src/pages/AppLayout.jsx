@@ -347,7 +347,7 @@ export default function AppLayout() {
               </Link>
               <div className="hidden min-w-0 flex-1 md:block">
                 <h1 className="truncate text-[21px] font-semibold leading-tight tracking-[-0.035em]">{routeMeta.title}</h1>
-                {location.pathname === "/dashboard" && <p className="mt-1 text-[12px] leading-tight text-muted-foreground">{new Date().toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}</p>}
+                {(location.pathname === "/dashboard" || location.pathname === "/transactions") && <p className="mt-1 text-[12px] leading-tight text-muted-foreground">{new Date().toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}</p>}
               </div>
               <button
                 type="button"
