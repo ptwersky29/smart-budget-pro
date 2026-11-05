@@ -1,4 +1,17 @@
-/* Penni Transactions — reference-matched workspace. Route scoped, no global page regressions. */
+/* Penni Transactions — reference-matched content in the shared Penni shell. */
+/* Typography is inherited from Penni's shared design system, not a second
+   transactions-only font. Text weights follow WorkspaceHeader, WorkspaceMetric
+   and the shared transaction lists rather than the image mockup's heavy type. */
+.penni-reference-transactions-shell .transactions-primary,
+.penni-reference-transactions-shell .transactions-primary button,
+.penni-reference-transactions-shell .transactions-primary input,
+.penni-reference-transactions-shell .transactions-primary select {
+  font-family:var(--font-body, "Inter", ui-sans-serif, system-ui);
+}
+@media (min-width:1024px) and (max-width:1180px) {
+  .penni-reference-transactions-shell .workspace-main {padding-inline:20px;}
+}
+
 .penni-reference-transactions-shell {
   --tx-violet: #5134ee;
   --tx-lavender: #f1efff;
@@ -10,32 +23,8 @@
   background: radial-gradient(ellipse at 48% 0%,#f0eeff 0%,#f9f8ff 55%,#f6f4ff 100%);
 }
 .penni-reference-transactions-shell .penni-main-panel::before { display:none; }
-.penni-reference-transactions-shell .penni-sidebar {
-  background: linear-gradient(160deg,#f7f6ff 0%,#f3f1ff 57%,#e8e2ff 100%);
-  border-right: 1px solid #e7e2fa;
-  box-shadow:none;
-}
-.penni-reference-transactions-shell .penni-sidebar .penni-side-link {
-  border-radius: 12px; border-color:transparent;
-  color: #252454;
-  min-height: 46px;
-}
-.penni-reference-transactions-shell .penni-sidebar .penni-nav-icon {color:#28245e}
-.penni-reference-transactions-shell .penni-sidebar .penni-side-link[aria-current="page"] {
-  color:white; background:linear-gradient(105deg,#6744ff,#4422ee);
-  box-shadow:0 5px 15px rgba(76,52,223,.22);
-}
-.penni-reference-transactions-shell .penni-sidebar .penni-side-link[aria-current="page"] .penni-nav-icon { color:white; }
-.penni-reference-transactions-shell .penni-sidebar .penni-side-link:hover:not([aria-current="page"]) {background:#ebe7ff;color:#262052}
-.penni-reference-transactions-shell .penni-sidebar-create { display:none; }
-.penni-reference-transactions-shell .penni-sidebar .penni-reference-sidebar-section-title {display:none}
-.penni-reference-transactions-shell .penni-sidebar [data-testid="sidebar-logo"] {gap:11px}
-.penni-reference-transactions-shell .penni-sidebar [data-testid="sidebar-logo"] > span { color:#161627 }
-.penni-reference-transactions-shell .penni-sidebar-profile {
-  background:rgba(255,255,255,.77); border:1px solid #e2dcfa;
-  box-shadow:0 6px 14px rgba(84,63,174,.08);border-radius:17px;
-}
-.penni-reference-transactions-shell .penni-sidebar-profile > span:first-child {background:#e5dbff;color:#5035c7;border-radius:50%}
+/* The sidebar is intentionally NOT styled here: AppLayout owns its width,
+   links, logo, section headings, create button and profile on every route. */
 .penni-reference-transactions-shell .transactions-reference {
   min-width:0; gap:14px; height:100%; padding-bottom:0;
 }
@@ -49,11 +38,11 @@
   padding:0; overflow:visible;
 }
 .penni-reference-transactions-shell .transactions-primary .penni-inner-title {
-  display:block !important; font-size:31px; line-height:1.05;
-  letter-spacing:-.045em; font-weight:750;color:#151529;
+  display:block !important; font-size:26px; line-height:1.25;
+  letter-spacing:-.035em; font-weight:600;color:hsl(var(--foreground));
 }
 .penni-reference-transactions-shell .transactions-primary .penni-inner-description {
-  display:block !important; margin-top:5px; font-size:13px; line-height:1.3;color:#3d397b
+  display:block !important; margin-top:6px; font-size:13px; line-height:1.5;color:hsl(var(--muted-foreground))
 }
 .penni-reference-transactions-shell .transactions-primary .penni-reference-month-switcher,
 .penni-reference-transactions-shell .transactions-primary .penni-reference-more-button {
@@ -87,12 +76,12 @@
 .penni-reference-transactions-shell .penni-reference-kpi--transfers .penni-reference-kpi-icon {background:#e7edff;color:#2760ed}
 .penni-reference-transactions-shell .penni-reference-kpi--net .penni-reference-kpi-icon {background:#ece6ff;color:#613cf4}
 .penni-reference-transactions-shell .penni-reference-kpi-copy {display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
-.penni-reference-transactions-shell .penni-reference-kpi-label {font-size:12px;font-weight:560;color:#4b4a87}
+.penni-reference-transactions-shell .penni-reference-kpi-label {font-size:12px;font-weight:500;color:hsl(var(--muted-foreground))}
 .penni-reference-transactions-shell .penni-reference-kpi-amount {
-  font-size:clamp(18px,1.45vw,23px);line-height:1.1;font-weight:750;letter-spacing:-.03em;
-  color:#171727;font-variant-numeric:tabular-nums;white-space:nowrap
+  font-size:clamp(18px,1.45vw,23px);line-height:1.15;font-weight:650;letter-spacing:-.035em;
+  color:hsl(var(--foreground));font-variant-numeric:tabular-nums;white-space:nowrap
 }
-.penni-reference-transactions-shell .penni-reference-kpi-detail {color:#515b89;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.penni-reference-transactions-shell .penni-reference-kpi-detail {color:hsl(var(--muted-foreground));font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .penni-reference-transactions-shell .penni-reference-sparkline {height:46px;width: min(30%,115px); flex-shrink:1;overflow:visible}
 .penni-reference-transactions-shell .penni-reference-toolbar {
   display:flex; flex:0 0 auto;align-items:center;gap:10px;min-width:0;
@@ -109,7 +98,7 @@
 }
 .penni-reference-transactions-shell .penni-reference-search input {
   background:transparent!important;border:0!important;box-shadow:none!important;outline:none!important;
-  border-radius:0!important;min-width:0;flex:1;font-size:12px;color:#25244a;padding:0;height:100%
+  border-radius:0!important;min-width:0;flex:1;font-size:13px;color:hsl(var(--foreground));padding:0;height:100%
 }
 .penni-reference-transactions-shell .penni-reference-search kbd {
   font-size:10px;color:#7672aa;background:#f3f1ff;border:1px solid #e5e0f5;
@@ -118,7 +107,7 @@
 .penni-reference-transactions-shell .penni-reference-toolbar .penni-reference-filter-control {
   flex:0 1 auto; min-width:0; height:43px;border:1px solid #e2ddf3;
   background:rgba(255,255,255,.94);color:#292743;
-  padding:0 14px;font-size:12px;font-weight:650;
+  padding:0 14px;font-size:13px;font-weight:600;
   display:inline-flex;align-items:center;justify-content:space-between;gap:9px;
   box-shadow:0 2px 10px rgba(69,54,150,.035);
 }
@@ -145,7 +134,7 @@
 }
 .penni-reference-transactions-shell .penni-reference-tabs-bar [role="tablist"] > button {
   border:0;border-radius:999px;padding:0 13px;height:38px;gap:8px;
-  font-size:12px;font-weight:650;color:#2c2951
+  font-size:12px;font-weight:600;color:hsl(var(--foreground))
 }
 .penni-reference-transactions-shell .penni-reference-tabs-bar [role="tablist"] > button[aria-selected="true"] {
   background:#eeeaff;color:#5230e7;box-shadow:inset 0 -2px #653fff
@@ -156,7 +145,7 @@
 .penni-reference-transactions-shell .penni-reference-tabs-bar [role="tablist"] > button[aria-selected="true"] span {background:#5636ec;color:#fff}
 .penni-reference-transactions-shell .penni-reference-sort {
   min-height:39px;flex-shrink:0;padding:0 14px;border:1px solid #e2dcf4;
-  background:white;color:#27223d;border-radius:999px !important;font-size:12px;font-weight:650
+  background:white;color:hsl(var(--foreground));border-radius:999px !important;font-size:12px;font-weight:600
 }
 .penni-reference-transactions-shell .transaction-ledger-panel {
   display:flex;flex:1 1 auto;flex-direction:column;min-height:0;
@@ -172,7 +161,7 @@
 }
 .penni-reference-transactions-shell .transaction-table-scroll .workspace-table > thead th {
   height:43px;padding-block:10px;
-  background:#f8f7ff !important;color:#3c3971;font-size:11px;font-weight:700;
+  background:#f8f7ff !important;color:hsl(var(--muted-foreground));font-size:11px;font-weight:600;
   border-color:#ece9f7;letter-spacing:.035em;text-transform:uppercase
 }
 .penni-reference-transactions-shell .transaction-table-scroll .penni-tx-date-row > th {
@@ -196,23 +185,23 @@
 .penni-reference-transactions-shell .transaction-table-scroll .workspace-table > tbody > tr.penni-reference-transaction-row:hover {background:#f5f2ff}
 .penni-reference-transactions-shell .transaction-table-scroll .workspace-table > tbody > tr.penni-reference-transaction-row[aria-selected="true"] {background:#f0edff}
 .penni-reference-transactions-shell .penni-reference-tx-title {
-  font-size:13.5px;font-weight:740;color:#17172d;line-height:1.25;
+  font-size:13px;font-weight:600;color:hsl(var(--foreground));line-height:1.25;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis
 }
 .penni-reference-transactions-shell .penni-reference-tx-subtitle {
   display:block;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  font-size:11px;color:#5d608b;line-height:1.25
+  font-size:11px;color:hsl(var(--muted-foreground));line-height:1.25
 }
 .penni-reference-transactions-shell .penni-reference-tx-type {
   display:flex;align-items:center;gap:6px
 }
 .penni-reference-transactions-shell .penni-reference-tx-type > span:first-child {width:30px;height:30px}
 .penni-reference-transactions-shell .penni-reference-tx-type > span:last-child {padding:5px 9px;font-size:11px}
-.penni-reference-transactions-shell .penni-reference-tx-bank > span {font-size:12px;color:#222344;font-weight:540}
+.penni-reference-transactions-shell .penni-reference-tx-bank > span {font-size:12px;color:hsl(var(--foreground));font-weight:500}
 .penni-reference-transactions-shell .penni-reference-tx-bank > span > span:first-child {height:29px;width:29px;background:white}
 .penni-reference-transactions-shell .penni-reference-tx-bank > span > span:last-child {max-width:162px}
-.penni-reference-transactions-shell .penni-reference-tx-status > span {padding:5px 11px;font-size:11px;font-weight:700}
-.penni-reference-transactions-shell .penni-reference-money {font-size:14px;font-weight:750;white-space:nowrap}
+.penni-reference-transactions-shell .penni-reference-tx-status > span {padding:5px 11px;font-size:11px;font-weight:600}
+.penni-reference-transactions-shell .penni-reference-money {font-size:14px;font-weight:650;white-space:nowrap}
 .penni-reference-transactions-shell .penni-reference-action-toggle {min-height:32px;min-width:32px;border-radius:8px}
 .penni-reference-transactions-shell .penni-reference-action-toggle:hover {background:#eeeaff}
 .penni-reference-transactions-shell .transaction-ledger-panel .penni-reference-pagination {
@@ -220,9 +209,8 @@
 }
 @media (min-width:1024px) {
   .penni-reference-transactions-shell .penni-route-header {display:none}
-  .penni-reference-transactions-shell .penni-sidebar:not([class*="w-[84px]"]) {width:232px}
   .penni-reference-transactions-shell .workspace-main {
-    width:100%;max-width:none;padding:16px 18px 18px;min-height:0;flex:1;overflow:hidden;
+    width:100%;max-width:var(--content-max);padding:16px 32px 18px;min-height:0;flex:1;overflow:hidden;
   }
   .penni-reference-transactions-shell .workspace-route-view,
   .penni-reference-transactions-shell .transactions-reference,
