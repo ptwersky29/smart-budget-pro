@@ -41,6 +41,7 @@ const TransactionRow = React.memo(
     t,
     account,
     showDate = true,
+    showTypeColumn = false,
     isSelected,
     isFocused,
     onToggleSelect,
@@ -75,6 +76,8 @@ const TransactionRow = React.memo(
     const description = t.description || t.merchant || "Transaction";
     const subtitle = t.merchant || t.normalized_merchant || t.source_label;
     const displaySubtitle = subtitle && subtitle.trim().toLowerCase() !== description.trim().toLowerCase() ? subtitle : null;
+    const displayTitle = showTypeColumn ? String(t.normalized_merchant || t.merchant || description).trim() : description;
+    const displayBankDescription = showTypeColumn && displayTitle.toLowerCase() !== description.trim().toLowerCase() ? description : displaySubtitle;
 
     const copyDescription = useCallback(() => {
       navigator.clipboard.writeText(t.description || "");
@@ -90,7 +93,8 @@ const TransactionRow = React.memo(
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <tr
-            className={`cursor-pointer border-b border-border/60 last:border-0 transition-colors ${
+            aria-selected={Boolean(isSelected)}
+            className={`penni-reference-transaction-row cursor-pointer border-b border-border/60 last:border-0 transition-colors ${
               isSelected
                 ? "bg-emerald/[0.10]"
                 : isFocused
@@ -129,15 +133,22 @@ const TransactionRow = React.memo(
               </label>
             </td>
             {showDate && <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">{dateLabel}</td>}
+            {showTypeColumn && <td className="px-2 py-2">
+              <div className="penni-reference-tx-type">
+                <TransactionTypeMark transaction={t} compact />
+                <TransactionTypeMark transaction={t} badge compact />
+              </div>
+            </td>}
             <td className="px-2 py-2">
               <div className="flex min-w-0 items-center gap-2.5">
-                <TransactionTypeMark transaction={t} compact />
+                {!showTypeColumn && <TransactionTypeMark transaction={t} compact />}
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px] font-semibold leading-[18px]" title={description}>{description}</div>
-                  <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
-                    <TransactionTypeMark transaction={t} badge compact />
-                    {displaySubtitle && <span className="min-w-0 truncate text-[10.5px] leading-4 text-muted-foreground" title={displaySubtitle}>{displaySubtitle}</span>}
-                    {t.transfer_pair_id && <span className="shrink-0 text-[10px] font-medium text-sky">Matched</span>}
+                  <div className={showTypeColumn ? "penni-reference-tx-title" : "truncate text-[13px] font-semibold leading-[18px]"} title={description}>{displayTitle}</div>
+                  <div className={showTypeColumn ? "penni-reference-tx-subtitle" : "mt-0.5 flex min-w-0 items-center gap-1.5"}>
+                    {!showTypeColumn && <TransactionTypeMark transaction={t} badge compact />}
+                    {displayBankDescription && <span className="min-w-0 truncate" title={displayBankDescription}>{displayBankDescription}</span>}
+                    {t.transfer_pair_id && <span className="ml-1 shrink-0 text-[10px] font-medium text-sky">Matched</span>}
+                    {t.is_split && <span className="ml-1 shrink-0 text-[10px] font-medium text-violet">Split</span>}
                   </div>
                 </div>
               </div>
@@ -153,19 +164,19 @@ const TransactionRow = React.memo(
                 {t.is_split ? <span className="shrink-0 rounded-full bg-violet/10 px-1.5 py-0.5 text-[11px] font-medium text-violet">Split</span> : null}
               </div>
             </td>
-            <td className="px-2 py-2">
+            <td className="penni-reference-tx-bank px-2 py-2">
               <TransactionBankMark transaction={t} account={account} />
             </td>
-            <td className={`money-tabular px-2 py-2 text-right text-[13px] font-semibold ${type === "transfer" ? "text-foreground" : negative ? "text-ruby" : "text-emerald"}`}>
+            <td className={`penni-reference-money money-tabular px-2 py-2 text-right text-[13px] font-semibold ${type === "transfer" ? "text-foreground" : negative ? "text-ruby" : "text-emerald"}`}>
               {amount > 0 ? "+" : "-"}{formatCurrency(Math.abs(amount))}
             </td>
-            <td className="px-2 py-2">
+            <td className="penni-reference-tx-status px-2 py-2">
               <TransactionStatusBadge transaction={t} />
             </td>
             <td className="px-1 py-1.5 text-right">
               <DropdownMenu>
                 <DropdownMenuTrigger
-                  className="p-2 text-muted-foreground hover:text-foreground"
+                  className="penni-reference-action-toggle p-2 text-muted-foreground hover:text-foreground"
                   aria-label="Transaction actions"
                 >
                   <MoreHorizontal className="h-4 w-4" />
@@ -248,6 +259,10 @@ const TransactionRow = React.memo(
     prev.t.transfer_pair_id === next.t.transfer_pair_id &&
     prev.showDate === next.showDate &&
     prev.t.is_transfer === next.t.is_transfer &&
+    prev.showTypeColumn === next.showTypeColumn &&
+    prev.t.description === next.t.description &&
+    prev.t.merchant === next.t.merchant &&
+    prev.t.normalized_merchant === next.t.normalized_merchant &&
     prev.account?.name === next.account?.name &&
     prev.account?.provider === next.account?.provider &&
     prev.isSelected === next.isSelected &&

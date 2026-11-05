@@ -47,6 +47,8 @@ import { useKeyboardShortcut } from "../hooks/useKeyboardShortcut";
 
 import CategoryCombobox from "../components/CategoryCombobox";
 import CategoryBadge from "../components/CategoryBadge";
+import TransactionSummaryCards from "../components/TransactionSummaryCards";
+import "../design-system/transactions-reference.css";
 
 const SOURCE_LABELS = { manual: "Manual", csv: "CSV", pdf: "PDF", statement: "Statement", sms: "SMS" };
 
@@ -1244,6 +1246,14 @@ const Transactions = React.memo(function Transactions() {
   const incomeDelta = deltaFor(monthTotals.income, previousMonthTotals.income);
   const expenseDelta = deltaFor(monthTotals.expenses, previousMonthTotals.expenses);
   const previousMonthName = MONTH_NAMES[Number(addMonth(month, -1).split("-")[1]) - 1];
+  const transferMonthRows = useMemo(() => monthRows.filter(tx => getTransactionType(tx) === "transfer"), [monthRows]);
+  const outgoingTransferRows = transferMonthRows.filter(tx => Number(tx.amount) < 0);
+  const distinctTransferRows = outgoingTransferRows.length ? outgoingTransferRows : transferMonthRows;
+  const transferMonthAmount = distinctTransferRows.reduce((sum, tx) => sum + Math.abs(Number(tx.amount) || 0), 0);
+  const transferMonthCount = distinctTransferRows.length;
+  const effectiveLedgerTab = filters.approval_status === "unapproved" ? "unapproved"
+    : filters.tx_type === "income" ? "income" : filters.tx_type === "expense" ? "expenses"
+    : filters.tx_type === "transfer" ? "transfers" : "all";
 
   const selectedTransactions = (aiResults?.transactions || txs).filter((transaction) => selectedIds.has(transaction.transaction_id));
   const selectedTotal = selectedTransactions.reduce((sum, transaction) => sum + (Number(transaction.amount) || 0), 0);
@@ -1284,11 +1294,11 @@ const Transactions = React.memo(function Transactions() {
   }, [txs, aiResults]);
 
   return (
-    <div className={`transactions-reference page-stack pb-2 ${activeTab === "ledger" ? "transactions-ledger" : "transactions-other"}`} data-testid="transactions-root">
+    <div className={`transactions-reference page-stack pb-0 ${activeTab === "ledger" ? "transactions-ledger" : "transactions-other"}`} data-testid="transactions-root">
 
       <div className={`grid min-h-0 items-start gap-4 lg:items-stretch ${activeTab === "ledger" && inspectorOpen ? "xl:grid-cols-[minmax(0,1fr)_328px]" : ""}`}>
-        <div className="transactions-primary min-w-0 space-y-3 lg:flex lg:min-h-0 lg:flex-col lg:gap-2 lg:space-y-0">
-          <div className="shrink-0 xl:pl-[14px]">
+        <div className="transactions-primary min-w-0 lg:flex lg:min-h-0 lg:flex-col">
+          <div className="penni-reference-page-top shrink-0">
             <WorkspaceHeader
               title={activeTab === "maaser" ? "Maaser" : "Transactions"}
               description={activeTab === "maaser"
@@ -1305,7 +1315,7 @@ const Transactions = React.memo(function Transactions() {
                 </button>
               ) : (
                 <>
-                  <div className="inline-flex h-[36px] items-center rounded-[10px] border border-border bg-card px-1 shadow-[0_1px_2px_hsl(var(--foreground)/0.03)]">
+                  <div className="penni-reference-month-switcher inline-flex h-[43px] items-center rounded-[13px] border border-border bg-card px-1">
                     <button
                       type="button"
                       onClick={() => applyGregorianMonth(addMonth(month, -1))}
@@ -1328,7 +1338,7 @@ const Transactions = React.memo(function Transactions() {
                     type="button"
                     onClick={openAdd}
                     data-testid="add-transaction"
-                    className="penni-primary-action inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-xl bg-[var(--penni-accent)] px-4 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    className="penni-primary-action inline-flex h-[43px] shrink-0 items-center justify-center gap-2 rounded-xl bg-[var(--penni-accent)] px-4 text-[13px] font-semibold text-white shadow-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                   >
                     <Plus className="h-4 w-4" /> Add transaction
                   </button>
@@ -1336,7 +1346,7 @@ const Transactions = React.memo(function Transactions() {
                     <DropdownMenuTrigger asChild>
                       <button
                         type="button"
-                        className="grid h-9 w-9 place-items-center rounded-full border border-border bg-card text-muted-foreground transition hover:text-foreground"
+                        className="penni-reference-more-button grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-muted-foreground transition hover:text-foreground"
                         aria-label="Transaction options"
                       >
                         <MoreHorizontal className="h-4 w-4" />
@@ -1369,133 +1379,56 @@ const Transactions = React.memo(function Transactions() {
 
           {activeTab === "ledger" && (
             <>
-              <div className="xl:px-[14px]">
-                <WorkspaceMetrics columns={3}>
-                  <WorkspaceMetric dense label="Income" value={formatCurrency(shownIncome)} compactValue={formatCurrency(shownIncome, { compact: true })}
-                    icon={TrendingUp} tone="emerald"
-                    note={filteredSummary ? "Approved matching transactions" : incomeDelta === null ? monthLabel : `${incomeDelta >= 0 ? "↑" : "↓"} ${Math.abs(incomeDelta)}% vs ${previousMonthName?.slice(0,3)}`} />
-                  <WorkspaceMetric dense label="Expenses" value={formatCurrency(shownExpenses)} compactValue={formatCurrency(shownExpenses, { compact: true })}
-                    icon={TrendingDown} tone="ruby"
-                    note={filteredSummary ? "Approved matching transactions" : expenseDelta === null ? monthLabel : `${expenseDelta >= 0 ? "↑" : "↓"} ${Math.abs(expenseDelta)}% vs ${previousMonthName?.slice(0,3)}`} />
-                  <WorkspaceMetric dense label="Net" value={formatCurrency(shownNet, { signed: true })} compactValue={formatCurrency(shownNet, { compact: true })}
-                    icon={Calculator} tone={shownNet >= 0 ? "emerald" : "ruby"} note={filteredSummary ? "Approved totals · " + rangeLabel : monthLabel} />
-                </WorkspaceMetrics>
-              </div>
+              <TransactionSummaryCards
+                income={shownIncome}
+                expenses={shownExpenses}
+                transfers={transferMonthAmount}
+                transferCount={transferMonthCount}
+                net={shownNet}
+                month={month}
+                monthLabel={monthLabel}
+                filtered={filteredSummary}
+                trendRows={filteredSummary ? [] : monthRows}
+              />
 
-              <div className={`flex min-w-0 flex-wrap items-center gap-2 2xl:grid 2xl:gap-2 ${showSearch || filters.search ? "2xl:grid-cols-[190px_176px_110px_118px_86px_96px_104px_32px_76px]" : "2xl:grid-cols-[36px_176px_110px_118px_86px_96px_104px_32px_76px]"}`}>
-                {/* Inline search – always visible */}
-                {showSearch || filters.search ? (
-                <div className="relative min-w-0 flex-1 sm:w-[190px] sm:flex-none">
-                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <div className="penni-reference-toolbar" role="group" aria-label="Search and filter transactions">
+                <label className="penni-reference-search">
+                  <Search className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
                   <input
-                    aria-label="Search transactions"
                     ref={searchRef}
+                    aria-label="Search transactions"
+                    type="search"
                     value={searchInput}
+                    placeholder="Search transactions, merchants, or notes..."
                     onChange={(event) => { setSearchInput(event.target.value); debouncedSetSearch(event.target.value); }}
-                    placeholder="Search…"
-                    className={`h-9 w-full rounded-[9px] border bg-card pl-8 pr-7 text-[11.5px] outline-none transition focus:ring-2 ${filters.search ? "border-emerald/40 bg-emerald/5 focus:ring-emerald/10" : "border-border focus:border-emerald/40 focus:ring-emerald/10"}`}
                   />
-                  {filters.search ? (
-                    <button onClick={() => { setSearchInput(""); setFilter("search", ""); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="Clear search">
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  ) : null}
-                </div>
-                ) : (
-                  <button type="button" onClick={revealSearch} className="grid h-9 w-9 shrink-0 place-items-center rounded-[9px] border border-border bg-card text-muted-foreground transition hover:bg-secondary/50 hover:text-foreground" aria-label="Search transactions">
-                    <Search className="h-3.5 w-3.5" />
-                  </button>
-                )}
-
-                {/* Date range */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[9px] border px-2.5 text-[11px] font-medium transition hover:bg-secondary/50 ${filters.date_from ? "border-emerald/30 bg-emerald/5 text-foreground" : "border-border bg-card text-foreground"}`}>
-                      <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      <span className="hidden truncate sm:inline">{rangeLabel}</span>
-                      <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    <DropdownMenuItem onClick={() => applyGregorianMonth(fmtMonth(new Date().getFullYear(), String(new Date().getMonth() + 1)))}>This month</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => applyGregorianMonth(addMonth(fmtMonth(new Date().getFullYear(), String(new Date().getMonth() + 1)), -1))}>Last month</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => applyGregorianMonth(addMonth(fmtMonth(new Date().getFullYear(), String(new Date().getMonth() + 1)), -2))}>Two months ago</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => { setMonth(fmtMonth(new Date().getFullYear(), "01")); setFilters((previous) => ({ ...previous, date_from: `${new Date().getFullYear()}-01-01`, date_to: `${new Date().getFullYear()}-12-31` })); }}>This year</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                {/* Account */}
-                <PenniSelect
-                  aria-label="Filter account"
-                  value={filters.account_id}
-                  onChange={(event) => toggleFilter("account_id", event.target.value)}
-                  className={`hidden h-9 w-[110px] shrink-0 xl:flex rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.account_id ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
-                >
+                  {searchInput && <button type="button" onClick={() => { setSearchInput(""); setFilter("search", ""); }} aria-label="Clear transaction search"><X className="h-4 w-4" /></button>}
+                  <kbd className="hidden lg:block">Ctrl K</kbd>
+                </label>
+                <PenniSelect aria-label="Filter account" value={filters.account_id} onChange={event => toggleFilter("account_id", event.target.value)}
+                  className="penni-reference-filter-control penni-reference-select-extra w-[146px]">
                   <option value="">All Accounts</option>
-                  {accounts.map((account) => <option key={account.account_id} value={account.account_id}>{account.name}</option>)}
+                  {accounts.map(account => <option key={account.account_id} value={account.account_id}>{account.name}</option>)}
                 </PenniSelect>
-
-                {/* Category */}
                 <CategoryCombobox
-                  label="Filter category"
-                  value={filters.category}
-                  onChange={(value) => toggleFilter("category", value)}
-                  categories={selectedCats.categories || selectedCats}
-                  placeholder="All Categories"
-                  className={`!hidden !h-9 !w-[118px] shrink-0 xl:!flex rounded-[9px] border bg-card px-2.5 text-[11px] font-medium text-foreground transition ${filters.category ? "border-emerald/30 bg-emerald/5" : "border-border"}`}
-                  allowClear
-                  onCategoryCreated={loadCats}
+                  label="Filter category" value={filters.category} onChange={value => toggleFilter("category", value)}
+                  categories={selectedCats.categories || selectedCats} placeholder="All Categories"
+                  className="penni-reference-filter-control penni-reference-select-extra !h-[43px] !w-[150px]"
+                  allowClear onCategoryCreated={loadCats}
                 />
-
-                {/* Type */}
-                <PenniSelect
-                  aria-label="Filter transaction type"
-                  value={filters.tx_type}
-                  onChange={(event) => { toggleFilter("tx_type", event.target.value); setLedgerTab(event.target.value === "expense" ? "expenses" : event.target.value === "income" ? "income" : event.target.value === "transfer" ? "transfers" : "all"); }}
-                  className={`hidden h-9 w-[86px] shrink-0 xl:flex rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.tx_type ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
-                >
+                <PenniSelect aria-label="Filter transaction type" value={filters.tx_type} onChange={event => setFilter("tx_type", event.target.value)}
+                  className="penni-reference-filter-control penni-reference-select-extra w-[120px]">
                   <option value="">All Types</option>
                   <option value="income">Income</option>
                   <option value="expense">Expense</option>
                   <option value="transfer">Transfer</option>
                 </PenniSelect>
-
-                {/* Status */}
-                <PenniSelect
-                  aria-label="Filter approval status"
-                  value={filters.approval_status}
-                  onChange={(event) => { toggleFilter("approval_status", event.target.value); setLedgerTab(event.target.value === "unapproved" ? "unapproved" : "all"); }}
-                  className={`hidden h-9 w-[96px] shrink-0 xl:flex rounded-[9px] border bg-card px-2.5 text-[11px] font-medium outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.approval_status ? "border-emerald/30 bg-emerald/5 text-emerald" : "border-border text-foreground"}`}
-                >
-                  <option value="">All Statuses</option>
-                  <option value="approved">Approved</option>
-                  <option value="unapproved">Unapproved</option>
-                  <option value="failed">Failed</option>
-                </PenniSelect>
-
-                {/* Merchant */}
-                <div className="relative hidden shrink-0 xl:block">
-                  <input
-                    aria-label="Filter merchant"
-                    value={filters.merchant}
-                    onChange={(event) => { setOffset(0); setFilters((previous) => ({ ...previous, merchant: event.target.value })); }}
-                    placeholder="All Merchants"
-                    className={`h-9 w-[104px] rounded-[9px] border bg-card px-2.5 pr-7 text-[11px] outline-none transition focus:border-emerald/40 focus:ring-2 focus:ring-emerald/10 ${filters.merchant ? "border-emerald/30 bg-emerald/5" : "border-border"}`}
-                  />
-                  {filters.merchant ? (
-                    <button onClick={() => { setOffset(0); setFilters((previous) => ({ ...previous, merchant: "" })); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="Clear merchant">
-                      <X className="h-3 w-3" />
-                    </button>
-                  ) : null}
-                </div>
                 <Sheet>
                   <SheetTrigger asChild>
-                    <button className={`grid h-9 w-8 shrink-0 place-items-center rounded-[9px] border transition ${
-                      hasRefinements
-                        ? "border-emerald/30 bg-emerald/10 text-emerald"
-                        : "border-border bg-card text-muted-foreground hover:text-foreground"
-                    }`} aria-label="Filters">
-                      <Filter className="h-3.5 w-3.5" />
+                    <button type="button" className={`penni-reference-filter-control penni-reference-filter-button ${hasRefinements ? "penni-reference-filter-control--active" : ""}`} aria-label="Advanced filters">
+                      <Filter className="h-4 w-4" />
+                      <span>Filters</span>
+                      {activeFilters.filter(chip => chip.key !== "date_from" && chip.key !== "date_to").length > 0 && <span className="penni-reference-active-count">{activeFilters.filter(chip => chip.key !== "date_from" && chip.key !== "date_to").length}</span>}
                     </button>
                   </SheetTrigger>
                   <SheetContent side="right" className="w-full sm:max-w-md">
@@ -1606,43 +1539,30 @@ const Transactions = React.memo(function Transactions() {
                     </div>
                   </SheetContent>
                 </Sheet>
-                <button onClick={clearAllFilters} className="h-9 w-[76px] shrink-0 rounded-[9px] border border-border bg-card px-3 text-[11px] font-medium text-muted-foreground transition hover:text-foreground">
-                  Reset
-                </button>
+                <button type="button" onClick={clearAllFilters} className="penni-reference-filter-control">Clear</button>
+                <div className="penni-reference-view-toggle">
+                  <WorkspaceViewToggle value={viewMode} onChange={setViewMode} label="Transaction view" />
+                </div>
               </div>
 
-              {activeFilters.filter((chip) => chip.key !== "date_from" && chip.key !== "date_to").length > 0 ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {activeFilters.filter((chip) => chip.key !== "date_from" && chip.key !== "date_to").map((chip) => (
-                    <span key={chip.key} className="inline-flex items-center gap-1 rounded-full border border-emerald/20 bg-emerald/10 px-2 py-0.5 text-[10px] text-emerald">
-                      {chip.label}
-                      <button onClick={() => { setFilter(chip.key, ""); setOffset(0); }} className="hover:text-emerald/80" aria-label={`Remove ${chip.label} filter`}><X className="h-2.5 w-2.5" /></button>
-                    </span>
-                  ))}
-                  <button onClick={clearAllFilters} className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground">Clear</button>
-                </div>
-              ) : null}
-
-              <div className="flex min-w-0 flex-col gap-1 border-b border-border pt-0 sm:flex-row sm:items-center sm:justify-between">
+              <div className="penni-reference-tabs-bar">
                 <WorkspaceTabs
                   label="Transaction categories"
                   tabs={[
                     { key: "all", label: "All Transactions", count: filteredSummary ? total : tabCounts.all },
-                    { key: "expenses", label: "Expenses", count: filteredSummary ? undefined : tabCounts.expenses },
                     { key: "income", label: "Income", count: filteredSummary ? undefined : tabCounts.income },
+                    { key: "expenses", label: "Expenses", count: filteredSummary ? undefined : tabCounts.expenses },
                     { key: "transfers", label: "Transfers", count: filteredSummary ? undefined : tabCounts.transfers },
                     { key: "unapproved", label: "Unapproved", count: filteredSummary ? undefined : tabCounts.unapproved },
                   ]}
-                  active={ledgerTab} onChange={selectLedgerTab} className="w-full min-w-0 sm:w-auto xl:pl-[14px]"
+                  active={effectiveLedgerTab}
+                  onChange={selectLedgerTab}
                 />
-                <div className="flex w-full items-center justify-end gap-2 pb-1 sm:w-auto xl:pr-[10px]">
-                  <PenniSelect aria-label="Sort transactions" value={filters.sort} onChange={(event) => setFilter("sort", event.target.value)} className="h-8 rounded-[8px] border border-border bg-card px-2 text-[11px] font-medium outline-none">
-                    <option value="date">Sort: Date (newest)</option>
-                    <option value="amount">Sort: Amount</option>
-                    <option value="description">Sort: Description</option>
-                  </PenniSelect>
-                  <WorkspaceViewToggle value={viewMode} onChange={setViewMode} label="Transaction view" />
-                </div>
+                <PenniSelect aria-label="Sort transactions" value={filters.sort} onChange={event => setFilter("sort", event.target.value)} className="penni-reference-sort">
+                  <option value="date">Sort: Date (newest)</option>
+                  <option value="amount">Sort: Amount</option>
+                  <option value="description">Sort: Description</option>
+                </PenniSelect>
               </div>
             </>
           )}
@@ -1674,7 +1594,7 @@ const Transactions = React.memo(function Transactions() {
       {/* â”€â”€â”€â”€â”€ Ledger tab â”€â”€â”€â”€â”€ */}
       {activeTab === "ledger" && <>
         {/* Transaction table */}
-        <div className="workspace-table-panel transaction-ledger-panel surface overflow-hidden rounded-[14px] p-0 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+        <div className="workspace-table-panel transaction-ledger-panel penni-reference-ledger surface overflow-hidden rounded-[21px] p-0 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
           {loading ? (
             <WorkspaceSkeleton rows={8} />
           ) : (aiResults?.transactions || txs).length === 0 ? (
@@ -1779,19 +1699,20 @@ const Transactions = React.memo(function Transactions() {
                 </div>
               ) : (
                 <div className="transaction-table-scroll hidden min-h-0 overflow-x-auto sm:block lg:flex-1 lg:overflow-auto" aria-label="Transaction ledger">
-                  <table className={`workspace-table w-full table-fixed text-sm ${filters.sort === "date" ? "min-w-[890px]" : "min-w-[980px]"}`}>
+                  <table className={`workspace-table w-full table-fixed text-sm ${filters.sort === "date" ? "min-w-[1000px]" : "min-w-[1100px]"}`}>
                     <thead className="sticky top-0 z-30 bg-card">
-                      <tr className="h-[38px] border-b border-border text-left text-[11px] font-medium text-muted-foreground">
+                      <tr className="h-[43px] border-b border-border text-left text-[11px] font-medium text-muted-foreground">
                         <th className="w-[42px] px-2.5 py-2.5">
                           <input type="checkbox" checked={allDisplayedSelected} onChange={toggleSelectAll}
                             className="mx-auto block h-3.5 w-3.5 cursor-pointer rounded border-border accent-emerald" aria-label="Select all transactions" />
                         </th>
                         {filters.sort !== "date" && <th className="w-[108px] px-2 py-2.5">Date</th>}
+                        <th className="w-[140px] px-2 py-2.5">Type</th>
                         <th className="px-3 py-2.5">Transaction</th>
-                        <th className="w-[151px] px-2 py-2.5">Category</th>
-                        <th className="w-[172px] px-2 py-2.5">Bank / Account</th>
+                        <th className="w-[165px] px-2 py-2.5">Category</th>
+                        <th className="w-[195px] px-2 py-2.5">Bank / Account</th>
                         <th className="w-[108px] px-2 py-2.5 text-right">Amount</th>
-                        <th className="w-[112px] px-2 py-2.5">Status</th>
+                        <th className="w-[125px] px-2 py-2.5">Status</th>
                         <th className="w-[52px] px-1 py-2.5"></th>
                       </tr>
                     </thead>
@@ -1799,8 +1720,8 @@ const Transactions = React.memo(function Transactions() {
                       <tbody key={(group.date || "ungrouped") + "-" + groupIndex}>
                         {group.date && (
                           <tr className="penni-tx-date-row">
-                            <th scope="rowgroup" colSpan={7} className="sticky top-[38px] z-20 p-0 text-left">
-                              <TransactionDateHeading date={group.date} count={group.items.length} sticky={false} />
+                            <th scope="rowgroup" colSpan={filters.sort === "date" ? 8 : 9} className="sticky top-[43px] z-20 p-0 text-left">
+                              <TransactionDateHeading date={group.date} count={group.items.length} net={group.items.reduce((sum, tx) => sum + (getTransactionType(tx) === "transfer" ? 0 : Number(tx.amount) || 0), 0)} sticky={false} />
                             </th>
                           </tr>
                         )}
@@ -1809,6 +1730,7 @@ const Transactions = React.memo(function Transactions() {
                           return <TransactionRow key={t.transaction_id || rowIndex} t={t}
                             account={accountsById[t.account_id]}
                             showDate={filters.sort !== "date"}
+                            showTypeColumn
                             isSelected={selectedIds.has(t.transaction_id)}
                             isFocused={focusedIndex === rowIndex}
                             onToggleSelect={toggleSelect} onSelectRow={selectTransactionRow} onEdit={openEdit}
@@ -1827,7 +1749,7 @@ const Transactions = React.memo(function Transactions() {
               )}
 
               {!aiResults && totalPages > 1 && (
-                <div className="px-4 py-3 border-t border-border flex items-center justify-between text-xs">
+                <div className="penni-reference-pagination px-4 py-3 border-t border-border flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">Showing {offset + 1}–{Math.min(offset + limit, total)} of {total}</span>
                   <div className="flex items-center gap-1.5">
                     <button onClick={() => setOffset(Math.max(0, offset - limit))} disabled={offset === 0}

@@ -79,10 +79,13 @@ export function groupTransactionsByDate(transactions) {
   return groups;
 }
 
-export function TransactionDateHeading({ date, count, sticky = true }) {
+export function TransactionDateHeading({ date, count, net, sticky = true }) {
   return <div role="heading" aria-level={3} className={(sticky ? "sticky top-0 z-20 " : "") + "penni-tx-date-heading flex min-h-[34px] items-center justify-between gap-3 border-y border-primary/10 bg-[#f0efff]/95 px-4 py-1 text-[11px] font-semibold text-foreground shadow-[0_2px_10px_rgba(75,85,240,0.06)] backdrop-blur-xl dark:bg-[#252441]/95 sm:px-5"} data-transaction-date={date}>
     <span className="inline-flex min-w-0 items-center gap-2"><CalendarDays className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" /><span className="truncate">{formatTransactionDay(date)}</span></span>
-    {count != null && <span className="shrink-0 rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">{count} transaction{count === 1 ? "" : "s"}</span>}
+    <span className="inline-flex shrink-0 items-center gap-2">
+      {count != null && <span className="rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">{count} transaction{count === 1 ? "" : "s"}</span>}
+      {Number.isFinite(net) && <span className="text-[11px] font-semibold tabular-nums">Net {formatCurrency(net, { signed: true })}</span>}
+    </span>
   </div>;
 }
 

@@ -52,6 +52,7 @@ export default function AppLayout() {
   const { openAction } = useActions();
   const location = useLocation();
   const workspaceRoute = FIXED_WORKSPACE_ROUTES.has(location.pathname) || /^\/accounts\/[^/]+$/.test(location.pathname);
+  const referenceTransactions = location.pathname === "/transactions";
   const navigate = useNavigate();
   const { setTheme, resolvedTheme } = useTheme();
   const noAnim = settings.preferences?.dashboard?.animations === false || settings.preferences?.accessibility?.reduce_motion === true;
@@ -159,6 +160,18 @@ export default function AppLayout() {
   const onCoreRoute = coreRoutes.some(to=>isActivePath(location.pathname,to));
   useEffect(()=>{if(!onCoreRoute && !settingsActive)setMoreExpanded(true);},[onCoreRoute,settingsActive]);
   const moreActive = location.pathname === "/more" || !["/dashboard", "/accounts", "/transactions", "/budgets"].some((path) => isActivePath(location.pathname, path));
+  const transactionMainNavigation = [
+    { ...NAV_SECTIONS[0].items[0], label: "Overview" },
+    NAV_SECTIONS[0].items[2],
+    NAV_SECTIONS[0].items[1],
+    NAV_SECTIONS[0].items[3],
+    NAV_SECTIONS[1].items[0],
+    { ...NAV_SECTIONS[0].items[4], label: "Insights" },
+    NAV_SECTIONS[2].items[0],
+  ];
+  const visibleNavigation = referenceTransactions
+    ? [{ label: "Navigation", items: transactionMainNavigation }, ...(moreExpanded ? NAV_SECTIONS.slice(1).filter(section => !section.adminOnly || user?.role === "admin").map(section => ({ ...section, items: section.items.filter(item => !transactionMainNavigation.some(link => link.to === item.to)) })).filter(section => section.items.length) : [])]
+    : NAV_SECTIONS.filter(section => (!section.adminOnly || user?.role === "admin") && (section.label === "Main" || moreExpanded));
   const initials = (user?.name?.[0] || user?.email?.[0] || "P").toUpperCase();
 
   const toggleTheme = () => setTheme(dark ? "light" : "dark");
@@ -196,7 +209,7 @@ export default function AppLayout() {
   };
 
   return (
-    <div className={`penni-v2 app-shell relative flex min-h-[100dvh] text-foreground md:h-[100dvh] md:min-h-0 md:overflow-hidden ${privacy ? "penni-private" : ""}`} data-penni-accent={accent}>
+    <div className={`penni-v2 app-shell relative flex min-h-[100dvh] text-foreground md:h-[100dvh] md:min-h-0 md:overflow-hidden ${privacy ? "penni-private" : ""} ${referenceTransactions ? "penni-reference-transactions-shell" : ""}`} data-penni-accent={accent}>
       <aside
         data-tour="sidebar"
         className={`penni-sidebar sticky top-0 z-40 hidden h-[100dvh] shrink-0 flex-col overflow-hidden transition-[width] duration-300 md:flex ${
@@ -228,7 +241,7 @@ export default function AppLayout() {
           ) : null}
         </div>
 
-        <div className={`mb-3 ${sidebarCompact ? "px-3" : "px-4"}`}>
+        <div className={`mb-3 ${referenceTransactions ? "penni-sidebar-create" : ""} ${sidebarCompact ? "px-3" : "px-4"}`}>
           <button type="button" disabled={demoMode} onClick={() => openAction("transaction-new")}
             className="penni-accent-button flex h-11 w-full items-center justify-center gap-2 text-sm font-semibold"
             aria-label="New transaction" title={demoMode ? "Disabled in read-only demo" : "New transaction"}>
@@ -237,10 +250,10 @@ export default function AppLayout() {
           </button>
         </div>
         <div className={`subtle-scroll flex-1 space-y-5 overflow-y-auto scroll-smooth ${sidebarCompact ? "px-3" : "px-4"} py-2`}>
-          {NAV_SECTIONS.filter((section) => (!section.adminOnly || user?.role === "admin") && (section.label === "Main" || moreExpanded)).map((section) => (
+          {visibleNavigation.map((section) => (
             <div key={section.label} className="space-y-1">
               {!sidebarCompact ? (
-                <p className="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-[0.13em] text-muted-foreground/70">
+                <p className="penni-reference-sidebar-section-title px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-[0.13em] text-muted-foreground/70">
                   {section.label}
                 </p>
               ) : null}
@@ -295,7 +308,7 @@ export default function AppLayout() {
             {!sidebarCompact ? <span className="flex-1 text-[13px] font-medium">Settings</span> : null}
           </Link>
 
-          <div className={`flex items-center rounded-2xl border border-border/60 bg-card shadow-[0_10px_26px_-22px_hsl(var(--foreground)/0.35)] ${sidebarCompact ? "justify-center p-1.5" : "gap-2.5 p-2"}`}>
+          <div className={`penni-sidebar-profile flex items-center rounded-2xl border border-border/60 bg-card shadow-[0_10px_26px_-22px_hsl(var(--foreground)/0.35)] ${sidebarCompact ? "justify-center p-1.5" : "gap-2.5 p-2"}`}>
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald/12 text-[12px] font-semibold text-emerald">
               {initials}
             </span>
