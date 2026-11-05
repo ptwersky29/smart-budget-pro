@@ -841,3 +841,194 @@ html.dark[data-penni-accent="violet"] .penni-v2 {--penni-accent:#a07bff;}
     padding-inline: 9px;
   }
 }
+
+/* --------------------------------------------------------------
+   PENNI UNIFIED OVERLAY SYSTEM
+   Portalled modals, native sheets, editors and popovers share
+   one token-driven surface, spacing and motion language.
+   -------------------------------------------------------------- */
+.penni-v2 {
+  --penni-popup-radius: 22px;
+  --penni-popup-field-radius: 11px;
+  --penni-popup-field-height: 44px;
+  --penni-popup-space: 20px;
+  --penni-popup-border: hsl(var(--border));
+  --penni-popup-panel: hsl(var(--card));
+  --penni-popup-muted: hsl(var(--secondary) / .27);
+  --penni-popup-ease: cubic-bezier(.22,.8,.24,1);
+}
+.penni-native-backdrop, .penni-radix-backdrop {
+  position: fixed; inset: 0; z-index: var(--penni-z-backdrop);
+  background: rgba(12,18,35,.46) !important;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.penni-v2.penni-native-popup,
+.penni-v2.penni-dialog-content,
+.penni-v2.penni-sheet-content {
+  color: hsl(var(--foreground));
+  background: var(--penni-popup-panel);
+  border: 1px solid var(--penni-popup-border);
+  box-shadow: 0 26px 85px -28px rgba(12,18,35,.38), 0 5px 25px -15px rgba(12,18,35,.24);
+  font-family: var(--font-body, "Inter", ui-sans-serif, system-ui);
+  -webkit-font-smoothing: antialiased;
+}
+.penni-v2.penni-native-popup, .penni-v2.penni-dialog-content {
+  border-radius: var(--penni-popup-radius);
+  max-height: min(90dvh, 900px);
+  overflow: hidden;
+}
+.penni-v2.penni-dialog-content {
+  display: flex; flex-direction: column;
+  min-width: 0; width: min(560px, calc(100vw - 32px));
+  animation: penni-dialog-enter .22s var(--penni-popup-ease) both;
+}
+.penni-v2.penni-dialog-content.sm\:max-w-2xl { width: min(720px, calc(100vw - 32px)); max-width: 720px; }
+.penni-v2.penni-native-popup {
+  border-radius: var(--penni-popup-radius);
+  animation: penni-native-enter .22s var(--penni-popup-ease) both;
+}
+.penni-native-header, .penni-dialog-header {
+  flex-shrink: 0; min-width: 0;
+  padding: 19px 23px; border-bottom: 1px solid var(--penni-popup-border);
+  background: var(--penni-popup-panel);
+}
+.penni-native-header { display:flex; align-items:center; gap:12px; }
+.penni-native-title, .penni-dialog-header [role="heading"] {
+  margin:0; font-size:17px; font-weight:650; line-height:1.3;
+  letter-spacing: -.025em;
+}
+.penni-native-description {
+  margin-top:3px; font-size:12px; line-height:1.5;
+  color:hsl(var(--muted-foreground)); opacity:1;
+}
+.penni-popup-heading-icon {
+  display:grid; flex:0 0 auto; place-items:center;
+  width:38px; height:38px;
+  color:hsl(var(--primary)); background:hsl(var(--primary) / .08);
+  border:1px solid hsl(var(--primary) / .1); border-radius:12px;
+}
+.penni-popup-heading-icon svg { width:18px; height:18px; }
+.penni-native-close, .penni-dialog-close {
+  display:grid; flex:0 0 auto; place-items:center;
+  min-width:36px; min-height:36px; margin-left:auto;
+  border-radius:11px; color:hsl(var(--muted-foreground));
+  transition:color 150ms ease, background 150ms ease;
+}
+.penni-native-close:hover, .penni-dialog-close:hover { color:hsl(var(--foreground)); background:var(--penni-popup-muted); }
+.penni-native-close:focus-visible, .penni-dialog-close:focus-visible { outline:2px solid hsl(var(--primary) / .6); outline-offset:2px; }
+.penni-native-body { padding:20px 23px; scrollbar-width:thin; }
+.penni-native-popup .penni-transaction-body { padding:0; }
+.penni-dialog-content > form, .penni-dialog-content > .penni-dialog-form {
+  flex:1 1 auto; min-height:0;
+}
+.penni-dialog-content > form { overflow:auto; padding:20px 23px; scrollbar-width:thin; }
+.penni-native-footer, .penni-dialog-footer, .penni-popup-actions {
+  display:flex; flex-shrink:0; align-items:center; justify-content:flex-end;
+  gap:10px; padding:13px 23px;
+  border-top:1px solid var(--penni-popup-border);
+  background:var(--penni-popup-panel);
+}
+.penni-popup-actions > button, .penni-native-footer button,
+.penni-dialog-footer > button, .penni-dialog-footer button {
+  min-height:42px; border-radius:11px; font-size:13px; font-weight:600;
+}
+.penni-popup-actions button:disabled {cursor:not-allowed; opacity:.55;}
+.penni-native-form label:not([class*="flex"]), .penni-dialog-form label:not([class*="flex"]) {
+  font-size:12px; font-weight:550; line-height:1.5;
+  color:hsl(var(--muted-foreground));
+}
+.penni-native-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]),
+.penni-native-form select, .penni-native-form textarea,
+.penni-dialog-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]),
+.penni-dialog-form select, .penni-dialog-form textarea {
+  min-height:var(--penni-popup-field-height);
+  background:hsl(var(--card)); border:1px solid var(--penni-popup-border);
+  border-radius:var(--penni-popup-field-radius); box-shadow:none;
+  font-size:13px; color:hsl(var(--foreground));
+}
+.penni-native-form :is(input,select,textarea):focus-visible,
+.penni-dialog-form :is(input,select,textarea):focus-visible {
+  outline:2px solid hsl(var(--primary) / .45); outline-offset:1px;
+}
+.penni-native-form input::placeholder, .penni-dialog-form input::placeholder { color:hsl(var(--muted-foreground) / .72); }
+.penni-popup-hint { font-size:12px; line-height:1.55; color:hsl(var(--muted-foreground)); }
+.penni-popup-soft-panel { border:1px solid hsl(var(--border) / .7); border-radius:13px; background:var(--penni-popup-muted); }
+.penni-popup-field { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.penni-popup-field > label { color:hsl(var(--muted-foreground)); font-size:12px; font-weight:550; }
+.penni-popup-field > input, .penni-popup-field > select { width:100%; }
+.penni-v2.penni-sheet-content {
+  background:var(--penni-popup-panel); border-radius:22px 0 0 22px;
+  max-width:min(100vw,720px);
+  box-shadow:-16px 0 55px -25px rgba(12,18,35,.27); scrollbar-width:thin;
+}
+.penni-v2.penni-sheet-content .penni-sheet-heading { flex:0 0 auto; }
+.penni-v2.penni-sheet-content .penni-native-handle-zone { display:none; }
+.penni-v2.penni-menu-content {
+  border-radius:12px; box-shadow:0 12px 35px -15px rgba(12,18,35,.28);
+  border:1px solid var(--penni-popup-border);
+}
+.penni-v2.penni-menu-content [role="option"],.penni-v2.penni-menu-content [role="menuitem"] { border-radius:8px; }
+.penni-dialog-content > :not(.penni-dialog-header):not(.penni-dialog-footer):not(button):not(form) {
+  min-height:0; padding:20px 23px; overflow-y:auto; scrollbar-width:thin;
+}
+.penni-dialog-content > .penni-dialog-footer {margin-top:auto;}
+.penni-statement-workspace {min-width:0;}
+.penni-statement-save {
+  position:sticky; bottom:0; z-index:3; min-height:44px;
+  box-shadow:0 -8px 24px hsl(var(--card) / .9);
+}
+.penni-compare-overlay {
+  background:rgba(12,18,35,.46);backdrop-filter:blur(6px);
+  -webkit-backdrop-filter:blur(6px);
+}
+.penni-compare-modal {
+  max-height:90dvh;
+  box-shadow:0 26px 85px -28px rgba(12,18,35,.38);
+  animation:penni-compare-enter .22s cubic-bezier(.22,.8,.24,1) both;
+}
+.penni-compare-header { flex-shrink:0; }
+.penni-compare-modal input:not([type="checkbox"]):not([type="radio"]) {
+  min-height:44px; border-radius:11px; border:1px solid hsl(var(--border));
+  background:hsl(var(--card));
+}
+@keyframes penni-dialog-enter {
+ from {opacity:0;transform:translate(-50%,calc(-50% + 9px)) scale(.985);}
+ to {opacity:1;transform:translate(-50%,-50%) scale(1);}
+}
+@keyframes penni-compare-enter {
+ from {opacity:0;transform:translateY(8px) scale(.99);}
+ to {opacity:1;transform:translateY(0) scale(1);}
+}
+@media(max-width:767px) {
+ .penni-v2.penni-native-popup,.penni-v2.penni-dialog-content {
+   top:auto;bottom:0;left:0;right:0;transform:none;
+   width:100%;max-width:100%;max-height:min(92dvh,960px);
+   border-radius:22px 22px 0 0;
+ }
+ .penni-v2.penni-native-popup {animation:penni-native-sheet-in .22s var(--penni-popup-ease) both;}
+ .penni-v2.penni-dialog-content {animation:penni-dialog-sheet-in .22s var(--penni-popup-ease) both;}
+ .penni-v2.penni-sheet-content {
+   width:100%;max-width:100%;max-height:92dvh;border-radius:22px 22px 0 0;
+   padding-bottom:max(12px,env(safe-area-inset-bottom));
+ }
+ .penni-v2.penni-sheet-content .penni-native-handle-zone {display:flex;}
+ .penni-native-header,.penni-dialog-header {padding:16px 17px;}
+ .penni-native-body {padding:16px 17px;}
+ .penni-native-popup .penni-transaction-body {padding:0;}
+ .penni-native-footer,.penni-dialog-footer,.penni-popup-actions {
+   padding:12px 17px max(14px,env(safe-area-inset-bottom));
+ }
+ .penni-dialog-content > :not(.penni-dialog-header):not(.penni-dialog-footer):not(button):not(form) {padding:16px 17px;}
+ .penni-dialog-content > form {padding:16px 17px;}
+ .penni-compare-modal {max-height:92dvh;border-radius:22px;}
+}
+@keyframes penni-dialog-sheet-in {
+ from {opacity:0;transform:translateY(12px);}
+ to {opacity:1;transform:translateY(0);}
+}
+@media(prefers-reduced-motion:reduce) {
+ .penni-v2.penni-native-popup,.penni-v2.penni-dialog-content,
+ .penni-native-backdrop,.penni-radix-backdrop,.penni-compare-modal {
+   animation:none !important;transition:none !important;
+ }
+}

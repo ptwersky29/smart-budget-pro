@@ -5,13 +5,7 @@ import { Button } from "../components/ui/button";
 import { PageToolbar } from "../components/ui/layout";
 import CategoryBadge from "../components/CategoryBadge";
 import CategoryEditorDialog from "../components/CategoryEditorDialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "../components/ui/dialog";
+import NativePopup from "../components/ui/NativePopup";
 import { useCategories } from "../contexts/CategoriesContext";
 import { formatApiError } from "../lib/api";
 
@@ -294,20 +288,24 @@ export default function CategoryManager() {
         }
       />
 
-      <Dialog
-        open={Boolean(deleteTarget)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDeleteTarget(null);
-            setReplacementCategory("");
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Delete category</DialogTitle>
-          </DialogHeader>
-
+      <NativePopup open={Boolean(deleteTarget)}
+        onClose={() => { setDeleteTarget(null); setReplacementCategory(""); }}
+        showHeader size="sm" closeDisabled={deleteBusy}
+        title="Delete category"
+        description="Review the impact before removing this category."
+        icon={<Trash2 />}
+        footer={<div className="flex w-full gap-2.5">
+          <Button type="button" variant="outlinePill"
+            onClick={() => { setDeleteTarget(null); setReplacementCategory(""); }}
+            disabled={deleteBusy} className="flex-1">Cancel</Button>
+          <Button type="button" variant="danger" className="flex-[1.4]"
+            onClick={handleDelete}
+            disabled={deleteBusy || ((deleteTarget?.usage?.total || 0) > 0 && !replacementCategory)}>
+            {deleteBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {(deleteTarget?.usage?.total || 0) > 0 ? "Reassign and delete" : "Delete category"}
+          </Button>
+        </div>}>
+        <div className="penni-native-form">
           {deleteTarget && (
             <div className="space-y-4">
               <div className="rounded-2xl border border-border bg-secondary/20 p-4">
@@ -347,35 +345,8 @@ export default function CategoryManager() {
             </div>
           )}
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outlinePill"
-              size="pill"
-              onClick={() => setDeleteTarget(null)}
-              disabled={deleteBusy}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              size="pill"
-              className="bg-ruby hover:bg-ruby/90"
-              onClick={handleDelete}
-              disabled={
-                deleteBusy ||
-                ((deleteTarget?.usage?.total || 0) > 0 && !replacementCategory)
-              }
-            >
-              {deleteBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {(deleteTarget?.usage?.total || 0) > 0
-                ? "Reassign and delete"
-                : "Delete category"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </NativePopup>
     </div>
   );
 }

@@ -1,5 +1,7 @@
 import React from "react";
 import { Button } from "./ui/button";
+import NativePopup from "./ui/NativePopup";
+import { Keyboard } from "lucide-react";
 
 const SHORTCUTS = [
   { keys: "g then d", desc: "Go to Dashboard" },
@@ -23,21 +25,22 @@ const SHORTCUTS = [
 export default function KeyboardShortcutsHelp({ open, onClose }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center p-4" onClick={onClose} role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-      <div className="relative rounded-2xl border border-border bg-card p-6 shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-        <p className="text-base font-semibold mb-1">Keyboard shortcuts</p>
-        <p className="text-xs text-muted-foreground mb-4">Press <kbd className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">?</kbd> to toggle this panel</p>
-        <div className="space-y-2 max-h-80 overflow-y-auto no-scrollbar">
-          {SHORTCUTS.map((s) => (
-            <div key={s.keys} className="flex items-center justify-between text-sm gap-3">
-              <span className="text-muted-foreground">{s.desc}</span>
-              <kbd className="px-2 py-0.5 rounded-md bg-secondary text-xs font-mono shrink-0 whitespace-nowrap">{s.keys}</kbd>
+    <NativePopup open={open} onClose={onClose} title="Keyboard shortcuts"
+      description="Move around Penni more quickly with these shortcuts."
+      icon={<Keyboard />} showHeader size="sm"
+      footer={<Button variant="primary" className="w-full" onClick={onClose}>Done</Button>}>
+      <div className="penni-native-form">
+        <div className="space-y-1 divide-y divide-border/50">
+          {SHORTCUTS.map((shortcut) => (
+            <div key={shortcut.keys} className="flex items-center justify-between gap-3 py-2.5 text-xs">
+              <span className="text-muted-foreground">{shortcut.desc}</span>
+              <kbd className="shrink-0 rounded-lg border border-border bg-secondary/40 px-2.5 py-1 font-mono text-[11px] text-foreground">
+                {shortcut.keys}
+              </kbd>
             </div>
           ))}
         </div>
-        <Button variant="warning" className="w-full mt-5" onClick={onClose}>Got it</Button>
       </div>
-    </div>
+    </NativePopup>
   );
 }

@@ -286,9 +286,9 @@ export default function GlobalActionHost() {
 
   return <Sheet open={Boolean(active)} onOpenChange={open=>{if(!open)closeAction()}}>
     <SheetContent side="right" variant={isInfo || type==="accounts-overview" || type==="transaction-search" ? "panel" : "modal"} size={isLarge?"lg":"md"} className={`flex w-full flex-col overflow-hidden p-0 ${isLarge?"sm:max-w-[min(940px,92vw)]":isInfo?"sm:max-w-[440px]":"sm:max-w-lg"}`}>
-      <SheetHeader className="shrink-0 border-b border-border bg-card px-5 py-5 pr-14 text-left">
-        <SheetTitle className="text-base">{PANEL_TITLES[type] || "Penni action"}</SheetTitle>
-        <SheetDescription>Complete this action without leaving your current page.</SheetDescription>
+      <SheetHeader className="penni-sheet-heading shrink-0 border-b border-border bg-card px-5 py-5 pr-14 text-left">
+        <SheetTitle className="text-[17px] font-semibold tracking-tight">{PANEL_TITLES[type] || "Penni action"}</SheetTitle>
+        <SheetDescription className="text-xs leading-relaxed">Complete this action without leaving your current page.</SheetDescription>
       </SheetHeader>
       <div className="subtle-scroll min-h-0 flex-1 overflow-y-auto p-4 sm:p-5" key={active.key}>
         {type==="transaction-split" && <SplitTransactionAction transaction={payload.transaction} categories={categories} onSaved={()=>afterSave("transactions")}/>}

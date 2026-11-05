@@ -275,18 +275,18 @@ export default function ComparePeriods({ open, onClose }) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+      className="penni-compare-overlay fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-3 sm:p-5"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label="Compare periods"
     >
       <div
-        className="my-auto rounded-2xl border border-border bg-card shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-[fadeUp_0.2s_ease-out]"
+        className="penni-v2 penni-compare-modal penni-popup-surface my-auto flex w-full max-w-3xl flex-col overflow-hidden rounded-[22px] border border-border bg-card"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border px-5 py-4 bg-card/80">
+        <div className="penni-compare-header flex items-center justify-between border-b border-border px-5 py-4 bg-card">
           <div className="flex items-center gap-3">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-topaz/10 text-topaz">
               <BarChart3 className="h-5 w-5" />

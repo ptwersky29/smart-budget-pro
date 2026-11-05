@@ -2124,63 +2124,54 @@ const Transactions = React.memo(function Transactions() {
           })()}
         </div>
 
-        {/* Edit Modal */}
+        {/* Maaser editors use the same native form layout as the rest of Penni. */}
         {maaserEditEntry && (
-          <NativePopup open={Boolean(maaserEditEntry)} title="Edit Maaser entry" onClose={() => setMaaserEditEntry(null)} size="md">
+          <NativePopup open title="Edit Maaser entry" showHeader size="sm"
+            description="Update the recorded Maaser payment."
+            onClose={() => setMaaserEditEntry(null)}
+            footer={<div className="flex w-full gap-2.5">
+              <Button variant="outlinePill" onClick={() => setMaaserEditEntry(null)} className="flex-1">Cancel</Button>
+              <Button variant="primary" onClick={handleMaaserSaveEdit} className="flex-[1.4]">Save changes</Button>
+            </div>}>
             <div className="penni-native-form space-y-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl tracking-tight font-medium">Edit Maaser Entry</h3>
-                <button onClick={() => setMaaserEditEntry(null)} className="p-3 rounded-lg hover:bg-secondary text-muted-foreground"><X className="h-4 w-4" /></button>
+              <div className="penni-popup-field">
+                <label htmlFor="tx-maaser-edit-amount">Amount (£)</label>
+                <Input id="tx-maaser-edit-amount" type="number" step="0.01" min="0" value={maaserEditAmount}
+                  onChange={(event) => setMaaserEditAmount(event.target.value)} />
               </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="label-overline">Amount (£)</label>
-                  <Input type="number" step="0.01" value={maaserEditAmount}
-                    onChange={(e) => setMaaserEditAmount(e.target.value)} className="mt-1 w-full" />
-                </div>
-                <div>
-                  <label className="label-overline">Recipient / Paid To</label>
-                  <Input value={maaserEditPaidTo}
-                    onChange={(e) => setMaaserEditPaidTo(e.target.value)} className="mt-1 w-full" />
-                </div>
-                <div>
-                  <label className="label-overline">Note</label>
-                  <Input value={maaserEditNote}
-                    onChange={(e) => setMaaserEditNote(e.target.value)} className="mt-1 w-full" />
-                </div>
-                <div className="flex gap-3 justify-end pt-2">
-                  <Button variant="outlinePill" size="pill" onClick={() => setMaaserEditEntry(null)}>Cancel</Button>
-                  <Button variant="primary" size="pill" onClick={handleMaaserSaveEdit}>Save</Button>
-                </div>
+              <div className="penni-popup-field">
+                <label htmlFor="tx-maaser-edit-recipient">Recipient / Paid to</label>
+                <Input id="tx-maaser-edit-recipient" value={maaserEditPaidTo}
+                  onChange={(event) => setMaaserEditPaidTo(event.target.value)} />
+              </div>
+              <div className="penni-popup-field">
+                <label htmlFor="tx-maaser-edit-note">Note</label>
+                <Input id="tx-maaser-edit-note" value={maaserEditNote}
+                  onChange={(event) => setMaaserEditNote(event.target.value)} />
               </div>
             </div>
           </NativePopup>
         )}
 
-        {/* Give Modal */}
         {maaserShowGive && (
-          <NativePopup open={maaserShowGive} title="Give Maaser" onClose={() => setMaaserShowGive(false)} size="md">
+          <NativePopup open title="Give Maaser" showHeader size="sm"
+            description="Record a payment in your Maaser ledger."
+            onClose={() => setMaaserShowGive(false)}
+            footer={<div className="flex w-full gap-2.5">
+              <Button variant="outlinePill" onClick={() => setMaaserShowGive(false)} className="flex-1">Cancel</Button>
+              <Button variant="primary" onClick={handleMaaserSubmitGive} className="flex-[1.4]">Record payment</Button>
+            </div>}>
             <div className="penni-native-form space-y-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl tracking-tight font-medium">Give Maaser</h3>
-                <button onClick={() => setMaaserShowGive(false)} className="p-3 rounded-lg hover:bg-secondary text-muted-foreground"><X className="h-4 w-4" /></button>
+              <div className="penni-popup-field">
+                <label htmlFor="tx-maaser-give-amount">Amount (£)</label>
+                <Input id="tx-maaser-give-amount" type="number" step="0.01" min="0" value={maaserGiveAmount}
+                  onChange={(event) => setMaaserGiveAmount(event.target.value)} />
               </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="label-overline">Amount (£)</label>
-                  <Input type="number" step="0.01" value={maaserGiveAmount}
-                    onChange={(e) => setMaaserGiveAmount(e.target.value)} className="mt-1 w-full" />
-                </div>
-                <div>
-                  <label className="label-overline">Recipient</label>
-                  <Input value={maaserGiveRecipient}
-                    onChange={(e) => setMaaserGiveRecipient(e.target.value)}
-                    placeholder="e.g. local shul, JNF, charity" className="mt-1 w-full" />
-                </div>
-                <div className="flex gap-3 justify-end pt-2">
-                  <Button variant="outlinePill" size="pill" onClick={() => setMaaserShowGive(false)}>Cancel</Button>
-                  <Button variant="primary" size="pill" onClick={handleMaaserSubmitGive}>Give</Button>
-                </div>
+              <div className="penni-popup-field">
+                <label htmlFor="tx-maaser-give-recipient">Recipient</label>
+                <Input id="tx-maaser-give-recipient" value={maaserGiveRecipient}
+                  onChange={(event) => setMaaserGiveRecipient(event.target.value)}
+                  placeholder="e.g. local shul, charity" />
               </div>
             </div>
           </NativePopup>
@@ -2402,16 +2393,26 @@ const Transactions = React.memo(function Transactions() {
       />
 
       {newCategoryModal && (
-        <NativePopup open={newCategoryModal} title="New category" onClose={() => setNewCategoryModal(false)} size="sm">
-          <div className="penni-native-form space-y-4">
-            <h3 className="text-lg font-medium mb-4">Add Custom Category</h3>
-            <input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)}
-              placeholder="Category name" autoFocus
-              className="w-full h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:outline-none text-sm"
-              onKeyDown={(e) => { if (e.key === "Enter" && newCategoryName.trim()) { bulkCategory(newCategoryName.trim().toLowerCase().replace(/\s+/g, "_")); setNewCategoryModal(false); } }} />
-            <div className="flex gap-2 mt-4">
-              <button onClick={() => setNewCategoryModal(false)} className="flex-1 h-10 rounded-xl bg-secondary text-sm font-medium text-muted-foreground hover:text-foreground">Cancel</button>
-              <button onClick={() => { if (newCategoryName.trim()) { bulkCategory(newCategoryName.trim().toLowerCase().replace(/\s+/g, "_")); setNewCategoryModal(false); } }} className="flex-1 h-10 rounded-xl bg-emerald text-white text-sm font-medium hover:bg-emerald/90">Add</button>
+        <NativePopup open title="New category" showHeader size="sm"
+          description="Add a new category to organise transactions."
+          onClose={() => setNewCategoryModal(false)}
+          footer={<div className="flex w-full gap-2.5">
+            <Button variant="outlinePill" onClick={() => setNewCategoryModal(false)} className="flex-1">Cancel</Button>
+            <Button variant="primary" className="flex-[1.4]" disabled={!newCategoryName.trim()}
+              onClick={() => { if (newCategoryName.trim()) { bulkCategory(newCategoryName.trim().toLowerCase().replace(/\s+/g, "_")); setNewCategoryModal(false); } }}>
+              Add category
+            </Button>
+          </div>}>
+          <div className="penni-native-form">
+            <div className="penni-popup-field">
+              <label htmlFor="tx-new-category-name">Category name</label>
+              <input id="tx-new-category-name" value={newCategoryName}
+                onChange={(event) => setNewCategoryName(event.target.value)}
+                placeholder="e.g. Home supplies" autoFocus className="h-11 w-full rounded-xl border border-border bg-card px-3 text-sm"
+                onKeyDown={(event) => { if (event.key === "Enter" && newCategoryName.trim()) {
+                  bulkCategory(newCategoryName.trim().toLowerCase().replace(/\s+/g, "_"));
+                  setNewCategoryModal(false);
+                } }} />
             </div>
           </div>
         </NativePopup>

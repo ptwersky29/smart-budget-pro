@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { toast } from "sonner";
 import { Plus, Edit2, Trash2, Loader2, Calendar, DollarSign, Tag, AlertCircle } from "lucide-react";
 import ConfirmModal from "./ui/ConfirmModal";
+import NativePopup from "./ui/NativePopup";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import CategoryCombobox from "./CategoryCombobox";
@@ -235,13 +236,20 @@ export default function RecurringTransactionManager() {
       )}
 
       {showForm && (
-        <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={() => !busy && setShowForm(false)}>
-          <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-semibold mb-4">
-              {editingId ? "Edit recurring transaction" : "New recurring transaction"}
-            </h2>
-
-            <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="space-y-4">
+        <NativePopup open onClose={() => setShowForm(false)} closeDisabled={busy}
+          title={editingId ? "Edit recurring transaction" : "New recurring transaction"}
+          description="Manage the schedule, amount and category in one place."
+          icon={<Calendar />} showHeader size="md"
+          footer={<div className="flex w-full gap-2.5">
+            <Button variant="outlinePill" type="button" onClick={() => setShowForm(false)}
+              disabled={busy} className="flex-1">Cancel</Button>
+            <Button variant="primary" type="submit" form="penni-recurring-editor"
+              disabled={busy} className="flex-[1.4]">
+              {busy ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving…</> : editingId ? "Save changes" : "Add recurring"}
+            </Button>
+          </div>}>
+          <div className="penni-native-form">
+            <form id="penni-recurring-editor" onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="space-y-4">
               <div>
                 <label className="label-overline">Description *</label>
                 <Input
@@ -273,7 +281,7 @@ export default function RecurringTransactionManager() {
                   <PenniSelect
                     value={form.frequency}
                     onChange={(e) => setForm({ ...form, frequency: e.target.value })}
-                    className="h-11 px-4 rounded-xl bg-secondary/50 border border-transparent focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none transition-colors w-full"
+                    className="h-11 w-full rounded-xl border border-border bg-card px-3 text-sm"
                   >
                     {FREQUENCIES.map((f) => (
                       <option key={f.value} value={f.value}>{f.label}</option>
@@ -321,26 +329,9 @@ export default function RecurringTransactionManager() {
                 Enabled
               </label>
 
-              <div className="flex gap-3 pt-4">
-                <Button
-                  variant="outlinePill" size="pill"
-                  type="button"
-                  onClick={() => setShowForm(false)}
-                  disabled={busy}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="primary" size="pill"
-                  type="submit"
-                  disabled={busy}
-                >
-                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-                </Button>
-              </div>
             </form>
           </div>
-        </div>
+        </NativePopup>
       )}
     </div>
   );

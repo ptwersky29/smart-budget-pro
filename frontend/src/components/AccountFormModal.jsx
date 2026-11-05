@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from "react";
-import { X, Upload, Wallet, Lock } from "lucide-react";
+import { Upload, Wallet, Lock } from "lucide-react";
 import { api, formatApiError } from "../lib/api";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
@@ -153,30 +153,32 @@ export default function AccountFormModal({ open, onClose, onCreated, editAccount
   const isSavings = accountType === "savings";
 
   return (
-    <NativePopup open={open} onClose={onClose} title={editAccount ? "Edit account" : "New account"} size="md">
-      <div className="penni-native-form space-y-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <span className={`grid h-8 w-8 place-items-center rounded-xl ${isSavings ? "bg-violet/10 text-violet" : "bg-emerald/10 text-emerald"}`}>
-              {isSavings ? <Lock className="h-4 w-4" /> : <Wallet className="h-4 w-4" />}
-            </span>
-            <h2 id="account-form-title" className="text-lg font-semibold">{editAccount ? "Edit Account" : "New Account"}</h2>
-          </div>
-          <button onClick={onClose} className="h-8 w-8 rounded-full grid place-items-center hover:bg-secondary/60 transition-colors" aria-label="Close">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <form key={formKey} onSubmit={handleSubmit} className="space-y-4">
+    <NativePopup open={open} onClose={onClose} title={editAccount ? "Edit account" : "New account"}
+      description={editAccount ? "Update your account appearance and details." : "Add an account to keep your balances organised."}
+      icon={isSavings ? <Lock /> : <Wallet />} showHeader size="md" closeDisabled={saving || cropping}
+      footer={<div className="flex w-full items-center gap-2.5">
+        <Button type="button" variant="outlinePill" onClick={onClose} disabled={saving || cropping} className="flex-1">Cancel</Button>
+        <Button type="submit" form="penni-account-editor-form" variant="primary" disabled={saving || cropping} className="flex-[1.4]">
+          {saving ? "Saving…" : editAccount ? "Save changes" : "Create account"}
+        </Button>
+      </div>}>
+      <div className="penni-native-form">
+        <form key={formKey} id="penni-account-editor-form" onSubmit={handleSubmit} className="space-y-4">
           {/* Circle preview */}
-          <CirclePreview image={imageDataUri} color={color} name={name} size="lg" />
+          <div className="penni-popup-soft-panel flex items-center gap-4 p-4">
+            <CirclePreview image={imageDataUri} color={color} name={name} size="lg" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">{name.trim() || "Your new account"}</p>
+              <p className="penni-popup-hint mt-1">Choose an accent colour or upload a logo below.</p>
+            </div>
+          </div>
 
           {/* Name */}
           <div>
             <label className="label-overline text-muted-foreground mb-1.5 block">Account Name</label>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)}
               placeholder="e.g. HSBC Main Account" required
-              className="w-full h-10 px-3 rounded-xl bg-secondary/30 border border-border focus:border-emerald/50 focus:outline-none text-sm" />
+              className="w-full h-11 px-3 rounded-xl border border-border bg-card text-sm" />
           </div>
 
           {/* Type */}
@@ -187,7 +189,7 @@ export default function AccountFormModal({ open, onClose, onCreated, editAccount
                 <button key={t.value} type="button" onClick={() => setAccountType(t.value)}
                   className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm transition-all ${
                     accountType === t.value
-                      ? (t.value === "savings" ? "border-violet/50 bg-violet/5 text-violet ring-1 ring-violet/20" : "border-emerald/50 bg-emerald/5 text-emerald ring-1 ring-emerald/20")
+                      ? (t.value === "savings" ? "border-primary/45 bg-primary/5 text-primary ring-1 ring-primary/20" : "border-primary/45 bg-primary/5 text-primary ring-1 ring-primary/20")
                       : "border-border/60 bg-secondary/20 text-muted-foreground hover:border-border hover:text-foreground"
                   }`}>
                   <span>{t.icon}</span>
@@ -213,7 +215,7 @@ export default function AccountFormModal({ open, onClose, onCreated, editAccount
             </label>
             <input type="number" value={balance} onChange={(e) => setBalance(e.target.value)}
               placeholder="0.00" step="0.01"
-              className="w-full h-10 px-3 rounded-xl bg-secondary/30 border border-border focus:border-emerald/50 focus:outline-none text-sm" />
+              className="w-full h-11 px-3 rounded-xl border border-border bg-card text-sm" />
           </div>
 
           {/* Color picker */}
@@ -221,11 +223,11 @@ export default function AccountFormModal({ open, onClose, onCreated, editAccount
             <label className="label-overline text-muted-foreground mb-1.5 block">Accent Color</label>
             <div className="flex items-center gap-2 flex-wrap">
               {PRESET_COLORS.map((c) => (
-                <button key={c} type="button" onClick={() => setColor(c)}
+                <button key={c} type="button" onClick={() => setColor(c)} aria-label={"Select " + c + " accent colour"} aria-pressed={color === c}
                   className={`h-7 w-7 rounded-full border-2 transition-all ${color === c ? "border-foreground scale-110" : "border-transparent"}`}
                   style={{ backgroundColor: c }} />
               ))}
-              <input type="color" value={color} onChange={(e) => setColor(e.target.value)}
+              <input type="color" aria-label="Custom accent colour" value={color} onChange={(e) => setColor(e.target.value)}
                 className="h-7 w-7 rounded-full border border-border/50 cursor-pointer" />
             </div>
           </div>
@@ -248,13 +250,6 @@ export default function AccountFormModal({ open, onClose, onCreated, editAccount
             <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/svg+xml" className="hidden" onChange={handleFile} />
           </div>
 
-          {/* Actions */}
-          <div className="penni-native-actions flex items-center gap-3 pt-1">
-            <Button type="button" variant="outlinePill" onClick={onClose} className="flex-1">Cancel</Button>
-            <Button type="submit" variant="primary" disabled={saving || cropping} className="flex-1">
-              {saving ? "Saving…" : editAccount ? "Save Changes" : "Create Account"}
-            </Button>
-          </div>
         </form>
       </div>
     </NativePopup>

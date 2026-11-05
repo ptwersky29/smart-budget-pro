@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { SectionCard } from "./ui/layout";
 import Skeleton from "./ui/Skeleton";
 import ConfirmModal from "./ui/ConfirmModal";
+import NativePopup from "./ui/NativePopup";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import {
@@ -387,67 +388,59 @@ export default function MaaserPanel({ refreshKey = 0, onChange }) {
         onConfirm={doReset} onCancel={() => setConfirmReset(false)} />
 
       {showGiveForm && (
-        <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={() => setShowGiveForm(false)}>
-          <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl tracking-tight font-medium">Give Maaser</h3>
-              <button onClick={() => setShowGiveForm(false)} className="p-3 rounded-lg hover:bg-secondary text-muted-foreground">
-                <X className="h-4 w-4" />
-              </button>
+        <NativePopup open onClose={() => setShowGiveForm(false)} closeDisabled={busy}
+          showHeader size="sm" title="Give Maaser"
+          description="Record a payment in your Maaser ledger."
+          footer={<div className="flex w-full gap-2.5">
+            <Button type="button" variant="outlinePill" onClick={() => setShowGiveForm(false)}
+              disabled={busy} className="flex-1">Cancel</Button>
+            <Button type="button" variant="primary" disabled={busy} onClick={submitGive}
+              className="flex-[1.4]">Record payment</Button>
+          </div>}>
+          <div className="penni-native-form space-y-4">
+            <div className="penni-popup-field">
+              <label htmlFor="penni-maaser-give-amount">Amount (£)</label>
+              <Input id="penni-maaser-give-amount" type="number" min="0" step="0.01"
+                value={giveAmount} onChange={(event) => setGiveAmount(event.target.value)} />
             </div>
-            <div className="space-y-4">
-              <div>
-                <label className="label-overline">Amount (£)</label>
-                <Input type="number" step="0.01" value={giveAmount} onChange={(e) => setGiveAmount(e.target.value)}
-                  className="mt-1 w-full" />
-              </div>
-              <div>
-                <label className="label-overline">Recipient</label>
-                <Input value={giveRecipient} onChange={(e) => setGiveRecipient(e.target.value)}
-                  placeholder="e.g. local shul, JNF, charity"
-                  className="mt-1 w-full" />
-              </div>
-              <div className="flex gap-3 justify-end pt-2">
-                <Button variant="outlinePill" size="pill" onClick={() => setShowGiveForm(false)}>Cancel</Button>
-                <Button variant="primary" size="pill" onClick={submitGive}>Give</Button>
-              </div>
+            <div className="penni-popup-field">
+              <label htmlFor="penni-maaser-give-recipient">Recipient</label>
+              <Input id="penni-maaser-give-recipient" value={giveRecipient}
+                onChange={(event) => setGiveRecipient(event.target.value)}
+                placeholder="e.g. local shul, charity" />
             </div>
           </div>
-        </div>
+        </NativePopup>
       )}
 
       {editEntry && (
-        <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={() => setEditEntry(null)}>
-          <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-modal p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl tracking-tight font-medium">Edit Maaser Entry</h3>
-              <button onClick={() => setEditEntry(null)} className="p-3 rounded-lg hover:bg-secondary text-muted-foreground">
-                <X className="h-4 w-4" />
-              </button>
+        <NativePopup open onClose={() => setEditEntry(null)} closeDisabled={busy}
+          showHeader size="sm" title="Edit Maaser entry"
+          description="Update the existing ledger record."
+          footer={<div className="flex w-full gap-2.5">
+            <Button type="button" variant="outlinePill" onClick={() => setEditEntry(null)}
+              disabled={busy} className="flex-1">Cancel</Button>
+            <Button type="button" variant="primary" disabled={busy} onClick={handleSaveEdit}
+              className="flex-[1.4]">Save changes</Button>
+          </div>}>
+          <div className="penni-native-form space-y-4">
+            <div className="penni-popup-field">
+              <label htmlFor="penni-maaser-edit-amount">Amount (£)</label>
+              <Input id="penni-maaser-edit-amount" type="number" min="0" step="0.01"
+                value={editAmount} onChange={(event) => setEditAmount(event.target.value)} />
             </div>
-            <div className="space-y-4">
-              <div>
-                <label className="label-overline">Amount (£)</label>
-                <Input type="number" step="0.01" value={editAmount}
-                  onChange={(e) => setEditAmount(e.target.value)} className="mt-1 w-full" />
-              </div>
-              <div>
-                <label className="label-overline">Recipient / Paid To</label>
-                <Input value={editPaidTo}
-                  onChange={(e) => setEditPaidTo(e.target.value)} className="mt-1 w-full" />
-              </div>
-              <div>
-                <label className="label-overline">Note</label>
-                <Input value={editNote}
-                  onChange={(e) => setEditNote(e.target.value)} className="mt-1 w-full" />
-              </div>
-              <div className="flex gap-3 justify-end pt-2">
-                <Button variant="outlinePill" size="pill" onClick={() => setEditEntry(null)}>Cancel</Button>
-                <Button variant="primary" size="pill" onClick={handleSaveEdit}>Save</Button>
-              </div>
+            <div className="penni-popup-field">
+              <label htmlFor="penni-maaser-edit-recipient">Recipient / Paid to</label>
+              <Input id="penni-maaser-edit-recipient" value={editPaidTo}
+                onChange={(event) => setEditPaidTo(event.target.value)} />
+            </div>
+            <div className="penni-popup-field">
+              <label htmlFor="penni-maaser-edit-note">Note</label>
+              <Input id="penni-maaser-edit-note" value={editNote}
+                onChange={(event) => setEditNote(event.target.value)} />
             </div>
           </div>
-        </div>
+        </NativePopup>
       )}
     </SectionCard>
   );

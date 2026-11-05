@@ -1,13 +1,7 @@
 import PenniSelect from "./PenniSelect";
 import React, { useEffect, useMemo, useState } from "react";
 import { Loader2, Palette, SmilePlus } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "./ui/dialog";
+import NativePopup from "./ui/NativePopup";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import CategoryBadge from "./CategoryBadge";
@@ -75,13 +69,22 @@ export default function CategoryEditorDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{title || (isEditing ? "Edit category" : "Create category")}</DialogTitle>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-5">
+    <NativePopup open={open} onClose={() => onOpenChange(false)}
+      showHeader size="lg" closeDisabled={saving}
+      title={title || (isEditing ? "Edit category" : "Create category")}
+      description="Your category identity appears consistently throughout Penni."
+      icon={<SmilePlus />}
+      bodyClassName="penni-category-editor-body"
+      footer={<div className="flex w-full gap-2.5">
+        <Button type="button" variant="outlinePill" onClick={() => onOpenChange(false)}
+          disabled={saving} className="flex-1">Cancel</Button>
+        <Button type="submit" form="penni-category-editor" variant="primary"
+          disabled={!canSave || saving} className="flex-[1.4]">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {submitLabel || (isEditing ? "Save category" : "Create category")}
+        </Button>
+      </div>}>
+        <form id="penni-category-editor" onSubmit={handleSubmit} className="penni-native-form space-y-5">
           <div className="rounded-2xl border border-border bg-secondary/20 p-4">
             <p className="label-overline mb-3">Preview</p>
             <div className="flex flex-wrap items-center gap-3">
@@ -214,17 +217,7 @@ export default function CategoryEditorDialog({
             </div>
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outlinePill" size="pill" onClick={() => onOpenChange(false)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="primary" size="pill" disabled={!canSave || saving}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {submitLabel || (isEditing ? "Save category" : "Create category")}
-            </Button>
-          </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+    </NativePopup>
   );
 }

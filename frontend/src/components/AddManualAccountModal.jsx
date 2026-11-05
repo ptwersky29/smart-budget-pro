@@ -1,6 +1,6 @@
 import PenniSelect from "./PenniSelect";
 import React, { useState, useRef } from "react";
-import { X, Upload, Wallet } from "lucide-react";
+import { Upload, Wallet } from "lucide-react";
 import { api, formatApiError } from "../lib/api";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
@@ -74,35 +74,29 @@ export default function AddManualAccountModal({ open, onClose, onCreated }) {
   };
 
   return (
-    <NativePopup open={open} onClose={onClose} title="Add manual account" size="md">
-      <div className="penni-native-form space-y-5">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <span className="grid h-8 w-8 place-items-center rounded-xl bg-emerald/10 text-emerald">
-              <Wallet className="h-4 w-4" />
-            </span>
-            <h2 className="text-lg font-semibold">Add Manual Account</h2>
-          </div>
-          <button onClick={onClose} className="h-8 w-8 rounded-full grid place-items-center hover:bg-secondary/60 transition-colors">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <form key={formKey} onSubmit={handleSubmit} className="space-y-4">
+    <NativePopup open={open} onClose={onClose} title="Add manual account" showHeader
+      description="Track cash, cards and accounts in one place." icon={<Wallet />} size="md" closeDisabled={saving}
+      footer={<div className="flex w-full items-center gap-2.5">
+        <Button type="button" variant="outlinePill" onClick={onClose} disabled={saving} className="flex-1">Cancel</Button>
+        <Button type="submit" form="penni-manual-account-form" variant="primary" disabled={saving} className="flex-[1.4]">
+          {saving ? "Saving…" : "Add account"}
+        </Button>
+      </div>}>
+      <div className="penni-native-form">
+        <form key={formKey} id="penni-manual-account-form" onSubmit={handleSubmit} className="space-y-4">
           {/* Name */}
           <div>
             <label className="label-overline text-muted-foreground mb-1.5 block">Account Name</label>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)}
               placeholder="e.g. My Cash Wallet" required
-              className="w-full h-10 px-3 rounded-xl bg-secondary/30 border border-border focus:border-emerald/50 focus:outline-none text-sm" />
+              className="w-full h-11 px-3 rounded-xl border border-border bg-card text-sm" />
           </div>
 
           {/* Type */}
           <div>
             <label className="label-overline text-muted-foreground mb-1.5 block">Account Type</label>
             <PenniSelect value={accountType} onChange={(e) => setAccountType(e.target.value)}
-              className="w-full h-10 px-3 rounded-xl bg-secondary/30 border border-border focus:border-emerald/50 focus:outline-none text-sm">
+              className="w-full h-11 px-3 rounded-xl border border-border bg-card text-sm">
               {ACCOUNT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
             </PenniSelect>
           </div>
@@ -112,7 +106,7 @@ export default function AddManualAccountModal({ open, onClose, onCreated }) {
             <label className="label-overline text-muted-foreground mb-1.5 block">Starting Balance (£)</label>
             <input type="number" value={balance} onChange={(e) => setBalance(e.target.value)}
               placeholder="0.00" step="0.01"
-              className="w-full h-10 px-3 rounded-xl bg-secondary/30 border border-border focus:border-emerald/50 focus:outline-none text-sm" />
+              className="w-full h-11 px-3 rounded-xl border border-border bg-card text-sm" />
           </div>
 
           {/* Color picker */}
@@ -120,11 +114,11 @@ export default function AddManualAccountModal({ open, onClose, onCreated }) {
             <label className="label-overline text-muted-foreground mb-1.5 block">Accent Color</label>
             <div className="flex items-center gap-2 flex-wrap">
               {PRESET_COLORS.map((c) => (
-                <button key={c} type="button" onClick={() => setColor(c)}
+                <button key={c} type="button" onClick={() => setColor(c)} aria-label={"Select " + c + " accent colour"} aria-pressed={color === c}
                   className={`h-7 w-7 rounded-full border-2 transition-all ${color === c ? "border-foreground scale-110" : "border-transparent"}`}
                   style={{ backgroundColor: c }} />
               ))}
-              <input type="color" value={color} onChange={(e) => setColor(e.target.value)}
+              <input type="color" aria-label="Custom accent colour" value={color} onChange={(e) => setColor(e.target.value)}
                 className="h-7 w-7 rounded-full border border-border/50 cursor-pointer" />
             </div>
           </div>
@@ -147,13 +141,6 @@ export default function AddManualAccountModal({ open, onClose, onCreated }) {
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
           </div>
 
-          {/* Actions */}
-          <div className="penni-native-actions flex items-center gap-3 pt-1">
-            <Button type="button" variant="outlinePill" onClick={onClose} className="flex-1">Cancel</Button>
-            <Button type="submit" variant="primary" disabled={saving} className="flex-1">
-              {saving ? "Saving…" : "Add Account"}
-            </Button>
-          </div>
         </form>
       </div>
     </NativePopup>

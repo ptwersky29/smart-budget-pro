@@ -30,7 +30,8 @@ describe("Penni audit: core source contracts", () => {
     const tx = sourceOf("pages/Transactions.jsx");
     expect(tx).toContain('if (!searchParams.has("date_from") && !searchParams.has("date_to"))');
     expect(tx).toContain('if (requestId !== ledgerRequestId.current) return;');
-    expect(tx).toContain('min-w-[980px] table-fixed');
+    expect(tx).toContain('groupTransactionsByDate');
+    expect(tx).toContain('<TransactionDateHeading');
     expect(tx).toContain('aria-label="Filter from date"');
     expect(tx).toContain('aria-label="Filter to date"');
   });

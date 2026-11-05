@@ -180,7 +180,7 @@ export default function CategoryCombobox({
                         />
                       </div>
                       {value === category.name && (
-                        <Check className="h-4 w-4 shrink-0 text-emerald" />
+                        <Check className="h-4 w-4 shrink-0 text-primary" />
                       )}
                     </CommandItem>
                   ))}

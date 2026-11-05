@@ -57,7 +57,7 @@ export default function StatementAction({ initialDraft, initialAccountId, onSave
     }
     finally { setSaving(false); }
   };
-  return <div className="space-y-4">
+  return <div className="penni-statement-workspace space-y-4">
     <div>
       <label className="mb-1.5 block text-xs font-semibold">Import into account</label>
       <PenniSelect value={accountId} onChange={event => {setAccountId(event.target.value);setDuplicateWarning(null)}}
@@ -69,7 +69,7 @@ export default function StatementAction({ initialDraft, initialAccountId, onSave
     {!draft && <div role="button" tabIndex={0} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); file.current?.click(); } }}
       onClick={() => file.current?.click()}
       onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); upload(event.dataTransfer.files[0]); }}
-      className="cursor-pointer rounded-xl border-2 border-dashed border-border bg-secondary/20 px-6 py-12 text-center hover:border-emerald/50">
+      className="penni-popup-soft-panel cursor-pointer border-dashed px-6 py-10 text-center transition-colors hover:border-primary/50 hover:bg-primary/[0.035]">
       {busy ? <Loader2 className="mx-auto h-6 w-6 animate-spin text-emerald" /> : <Upload className="mx-auto h-6 w-6 text-emerald" />}
       <p className="mt-3 text-sm font-semibold">Choose or drop a PDF/CSV statement</p>
       <p className="mt-1 text-xs text-muted-foreground">Maximum 5 MB · You can review transactions before saving</p>
@@ -91,7 +91,7 @@ export default function StatementAction({ initialDraft, initialAccountId, onSave
           </tr>)}</tbody>
         </table>
       </div>
-      <Button variant="primary" onClick={save} disabled={!accountId || saving || !rows.length} className="w-full">
+      <Button variant="primary" onClick={save} disabled={!accountId || saving || !rows.length} className="penni-statement-save w-full">
         {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4"/>} Save {rows.length} transactions
       </Button>
     </>}

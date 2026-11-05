@@ -320,8 +320,15 @@ export default function Subscriptions() {
       {open && (
         <NativePopup open={open} showHeader title={editingId ? "Edit subscription" : "New subscription"}
           description="Manage a recurring payment without leaving your workspace."
-          onClose={() => setOpen(false)} size="md" bodyClassName="penni-native-form">
-          <form onSubmit={submit} className="space-y-4" aria-label="Subscription details">
+          onClose={() => setOpen(false)} size="md" bodyClassName="penni-native-form"
+          footer={<div className="flex w-full gap-2.5">
+            <Button type="button" variant="outlinePill" onClick={() => setOpen(false)}
+              className="flex-1">Cancel</Button>
+            <Button type="submit" form="penni-subscription-editor" variant="primary" className="flex-[1.4]">
+              {editingId ? "Save subscription" : "Add subscription"}
+            </Button>
+          </div>}>
+          <form id="penni-subscription-editor" onSubmit={submit} className="space-y-4" aria-label="Subscription details">
             <div className="space-y-1.5">
               <label htmlFor="penni-sub-name" className="block text-xs font-medium text-muted-foreground">Name</label>
               <Input id="penni-sub-name" required placeholder="Subscription name" value={form.name}
@@ -361,10 +368,6 @@ export default function Subscriptions() {
                 onChange={(event) => setForm({ ...form, notes: event.target.value })}
                 className="w-full resize-none rounded-xl border border-border bg-secondary/50 px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                 rows={2} />
-            </div>
-            <div className="flex justify-end gap-2 border-t border-border/60 pt-4">
-              <Button type="button" variant="outlinePill" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button type="submit" variant="primary">{editingId ? "Save subscription" : "Add subscription"}</Button>
             </div>
           </form>
         </NativePopup>
