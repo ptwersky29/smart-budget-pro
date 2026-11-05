@@ -38,6 +38,8 @@ import { SkeletonTable } from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import TransactionRow from "../components/TransactionRow";
+import GroupedTransactionItems from "../components/GroupedTransactionItems";
+import { useActions } from "../contexts/ActionContext";
 import { toAccountTypeLabel } from "../data/bankLogos";
 import BankCardMockup from "../components/BankCardMockup";
 import {
@@ -54,6 +56,7 @@ import { useCategories } from "../contexts/CategoriesContext";
 import ConfirmModal from "../components/ui/ConfirmModal";
 
 export default function AccountPage() {
+  const { openAction } = useActions();
   const { connectionId } = useParams();
   const navigate = useNavigate();
   useEffect(() => {
@@ -837,51 +840,8 @@ export default function AccountPage() {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-[11px] text-muted-foreground border-b border-border">
-                      <th className="px-4 py-2.5">Date</th>
-                      <th className="px-4 py-2.5">Description</th>
-                      <th className="px-4 py-2.5">Category</th>
-                      <th className="px-4 py-2.5 text-right">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {txs.map((t) => (
-                      <tr
-                        key={t.transaction_id}
-                        className="border-b border-border last:border-0 hover:bg-secondary/30 transition-colors"
-                      >
-                        <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                          {t.date?.slice(0, 10)}
-                        </td>
-                        <td className="px-4 py-3 max-w-[200px]">
-                          <div className="font-medium truncate">
-                            {t.description}
-                          </div>
-                          {t.normalized_merchant &&
-                            t.normalized_merchant !== t.description && (
-                              <div className="text-xs text-muted-foreground truncate">
-                                {t.normalized_merchant}
-                              </div>
-                            )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs px-2 py-1 rounded-full bg-secondary capitalize">
-                            {t.category || "uncategorized"}
-                          </span>
-                        </td>
-                        <td
-                          className={`px-4 py-3 text-right font-medium tabular-nums whitespace-nowrap ${t.amount >= 0 ? "text-emerald" : "text-ruby"}`}
-                        >
-                          {t.amount >= 0 ? "+" : "-"}£
-                          {Math.abs(t.amount).toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="max-h-[580px] overflow-y-auto subtle-scroll">
+                <GroupedTransactionItems transactions={txs} account={conn} onSelect={transaction => openAction("transaction-info", { transaction })} groupDates={filters.sort === "date"} />
               </div>
 
               {/* Pagination — same chevron style as Transactions */}

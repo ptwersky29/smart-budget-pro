@@ -34,6 +34,7 @@ import Sparkline from "../components/ui/Sparkline";
 import ReferenceCashFlowChart from "../components/finance/ReferenceCashFlowChart";
 import ReferenceBalanceHero from "../components/finance/ReferenceBalanceHero";
 import AccountTile from "../components/finance/AccountTile";
+import GroupedTransactionItems from "../components/GroupedTransactionItems";
 import CategoryDonut from "../components/finance/CategoryDonut";
 import {
   formatCurrency,
@@ -47,33 +48,6 @@ function monthLabel(value) {
   if (!String(value).includes("-")) return String(value);
   const formatted = formatMonth(value);
   return formatted.split(" ")[0];
-}
-
-function TransactionLine({ transaction, onSelect }) {
-  const income = Number(transaction.amount) > 0;
-  const title = transaction.description || transaction.merchant || "Transaction";
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(transaction)}
-      className="group flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-secondary/35 sm:px-5"
-    >
-      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl ${income ? "bg-emerald/10 text-emerald" : "bg-secondary text-muted-foreground"}`}>
-        {income ? <ArrowDownLeft className="h-3.5 w-3.5" /> : <ArrowUpRight className="h-3.5 w-3.5" />}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[12.5px] font-medium">{title}</span>
-        <span className="mt-0.5 flex items-center gap-1.5 truncate text-[10.5px] capitalize text-muted-foreground">
-          <span>{humanizeCategoryName(transaction.category)}</span>
-          <span className="text-border">·</span>
-          <span>{formatShortDate(transaction.date)}</span>
-        </span>
-      </span>
-      <span className={`money-tabular shrink-0 text-[12.5px] font-semibold ${income ? "text-emerald" : ""}`}>
-        {formatCurrency(transaction.amount, { signed: true })}
-      </span>
-    </button>
-  );
 }
 
 function BudgetLine({ budget, onSelect }) {
@@ -464,10 +438,8 @@ export default function Dashboard() {
                 }
                 compact
               />
-              <div className="mt-2 divide-y divide-border/50 border-t border-border/50">
-                {overview.recent.slice(0, 5).map((transaction, index) => (
-                  <TransactionLine key={transaction.transaction_id || transaction.tx_id || index} transaction={transaction} onSelect={selected => openAction("transaction-info", { transaction: selected })} />
-                ))}
+              <div className="mt-2 max-h-[430px] overflow-y-auto border-t border-border/50 subtle-scroll">
+                <GroupedTransactionItems transactions={overview.recent.slice(0, 5)} accountsById={Object.fromEntries(accounts.map(a => [a.account_id || a.id, a]))} onSelect={selected => openAction("transaction-info", { transaction: selected })} />
               </div>
             </Surface>
           ) : null}

@@ -34,6 +34,7 @@ import {
   pickBankInstitution,
 } from "../data/bankLogos";
 import CategoryBadge from "./CategoryBadge";
+import { TransactionTypeMark, getTransactionType } from "./GroupedTransactionItems";
 
 const TransactionRow = React.memo(
   ({
@@ -63,7 +64,7 @@ const TransactionRow = React.memo(
     const brandLogo = brandInstitution ? getBankLogoOrFallback(brandInstitution) : null;
     const amount = Number(t.amount) || 0;
     const negative = amount < 0;
-    const income = amount > 0;
+    const type = getTransactionType(t);
     const unapproved = t.approval_status === "unapproved" || t.category_approval_status === "unapproved";
     const failed = t.approval_status === "failed";
     const status = failed ? "Failed" : unapproved ? "Unapproved" : t.pending ? "Pending" : "Approved";
@@ -88,7 +89,7 @@ const TransactionRow = React.memo(
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <tr
-            className={`cursor-pointer border-b border-border last:border-0 transition-colors ${
+            className={`cursor-pointer border-b border-border/60 last:border-0 transition-colors ${
               isSelected
                 ? "bg-emerald/[0.10]"
                 : isFocused
@@ -126,37 +127,24 @@ const TransactionRow = React.memo(
                 />
               </label>
             </td>
-            <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">
+            <td className="whitespace-nowrap px-3 py-3.5 text-xs text-muted-foreground">
               {dateLabel}
             </td>
-            <td className="px-1.5 py-2">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className={`grid h-6 w-6 shrink-0 place-items-center overflow-hidden rounded-full ${income ? "bg-emerald/10 text-emerald" : "bg-secondary text-muted-foreground"}`}>
-                  {brandLogo ? (
-                    <img
-                      src={brandLogo}
-                      alt=""
-                      className="h-[18px] w-[18px] rounded-full object-contain"
-                      onError={(event) => {
-                        event.currentTarget.style.display = "none";
-                      }}
-                    />
-                  ) : (
-                    <Receipt className="h-3 w-3" />
-                  )}
-                </span>
+            <td className="px-2 py-3.5">
+              <div className="flex min-w-0 items-center gap-3">
+                <TransactionTypeMark transaction={t} />
                 <div className="min-w-0">
-                  <div className="truncate text-[13px] font-medium leading-tight">{description}</div>
+                  <div className="flex min-w-0 items-center gap-2"><span className="truncate text-[13px] font-semibold leading-tight">{description}</span><TransactionTypeMark transaction={t} badge /></div>
                   {displaySubtitle ? (
                     <div className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">{displaySubtitle}</div>
                   ) : null}
                 </div>
               </div>
             </td>
-            <td className="px-1.5 py-2">
-              <div className="flex min-w-0 items-center gap-1">
+            <td className="px-2 py-3.5">
+              <div className="flex min-w-0 items-center gap-1.5">
                 <CategoryBadge
-                  category={t.category || "uncategorized"}
+                  category={type === "transfer" ? "Transfer" : t.category || "uncategorized"}
                   size="sm"
                   truncate
                   showIcon
@@ -164,16 +152,16 @@ const TransactionRow = React.memo(
                 {t.is_split ? <span className="shrink-0 rounded-full bg-violet/10 px-1.5 py-0.5 text-[11px] font-medium text-violet">Split</span> : null}
               </div>
             </td>
-            <td className="px-1 py-2">
+            <td className="px-2 py-3.5">
               <span className="flex min-w-0 items-center gap-1.5 text-xs text-foreground">
                 {brandLogo ? <img src={brandLogo} alt="" className="h-5 w-5 shrink-0 rounded-full object-contain" /> : <Wallet className="h-4 w-4 shrink-0 text-muted-foreground" />}
                 <span className="truncate">{accountName}</span>
               </span>
             </td>
-            <td className={`money-tabular px-2 py-2 text-right text-[13px] font-semibold ${negative ? "text-ruby" : "text-emerald"}`}>
+            <td className={`money-tabular px-2 py-3.5 text-right text-[13px] font-semibold ${type === "transfer" ? "text-foreground" : negative ? "text-ruby" : "text-emerald"}`}>
               {amount > 0 ? "+" : "-"}{formatCurrency(Math.abs(amount))}
             </td>
-            <td className="px-1.5 py-2">
+            <td className="px-2 py-3.5">
               <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
                 failed
                   ? "bg-ruby/10 text-ruby"
@@ -186,7 +174,7 @@ const TransactionRow = React.memo(
                 {status}
               </span>
             </td>
-            <td className="px-1 py-2 text-right">
+            <td className="px-1 py-3.5 text-right">
               <DropdownMenu>
                 <DropdownMenuTrigger
                   className="p-2 text-muted-foreground hover:text-foreground"
@@ -270,6 +258,7 @@ const TransactionRow = React.memo(
     prev.t.category_approval_status === next.t.category_approval_status &&
     prev.t.is_split === next.t.is_split &&
     prev.t.transfer_pair_id === next.t.transfer_pair_id &&
+    prev.t.is_transfer === next.t.is_transfer &&
     prev.account?.name === next.account?.name &&
     prev.account?.provider === next.account?.provider &&
     prev.isSelected === next.isSelected &&

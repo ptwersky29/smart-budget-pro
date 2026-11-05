@@ -35,6 +35,7 @@ import {
 } from "../components/ui/sheet";
 import ComparePeriods from "../components/ComparePeriods";
 import TransactionRow from "../components/TransactionRow";
+import { TransactionDateHeading, TransactionTypeMark, TransactionBankMark, groupTransactionsByDate, transactionDateKey, getTransactionType } from "../components/GroupedTransactionItems";
 import TransactionInspectorPanel from "../components/TransactionInspectorPanel";
 import { getBankLogoOrFallback, pickBankInstitution } from "../data/bankLogos";
 const CategoryPieChart = React.lazy(() => import("../components/CategoryPieChart"));
@@ -1251,16 +1252,11 @@ const Transactions = React.memo(function Transactions() {
   )).length;
 
   const mobileRows = aiResults?.transactions || txs;
+  const dateGroupCounts = useMemo(() => mobileRows.reduce((counts, tx) => { const key = transactionDateKey(tx); counts[key] = (counts[key] || 0) + 1; return counts; }, {}), [mobileRows]);
   const panelTransaction = inspectTx || txs[0] || null;
   const mobileDateGroups = useMemo(() => {
     if (filters.sort !== "date" || mobileRows.length === 0) return null;
-    return mobileRows.reduce((groups, tx) => {
-      const date = tx.date?.slice(0, 10) || "";
-      const last = groups[groups.length - 1];
-      if (last?.date === date) last.items.push(tx);
-      else groups.push({ date, items: [tx] });
-      return groups;
-    }, []);
+    return groupTransactionsByDate(mobileRows);
   }, [mobileRows, filters.sort]);
 
   const exportCsv = useCallback(() => {
@@ -1689,19 +1685,13 @@ const Transactions = React.memo(function Transactions() {
                 {mobileDateGroups ? (
                   mobileDateGroups.map((group) => (
                     <section key={group.date || "unknown"}>
-                      <div className="flex items-center justify-between border-y border-border/50 bg-secondary/25 px-4 py-1.5 first:border-t-0">
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                          {transactionDayLabel(group.date)}
-                        </span>
-                        <span className="text-[10px] tabular-nums text-muted-foreground/50">
-                          {group.items.length}
-                        </span>
-                      </div>
+                      <TransactionDateHeading date={group.date} count={group.items.length} />
                       <div className="divide-y divide-border/60">
                         {group.items.map((t) => (
                           <SwipeableCard
                             key={t.transaction_id}
                             t={t}
+                            account={accountsById[t.account_id]}
                             isSelected={selectedIds.has(t.transaction_id)}
                             swipedId={swipedId}
                             setSwipedId={setSwipedId}
@@ -1725,6 +1715,7 @@ const Transactions = React.memo(function Transactions() {
                       <SwipeableCard
                         key={t.transaction_id}
                         t={t}
+                        account={accountsById[t.account_id]}
                         isSelected={selectedIds.has(t.transaction_id)}
                         swipedId={swipedId}
                         setSwipedId={setSwipedId}
@@ -1775,7 +1766,7 @@ const Transactions = React.memo(function Transactions() {
               ) : (
                 <div className="transaction-table-scroll hidden min-h-0 overflow-x-auto sm:block lg:flex-1 lg:overflow-auto">
                   <table className="workspace-table w-full min-w-[980px] table-fixed text-sm">
-                    <thead>
+                    <thead className="sticky top-0 z-30 bg-card">
                       <tr className="border-b border-border text-left text-[11px] font-medium text-muted-foreground">
                         <th className="w-[40px] px-2.5 py-2.5">
                           <input type="checkbox" checked={allDisplayedSelected} onChange={toggleSelectAll}
@@ -1792,7 +1783,11 @@ const Transactions = React.memo(function Transactions() {
                     </thead>
                     <tbody>
                       {(aiResults?.transactions || txs).map((t, idx) => (
-                        <TransactionRow key={t.transaction_id} t={t}
+                        <React.Fragment key={t.transaction_id}>
+                          {filters.sort === "date" && (idx === 0 || transactionDateKey(mobileRows[idx - 1]) !== transactionDateKey(t)) && (
+                            <tr className="sticky top-[38px] z-20"><td colSpan={8} className="p-0"><TransactionDateHeading date={transactionDateKey(t)} count={dateGroupCounts[transactionDateKey(t)]} sticky={false} /></td></tr>
+                          )}
+                        <TransactionRow t={t}
                           account={accountsById[t.account_id]}
                           isSelected={selectedIds.has(t.transaction_id)}
                           isFocused={focusedIndex === idx}
@@ -1804,6 +1799,7 @@ const Transactions = React.memo(function Transactions() {
                           onPairTransfer={pairTransfer}
                           onUnpairTransfer={unpairTransfer}
                           onSetFocus={() => setFocusedIndex(idx)} />
+                        </React.Fragment>
                       ))}
                     </tbody>
                   </table>
@@ -2420,14 +2416,14 @@ const Transactions = React.memo(function Transactions() {
   );
 });
 
-function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, onEdit, onInspect, onDelete, onApprove, onClassify, onSplit, onPairTransfer, onUnpairTransfer, showDate = false }) {
+function SwipeableCard({ t, account, isSelected, swipedId, setSwipedId, onToggleSelect, onEdit, onInspect, onDelete, onApprove, onClassify, onSplit, onPairTransfer, onUnpairTransfer, showDate = false }) {
   const handlers = useSwipe(
     () => setSwipedId(t.transaction_id),
     () => setSwipedId(null),
     50,
   );
   const deleting = swipedId === t.transaction_id;
-  const brandInstitution = t.institution ? pickBankInstitution(t.institution, t.source_label) : null;
+  const brandInstitution = pickBankInstitution(account?.provider, account?.name, t.institution, t.source_label);
   const unapproved = t.approval_status === "unapproved" || t.category_approval_status === "unapproved";
   const status = t.approval_status === "failed"
     ? { label: "Failed", className: "bg-ruby/10 text-ruby" }
@@ -2444,13 +2440,14 @@ function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, o
       <div
         className={`transition-transform duration-200 ease-out ${deleting ? "-translate-x-20" : "translate-x-0"} ${isSelected ? "bg-emerald/5" : ""}`}
       >
-        <div className="flex items-start gap-2 px-3 py-2.5">
+        <div className="flex items-start gap-3 px-3 py-3.5">
           <label className="-ml-0.5 flex h-11 w-7 shrink-0 items-center justify-center">
             <input type="checkbox" checked={isSelected}
               onChange={() => onToggleSelect(t.transaction_id)}
               aria-label="Select transaction"
               className="h-[18px] w-[18px] rounded-[5px] border-border accent-emerald cursor-pointer shrink-0" />
           </label>
+          <TransactionTypeMark transaction={t} />
           <div className="min-w-0 flex-1 pt-0.5">
             <p
               className="truncate text-[13px] font-medium leading-5 text-foreground"
@@ -2458,8 +2455,9 @@ function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, o
             >
               {t.description}
             </p>
-            <div className="mt-1 flex min-w-0 items-center gap-1.5">
-              <CategoryBadge category={t.category || "uncategorized"} size="sm" truncate className="min-w-0" />
+            <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
+              <TransactionTypeMark transaction={t} badge />
+              <CategoryBadge category={getTransactionType(t) === "transfer" ? "Transfer" : t.category || "uncategorized"} size="sm" truncate className="min-w-0" />
               {status && (
                 <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${status.className}`}>
                   {status.label}
@@ -2470,18 +2468,11 @@ function SwipeableCard({ t, isSelected, swipedId, setSwipedId, onToggleSelect, o
                   {transactionDayLabel(t.date, { weekday: false })}
                 </span>
               )}
-              {brandInstitution && (
-                <img
-                  src={getBankLogoOrFallback(brandInstitution)}
-                  alt=""
-                  title={t.source_label || brandInstitution}
-                  className="ml-auto hidden h-4 w-4 shrink-0 rounded-[3px] object-contain min-[360px]:block"
-                />
-              )}
+              <TransactionBankMark transaction={t} account={account} showName={false} />
             </div>
           </div>
           <div className="flex shrink-0 flex-col items-end justify-between self-stretch pl-0.5">
-            <span className={`whitespace-nowrap text-[13px] font-semibold leading-5 tabular-nums ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}>
+            <span className={`whitespace-nowrap text-[13px] font-semibold leading-5 tabular-nums ${getTransactionType(t) === "transfer" ? "text-foreground" : t.amount > 0 ? "text-emerald" : "text-ruby"}`}>
               {t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}
             </span>
             <DropdownMenu>

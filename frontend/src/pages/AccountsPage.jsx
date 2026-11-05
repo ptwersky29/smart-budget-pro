@@ -24,7 +24,6 @@ import { getBankLogoOrFallback, pickBankInstitution } from "../data/bankLogos";
 import { formatCurrency } from "../lib/format";
 import { buildDailyBalanceTrend } from "../lib/balanceTrend";
 import Sparkline from "../components/ui/Sparkline";
-import { humanizeCategoryName } from "../lib/categories";
 import Skeleton from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
 import {
@@ -35,6 +34,7 @@ import {
 } from "../components/ui/dropdown-menu";
 import { EmptyPanel, PageHeader, Surface } from "../components/ui/page";
 import AccountFormModal from "../components/AccountFormModal";
+import GroupedTransactionItems from "../components/GroupedTransactionItems";
 
 const ACCOUNT_TYPE_META = {
   current: { icon: Wallet, label: "Current account" },
@@ -503,22 +503,10 @@ export default function AccountsPage() {
                       className={`h-8 rounded-lg px-3 text-xs ${transactionType===x.v?"bg-card font-semibold shadow-sm":"text-muted-foreground"}`}>{x.t}</button>)}
                 </div>
               </div>
-              <div className="penni-account-history-list min-h-0 flex-1 overflow-visible border-t border-border/60">
-                {transactionLoading?<p className="p-5 text-xs text-muted-foreground">Loading transactions…</p>:
-                filteredTransactions.length ? filteredTransactions.map((t,i)=>
-                  <button type="button" key={t.transaction_id||i}
-                    onClick={()=>openAction("transaction-info",{transaction:t})}
-                    className="flex w-full items-center gap-3 border-b border-border/50 px-5 py-3 text-left transition-colors hover:bg-secondary/40">
-                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-secondary text-muted-foreground">
-                      <ArrowRight className={`h-4 w-4 ${Number(t.amount)<0?"rotate-45":"-rotate-45"}`}/>
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-medium">{t.description||t.merchant||"Transaction"}</span>
-                      <span className="mt-1 block truncate text-[11px] text-muted-foreground">{humanizeCategoryName(t.category)} · {String(t.date||"").slice(0,10)}</span>
-                    </span>
-                    <span className={`money-tabular shrink-0 text-[13px] font-semibold ${Number(t.amount)>0?"text-emerald":""}`}>{formatCurrency(t.amount,{signed:true})}</span>
-                  </button>
-                ):<p className="p-6 text-center text-xs text-muted-foreground">No matching transactions.</p>}
+              <div className="penni-account-history-list min-h-0 max-h-[570px] flex-1 overflow-y-auto border-t border-border/60 subtle-scroll">
+                {transactionLoading ? <p className="p-5 text-xs text-muted-foreground">Loading transactions…</p> :
+                filteredTransactions.length ? <GroupedTransactionItems transactions={filteredTransactions} account={selectedAccount} onSelect={transaction => openAction("transaction-info", { transaction })} /> :
+                <p className="p-6 text-center text-xs text-muted-foreground">No matching transactions.</p>}
               </div>
             </section>
           </div>}

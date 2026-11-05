@@ -18,11 +18,11 @@ import AccountFormModal from "../components/AccountFormModal";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import TransactionForm from "../components/TransactionForm";
 import TransactionInspectorPanel from "../components/TransactionInspectorPanel";
+import GroupedTransactionItems from "../components/GroupedTransactionItems";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu";
 import { withUndo } from "../lib/undo";
 import { useCategories } from "../contexts/CategoriesContext";
 import { formatCurrency, formatShortDate, formatDateTime } from "../lib/format";
-import { humanizeCategoryName } from "../lib/categories";
 
 const ACCOUNT_TYPE_META = {
   current: { icon: Wallet, label: "Current Account", color: "text-emerald", bg: "bg-emerald/10" },
@@ -534,42 +534,9 @@ export default function AccountDetailPage() {
             <>
 
               <div ref={scrollRef} className="account-detail-list subtle-scroll min-h-0 flex-1 overflow-y-visible overflow-x-hidden lg:overflow-y-auto lg:overscroll-contain" role="list" aria-label="Account transactions">
-                {txs.map((t) => {
-                  const amount = Number(t.amount) || 0;
-                  const description = t.description || t.merchant || "Transaction";
-                  const dateLabel = t.date ? new Date(`${String(t.date).slice(0, 10)}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "No date";
-                  const merchant = t.merchant || t.normalized_merchant;
-                  const status = t.approval_status === "failed" ? "Failed" : t.pending ? "Pending" : (t.approval_status === "unapproved" || t.category_approval_status === "unapproved") ? "Unapproved" : "Approved";
-                  const detail = [merchant && merchant.toLowerCase() !== description.toLowerCase() ? merchant : null, humanizeCategoryName(t.category), t.source_label || t.source].filter(Boolean).join(" · ");
-                  return (
-                    <div role="listitem" key={t.transaction_id} className={`flex min-w-0 items-center gap-2 border-b border-border/60 px-3 py-3 last:border-0 hover:bg-secondary/25 ${inspectedTransaction?.transaction_id === t.transaction_id ? "bg-emerald/10" : ""}`}>
-                      <button type="button" onClick={() => setInspectedTransaction(t)} className="flex min-w-0 flex-1 items-start gap-2.5 text-left" aria-label={`View details for ${description}`}>
-                        <span className="hidden w-[78px] shrink-0 pt-0.5 text-[10.5px] text-muted-foreground sm:block">{dateLabel}</span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block break-words text-[12px] font-semibold leading-snug">{description}</span>
-                          <span className="mt-1 block break-words text-[10.5px] leading-snug text-muted-foreground">{detail}</span>
-                          <span className="mt-1 block text-[10px] text-muted-foreground sm:hidden">{dateLabel}</span>
-                        </span>
-                      </button>
-                      <span className="flex max-w-[39%] shrink-0 flex-col items-end gap-1">
-                        <span className={`money-tabular whitespace-nowrap text-right text-[12px] font-semibold ${amount < 0 ? "text-ruby" : "text-emerald"}`}>
-                          {amount > 0 ? "+" : amount < 0 ? "−" : ""}{CURRENCY_SYMBOL}{Math.abs(amount).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">{status}</span>
-                      </span>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button type="button" aria-label={`Actions for ${description}`} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"><MoreHorizontal className="h-4 w-4" /></button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setInspectedTransaction(t)}><Receipt className="mr-2 h-4 w-4" /> View details</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openEditTx(t)}><Pencil className="mr-2 h-4 w-4" /> Edit transaction</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => { setInspectedTransaction(null); deleteTx(t.transaction_id); }} className="text-ruby"><Trash2 className="mr-2 h-4 w-4" /> Delete transaction</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  );
-                })}
+                <GroupedTransactionItems transactions={txs} account={account} onSelect={setInspectedTransaction}
+                  onEdit={openEditTx} onDelete={t => { setInspectedTransaction(null); deleteTx(t.transaction_id); }}
+                  activeId={inspectedTransaction?.transaction_id} groupDates={filters.sort === "date"} />
                 <div ref={loadMoreRef} className="py-3 text-center text-[11px] text-muted-foreground" aria-live="polite">
                   {loadingMore ? "Loading more transactions…" : txs.length < totalTx ? "More transactions will load as you scroll" : `All ${txs.length.toLocaleString()} transactions shown`}
                 </div>

@@ -23,4 +23,623 @@
   --surface: var(--penni-surface); --surface-solid: var(--penni-surface);
   --surface-muted: var(--penni-surface-2);
   color: var(--penni-ink); background: var(--penni-bg);
-  font-family: "Inter Variable","Inter",ui-sans-serif,system-u¶»§q«^
+  font-family: "Inter Variable","Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-feature-settings: "cv11","ss01"; -webkit-font-smoothing: antialiased;
+}
+.dark .penni-v2 {
+  --penni-bg: #07080b; --penni-surface: #0f1115; --penni-surface-2: #171a20;
+  --penni-ink: #f3f4f7; --penni-muted: #8d94a5; --penni-faint: #545b6b;
+  --penni-line: rgba(255,255,255,.07); --penni-accent: #7476ff;
+  --penni-glow: rgba(124,125,255,.1);
+  --penni-promo-bg: #26245f;
+  --penni-shadow: 0 1px 0 rgba(255,255,255,.03) inset,0 18px 36px -20px rgba(0,0,0,.8);
+  --background: 225 22% 4%; --foreground: 220 11% 96%;
+  --card: 225 15% 7%; --card-foreground: 220 11% 96%;
+  --popover: 225 15% 7%; --popover-foreground: 220 11% 96%;
+  --primary: 239 100% 73%; --primary-foreground: 0 0% 100%;
+  --secondary: 220 15% 11%; --secondary-foreground: 220 11% 96%;
+  --muted: 220 15% 11%; --muted-foreground: 220 12% 60%;
+  --accent: 239 100% 73%; --border: 220 10% 16%; --input: 220 10% 16%; --ring: 239 100% 73%;
+  --surface: var(--penni-surface); --surface-solid: var(--penni-surface);
+  --surface-muted: var(--penni-surface-2);
+}
+.penni-v2[data-penni-accent="emerald"] { --penni-accent:#0ea371; --penni-glow:rgba(14,163,113,.12); }
+.penni-v2[data-penni-accent="copper"] { --penni-accent:#d9772f; --penni-glow:rgba(217,119,47,.12); }
+.penni-v2[data-penni-accent="rose"] { --penni-accent:#e23d68; --penni-glow:rgba(226,61,104,.12); }
+.penni-v2[data-penni-accent="sky"] { --penni-accent:#0d93e8; --penni-glow:rgba(13,147,232,.12); }
+.penni-v2[data-penni-accent="violet"] { --penni-accent:#8b5cf6; --penni-glow:rgba(139,92,246,.12); }
+.dark .penni-v2[data-penni-accent="emerald"] { --penni-accent:#19c48c; }
+.dark .penni-v2[data-penni-accent="copper"] { --penni-accent:#f08a3e; }
+.dark .penni-v2[data-penni-accent="rose"] { --penni-accent:#f2587f; }
+.dark .penni-v2[data-penni-accent="sky"] { --penni-accent:#2fa8f5; }
+.dark .penni-v2[data-penni-accent="violet"] { --penni-accent:#a07bff; }
+.penni-v2[data-penni-accent="emerald"] { --primary:160 85% 35%; --accent:160 85% 35%; --ring:160 85% 35%; }
+.penni-v2[data-penni-accent="copper"] { --primary:25 68% 52%; --accent:25 68% 52%; --ring:25 68% 52%; }
+.penni-v2[data-penni-accent="rose"] { --primary:346 74% 56%; --accent:346 74% 56%; --ring:346 74% 56%; }
+.penni-v2[data-penni-accent="sky"] { --primary:204 89% 48%; --accent:204 89% 48%; --ring:204 89% 48%; }
+.penni-v2[data-penni-accent="violet"] { --primary:258 90% 66%; --accent:258 90% 66%; --ring:258 90% 66%; }
+.dark .penni-v2[data-penni-accent="emerald"] { --primary:160 77% 43%; --accent:160 77% 43%; --ring:160 77% 43%; }
+.dark .penni-v2[data-penni-accent="copper"] { --primary:25 85% 59%; --accent:25 85% 59%; --ring:25 85% 59%; }
+.dark .penni-v2[data-penni-accent="rose"] { --primary:346 84% 65%; --accent:346 84% 65%; --ring:346 84% 65%; }
+.dark .penni-v2[data-penni-accent="sky"] { --primary:204 90% 57%; --accent:204 90% 57%; --ring:204 90% 57%; }
+.dark .penni-v2[data-penni-accent="violet"] { --primary:258 100% 74%; --accent:258 100% 74%; --ring:258 100% 74%; }
+.penni-v2, .penni-v2 * { scrollbar-color:rgba(102,112,133,.28) transparent; scrollbar-width:thin; }
+.penni-v2 *:focus-visible { outline:2px solid var(--penni-accent); outline-offset:2px; }
+.penni-v2 .penni-sidebar { background:var(--penni-surface); border:0; border-right:1px solid var(--penni-line); border-radius:0; box-shadow:none; }
+.penni-v2 .penni-main-panel { background:var(--penni-bg); border:0; border-radius:0; box-shadow:none; }
+.penni-v2 .penni-main-panel::before {
+  pointer-events:none; content:""; position:absolute; inset:0 0 auto; height:430px;
+  background:radial-gradient(60% 95% at 50% 0,var(--penni-glow),transparent);
+}
+.penni-v2 .penni-route-header {
+  border-bottom:1px solid var(--penni-line); background:var(--penni-bg);
+  backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
+}
+.penni-v2 .penni-side-link {
+  border:1px solid transparent; border-radius:16px; color:var(--penni-muted);
+  transition:background .18s,color .18s,border-color .18s,transform .18s;
+}
+.penni-v2 .penni-side-link:hover { color:var(--penni-ink); background:var(--penni-surface-2); }
+.penni-v2 .penni-side-link[aria-current="page"] {
+  color:var(--penni-ink); border-color:var(--penni-line);
+  background:var(--penni-surface); box-shadow:var(--penni-shadow);
+}
+.penni-v2 .penni-side-link[aria-current="page"] svg { color:var(--penni-accent); }
+.penni-v2 .penni-search {
+  border:1px solid var(--penni-line); border-radius:16px; background:var(--penni-surface);
+  min-height:40px; color:var(--penni-muted); box-shadow:var(--penni-shadow);
+}
+.penni-v2 .penni-icon-button { border-radius:9999px; color:var(--penni-muted); transition:background .18s,color .18s; }
+.penni-v2 .penni-icon-button:hover { background:var(--penni-surface-2); color:var(--penni-ink); }
+.penni-v2 .penni-bottom-nav {
+  border:0; border-top:1px solid var(--penni-line); border-radius:0;
+  background:var(--penni-surface); box-shadow:none; backdrop-filter:blur(22px);
+}
+.penni-v2 .penni-bottom-link[aria-current="page"] { color:var(--penni-accent); }
+.penni-v2 .penni-bottom-link[aria-current="page"] .penni-bottom-icon { background:var(--penni-glow); }
+.penni-v2 .surface,.penni-v2 .glass-panel,.penni-v2 .glass-tile {
+  background:var(--penni-surface); border:1px solid var(--penni-line);
+  border-radius:24px; box-shadow:var(--penni-shadow);
+}
+.penni-v2 .surface-hover,.penni-v2 .penni-interactive { transition:transform .22s cubic-bezier(.22,1,.36,1),box-shadow .22s,border-color .22s; }
+.penni-v2 .surface-hover:hover,.penni-v2 .penni-interactive:hover {
+  transform:translateY(-2px); border-color:var(--penni-accent);
+}
+.penni-v2 .workspace-metric { border-radius:20px; }
+.penni-v2 .label-overline { color:var(--penni-muted); letter-spacing:.11em; }
+.penni-v2 .money-tabular,.penni-v2 .num { font-variant-numeric:tabular-nums; }
+.penni-v2 .penni-accent-button {
+  background:var(--penni-accent); color:#fff; border:1px solid transparent; border-radius:16px;
+  box-shadow:0 8px 22px -9px var(--penni-accent),inset 0 1px 0 rgba(255,255,255,.22);
+  transition:filter .18s,transform .18s;
+}
+.penni-v2 .penni-accent-button:hover { filter:brightness(1.07); }
+.penni-v2 .penni-accent-button:active { transform:scale(.97); }
+.penni-v2 .penni-secondary-button { background:var(--penni-surface-2); border:1px solid var(--penni-line); color:var(--penni-ink); border-radius:16px; }
+.penni-v2 .penni-outline-button { background:var(--penni-surface); border:1px solid var(--penni-line); color:var(--penni-ink); border-radius:16px; }
+.penni-v2 .penni-ghost-button { background:transparent; border-radius:14px; color:var(--penni-muted); }
+.penni-v2 .penni-ghost-button:hover { background:var(--penni-surface-2); color:var(--penni-ink); }
+.penni-v2 .penni-accent-text { color:var(--penni-accent); }
+.penni-v2 .penni-tab[aria-selected="true"] { color:var(--penni-accent); border-color:var(--penni-accent); }
+.penni-v2 .penni-account-card {
+  position:relative; isolation:isolate; overflow:hidden;
+  min-height:175px; border:0; border-radius:26px; padding:20px; color:#fff;
+  box-shadow:0 18px 40px -18px rgba(0,0,0,.45);
+  background:var(--account-gradient,linear-gradient(135deg,#1e1b4b,#312e81 45%,#5b5cf0 115%));
+}
+.penni-v2 .penni-account-card::before {
+  content:""; pointer-events:none; position:absolute; right:-32px; top:-72px;
+  width:190px; height:190px; border-radius:9999px; background:rgba(255,255,255,.12);
+  filter:blur(26px); transition:transform .4s;
+}
+.penni-v2 .penni-account-card:hover::before { transform:scale(1.3); }
+.penni-v2 .penni-account-card .text-muted-foreground,.penni-v2 .penni-account-card .text-emerald { color:rgba(255,255,255,.8); }
+.penni-v2 .penni-account-card .money-tabular { font-size:1.55rem; letter-spacing:-.03em; }
+.penni-v2.penni-private .money-tabular,.penni-v2.penni-private .money { filter:blur(7px); user-select:none; }
+@keyframes penni-page-enter { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+.penni-v2 .page-in { animation:penni-page-enter .38s cubic-bezier(.22,1,.36,1) both; }
+@media(max-width:1023px) {
+  .penni-v2 .penni-bottom-nav {left:0;right:0;bottom:0;padding-bottom:env(safe-area-inset-bottom);}
+  .penni-v2 .app-main-scroll {padding-bottom:calc(86px + env(safe-area-inset-bottom));}
+}
+@media(min-width:1024px) { .penni-v2 .penni-main-panel {height:100dvh;} }
+@media(prefers-reduced-motion:reduce) {
+  .penni-v2 *,.penni-v2 *::before,.penni-v2 *::after {animation-duration:.01ms!important;transition-duration:.01ms!important;}
+}
+
+/* Prevent page controls collapsing underneath the next scrollable panel. */
+.penni-v2 .penni-inner-page-header {
+  position:relative;
+  z-index:2;
+  flex:0 0 auto;
+  min-height:44px;
+}
+.penni-v2 .penni-accounts-toolbar {
+  flex:0 0 auto;
+  min-height:44px;
+  isolation:isolate;
+}
+.penni-v2 .penni-accounts-toolbar > :last-child {
+  min-height:40px;
+  max-width:100%;
+}
+.penni-v2 .accounts-workspace > .accounts-panels {
+  position:relative;
+  z-index:0;
+  min-height:0;
+}
+/* At tablet/desktop sizes the global 68px sticky header owns the page title.
+ * Keep each page's own buttons, back navigation and filters in the workspace. */
+@media(min-width:768px) {
+  .penni-v2 .penni-inner-page-header .penni-inner-title,
+  .penni-v2 .penni-inner-page-header .penni-inner-description,
+  .penni-v2 .penni-inner-page-header .penni-inner-eyebrow { display:none; }
+  .penni-v2 .penni-inner-page-header { align-items:center; min-height:44px; flex-shrink:0; }
+  .penni-v2 .penni-inner-page-header .min-w-0:empty { display:none; }
+  .penni-v2 .app-main-scroll { padding-bottom:24px; }
+}
+
+/* Shared overlay layers sit above the fixed app shell; menus above dialogs. */
+.penni-shared-backdrop { z-index: var(--penni-z-backdrop); background: var(--penni-overlay-backdrop); }
+.penni-v2.penni-overlay-content { z-index: var(--penni-z-dialog); }
+.penni-v2.penni-menu-content { z-index: var(--penni-z-menu); }
+/* Portalled Radix overlays carry penni-v2 because they render outside AppLayout. */
+.penni-overlay-content.penni-v2 {
+  color:var(--penni-ink);
+  background:var(--penni-surface);
+  border:1px solid var(--penni-line);
+  border-radius:26px;
+  box-shadow:0 28px 80px -26px rgba(13,15,20,.37);
+  max-height:min(92dvh,960px);
+  overflow-y:auto;
+}
+.penni-menu-content.penni-v2 {
+  color:var(--penni-ink);
+  background:var(--penni-surface);
+  border:1px solid var(--penni-line);
+  border-radius:17px;
+  box-shadow:var(--penni-shadow);
+}
+.penni-menu-content [data-highlighted] { background:var(--penni-glow); outline:0; }
+.penni-overlay-content.penni-v2[data-penni-side="bottom"] {
+  width:100vw;
+  max-width:100vw;
+  max-height:92dvh;
+  border-radius:26px 26px 0 0;
+  padding-bottom:max(24px,env(safe-area-inset-bottom));
+}
+@media(max-width:767px) {
+  .penni-overlay-content.penni-v2:not([data-penni-side]) {
+    max-width:calc(100vw - 20px);
+    border-radius:24px;
+  }
+}
+
+/* Desktop has one title in the persistent app bar. Title-only page headers do
+ * not reserve an empty second row; headers containing actions remain visible. */
+@media (min-width: 768px) {
+  .penni-v2 .penni-page-heading-only { display: none; }
+}
+
+/* Shared compact financial-table language for secondary workspaces. */
+.penni-v2 .penni-data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+.penni-v2 .penni-data-table th {
+  padding: 12px 16px;
+  background: var(--penni-surface-2);
+  color: var(--penni-muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: .045em;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--penni-line);
+}
+.penni-v2 .penni-data-table td {
+  padding: 11px 16px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--penni-line);
+  color: inherit;
+}
+.penni-v2 .penni-data-table th:last-child,
+.penni-v2 .penni-data-table td:last-child { text-align: right; }
+.penni-v2 .penni-data-table tbody tr:last-child td { border-bottom: none; }
+.penni-v2 .penni-data-table tbody tr {
+  transition: background-color .16s ease;
+}
+.penni-v2 .penni-data-table tbody tr:hover {
+  background: var(--penni-surface-2);
+}
+.penni-v2 .penni-data-table td button:focus-visible {
+  outline: 2px solid var(--penni-accent);
+  outline-offset: 2px;
+}
+@media (min-width: 768px) {
+  .penni-v2 .penni-data-table th,
+  .penni-v2 .penni-data-table td { padding-inline: 20px; }
+}
+
+/* Penni 2.0: consistency layer shared by all existing financial modules. */
+.penni-v2 .page-stack { gap:16px; }
+.penni-v2 .surface,
+.penni-v2 .penni-analytics .surface { border-radius:24px; }
+.penni-v2 .surface .label-overline { font-size:11px; font-weight:600; letter-spacing:.08em; }
+.penni-v2 .surface h2 { letter-spacing:-.025em; }
+.penni-v2 .workspace-page-header { padding-bottom:2px; }
+.penni-v2 .workspace-metrics { gap:12px; }
+.penni-v2 .workspace-table-panel,
+.penni-v2 .transaction-ledger-panel { border-radius:24px; }
+.penni-v2 .workspace-table th,
+.penni-v2 .workspace-table td { border-color:var(--penni-line); }
+.penni-v2 .workspace-table th {
+  color:var(--penni-muted);font-weight:650;font-size:10px;letter-spacing:.05em;
+  background:var(--penni-surface-2);
+}
+.penni-v2 .workspace-table tbody tr { transition:background .15s; }
+.penni-v2 .workspace-table tbody tr:hover { background:var(--penni-glow); }
+.penni-v2 input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.penni-v2 textarea,
+.penni-v2 select {
+  border-color:var(--penni-line);
+  border-radius:13px;
+  background-color:var(--penni-surface);
+  color:var(--penni-ink);
+}
+.penni-v2 input::placeholder,.penni-v2 textarea::placeholder { color:var(--penni-faint); }
+.penni-v2 .transaction-ledger-panel .money-tabular { letter-spacing:-.01em; }
+.penni-v2 .penni-reference-chart .recharts-text { font-family:inherit; }
+.penni-v2 .penni-analytics .penni-reference-chart { padding-top:12px; }
+.penni-v2 .penni-analytics .penni-skeleton {
+  background:linear-gradient(90deg,var(--penni-surface-2),var(--penni-surface),var(--penni-surface-2));
+  background-size:200% 100%; animation:penni-shimmer 1.4s linear infinite;
+}
+@keyframes penni-shimmer { to { background-position:-200% 0; } }
+.penni-v2 .transactions-primary button[data-testid="add-transaction"],
+.penni-v2 .budget-workspace .workspace-page-header .bg-emerald {
+  background:var(--penni-accent);
+  border-radius:12px;
+  color:white;
+  box-shadow:0 8px 24px -12px var(--penni-accent);
+}
+.penni-v2 .dashboard-reference .surface .penni-account-card {
+  border-radius:26px;
+  min-height:155px;
+}
+.penni-v2 .penni-account-card h3,
+.penni-v2 .penni-account-card p,
+.penni-v2 .penni-account-card svg { position:relative;z-index:1; }
+.penni-v2 .penni-account-card .text-muted-foreground { color:rgba(255,255,255,.76); }
+.penni-v2 .penni-account-card .text-ruby { color:#ffb4bc; }
+.penni-v2 .penni-account-card .text-emerald { color:rgba(255,255,255,.88); }
+.penni-v2 .penni-account-card .bg-secondary { background:rgba(255,255,255,.12); }
+.penni-v2 .penni-account-card .border-border { border-color:rgba(255,255,255,.17); }
+.penni-v2 .penni-account-card .money-tabular { color:#fff; }
+.penni-v2 .penni-inner-page-header .penni-inner-title { letter-spacing:-.035em; }
+@media(min-width:768px) and (max-width:1023px) {
+  .penni-v2 .penni-main-panel { min-height:0; height:100dvh; }
+  .penni-v2 .penni-bottom-nav {display:none;}
+}
+@media(max-width:767px) {
+  .penni-v2 .penni-main-panel {min-height:100dvh;}
+  .penni-v2 .penni-route-header {position:sticky;}
+  .penni-v2 .penni-analytics .grid {min-width:0;}
+}
+.penni-v2.penni-private .penni-reference-chart,
+.penni-v2.penni-private .penni-analytics .recharts-wrapper {
+  filter:blur(7px);
+}
+html[data-penni-accent="emerald"] .penni-v2 { --penni-accent:#0ea371; --penni-glow:rgba(14,163,113,.12); --primary:160 85% 35%; --accent:160 85% 35%; --ring:160 85% 35%; }
+html[data-penni-accent="copper"] .penni-v2 { --penni-accent:#d9772f; --penni-glow:rgba(217,119,47,.12); --primary:25 68% 52%; --accent:25 68% 52%; --ring:25 68% 52%; }
+html[data-penni-accent="rose"] .penni-v2 { --penni-accent:#e23d68; --penni-glow:rgba(226,61,104,.12); --primary:346 74% 56%; --accent:346 74% 56%; --ring:346 74% 56%; }
+html[data-penni-accent="sky"] .penni-v2 { --penni-accent:#0d93e8; --penni-glow:rgba(13,147,232,.12); --primary:204 89% 48%; --accent:204 89% 48%; --ring:204 89% 48%; }
+html[data-penni-accent="violet"] .penni-v2 { --penni-accent:#8b5cf6; --penni-glow:rgba(139,92,246,.12); --primary:258 90% 66%; --accent:258 90% 66%; --ring:258 90% 66%; }
+html.dark[data-penni-accent="emerald"] .penni-v2 {--penni-accent:#19c48c;}
+html.dark[data-penni-accent="copper"] .penni-v2 {--penni-accent:#f08a3e;}
+html.dark[data-penni-accent="rose"] .penni-v2 {--penni-accent:#f2587f;}
+html.dark[data-penni-accent="sky"] .penni-v2 {--penni-accent:#2fa8f5;}
+html.dark[data-penni-accent="violet"] .penni-v2 {--penni-accent:#a07bff;}
+
+/* Dashboard layout repair: the sticky app header owns the route name, while
+   the Dashboard introduces the user with a real heading alongside its actions.
+   Avoid hiding the left-hand title while retaining right-hand controls. */
+.penni-v2 .penni-dashboard-header {
+  align-items:center;
+  column-gap:20px;
+  row-gap:12px;
+}
+.penni-v2 .penni-dashboard-header > :first-child { min-width:0; flex:1 1 340px; }
+.penni-v2 .penni-dashboard-header > :last-child { flex:0 0 auto; }
+.penni-v2 .penni-dashboard-alerts { box-shadow:var(--penni-shadow); }
+@media(min-width:768px) {
+  .penni-v2 .penni-inner-page-header.penni-dashboard-header .penni-inner-title,
+  .penni-v2 .penni-inner-page-header.penni-dashboard-header .penni-inner-description,
+  .penni-v2 .penni-inner-page-header.penni-dashboard-header .penni-inner-eyebrow {
+    display:block;
+  }
+  .penni-v2 .penni-dashboard-header .penni-inner-title {
+    font-size:clamp(21px,2vw,28px);
+    line-height:1.2;
+  }
+  .penni-v2 .penni-dashboard-header .penni-inner-description { font-size:12px; }
+}
+@media(min-width:768px) and (max-width:1199px) {
+  .penni-v2 .penni-dashboard-header {flex-wrap:wrap;}
+  .penni-v2 .penni-dashboard-header > :last-child {width:100%;justify-content:flex-start;}
+}
+@media(max-width:767px) {
+  .penni-v2 .penni-dashboard-header > :last-child {width:100%;justify-content:flex-start;}
+  .penni-v2 .penni-dashboard-alerts {padding:12px;}
+}
+
+
+/* Penny ZIP Accounts: compact summary, coloured horizontal cards and split inspector workspace. */
+.penni-v2 .penni-reference-account-summary .surface{min-width:0;min-height:110px;border-radius:22px;}
+.penni-v2 .penni-account-selector{scroll-snap-type:x proximity;scrollbar-width:thin;}
+.penni-v2 .penni-account-selector .penni-selected-account{border:2px solid transparent;transition:border-color .22s,box-shadow .22s;scroll-snap-align:start;}
+.penni-v2 .penni-account-selector .penni-selected-account.is-selected{border-color:var(--penni-accent);}
+.penni-v2 .penni-account-selector .penni-account-card{min-height:190px;box-shadow:0 18px 30px -17px rgba(0,0,0,.38);}
+.penni-v2 .penni-account-selector .penni-account-card .money-tabular{font-size:24px;}
+.penni-v2 .penni-account-workspace .surface{border-radius:24px;}
+.penni-v2 .penni-account-history{min-height:470px;}
+.penni-v2 .penni-account-history-list{scrollbar-width:thin;scrollbar-color:rgba(102,112,133,.28) transparent;}
+@media(min-width:1024px){.penni-v2 .penni-account-history{max-height:min(70dvh,650px);}}
+@media(max-width:767px){
+ .penni-v2 .penni-account-selector .penni-selected-account{width:265px;min-width:265px;}
+ .penni-v2 .penni-account-history{min-height:390px;}
+}
+
+
+/* Exact Penny type rhythm, space, warm logo and spring-like navigation. */
+.penni-v2{font-family:var(--font-body);font-size:14px;letter-spacing:-.007em;font-feature-settings:"cv11","ss01";-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+.penni-v2 .penni-route-header{height:68px;min-height:68px;display:flex;flex-direction:column;justify-content:center;}
+.penni-v2 .penni-side-link{min-height:43px;font-size:13px;font-weight:500;}
+.penni-v2 .penni-side-link[aria-current="page"]{animation:penni-nav-select .3s cubic-bezier(.22,1,.36,1) both;}
+.penni-v2 .penni-sidebar{background:color-mix(in srgb,var(--penni-surface) 72%,var(--penni-bg));}
+.penni-v2 .penni-sidebar .penni-nav-icon{width:28px;height:28px;}
+.penni-v2 .penni-search{border-radius:16px;font-size:13px;}
+.penni-v2 .penni-accent-button{font-weight:600;box-shadow:0 10px 24px -10px var(--penni-accent),inset 0 1px 0 rgba(255,255,255,.22);}
+.penni-v2 .penni-side-link:hover{transform:translateX(1px);}
+.penni-v2 .penni-side-link:active{transform:scale(.985);}
+.penni-v2 .surface{box-shadow:var(--penni-shadow);}
+.penni-v2 .surface h2,.penni-v2 .surface h3{font-weight:650;letter-spacing:-.025em;}
+.penni-v2 .money-tabular{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;letter-spacing:-.035em;}
+.penni-v2 .penni-selected-account .penni-account-card>div:first-child>span:first-child{display:none;}
+.penni-v2 .penni-ref-account-row .penni-account-card>div:first-child>span:first-child{display:none;}
+.penni-v2 .penni-account-card{transition:transform .25s cubic-bezier(.22,1,.36,1),box-shadow .25s;}
+.penni-v2 .penni-account-card:hover{transform:translateY(-3px);box-shadow:0 25px 45px -22px rgba(0,0,0,.45);}
+@keyframes penni-nav-select{from{opacity:.8;transform:scale(.985)}to{opacity:1;transform:scale(1)}}
+@media(max-width:767px){.penni-v2 .penni-route-header{height:62px;min-height:62px;}}
+@media(prefers-reduced-motion:reduce){.penni-v2 .penni-side-link[aria-current="page"]{animation:none;}}
+
+/* 2.1 regression fix: new Dashboard/Accounts exceeded the old short fixed workspace.
+ * Their page content must scroll naturally inside the app shell. */
+@media (min-width: 1024px) {
+  .penni-v2 .app-main-scroll:not(.workspace-main) {
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    overscroll-behavior: contain;
+  }
+  .penni-v2 .app-main-scroll:not(.workspace-main) > .page-in {
+    height: auto;
+    min-height: min-content;
+  }
+
+}
+.penni-v2 .penni-hero-grid,
+.penni-v2 .penni-reference-balance-card,
+.penni-v2 .penni-month-summary,
+.penni-v2 .penni-ref-accounts,
+.penni-v2 .penni-account-workspace,
+.penni-v2 .penni-account-selector {
+  min-width: 0;
+  max-width: 100%;
+}
+.penni-v2 .penni-reference-balance-card,
+.penni-v2 .penni-month-summary {
+  min-height: 0;
+}
+.penni-v2 .penni-hero-balance {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: clamp(30px, 4vw, 60px);
+}
+.penni-v2 .penni-ref-account-row,
+.penni-v2 .penni-account-selector {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.penni-v2 .penni-account-history-list {
+  min-height: 0;
+  max-height: min(65dvh, 620px);
+  overflow-y: auto;
+}
+@media (max-width: 767px) {
+  .penni-v2 .penni-hero-grid {grid-template-columns: minmax(0,1fr);}
+  .penni-v2 .penni-account-workspace {grid-template-columns: minmax(0,1fr);}
+  .penni-v2 .penni-hero-balance {font-size: clamp(29px, 8vw, 48px);}
+  .penni-v2 .penni-month-summary {height: auto;}
+  .penni-v2 .penni-account-history {min-width: 0;}
+  .penni-v2 .penni-native-popup {max-height: calc(100dvh - max(8px, env(safe-area-inset-top)));}
+}
+
+/* NativePopup renders through a Radix portal under document.body, so its
+   layout MUST be established here rather than inherited from the app shell.
+   A z-index without positioning leaves dialogs in normal document flow. */
+.penni-native-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--penni-z-backdrop);
+  background: var(--penni-overlay-backdrop);
+  backdrop-filter: blur(5px);
+  animation: penni-native-fade-in .18s ease-out both;
+}
+.penni-native-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: var(--penni-z-dialog);
+  display: flex;
+  flex-direction: column;
+  width: min(560px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: min(90dvh, 900px);
+  overflow: hidden;
+  color: hsl(var(--foreground));
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 24px;
+  box-shadow: 0 30px 90px -20px rgba(12, 18, 30, .4);
+  outline: none;
+  animation: penni-native-enter .22s cubic-bezier(.2,.8,.2,1) both;
+}
+.penni-native-popup[data-size="sm"] { width: min(420px, calc(100vw - 32px)); }
+.penni-native-popup[data-size="lg"] { width: min(780px, calc(100vw - 32px)); }
+.penni-native-popup[data-size="xl"] { width: min(1000px, calc(100vw - 32px)); }
+.penni-native-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.penni-native-popup .penni-transaction-body { min-height: 0; }
+.penni-native-popup .penni-transaction-fields { min-height: 0; overscroll-behavior: contain; }
+.penni-native-popup .penni-transaction-header,
+.penni-native-popup .penni-transaction-footer { flex-shrink: 0; }
+.penni-native-header,
+.penni-native-footer { display: flex; align-items: center; gap: 12px; padding: 18px 20px; }
+.penni-native-header { border-bottom: 1px solid hsl(var(--border)); }
+.penni-native-footer { border-top: 1px solid hsl(var(--border)); }
+.penni-native-title { font-size: 1rem; font-weight: 650; }
+.penni-native-description { margin-top: 4px; font-size: .8rem; opacity: .7; }
+.penni-native-close { margin-left: auto; padding: 6px; border-radius: 9px; }
+.penni-native-handle-zone { display: none; }
+@keyframes penni-native-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes penni-native-enter {
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 10px)) scale(.985); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@media (max-width: 767px) {
+  .penni-native-popup {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - env(safe-area-inset-top) - 8px);
+    border-radius: 24px 24px 0 0;
+    transform: none;
+    padding-bottom: env(safe-area-inset-bottom);
+    animation: penni-native-sheet-in .22s cubic-bezier(.2,.8,.2,1) both;
+  }
+  .penni-native-popup[data-size] { width: 100%; }
+  .penni-native-handle-zone {
+    display: flex;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 9px 0 3px;
+    touch-action: pan-y;
+  }
+  .penni-native-handle { width: 36px; height: 4px; border-radius: 999px; background: hsl(var(--muted-foreground) / .28); }
+  @keyframes penni-native-sheet-in { from { opacity: .85; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .penni-native-popup, .penni-native-backdrop { animation: none; }
+}
+
+/* Radix popover/select menus portal to document.body, outside the dialog.
+   Their default Tailwind z-50 / z-100 is BELOW NativePopup's z-index 9991,
+   making account and category options appear inaccessible. All dropdown
+   portals must be stacked above the native dialog, without clipping. */
+/* Radix popper wrappers create independent stacking contexts; keep menus above dialogs. */
+.penni-native-popover,
+[data-radix-popper-content-wrapper]:has(.penni-native-popover) {
+  z-index: var(--penni-z-menu) !important;
+}
+.penni-native-popup [data-radix-select-trigger] { cursor: pointer; }
+[data-radix-popper-content-wrapper]:has([role="listbox"]),
+[data-radix-popper-content-wrapper]:has([data-radix-select-viewport]) {
+  z-index: var(--penni-z-menu) !important;
+}
+.penni-native-popover {
+  max-height: min(65dvh, 420px);
+  overflow: auto;
+}
+
+/* Shared layout contract: the Dashboard, not its individual columns, owns its scroll. */
+@media(min-width:1024px) {
+ .penni-v2 .dashboard-reference {
+   min-height:0; overflow-x:hidden; overflow-y:auto;
+   overscroll-behavior:contain; scrollbar-width:thin;
+   padding-right:clamp(0px,.3vw,6px);
+ }
+ .penni-v2 .dashboard-reference > .dashboard-panels {
+   display:grid; flex:none; min-height:auto; overflow:visible;
+ }
+ .penni-v2 .dashboard-reference > .dashboard-panels > div {
+   min-height:auto; overflow:visible; padding-right:0;
+ }
+}
+@media(max-width:767px) {
+ .penni-v2 .app-main-scroll {padding-bottom:calc(80px + env(safe-area-inset-bottom,0px));}
+ .penni-v2 .penni-account-selector .penni-selected-account {
+   width:min(290px,calc(100vw - 40px));min-width:min(290px,calc(100vw - 40px));
+ }
+}
+.penni-v2 .label-overline {font-size:11px;line-height:1.45;}
+.penni-v2 .penni-data-table th {font-size:12px;}
+.penni-v2 .penni-ref-account-row .penni-account-card {min-height:175px;}
+.penni-v2.penni-private [data-sensitive-amount] {filter:blur(7px);user-select:none;}
+
+/* The Accounts overview owns vertical scroll: do not trap a second independent
+   scroller inside the transaction-history card. */
+.penni-v2 .accounts-workspace .penni-account-history {
+  min-height:0;
+  max-height:none;
+  overflow:visible;
+}
+.penni-v2 .accounts-workspace .penni-account-history-list {
+  max-height:none;
+  overflow:visible;
+}
+/* Keep actions in their own row when the viewport narrows. */
+@media (max-width:767px) {
+ .penni-v2 .penni-accounts-toolbar {align-items:stretch;gap:10px;}
+ .penni-v2 .penni-accounts-toolbar > :last-child {
+   display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-start;
+ }
+ .penni-v2 .transactions-primary .workspace-page-header > :last-child {
+   width:100%;justify-content:flex-start;
+ }
+}
+@media (min-width:768px) {
+ .penni-v2 .penni-accounts-toolbar > :first-child {display:none;}
+ .penni-v2 .penni-accounts-toolbar > :last-child {margin-left:auto;}
+}
+/* Only transaction form fields scroll inside the NativePopup: title and action
+   bar stay visible when the virtual keyboard or 200% zoom shrinks the viewport. */
+.penni-native-popup .penni-transaction-body {
+  overflow:hidden;
+}
+.penni-native-popup .penni-transaction-fields {
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+}
+@media (hover:none) {
+  .penni-v2 .surface-hover:hover, .penni-v2 .penni-interactive:hover {
+    transform:none;
+  }
+}
