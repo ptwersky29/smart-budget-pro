@@ -1,6 +1,7 @@
 """Smart financial engine: transactions, budgets, analytics, merchant normalization, split, recurring."""
 
 import logging
+import math
 import re
 import uuid
 from collections import defaultdict
@@ -416,6 +417,21 @@ class BulkUpdateIn(BaseModel):
 
 class SplitIn(BaseModel):
     splits: list[dict]  # [{amount: float, category: str, description: str}]
+
+
+class SplitComposeIn(TransactionIn):
+    """Create or update a parent transaction and its allocations together."""
+    splits: list[dict]
+    exclude_from_maaser: bool = False
+
+
+class TransferCreateIn(BaseModel):
+    from_account_id: str
+    to_account_id: str
+    amount: float
+    date: Optional[str] = None
+    description: str = "Transfer between accounts"
+    notes: Optional[str] = None
 
 
 class ApproveCategoryIn(BaseModel):
@@ -2069,6 +2085,184 @@ Output ONLY valid JSON, no markdown, no explanation:
                 }
 
             return resp
+
+    # Atomic transaction composer routes. Never create a dangling expense and
+    # then ask the user to complete its split or transfer in a second dialog.
+    @router.post("/transactions/split-create")
+    @router.put("/transactions/{tx_id}/split-composed")
+    async def save_composed_split(
+        payload: SplitComposeIn,
+        request: Request,
+        user: dict = Depends(get_current_user),
+        tx_id: Optional[str] = None,
+    ):
+        from statements import resolve_category as resolve_split_category
+
+        sm = request.app.state.db
+        if not math.isfinite(payload.amount):
+            raise HTTPException(400, "Enter a valid transaction amount")
+        amount_cents = round(abs(payload.amount) * 100)
+        if not (0 < amount_cents <= 100000000000):
+            raise HTTPException(400, "Enter a valid transaction amount")
+        if len(payload.splits) < 2 or len(payload.splits) > 50:
+            raise HTTPException(400, "Use between 2 and 50 categories")
+        allocations = []
+        for line in payload.splits:
+            if not isinstance(line, dict):
+                raise HTTPException(400, "Invalid split row")
+            name = str(line.get("category") or "").strip()
+            if not name:
+                raise HTTPException(400, "Choose a category for every split")
+            try:
+                number = float(line.get("amount"))
+            except (ValueError, TypeError):
+                raise HTTPException(400, "Enter an amount for every split")
+            if not (number > 0 and math.isfinite(number)) or abs(round(number * 100) / 100 - number) > 0.000001:
+                raise HTTPException(400, "Split amounts must be positive and in pence")
+            allocations.append((round(number * 100), resolve_split_category(name),
+                                sanitize_input(str(line.get("description") or ""), max_len=500)))
+        if sum(part[0] for part in allocations) != amount_cents:
+            raise HTTPException(400, "Split allocations must equal the full transaction amount")
+        if not str(payload.description or "").strip():
+            raise HTTPException(400, "Enter a transaction description")
+        try:
+            tx_date = datetime.fromisoformat(payload.date) if payload.date else datetime.now(timezone.utc)
+        except ValueError:
+            raise HTTPException(400, "Invalid transaction date")
+        amount = (1 if payload.is_income else -1) * amount_cents / 100
+        async with sm() as session:
+            account = (await session.execute(select(BankAccount).where(
+                BankAccount.user_id == user["user_id"],
+                BankAccount.account_id == payload.account_id,
+            ))).scalar_one_or_none()
+            if not account:
+                raise HTTPException(400, "Select an existing account")
+            tx = None
+            if tx_id:
+                tx = (await session.execute(select(Transaction).where(
+                    Transaction.transaction_id == tx_id,
+                    Transaction.user_id == user["user_id"],
+                ))).scalar_one_or_none()
+                if not tx:
+                    raise HTTPException(404, "Transaction not found")
+                if tx.transfer_pair_id or tx.tx_type == "transfer":
+                    raise HTTPException(400, "Transfers cannot be split")
+                old_account, old_amount = tx.account_id, float(tx.amount or 0)
+                if old_account == payload.account_id:
+                    await _adjust_account_balance(session, user["user_id"], old_account, amount - old_amount)
+                else:
+                    await _adjust_account_balance(session, user["user_id"], old_account, -old_amount)
+                    await _adjust_account_balance(session, user["user_id"], payload.account_id, amount)
+                await session.execute(delete(SplitTransaction).where(
+                    SplitTransaction.parent_transaction_id == tx_id,
+                    SplitTransaction.user_id == user["user_id"],
+                ))
+            else:
+                tx = Transaction(
+                    transaction_id=f"tx_{uuid.uuid4().hex[:12]}",
+                    user_id=user["user_id"], source="manual",
+                    approval_status="approved", category_approval_status="approved",
+                    approved_at=datetime.now(timezone.utc),
+                )
+                # Delay adding new parent until all NOT NULL fields are populated.
+                # Balance lookups would otherwise autoflush it early.
+                await _adjust_account_balance(session, user["user_id"], payload.account_id, amount)
+            description = sanitize_input(payload.description, max_len=500)
+            merchant = sanitize_input(payload.merchant or "", max_len=255)
+            tx.account_id = payload.account_id
+            tx.amount = amount
+            tx.currency = "GBP"
+            tx.date = tx_date
+            tx.description = description
+            tx.merchant_name = merchant or None
+            tx.normalized_merchant = normalize_merchant(merchant or description)
+            tx.category = allocations[0][1]
+            tx.notes = payload.notes
+            tx.exclude_from_maaser = bool(payload.exclude_from_maaser)
+            tx.category_approval_status = "approved"
+            if not tx_id:
+                session.add(tx)
+            for cents, category, line_description in allocations:
+                session.add(SplitTransaction(
+                    split_id=f"spl_{uuid.uuid4().hex[:12]}",
+                    parent_transaction_id=tx.transaction_id,
+                    user_id=user["user_id"],
+                    amount=cents / 100,
+                    category=category,
+                    description=line_description or None,
+                ))
+            await session.commit()
+            await session.refresh(tx)
+            doc = _tx_to_dict(tx)
+            doc["is_split"] = True
+            doc["split_count"] = len(allocations)
+            if doc["approval_status"] == "approved":
+                await maaser.maybe_accrue(session, user["user_id"], doc)
+            _invalidate_finance_caches(user["user_id"])
+            return doc
+
+    @router.post("/transactions/transfer-create")
+    async def create_linked_transfer(
+        payload: TransferCreateIn,
+        request: Request,
+        user: dict = Depends(get_current_user),
+    ):
+        if payload.from_account_id == payload.to_account_id:
+            raise HTTPException(400, "Choose two different accounts")
+        if not math.isfinite(payload.amount):
+            raise HTTPException(400, "Enter a valid transfer amount")
+        amount_cents = round(abs(payload.amount) * 100)
+        if not (0 < amount_cents <= 100000000000):
+            raise HTTPException(400, "Enter a valid transfer amount")
+        if abs(round(abs(payload.amount) * 100) / 100 - abs(payload.amount)) > 0.000001:
+            raise HTTPException(400, "Transfer amount must be in pence")
+        try:
+            transfer_date = datetime.fromisoformat(payload.date) if payload.date else datetime.now(timezone.utc)
+        except ValueError:
+            raise HTTPException(400, "Invalid transfer date")
+        sm = request.app.state.db
+        async with sm() as session:
+            accounts = (await session.execute(select(BankAccount).where(
+                BankAccount.user_id == user["user_id"],
+                BankAccount.account_id.in_([payload.from_account_id, payload.to_account_id]),
+            ))).scalars().all()
+            if len(accounts) != 2:
+                raise HTTPException(400, "Both accounts must exist")
+            if (accounts[0].currency or "GBP") != (accounts[1].currency or "GBP"):
+                raise HTTPException(400, "Transfers require matching account currencies")
+            currency = accounts[0].currency or "GBP"
+            pair_id = f"trp_{uuid.uuid4().hex[:12]}"
+            outgoing_id = f"tx_{uuid.uuid4().hex[:12]}"
+            incoming_id = f"tx_{uuid.uuid4().hex[:12]}"
+            description = sanitize_input(payload.description or "Transfer between accounts", max_len=500)
+            rows = []
+            for account_id, cents, tx_id in (
+                (payload.from_account_id, -amount_cents, outgoing_id),
+                (payload.to_account_id, amount_cents, incoming_id),
+            ):
+                tx = Transaction(
+                    transaction_id=tx_id, user_id=user["user_id"],
+                    account_id=account_id, amount=cents / 100, currency=currency,
+                    description=description, category="transfer",
+                    normalized_merchant=None,
+                    date=transfer_date, notes=payload.notes,
+                    source="manual", tx_type="transfer", transfer_pair_id=pair_id,
+                    exclude_from_maaser=True, approval_status="approved",
+                    category_approval_status="approved",
+                    approved_at=datetime.now(timezone.utc),
+                )
+                session.add(tx)
+                rows.append(tx)
+                await _adjust_account_balance(session, user["user_id"], account_id, cents / 100)
+            session.add(TransactionTransferPair(
+                transfer_pair_id=pair_id, user_id=user["user_id"],
+                outgoing_transaction_id=outgoing_id, incoming_transaction_id=incoming_id,
+                notes=payload.notes,
+            ))
+            await session.commit()
+            _invalidate_finance_caches(user["user_id"])
+            return {"ok": True, "transfer_pair_id": pair_id,
+                    "transactions": [_tx_to_dict(tx) for tx in rows]}
 
     @router.post("/transactions")
     async def create_transaction(

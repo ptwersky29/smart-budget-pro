@@ -19,7 +19,8 @@ const today = () => new Date().toISOString().slice(0,10);
 const emptyTransaction = (account_id="") => ({
   description:"", date:today(), amount:"", category:"", merchant:"", notes:"",
   account_id, is_income:false, is_transfer:false, entry_mode:"standard",
-  budget_type:"", occasion:"", exclude_from_maaser:false,
+  budget_type:"", occasion:"", exclude_from_maaser:false, split_lines:[],
+  transfer_to_account_id:"", transfer_outgoing_id:"", transfer_incoming_id:"", transfer_flow:"new",
 });
 const PANEL_TITLES = {
   "transaction-info":"Transaction details", "budget-new":"Create budget", "budget-edit":"Edit budget",
@@ -40,6 +41,7 @@ export default function GlobalActionHost() {
   const [saveAsRecurring, setSaveAsRecurring] = useState(false);
   const [savingTransaction, setSavingTransaction] = useState(false);
   const [transactionError, setTransactionError] = useState("");
+  const [loadingSplit, setLoadingSplit] = useState(false);
   const savingRef = useRef(false);
   const [fromDate,setFromDate] = useState(() => {const d=new Date();d.setDate(d.getDate()-90);return d.toISOString().slice(0,10)});
 
@@ -67,9 +69,34 @@ export default function GlobalActionHost() {
       setTransactionForm({...emptyTransaction(item.account_id||""), description:item.description||"",date:String(item.date||today()).slice(0,10),
         amount:String(Math.abs(Number(item.amount)||0)), category:item.category||"",merchant:item.merchant||"",notes:item.notes||"",
         account_id:item.account_id||"",is_income:Number(item.amount)>0,is_transfer:!!(item.is_transfer || item.tx_type === "transfer"),
+        entry_mode:item.is_split ? "split" : (item.is_transfer || item.tx_type === "transfer") ? "transfer" : "standard",
         exclude_from_maaser:!!item.exclude_from_maaser,budget_type:item.budget_type||"",occasion:item.occasion||"",
         balance_type:item.balance_type||"available",pending:!!item.pending,tags:item.tags||null});
     } else setTransactionForm(emptyTransaction(payload.accountId || ""));
+  }, [type, active?.key]);
+
+  // Existing split rows are loaded before editing; allocations belong to one
+  // parent transaction and cannot be guessed from its displayed category.
+  useEffect(() => {
+    if (type !== "transaction-edit" || !item?.transaction_id || !item.is_split) return;
+    let alive = true;
+    setLoadingSplit(true);
+    api.get(`/transactions/${item.transaction_id}/splits`)
+      .then(({data}) => {
+        if (!alive) return;
+        setTransactionForm(previous => ({
+          ...previous,
+          entry_mode:"split",
+          split_lines:(data.splits||[]).map((line,i)=>({
+            id:line.split_id || `existing-${i}`,
+            category:line.category || "", amount:String(line.amount || ""),
+            description:line.description || "",
+          })),
+        }));
+      })
+      .catch(()=>{if(alive)setTransactionError("Could not load split allocations. Please reopen this transaction.");})
+      .finally(()=>{if(alive)setLoadingSplit(false);});
+    return()=>{alive=false;};
   }, [type, active?.key]);
 
   // Avoid forcing users with one account to select the only option, but never
@@ -92,70 +119,140 @@ export default function GlobalActionHost() {
   const afterSave = (entity) => { changed(entity); closeAction(); };
   const saveTransaction = async event => {
     event?.preventDefault?.();
-    if (savingRef.current) return;
+    if (savingRef.current || loadingSplit) return;
+    const mode = transactionForm.entry_mode || "standard";
+    const pairExisting = mode === "transfer" && transactionForm.transfer_flow === "pair";
     const amount = Number(transactionForm.amount);
     const description = String(transactionForm.description || "").trim();
-    if (!transactionForm.account_id) {
-      setTransactionError("Choose an account before saving.");
-      requestAnimationFrame(() => document.getElementById("tx-account")?.focus());
+    const fail = (message, id) => {
+      setTransactionError(message);
+      if (id) requestAnimationFrame(() => document.getElementById(id)?.focus());
+    };
+    if (pairExisting) {
+      if (!transactionForm.transfer_outgoing_id || !transactionForm.transfer_incoming_id) {
+        fail("Select both matching transactions.");
+        return;
+      }
+    } else {
+      if (!transactionForm.account_id) {
+        fail("Choose an account before saving.", "tx-account");
+        return;
+      }
+      if (!Number.isFinite(amount) || amount <= 0 || Math.abs(amount * 100 - Math.round(amount * 100)) > 0.000001) {
+        fail("Enter an amount greater than zero.", "tx-amount");
+        return;
+      }
+      if (!description && mode !== "transfer") {
+        fail("Enter a transaction description.", "tx-desc");
+        return;
+      }
+      if (!transactionForm.date) {
+        fail("Choose a transaction date.", "tx-date");
+        return;
+      }
+    }
+    const lines = transactionForm.split_lines || [];
+    if (mode === "split") {
+      if (lines.length < 2 || lines.length > 50 ||
+        lines.some(line => !line.category || !Number.isFinite(Number(line.amount)) || Number(line.amount) <= 0) ||
+        lines.reduce((sum,line)=>sum + Math.round(Number(line.amount)*100),0) !== Math.round(amount*100)) {
+        fail("Add at least two valid category amounts that exactly equal the transaction total.");
+        return;
+      }
+    }
+    if (mode === "transfer" && !pairExisting &&
+      (!transactionForm.transfer_to_account_id || transactionForm.transfer_to_account_id === transactionForm.account_id)) {
+      fail("Choose a different destination account.", "tx-to-account");
       return;
     }
-    if (!Number.isFinite(amount) || amount<=0) {
-      setTransactionError("Enter an amount greater than zero.");
-      requestAnimationFrame(() => document.getElementById("tx-amount")?.focus());
-      return;
-    }
-    if (!description) {
-      setTransactionError("Enter a transaction description.");
-      requestAnimationFrame(() => document.getElementById("tx-desc")?.focus());
-      return;
-    }
-    if (!transactionForm.date) {
-      setTransactionError("Choose a transaction date.");
-      requestAnimationFrame(() => document.getElementById("tx-date")?.focus());
+    if (type === "transaction-edit" && item?.transfer_pair_id) {
+      fail("Unpair this transfer before editing either side, so the linked balances stay consistent.");
       return;
     }
     setTransactionError("");
-    const body={description,amount:transactionForm.is_income?Math.abs(amount):-Math.abs(amount),
-      category:transactionForm.category||undefined,date:transactionForm.date||today(),account_id:transactionForm.account_id,
-      merchant:transactionForm.merchant||undefined,notes:transactionForm.notes||undefined,
-      is_income:!!transactionForm.is_income,is_transfer:!!transactionForm.is_transfer};
+    const body = {
+      description:description || "Transfer between accounts",
+      amount:transactionForm.is_income ? Math.abs(amount) : -Math.abs(amount),
+      category:transactionForm.category||undefined,
+      date:transactionForm.date||today(),
+      account_id:transactionForm.account_id,
+      merchant:transactionForm.merchant||undefined,
+      notes:transactionForm.notes||undefined,
+      is_income:!!transactionForm.is_income,
+      is_transfer:false,
+    };
     savingRef.current = true;
     setSavingTransaction(true);
     try {
-      let createdTransaction = null;
-      if (type==="transaction-edit" && item?.transaction_id) {
-        await api.patch(`/transactions/${item.transaction_id}`, {...body, exclude_from_maaser: !!transactionForm.exclude_from_maaser});
-      } else if (transactionForm.entry_mode === "split" || transactionForm.entry_mode === "transfer") {
-        const {data} = await api.post("/transactions", {...body, exclude_from_maaser: transactionForm.entry_mode === "transfer" || !!transactionForm.exclude_from_maaser});
-        createdTransaction = data;
+      if (pairExisting) {
+        await api.post("/transactions/transfer-pairs", {
+          outgoing_transaction_id:transactionForm.transfer_outgoing_id,
+          incoming_transaction_id:transactionForm.transfer_incoming_id,
+        });
+      } else if (mode === "transfer") {
+        if (type === "transaction-edit") {
+          fail("Existing transfers can only be paired or unpaired. Create a new transfer to move funds.");
+          return;
+        }
+        await api.post("/transactions/transfer-create", {
+          from_account_id:transactionForm.account_id,
+          to_account_id:transactionForm.transfer_to_account_id,
+          amount:Math.abs(amount), date:body.date,
+          description:body.description, notes:body.notes,
+        });
+      } else if (mode === "split") {
+        const payload = {
+          ...body,
+          splits:lines.map(line=>({
+            category:line.category,
+            amount:Number(line.amount),
+            description:line.description || description,
+          })),
+          exclude_from_maaser:!!transactionForm.exclude_from_maaser,
+        };
+        if (type === "transaction-edit" && item?.transaction_id) {
+          await api.put(`/transactions/${item.transaction_id}/split-composed`, payload);
+        } else {
+          await api.post("/transactions/split-create", payload);
+        }
+      } else if (type === "transaction-edit" && item?.transaction_id) {
+        await api.patch(`/transactions/${item.transaction_id}`, {
+          ...body,
+          exclude_from_maaser:!!transactionForm.exclude_from_maaser,
+        });
+        if (item.is_split) {
+          await api.delete(`/transactions/${item.transaction_id}/splits`);
+        }
       } else if (classification || transactionForm.budget_type) {
         const suggestions = classification?.suggestions || [];
         const chosenIndex = suggestions.findIndex(s=>s.category === transactionForm.category);
         await api.post("/budget-system/approve", {
-          description:body.description?.trim() || "Transaction", amount:body.amount,
+          description:body.description, amount:body.amount,
           budget_type:transactionForm.budget_type || suggestions[0]?.budget_type || "day_to_day",
           occasion:transactionForm.occasion || suggestions[0]?.occasion || "Monthly Living",
-          category:body.category || suggestions[0]?.category || "uncategorized", merchant:body.merchant || suggestions[0]?.merchant || "",
-          account_id:body.account_id, suggestion_id:classification?.suggestion_id || null,
-          suggestion_index:chosenIndex>=0 ? chosenIndex : null, save_as_recurring:saveAsRecurring
+          category:body.category || suggestions[0]?.category || "uncategorized",
+          merchant:body.merchant || suggestions[0]?.merchant || "",
+          account_id:body.account_id,
+          suggestion_id:classification?.suggestion_id || null,
+          suggestion_index:chosenIndex>=0 ? chosenIndex : null,
+          save_as_recurring:saveAsRecurring,
         });
       } else {
-        await api.post("/transactions", {...body, exclude_from_maaser: !!transactionForm.exclude_from_maaser});
+        await api.post("/transactions", {...body, exclude_from_maaser:!!transactionForm.exclude_from_maaser});
       }
-      toast.success(type==="transaction-edit"?"Transaction updated":"Transaction added");
-      if (createdTransaction?.transaction_id && (transactionForm.entry_mode === "split" || transactionForm.entry_mode === "transfer")) {
-        changed("transactions");
-        openAction(transactionForm.entry_mode === "split" ? "transaction-split" : "transaction-transfer", {transaction:createdTransaction});
-        return;
-      }
+      toast.success(pairExisting ? "Transactions paired" :
+        mode === "transfer" ? "Transfer created" :
+        mode === "split" ? "Split saved" :
+        type === "transaction-edit" ? "Transaction updated" : "Transaction added");
       afterSave("transactions");
-    } catch(e){
-      const message = formatApiError(e) || "Could not save transaction";
+    } catch(error) {
+      const message = formatApiError(error.response?.data?.detail || error) || "Could not save transaction";
       setTransactionError(message);
       toast.error(message);
+    } finally {
+      savingRef.current = false;
+      setSavingTransaction(false);
     }
-    finally { savingRef.current = false; setSavingTransaction(false); }
   };
   const connectBank = async () => {
     setConnecting(true);
@@ -171,7 +268,7 @@ export default function GlobalActionHost() {
     onClose={closeAction} onSubmit={saveTransaction} accounts={accounts} accountsLoading={accountLoading}
     onClassify={classifyTransaction} classifying={classifying} classification={classification}
     onClearClassification={() => setClassification(null)}
-    saveAsRecurring={saveAsRecurring} setSaveAsRecurring={setSaveAsRecurring} saving={savingTransaction}
+    saveAsRecurring={saveAsRecurring} setSaveAsRecurring={setSaveAsRecurring} saving={savingTransaction || loadingSplit}
     validationError={transactionError}/>;
   if (isAccountForm) return <AccountFormModal key={active.key} open onClose={closeAction} onCreated={()=>changed("accounts")} />;
   // Creation and editing use the same native modal on every page. Information

@@ -643,3 +643,89 @@ html.dark[data-penni-accent="violet"] .penni-v2 {--penni-accent:#a07bff;}
     transform:none;
   }
 }
+
+/* Unified transaction composer — popup inherits Penni's existing token palette. */
+.penni-composer .penni-native-header { padding: 16px 22px; }
+.penni-composer .penni-native-description { font-size: 12px; }
+.penni-composer .penni-native-body { overflow: hidden; }
+.penni-composer .penni-transaction-fields { scrollbar-width: thin; }
+.penni-composer .penni-composer-segments,
+.penni-composer .penni-composer-kind {
+  padding: 4px; border: 1px solid hsl(var(--border));
+  border-radius: 14px; background: hsl(var(--secondary) / .36);
+}
+.penni-composer .penni-composer-segment,
+.penni-composer .penni-composer-kind-option {
+  display: inline-flex; min-width: 0; align-items: center; justify-content: center;
+  gap: 7px; border-radius: 10px; padding: 10px 7px; color: hsl(var(--muted-foreground));
+  font-size: 12px; font-weight: 550; transition: background .16s ease, color .16s ease, box-shadow .16s ease;
+}
+.penni-composer .penni-composer-segment:hover,
+.penni-composer .penni-composer-kind-option:hover { color: hsl(var(--foreground)); }
+.penni-composer .penni-composer-segment.is-active,
+.penni-composer .penni-composer-kind-option.is-active {
+  color: hsl(var(--foreground)); background: hsl(var(--card));
+  box-shadow: 0 1px 5px hsl(var(--foreground) / .08), inset 0 0 0 1px hsl(var(--border) / .6);
+}
+.penni-composer .penni-composer-amount {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; padding: 17px 8px; background: hsl(var(--secondary) / .23); border-radius: 16px;
+}
+.penni-composer .penni-composer-control {
+  border: 1px solid hsl(var(--border)); border-radius: 11px;
+  background: hsl(var(--card)); padding-left: 12px; padding-right: 12px;
+  color: hsl(var(--foreground)); font-size: 13px; box-shadow: none;
+}
+.penni-composer .penni-composer-control:focus-visible {
+  outline: 2px solid hsl(var(--primary) / .45); outline-offset: 1px;
+}
+.penni-composer .penni-composer-category {
+  display:flex; align-items:center; gap: 9px; min-width:0;
+  min-height: 42px; padding: 7px 11px; border: 1px solid hsl(var(--border));
+  background: hsl(var(--secondary) / .2); border-radius: 11px; font-size:12px;
+  transition: background .16s ease, border-color .16s ease;
+}
+.penni-composer .penni-composer-category:hover { background: hsl(var(--secondary) / .5); }
+.penni-composer .penni-composer-category.is-active {
+  border-color: hsl(var(--primary) / .35); background: hsl(var(--primary) / .08);
+}
+.penni-composer .penni-composer-split-row {
+  display:flex; align-items:center; gap: 8px; min-width:0;
+}
+.penni-composer .penni-composer-row-number {
+  display:grid; place-items:center; flex-shrink:0; width:22px; height:22px;
+  border-radius: 7px; background: hsl(var(--secondary)); font-size:11px;
+  font-weight:650; color: hsl(var(--muted-foreground));
+}
+.penni-composer .penni-composer-remove {
+  flex-shrink:0; padding:7px; border-radius: 9px; color:hsl(var(--muted-foreground));
+}
+.penni-composer .penni-composer-remove:not(:disabled):hover {color:hsl(var(--destructive));background:hsl(var(--destructive) / .07);}
+.penni-composer .penni-composer-remove:disabled {opacity:.22;cursor:not-allowed;}
+.penni-composer .penni-composer-add {
+  padding:10px;border:1px dashed hsl(var(--border));border-radius:11px;
+  color:hsl(var(--primary));font-size:12px;font-weight:600;
+  transition:background .16s ease;
+}
+.penni-composer .penni-composer-add:hover {background:hsl(var(--secondary) / .45);}
+.penni-composer .penni-composer-breakdown {
+  border: 1px solid hsl(var(--border)); border-radius:12px;
+  padding:13px; background:hsl(var(--secondary) / .23);
+}
+.penni-composer .penni-composer-swap {
+  display:grid; place-items:center; height:32px;width:32px;border-radius:999px;
+  border:1px solid hsl(var(--border)); color:hsl(var(--muted-foreground));
+  background:hsl(var(--card));transition: transform .18s ease;
+}
+.penni-composer .penni-composer-swap:hover {transform:rotate(180deg);}
+.penni-composer .penni-transaction-footer {background:hsl(var(--card));}
+@media(max-width:480px) {
+  .penni-composer .penni-composer-segment {gap:4px;font-size:11px;}
+  .penni-composer .penni-composer-split-row {gap:5px;}
+  .penni-composer .penni-composer-split-row > .relative {width:98px;}
+  .penni-composer .penni-composer-row-number {display:none;}
+}
+@media(prefers-reduced-motion:reduce) {
+  .penni-composer .penni-composer-segment, .penni-composer .penni-composer-kind-option,
+  .penni-composer .penni-composer-swap, .penni-composer .penni-composer-add {transition:none;}
+}

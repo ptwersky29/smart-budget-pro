@@ -1,608 +1,322 @@
-import PenniSelect from "./PenniSelect";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { ArrowDownUp, ArrowLeftRight, Check, ChevronDown, ChevronUp, Loader2, Plus, ReceiptText, Sparkles, Split, Trash2 } from "lucide-react";
+import { api, formatApiError } from "../lib/api";
 import NativePopup from "./ui/NativePopup";
-import { toast } from "sonner";
+import PenniSelect from "./PenniSelect";
+import CategoryCombobox from "./CategoryCombobox";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import {
-  Sparkles,
-  Loader2,
-  X,
-  ChevronDown,
-  ChevronUp,
-  Check,
-  Brain,
-  Receipt,
-  Split,
-  ArrowLeftRight,
-  Plus,
-  Pencil,
-  Wallet,
-  CalendarDays,
-} from "lucide-react";
-import CategoryCombobox from "./CategoryCombobox";
-import CategoryBadge from "./CategoryBadge";
 import { formatCurrency } from "../lib/format";
 
-const BUDGET_TYPES = ["day_to_day", "yom_tov", "holiday", "simcha", "other"];
+const moneyCents = value => Math.round((Number(value) || 0) * 100);
+const freshRow = () => ({ id: Math.random().toString(36).slice(2), category: "", amount: "", description: "" });
+const fieldLabel = "mb-1.5 block text-xs font-medium text-muted-foreground";
+const modes = [{ value: "standard", label: "Standard", Icon: ReceiptText }, { value: "split", label: "Split", Icon: Split }, { value: "transfer", label: "Transfer", Icon: ArrowLeftRight }];
 
 export default function TransactionForm({
-  open,
-  editingId,
-  form,
-  setForm,
-  selectedCats,
-  onClose,
-  onSubmit,
-  saving = false,
-  onClassify,
-  classifying,
-  classification,
-  onClearClassification,
-  saveAsRecurring,
-  setSaveAsRecurring,
-  onCategoryCreated,
-  accounts,
-  accountsLoading,
-  validationError,
+  open, editingId, form, setForm, selectedCats = [], onClose, onSubmit,
+  saving = false, onClassify, classifying, classification, onClearClassification,
+  saveAsRecurring, setSaveAsRecurring, onCategoryCreated,
+  accounts = [], accountsLoading, validationError,
 }) {
-  const [showMore, setShowMore] = useState(false);
-
-  if (!open) return null;
-
-  const canClassify =
-    Boolean(form.description?.trim()) && Boolean(form.amount) && !editingId && !classifying;
-  const hasManualFields = form.budget_type || form.occasion || form.merchant;
-  const entryMode =
-    form.entry_mode || (form.is_transfer ? "transfer" : "standard");
-
-  const setEntryMode = (mode) => {
-    setForm({
-      ...form,
-      entry_mode: mode,
-      is_transfer: mode === "transfer",
-      is_income: mode === "transfer" ? false : form.is_income,
-      exclude_from_maaser:
-        mode === "transfer" ? true : form.exclude_from_maaser,
+  const [more, setMore] = useState(false);
+  const [matches, setMatches] = useState([]);
+  const [matchesTotal, setMatchesTotal] = useState(0);
+  const [matchesLoading, setMatchesLoading] = useState(false);
+  const [matchError, setMatchError] = useState("");
+  const mode = form.entry_mode || "standard";
+  const pairExisting = mode === "transfer" && form.transfer_flow === "pair";
+  const update = fields => setForm({ ...form, ...fields });
+  const splitRows = Array.isArray(form.split_lines) && form.split_lines.length ? form.split_lines : [freshRow(), freshRow()];
+  const updateSplit = (index, changes) => update({ split_lines: splitRows.map((line, i) => i === index ? { ...line, ...changes } : line) });
+  const totalCents = moneyCents(form.amount);
+  const allocated = splitRows.reduce((total, line) => total + moneyCents(line.amount), 0);
+  const remaining = totalCents - allocated;
+  const availableAccounts = Array.isArray(accounts) ? accounts : [];
+  const chosenFrom = availableAccounts.find(a => a.account_id === form.account_id);
+  const chosenTo = availableAccounts.find(a => a.account_id === form.transfer_to_account_id);
+  const sourceTx = matches.find(t => t.transaction_id === form.transfer_outgoing_id);
+  const targetTx = matches.find(t => t.transaction_id === form.transfer_incoming_id);
+  const pairValid = Boolean(sourceTx && targetTx &&
+    sourceTx.account_id !== targetTx.account_id &&
+    !sourceTx.transfer_pair_id && !targetTx.transfer_pair_id &&
+    (sourceTx.currency || "GBP") === (targetTx.currency || "GBP") &&
+    moneyCents(sourceTx.amount) === -moneyCents(targetTx.amount) &&
+    moneyCents(sourceTx.amount) < 0);
+  const categories = (Array.isArray(selectedCats) ? selectedCats : []).filter(c => c && typeof c.name === "string" && !c.is_archived);
+  const quickCategories = categories.slice(0, 4);
+  const canClassify = Boolean(form.description?.trim()) && totalCents > 0 && !editingId && !classifying && mode === "standard";
+  const setMode = value => {
+    update({
+      entry_mode: value, is_transfer: value === "transfer",
+      split_lines: value === "split" ? (Array.isArray(form.split_lines) && form.split_lines.length >= 2 ? form.split_lines : [freshRow(), freshRow()]) : form.split_lines,
+      transfer_flow: form.transfer_flow || "new",
+      is_income: value === "transfer" ? false : form.is_income,
     });
   };
 
-  const transactionModes = [
-    { value: "standard", label: "Standard", Icon: Receipt },
-    { value: "split", label: "Split", Icon: Split },
-    { value: "transfer", label: "Transfer", Icon: ArrowLeftRight },
-  ];
+  useEffect(() => {
+    if (!open || !pairExisting) return;
+    let active = true;
+    setMatchesLoading(true);
+    setMatchError("");
+    api.get("/transactions", { params: { limit: 1000, offset: 0 } })
+      .then(({ data }) => {
+        if (!active) return;
+        setMatches(data.transactions || []);
+        setMatchesTotal(Number(data.total) || 0);
+      })
+      .catch(error => { if (active) setMatchError(formatApiError(error) || "Could not load transactions"); })
+      .finally(() => { if (active) setMatchesLoading(false); });
+    return () => { active = false; };
+  }, [open, pairExisting]);
 
-  const suggestions = classification?.suggestions || [];
-  const topSuggestion = suggestions[0];
-  const autoFill = topSuggestion && topSuggestion.confidence >= 0.95;
+  const loadMore = async () => {
+    setMatchesLoading(true);
+    try {
+      const { data } = await api.get("/transactions", { params: { limit: 1000, offset: matches.length } });
+      setMatches(rows => [...rows, ...(data.transactions || [])]);
+      setMatchesTotal(Number(data.total) || 0);
+    } catch(error) {
+      setMatchError(formatApiError(error) || "Could not load older transactions");
+    } finally {
+      setMatchesLoading(false);
+    }
+  };
 
-  return (
-    <NativePopup open={open} onClose={onClose} title={editingId ? "Edit transaction" : "New transaction"}
-      size="md" className="penni-transaction-popup" bodyClassName="penni-transaction-body" showHeader
-      description={editingId ? "Balances, budgets and analytics update instantly." : "Log money in or out of any account."}>
-      <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
-        {/* Scrollable Form Body */}
-        <form
-          id="penni-transaction-form"
-          noValidate
-          onSubmit={onSubmit}
-          className="penni-transaction-fields min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-2 space-y-5 sm:px-6"
-          aria-label={editingId ? "Edit transaction details" : "New transaction details"}
-        >
-          {/* Type Toggle: Expense vs Income */}
-          <div>
-            <label className="sr-only">
-              Transaction Type
-            </label>
-            <div className="grid grid-cols-2 gap-1 rounded-2xl border border-border bg-secondary/30 p-1" role="group" aria-label="Transaction type">
-              <button
-                type="button"
-                onClick={() =>
-                  setForm({
-                    ...form,
-                    is_income: false,
-                    is_transfer: false,
-                    entry_mode: entryMode === "transfer" ? "standard" : entryMode,
-                  })
-                }
-                className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-medium transition-all ${
-                  !form.is_income && !form.is_transfer
-                    ? "bg-card text-foreground shadow-sm ring-1 ring-border"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <span>Expense</span>
-                <span className="text-[10px] opacity-75">(-)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setForm({
-                    ...form,
-                    is_income: true,
-                    is_transfer: false,
-                    entry_mode: entryMode === "transfer" ? "standard" : entryMode,
-                  })
-                }
-                className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-medium transition-all ${
-                  form.is_income && !form.is_transfer
-                    ? "bg-card text-foreground shadow-sm ring-1 ring-border"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <span>Income</span>
-                <span className="text-[10px] opacity-75">(+)</span>
-              </button>
-            </div>
-          </div>
+  if (!open) return null;
 
-          {/* Original ZIP: large, centered amount instead of a cramped input. */}
-          <div className="py-2 text-center">
-            <label htmlFor="tx-amount" className="sr-only">Amount</label>
-            <div className="inline-flex max-w-full items-baseline justify-center gap-1">
-              <span className="text-3xl font-semibold tracking-tight text-muted-foreground">{form.is_income ? "+" : "−"}£</span>
-              <input
-                id="tx-amount"
-                data-testid="tx-amount"
-                required
-                type="number"
-                min="0"
-                step="0.01"
-                inputMode="decimal"
-                aria-label="Amount"
-                placeholder="0.00"
-                value={form.amount}
-                onChange={(e) => {
-                  setForm({ ...form, amount: e.target.value });
-                  onClearClassification?.();
-                }}
-                className="w-[min(210px,60vw)] min-w-0 bg-transparent text-center text-[clamp(28px,7vw,50px)] font-semibold tracking-tight text-foreground outline-none placeholder:text-muted-foreground/35 tabular-nums sm:text-[56px]"
-              />
-            </div>
-          </div>
-
-          {/* Description input */}
-          <div>
-            <label
-              htmlFor="tx-desc"
-              className="text-xs font-medium text-muted-foreground block mb-1.5"
-            >
-              {form.is_income ? "Received from" : "Merchant / description"} <span className="text-ruby">*</span>
-            </label>
-            <Input
-              id="tx-desc"
-              data-testid="tx-desc"
-              required
-              placeholder="e.g. Sainsbury's, Salary, Electricity"
-              value={form.description}
-              onChange={(e) => {
-                setForm({ ...form, description: e.target.value });
-                if (onClearClassification) onClearClassification();
-              }}
-              className="h-11 text-sm"
-            />
-          </div>
-
-          {/* Category Selector */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                Category
-              </label>
-              {!editingId && canClassify && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const parsed = parseFloat(form.amount);
-                    if (isNaN(parsed)) {
-                      toast.error("Invalid amount");
-                      return;
-                    }
-                    onClassify({
-                      description: form.description,
-                      amount: parsed,
-                    });
-                  }}
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald hover:underline"
-                >
-                  {classifying ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-3 w-3" />
-                  )}
-                  {classifying ? "Classifying..." : "Suggest with AI"}
-                </button>
-              )}
-            </div>
-
-
-            {/* Original ZIP: defined category cards, never unstyled inline text. */}
-            {Array.isArray(selectedCats) && selectedCats.some(c => c && typeof c === "object") && (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="group" aria-label="Quick categories">
-                {selectedCats.filter(c => c && typeof c === "object" && !c.is_archived)
-                  .slice(0, 9).map(c => {
-                    const name = c.name || c.slug || c.label;
-                    const selected = form.category === name;
-                    return (
-                      <button key={c.category_id || name} type="button" aria-pressed={selected}
-                        className={`relative flex min-w-0 items-center gap-2 rounded-2xl border px-2.5 py-2.5 text-left text-[13px] font-medium transition-all ${selected
-                          ? "border-primary bg-primary/10 text-foreground ring-1 ring-primary/20"
-                          : "border-border bg-secondary/30 text-muted-foreground hover:bg-secondary/60 hover:text-foreground"}`}
-                        onClick={() => setForm({ ...form, category: name })}>
-                        <span aria-hidden="true" className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-base"
-                          style={{ backgroundColor: (c.color || "#6366f1") + "18" }}>
-                          {c.emoji || "•"}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate">{c.display_name || c.label || String(name).replace(/_/g, " ")}</span>
-                        {selected && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
-                      </button>
-                    );
-                  })}
-              </div>
-            )}
-            <div className="mt-2">
-            <CategoryCombobox
-              value={form.category}
-              onChange={(val) => setForm({ ...form, category: val })}
-              categories={selectedCats}
-              placeholder={
-                autoFill
-                  ? `${topSuggestion.category} (AI Suggested · ${Math.round(topSuggestion.confidence * 100)}%)`
-                  : "Select category..."
-              }
-              onCategoryCreated={onCategoryCreated}
-            />
-
-              </div>
-
-            {/* Source badges for selected category */}
-            {form.category && (
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                {(() => {
-                  const found = selectedCats?.find?.(
-                    (c) => c.name === form.category,
-                  );
-                  if (found) {
-                    return (
-                      <>
-                        <CategoryBadge category={found} size="sm" />
-                        {found.section && (
-                          <span className="px-2 py-0.5 rounded-md bg-secondary/50 text-[10px] font-medium">
-                            {found.section}
-                          </span>
-                        )}
-                        {found.source === "System" ? (
-                          <span className="px-2 py-0.5 rounded-md bg-secondary/60 text-[10px]">
-                            System
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-md bg-topaz/10 text-topaz text-[10px] font-medium">
-                            Custom
-                          </span>
-                        )}
-                      </>
-                    );
-                  }
-                  return <CategoryBadge category={form.category} size="sm" />;
-                })()}
-              </div>
-            )}
-          </div>
-
-          {/* Account & Date (2 columns) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label
-                htmlFor="tx-account"
-                className="text-xs font-medium text-muted-foreground block mb-1.5"
-              >
-                Account <span className="text-ruby">*</span>
-              </label>
-              {accountsLoading ? (
-                <div className="h-11 rounded-xl bg-secondary/30 border border-border flex items-center px-3 text-xs text-muted-foreground">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
-                  Loading accounts...
-                </div>
-              ) : !accounts || accounts.length === 0 ? (
-                <div className="h-11 rounded-xl bg-secondary/30 border border-dashed border-ruby/30 flex items-center px-3 text-xs text-ruby">
-                  No accounts found
-                </div>
-              ) : (
-                <PenniSelect
-                  id="tx-account"
-                  required
-                  value={form.account_id}
-                  onChange={(e) =>
-                    setForm({ ...form, account_id: e.target.value })
-                  }
-                  className="flex h-11 w-full rounded-xl bg-secondary/30 border border-border px-3 text-xs transition-colors placeholder:text-muted-foreground focus:border-emerald/50 focus:ring-2 focus:ring-emerald/20 focus:outline-none"
-                >
-                  <option value="" disabled>
-                    Select account...
-                  </option>
-                  {accounts.map((a) => (
-                    <option key={a.account_id} value={a.account_id}>
-                      {a.name} ({formatCurrency(a.balance || 0)})
-                    </option>
-                  ))}
-                </PenniSelect>
-              )}
-            </div>
-
-            <div>
-              <label
-                htmlFor="tx-date"
-                className="text-xs font-medium text-muted-foreground block mb-1.5"
-              >
-                Date <span className="text-ruby">*</span>
-              </label>
-              <Input
-                id="tx-date"
-                type="date"
-                required
-                value={form.date || new Date().toISOString().slice(0, 10)}
-                onChange={(e) => setForm({ ...form, date: e.target.value })}
-                className="h-11 text-xs"
-              />
-            </div>
-          </div>
-
-          {/* AI Suggestions dropdown if classification returned */}
-          {suggestions.length > 0 && (
-            <div className="rounded-xl border border-emerald/25 bg-emerald/5 p-3 text-sm space-y-2 animate-[fadeUp_0.2s_ease-out]">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Brain className="h-3.5 w-3.5 text-emerald" />
-                  <span className="text-xs font-semibold text-emerald">
-                    AI Suggestions
-                  </span>
-                </div>
-                {onClearClassification && (
-                  <button
-                    type="button"
-                    onClick={onClearClassification}
-                    className="text-muted-foreground hover:text-foreground"
-                    aria-label="Clear suggestions"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-
-              <div className="space-y-1.5">
-                {suggestions.map((s, i) => {
-                  const isSelected = form.category === s.category;
-                  const confPct = Math.round(s.confidence * 100);
-                  return (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() =>
-                        setForm({
-                          ...form,
-                          category: s.category,
-                          budget_type: s.budget_type || "",
-                          occasion: s.occasion || "",
-                          merchant: s.merchant || "",
-                        })
-                      }
-                      className={`w-full rounded-lg p-2 text-left transition flex items-center justify-between ${
-                        isSelected
-                          ? "bg-emerald/15 ring-1 ring-emerald/40"
-                          : "bg-card/70 hover:bg-card border border-border/40"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        {isSelected ? (
-                          <Check className="h-3.5 w-3.5 shrink-0 text-emerald" />
-                        ) : (
-                          <span className="w-3.5 h-3.5 shrink-0 rounded-full border border-border" />
-                        )}
-                        <CategoryBadge category={s.category} size="sm" truncate />
-                        {s.merchant && (
-                          <span className="text-[10px] text-muted-foreground truncate hidden sm:inline">
-                            · {s.merchant}
-                          </span>
-                        )}
-                      </div>
-                      <span
-                        className={`text-[10px] font-semibold tabular-nums ${
-                          confPct >= 90
-                            ? "text-emerald"
-                            : confPct >= 70
-                              ? "text-topaz"
-                              : "text-muted-foreground"
-                        }`}
-                      >
-                        {confPct}%
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {topSuggestion?.recurring && (
-                <label className="flex items-center gap-2 pt-2 border-t border-emerald/15 text-xs cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={saveAsRecurring}
-                    onChange={(e) => setSaveAsRecurring(e.target.checked)}
-                    className="rounded border-border accent-emerald h-3.5 w-3.5"
-                  />
-                  <span className="text-muted-foreground">
-                    Save as recurring transaction
-                  </span>
-                </label>
-              )}
-            </div>
-          )}
-
-          {/* Mode Selector (Standard / Split / Transfer) */}
-          <div>
-            <label className="text-xs font-medium text-muted-foreground block mb-1.5">
-              Transaction mode
-            </label>
-            <div className="grid grid-cols-3 gap-2" role="group" aria-label="Transaction mode">
-              {transactionModes.map(({ value, label, Icon }) => {
-                const active = entryMode === value;
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setEntryMode(value)}
-                    aria-pressed={active}
-                    className={`flex items-center justify-center gap-1.5 rounded-xl border py-2 text-xs font-medium transition ${
-                      active
-                        ? "border-emerald/40 bg-emerald/10 text-foreground font-semibold shadow-sm"
-                        : "border-border bg-secondary/20 text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
-                    }`}
-                  >
-                    <Icon
-                      className={`h-3.5 w-3.5 ${
-                        active ? "text-emerald" : "text-muted-foreground"
-                      }`}
-                    />
-                    <span>{label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Maaser calculation exclusion (if income or transfer) */}
-          {(form.is_income || entryMode === "transfer") && (
-            <div className="rounded-xl border border-border bg-secondary/15 p-3 space-y-1">
-              <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.exclude_from_maaser || entryMode === "transfer"}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      exclude_from_maaser: e.target.checked,
-                    })
-                  }
-                  disabled={entryMode === "transfer"}
-                  className="accent-topaz h-4 w-4 rounded cursor-pointer"
-                />
-                <span>Exclude from Maaser tithe</span>
-              </label>
-              <p className="text-[11px] text-muted-foreground pl-6">
-                {entryMode === "transfer"
-                  ? "Internal transfers are automatically excluded from tithe obligations."
-                  : "Check to exclude this income from the 10% Maaser calculation."}
-              </p>
-            </div>
-          )}
-
-          {/* Notes */}
-          <div>
-            <label
-              htmlFor="tx-notes"
-              className="text-xs font-medium text-muted-foreground block mb-1.5"
-            >
-              Notes
-            </label>
-            <textarea
-              id="tx-notes"
-              placeholder="Optional notes or receipt details..."
-              value={form.notes || ""}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              className="flex min-h-[60px] w-full rounded-xl bg-secondary/30 border border-border px-3.5 py-2.5 text-xs transition-colors placeholder:text-muted-foreground focus:border-emerald/50 focus:ring-2 focus:ring-emerald/20 focus:outline-none"
-            />
-          </div>
-
-          {/* More options accordion */}
-          {!editingId && (
-            <div>
-              <button
-                type="button"
-                onClick={() => setShowMore(!showMore)}
-                className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition"
-              >
-                {showMore ? (
-                  <ChevronUp className="h-3.5 w-3.5" />
-                ) : (
-                  <ChevronDown className="h-3.5 w-3.5" />
-                )}
-                <span>
-                  {hasManualFields
-                    ? "Additional classification fields set"
-                    : "Additional details (Occasion, Merchant, Budget Type)"}
-                </span>
-              </button>
-
-              {showMore && (
-                <div className="mt-2 space-y-2 p-3 rounded-xl bg-secondary/20 border border-border animate-[fadeUp_0.2s_ease-out]">
-                  <PenniSelect
-                    value={form.budget_type}
-                    onChange={(e) =>
-                      setForm({ ...form, budget_type: e.target.value })
-                    }
-                    className="flex h-9 w-full rounded-lg bg-card border border-border px-3 text-xs transition-colors"
-                  >
-                    <option value="">Budget type (optional)...</option>
-                    {BUDGET_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {t.replace(/_/g, " ")}
-                      </option>
-                    ))}
-                  </PenniSelect>
-                  <Input
-                    placeholder="Occasion (e.g. Pesach 2026, Wedding)"
-                    value={form.occasion}
-                    onChange={(e) =>
-                      setForm({ ...form, occasion: e.target.value })
-                    }
-                    className="h-9 text-xs"
-                  />
-                  <Input
-                    placeholder="Merchant name (e.g. Tesco, Amazon)"
-                    value={form.merchant}
-                    onChange={(e) =>
-                      setForm({ ...form, merchant: e.target.value })
-                    }
-                    className="h-9 text-xs"
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-        </form>
-
-        {/* Inline feedback remains visible when the form's fields scroll. */}
-        {validationError ? (
-          <p id="penni-transaction-save-error" role="alert" className="mx-5 mb-2 rounded-xl border border-ruby/20 bg-ruby/10 px-3 py-2 text-xs font-medium text-ruby">
-            {validationError}
-          </p>
-        ) : null}
-        {/* Modal Footer */}
-        <div className="penni-transaction-footer border-t border-border bg-card px-6 py-4 flex items-center gap-3">
-          <Button
-            type="button"
-            variant="outlinePill"
-            size="sm"
-            onClick={onClose}
-            className="flex-1 text-sm"
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            form="penni-transaction-form"
-            variant="primary"
-            size="sm"
-            data-testid="tx-submit"
-            disabled={saving}
-            aria-describedby={validationError ? "penni-transaction-save-error" : undefined}
-            className="flex-[1.4] text-sm font-semibold px-4"
-          >
-            {saving ? "Saving…" : editingId ? "Save changes" : "Add transaction"}
-          </Button>
-        </div>
-      </div>
-    </NativePopup>
+  const accountPicker = (id, value, onValue, emptyLabel, options = availableAccounts) => (
+    <PenniSelect id={id} value={value || ""} onChange={event => onValue(event.target.value)}
+      className="penni-composer-control h-11 w-full" aria-label="Choose option" required>
+      <option value="">{emptyLabel}</option>
+      {options.map(account => <option key={account.account_id} value={account.account_id}>
+        {account.name} ({formatCurrency(account.balance || 0)})
+      </option>)}
+    </PenniSelect>
   );
+
+  const renderAccount = () => accountsLoading ? (
+    <div className="penni-composer-control flex h-11 items-center gap-2 text-xs text-muted-foreground">
+      <Loader2 className="h-4 w-4 animate-spin" /> Loading accounts…
+    </div>
+  ) : !availableAccounts.length ? (
+    <div className="penni-composer-control flex h-11 items-center text-xs text-ruby">No accounts found</div>
+  ) : accountPicker("tx-account", form.account_id, value => update({account_id: value}), "Select account…");
+
+  const candidates = matches.filter(t => !t.transfer_pair_id && t.tx_type !== "transfer" && t.transaction_id);
+  const choiceLabel = tx => [
+    String(tx.date || "").slice(0, 10),
+    tx.description || tx.merchant || "Transaction",
+    formatCurrency(tx.amount),
+    availableAccounts.find(a => a.account_id === tx.account_id)?.name || "Account",
+  ].filter(Boolean).join(" · ");
+
+  return <NativePopup open={open} onClose={onClose} size="md" showHeader
+    className="penni-transaction-popup penni-composer"
+    bodyClassName="penni-transaction-body"
+    title={editingId ? "Edit transaction" : "New transaction"}
+    description="A clear view of every movement of money.">
+    <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
+      <form id="penni-transaction-form" noValidate onSubmit={onSubmit}
+        aria-label={editingId ? "Edit transaction details" : "New transaction details"}
+        className="penni-transaction-fields min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-5 pt-4 sm:px-6">
+        <div className="penni-composer-segments grid grid-cols-3 gap-1" role="group" aria-label="Transaction mode">
+          {modes.map(({ value, label, Icon }) => (
+            <button key={value} type="button" aria-pressed={mode === value}
+              onClick={() => setMode(value)}
+              className={"penni-composer-segment " + (mode === value ? "is-active" : "")}>
+              <Icon className="h-4 w-4" aria-hidden="true" />
+              {label}
+            </button>
+          ))}
+        </div>
+        {mode !== "transfer" && <div className="penni-composer-kind grid grid-cols-2 gap-1" role="group" aria-label="Transaction type">
+          {[{ label: "Expense", value: false }, { label: "Income", value: true }].map(item => (
+            <button type="button" key={item.label} aria-pressed={Boolean(form.is_income) === item.value}
+              onClick={() => update({is_income: item.value, is_transfer: false})}
+              className={"penni-composer-kind-option " + (Boolean(form.is_income) === item.value ? "is-active" : "")}>{item.label}</button>
+          ))}
+        </div>}
+
+        {!pairExisting && <div className="penni-composer-amount">
+          <label htmlFor="tx-amount" className="text-xs font-medium text-muted-foreground">{mode === "transfer" ? "Amount to transfer" : "Transaction amount"}</label>
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-2xl font-semibold text-muted-foreground">{mode === "transfer" ? "" : form.is_income ? "+" : "−"}£</span>
+            <input id="tx-amount" data-testid="tx-amount" type="number" min="0" step="0.01" inputMode="decimal"
+              aria-label="Amount" placeholder="0.00" value={form.amount}
+              onChange={event => {update({amount: event.target.value});onClearClassification?.();}}
+              className="min-w-0 w-[min(180px,54vw)] bg-transparent text-center text-[clamp(32px,6vw,48px)] font-semibold tracking-tight tabular-nums text-foreground outline-none placeholder:text-muted-foreground/35" />
+          </div>
+        </div>}
+        {mode === "transfer" && !editingId && <div className="penni-composer-kind grid grid-cols-2 gap-1" role="group" aria-label="Transfer method">
+          <button type="button" aria-pressed={!pairExisting} className={"penni-composer-kind-option " + (!pairExisting ? "is-active" : "")}
+            onClick={() => update({transfer_flow: "new"})}>New transfer</button>
+          <button type="button" aria-pressed={pairExisting} className={"penni-composer-kind-option " + (pairExisting ? "is-active" : "")}
+            onClick={() => update({transfer_flow: "pair"})}>Pair existing</button>
+        </div>}
+        {!pairExisting && <div>
+          <label htmlFor="tx-desc" className={fieldLabel}>{mode === "transfer" ? "Description" : form.is_income ? "Received from" : "Merchant / description"}{mode !== "transfer" && <span className="text-ruby"> *</span>}</label>
+          <Input id="tx-desc" data-testid="tx-desc" value={form.description || ""}
+            onChange={event => {update({description: event.target.value});onClearClassification?.();}}
+            placeholder={mode === "transfer" ? "Transfer between accounts" : "e.g. Sainsbury's, Salary, Electricity"}
+            className="penni-composer-control h-11 w-full" />
+        </div>}
+
+        {mode === "standard" && <section className="space-y-2" aria-label="Category">
+          <div className="flex items-center justify-between">
+            <span className={fieldLabel}>Category</span>
+            {canClassify && <button type="button" disabled={classifying} onClick={() => onClassify?.({description:form.description,amount:Number(form.amount)})}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-primary"><Sparkles className="h-3.5 w-3.5"/>{classifying?"Suggesting…":"Suggest with AI"}</button>}
+          </div>
+          {quickCategories.length > 0 && <div className="grid grid-cols-2 gap-2" role="group" aria-label="Quick categories">
+            {quickCategories.map(c => <button key={c.category_id || c.name} type="button" aria-pressed={form.category === c.name}
+              onClick={() => update({ category: c.name })}
+              className={"penni-composer-category " + (form.category === c.name ? "is-active" : "")}>
+              <span className="text-lg" aria-hidden="true">{c.emoji || "◦"}</span>
+              <span className="min-w-0 flex-1 break-words text-left">{c.display_name || c.label || c.name}</span>
+              {form.category === c.name && <Check className="h-4 w-4 shrink-0"/>}
+            </button>)}
+          </div>}
+          <CategoryCombobox value={form.category} onChange={category => update({ category })}
+            categories={selectedCats} onCategoryCreated={onCategoryCreated}
+            className="penni-composer-control h-11 w-full" placeholder="Search or choose category…" />
+          {classification?.suggestions?.length > 0 && <div className="space-y-1.5 rounded-xl border border-border p-3">
+            <p className="text-xs font-medium text-muted-foreground">AI suggestions</p>
+            {classification.suggestions.slice(0, 3).map(s => <button key={s.category} type="button"
+              className="flex w-full justify-between rounded-lg p-2 text-left text-sm hover:bg-secondary"
+              onClick={() => update({category:s.category,budget_type:s.budget_type||"",occasion:s.occasion||"",merchant:s.merchant||""})}>
+              {s.category}<span className="text-muted-foreground">{Math.round((s.confidence||0)*100)}%</span>
+            </button>)}
+            <label className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
+              <input type="checkbox" checked={Boolean(saveAsRecurring)} onChange={event=>setSaveAsRecurring?.(event.target.checked)}/> Save as recurring
+            </label>
+          </div>}
+        </section>}
+
+        {mode === "split" && <section className="space-y-3" aria-label="Split allocation">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold">Split allocation</span>
+            <span className="text-xs text-muted-foreground">{splitRows.length} categories</span>
+          </div>
+          <div className="penni-composer-split-list space-y-2">
+            {splitRows.map((line, index) => <div className="penni-composer-split-row" key={line.id || index}>
+              <span className="penni-composer-row-number">{index + 1}</span>
+              <div className="min-w-0 flex-1">
+                <CategoryCombobox label={"Category for split " + (index + 1)}
+                  value={line.category} onChange={category => updateSplit(index, {category})}
+                  categories={selectedCats} className="penni-composer-control h-10 w-full"
+                  placeholder="Choose category…"/>
+              </div>
+              <div className="relative w-[112px] shrink-0">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">£</span>
+                <Input type="number" min="0" step="0.01" inputMode="decimal"
+                  aria-label={"Amount for split " + (index + 1)}
+                  value={line.amount} onChange={event => updateSplit(index, {amount:event.target.value})}
+                  className="penni-composer-control h-10 w-full pl-6 text-right tabular-nums" placeholder="0.00"/>
+              </div>
+              <button type="button" aria-label={"Remove split " + (index + 1)}
+                disabled={splitRows.length <= 2}
+                onClick={() => update({split_lines:splitRows.filter((_,i)=>i!==index)})}
+                className="penni-composer-remove" title="Remove category"><Trash2 className="h-4 w-4"/></button>
+            </div>)}
+          </div>
+          <button type="button" className="penni-composer-add flex w-full items-center justify-center gap-2"
+            disabled={splitRows.length >= 50}
+            onClick={() => update({ split_lines:[...splitRows, freshRow()] })}>
+            <Plus className="h-4 w-4"/> Add another category
+          </button>
+          <div className="penni-composer-breakdown space-y-2">
+            <div className="flex justify-between text-xs"><span className="text-muted-foreground">Allocated</span><strong className="tabular-nums">{formatCurrency(allocated / 100)} of {formatCurrency(totalCents / 100)}</strong></div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-border"><div className={"h-full rounded-full transition-all duration-200 " + (remaining === 0 && totalCents > 0 ? "bg-emerald" : "bg-primary")} style={{width: totalCents ? Math.min(100, allocated / totalCents * 100) + "%" : "0%"}}/></div>
+            <div aria-live="polite" className={"flex items-center justify-between text-xs " + (remaining === 0 && totalCents > 0 ? "text-emerald" : "text-muted-foreground")}>
+              <span>{remaining === 0 && totalCents > 0 ? "Fully allocated" : remaining < 0 ? "Over allocated" : "Remaining"}</span>
+              <strong className="tabular-nums">{formatCurrency(Math.abs(remaining) / 100)}</strong>
+            </div>
+          </div>
+        </section>}
+
+        {mode === "transfer" && !pairExisting && <section className="space-y-3" aria-label="Transfer accounts">
+          <div><label htmlFor="tx-account" className={fieldLabel}>From account <span className="text-ruby">*</span></label>{renderAccount()}</div>
+          <div className="flex justify-center"><button type="button" aria-label="Swap transfer accounts" className="penni-composer-swap"
+            onClick={() => update({account_id:form.transfer_to_account_id || "",transfer_to_account_id:form.account_id || ""})}><ArrowDownUp className="h-4 w-4"/></button></div>
+          <div><label htmlFor="tx-to-account" className={fieldLabel}>To account <span className="text-ruby">*</span></label>
+            {accountPicker("tx-to-account", form.transfer_to_account_id, value => update({transfer_to_account_id:value}), "Select destination…",
+              availableAccounts.filter(a=>a.account_id !== form.account_id))}
+          </div>
+          <div className="penni-composer-breakdown space-y-2 text-xs">
+            <div className="flex justify-between"><span className="text-muted-foreground">{chosenFrom?.name || "Source"}</span><strong>−{formatCurrency(Number(form.amount)||0)}</strong></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">{chosenTo?.name || "Destination"}</span><strong className="text-emerald">+{formatCurrency(Number(form.amount)||0)}</strong></div>
+            <p className="text-muted-foreground">Both entries are created and linked together. Transfers don't count as spending or income.</p>
+          </div>
+        </section>}
+
+        {pairExisting && <section className="space-y-3" aria-label="Pair existing transactions">
+          <p className="text-xs text-muted-foreground">Link two transactions already in Penni, without changing their balances or creating duplicates.</p>
+          <div><label className={fieldLabel} htmlFor="tx-pair-out">Outgoing transaction</label>
+            <PenniSelect id="tx-pair-out" value={form.transfer_outgoing_id || ""}
+              onChange={event=>update({transfer_outgoing_id:event.target.value})}
+              className="penni-composer-control h-11 w-full">
+              <option value="">Choose outgoing transaction…</option>
+              {candidates.filter(t=>moneyCents(t.amount)<0).map(t=><option key={t.transaction_id} value={t.transaction_id}>{choiceLabel(t)}</option>)}
+            </PenniSelect></div>
+          <div><label className={fieldLabel} htmlFor="tx-pair-in">Incoming transaction</label>
+            <PenniSelect id="tx-pair-in" value={form.transfer_incoming_id || ""}
+              onChange={event=>update({transfer_incoming_id:event.target.value})}
+              className="penni-composer-control h-11 w-full">
+              <option value="">Choose incoming transaction…</option>
+              {candidates.filter(t=>moneyCents(t.amount)>0 && (!sourceTx || (t.account_id!==sourceTx.account_id && moneyCents(t.amount)===-moneyCents(sourceTx.amount)))).map(t=><option key={t.transaction_id} value={t.transaction_id}>{choiceLabel(t)}</option>)}
+            </PenniSelect></div>
+          {sourceTx && targetTx && <p aria-live="polite" className={"text-xs " + (pairValid ? "text-emerald" : "text-ruby")}>{pairValid ? "Ready to pair — equal amounts in two different accounts." : "The entries must have equal opposite amounts, separate accounts, and matching currencies."}</p>}
+          {matchError && <p role="alert" className="text-xs text-ruby">{matchError}</p>}
+          {matchesTotal > matches.length && <Button type="button" variant="outlinePill" disabled={matchesLoading} onClick={loadMore} className="w-full">
+            {matchesLoading ? "Loading…" : "Search older transactions"}
+          </Button>}
+          {matchesLoading && <p className="text-xs text-muted-foreground">Loading transactions…</p>}
+        </section>}
+
+        {mode !== "transfer" && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div><label htmlFor="tx-account" className={fieldLabel}>Account <span className="text-ruby">*</span></label>{renderAccount()}</div>
+          <div><label htmlFor="tx-date" className={fieldLabel}>Date <span className="text-ruby">*</span></label>
+            <Input id="tx-date" type="date" value={form.date || ""}
+              onChange={event=>update({date:event.target.value})}
+              className="penni-composer-control h-11 w-full text-sm"/></div>
+        </div>}
+        {mode === "transfer" && !pairExisting && <div><label htmlFor="tx-date" className={fieldLabel}>Transfer date</label>
+          <Input id="tx-date" type="date" value={form.date || ""} onChange={event=>update({date:event.target.value})}
+            className="penni-composer-control h-11 w-full text-sm"/></div>}
+        {mode !== "transfer" && form.is_income && <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <input type="checkbox" checked={Boolean(form.exclude_from_maaser)} onChange={event=>update({exclude_from_maaser:event.target.checked})}/> Exclude from Maaser tithe
+        </label>}
+        <button type="button" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground" aria-expanded={more} onClick={()=>setMore(!more)}>
+          {more ? <ChevronUp className="h-4 w-4"/>:<ChevronDown className="h-4 w-4"/>} Additional details
+        </button>
+        {more && <div className="space-y-3 rounded-xl border border-border bg-secondary/20 p-3">
+          <div><label className={fieldLabel} htmlFor="tx-notes">Notes</label>
+            <textarea id="tx-notes" value={form.notes || ""} onChange={event=>update({notes:event.target.value})}
+              className="penni-composer-control min-h-20 w-full py-2.5" placeholder="Optional notes…"/></div>
+          {mode === "standard" && <>
+            <div><label className={fieldLabel}>Budget type</label>
+              <PenniSelect value={form.budget_type || ""} onChange={event=>update({budget_type:event.target.value})}
+                className="penni-composer-control h-11 w-full">
+                <option value="">Optional</option>
+                {["day_to_day","yom_tov","holiday","simcha","other"].map(x=><option key={x} value={x}>{x.replace(/_/g," ")}</option>)}
+              </PenniSelect></div>
+            <Input placeholder="Occasion (optional)" value={form.occasion || ""} onChange={event=>update({occasion:event.target.value})} className="penni-composer-control h-11 w-full"/>
+            <Input placeholder="Merchant name (optional)" value={form.merchant || ""} onChange={event=>update({merchant:event.target.value})} className="penni-composer-control h-11 w-full"/>
+          </>}
+        </div>}
+      </form>
+      {validationError && <p id="penni-transaction-save-error" role="alert" className="mx-5 mb-2 rounded-xl border border-ruby/20 bg-ruby/10 px-3 py-2 text-xs font-medium text-ruby">{validationError}</p>}
+      <div className="penni-transaction-footer flex shrink-0 items-center gap-3 border-t border-border px-5 py-3 sm:px-6">
+        <Button type="button" variant="outlinePill" size="sm" onClick={onClose} className="flex-1">Cancel</Button>
+        <Button type="submit" form="penni-transaction-form" variant="primary" size="sm" data-testid="tx-submit"
+          disabled={saving || (mode==="split" && (remaining!==0 || totalCents<=0 || splitRows.length<2)) || (pairExisting && !pairValid)}
+          aria-describedby={validationError ? "penni-transaction-save-error" : undefined}
+          className="flex-[1.5] font-semibold">
+          {saving ? "Saving…" : editingId ? "Save changes" : pairExisting ? "Pair transactions" : mode==="transfer" ? "Create transfer" : mode==="split" ? "Save split transaction" : "Add transaction"}
+        </Button>
+      </div>
+    </div>
+  </NativePopup>;
 }
