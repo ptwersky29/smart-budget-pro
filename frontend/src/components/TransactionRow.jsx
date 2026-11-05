@@ -34,12 +34,13 @@ import {
   pickBankInstitution,
 } from "../data/bankLogos";
 import CategoryBadge from "./CategoryBadge";
-import { TransactionTypeMark, getTransactionType } from "./GroupedTransactionItems";
+import { TransactionTypeMark, TransactionBankMark, TransactionStatusBadge, getTransactionType } from "./GroupedTransactionItems";
 
 const TransactionRow = React.memo(
   ({
     t,
     account,
+    showDate = true,
     isSelected,
     isFocused,
     onToggleSelect,
@@ -127,14 +128,13 @@ const TransactionRow = React.memo(
                 />
               </label>
             </td>
-            <td className="whitespace-nowrap px-3 py-3.5 text-xs text-muted-foreground">
-              {dateLabel}
-            </td>
+            {showDate && <td className="whitespace-nowrap px-3 py-3.5 text-xs text-muted-foreground">{dateLabel}</td>}
             <td className="px-2 py-3.5">
               <div className="flex min-w-0 items-center gap-3">
                 <TransactionTypeMark transaction={t} />
-                <div className="min-w-0">
-                  <div className="flex min-w-0 items-center gap-2"><span className="truncate text-[13px] font-semibold leading-tight">{description}</span><TransactionTypeMark transaction={t} badge /></div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-center gap-2"><span className="min-w-0 truncate text-[13px] font-semibold leading-tight" title={description}>{description}</span></div>
+                  <div className="mt-1 flex items-center gap-1.5"><TransactionTypeMark transaction={t} badge />{t.transfer_pair_id && <span className="text-[10px] font-medium text-sky">Matched</span>}</div>
                   {displaySubtitle ? (
                     <div className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">{displaySubtitle}</div>
                   ) : null}
@@ -153,26 +153,13 @@ const TransactionRow = React.memo(
               </div>
             </td>
             <td className="px-2 py-3.5">
-              <span className="flex min-w-0 items-center gap-1.5 text-xs text-foreground">
-                {brandLogo ? <img src={brandLogo} alt="" className="h-5 w-5 shrink-0 rounded-full object-contain" /> : <Wallet className="h-4 w-4 shrink-0 text-muted-foreground" />}
-                <span className="truncate">{accountName}</span>
-              </span>
+              <TransactionBankMark transaction={t} account={account} />
             </td>
             <td className={`money-tabular px-2 py-3.5 text-right text-[13px] font-semibold ${type === "transfer" ? "text-foreground" : negative ? "text-ruby" : "text-emerald"}`}>
               {amount > 0 ? "+" : "-"}{formatCurrency(Math.abs(amount))}
             </td>
             <td className="px-2 py-3.5">
-              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                failed
-                  ? "bg-ruby/10 text-ruby"
-                  : unapproved
-                    ? "bg-topaz/10 text-topaz"
-                    : t.pending
-                      ? "bg-sky/10 text-sky"
-                      : "bg-emerald/10 text-emerald"
-              }`}>
-                {status}
-              </span>
+              <TransactionStatusBadge transaction={t} />
             </td>
             <td className="px-1 py-3.5 text-right">
               <DropdownMenu>
@@ -258,6 +245,7 @@ const TransactionRow = React.memo(
     prev.t.category_approval_status === next.t.category_approval_status &&
     prev.t.is_split === next.t.is_split &&
     prev.t.transfer_pair_id === next.t.transfer_pair_id &&
+    prev.showDate === next.showDate &&
     prev.t.is_transfer === next.t.is_transfer &&
     prev.account?.name === next.account?.name &&
     prev.account?.provider === next.account?.provider &&

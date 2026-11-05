@@ -26,13 +26,28 @@ export function TransactionTypeMark({ transaction, badge = false }) {
 }
 
 export function TransactionBankMark({ transaction, account, showName = true }) {
-  const institution = pickBankInstitution(account?.provider, account?.institution, account?.name, transaction?.institution, transaction?.account_name, transaction?.source_label);
+  const institution = pickBankInstitution(account?.institution, account?.provider, account?.name, transaction?.institution, transaction?.account_name, transaction?.source_label);
   const logo = institution ? getBankLogoOrFallback(institution) : null;
-  const name = account?.name || transaction?.account_name || transaction?.source_label || institution || "Manual account";
-  return <span className="inline-flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground" title={name}>
-    {logo ? <img src={logo} alt={institution || "Bank"} className="h-[19px] w-[19px] shrink-0 rounded-full bg-white object-contain p-px" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : <Wallet className="h-4 w-4 shrink-0" aria-hidden="true" />}
-    {showName && <span className="max-w-[150px] truncate">{name}</span>}
+  const name = account?.name || account?.account_name || transaction?.account_name || transaction?.source_label || institution || "Manual account";
+  return <span className="inline-flex min-w-0 items-center gap-2 text-[11px] text-muted-foreground" title={name}>
+    <span className="grid h-[23px] w-[23px] shrink-0 place-items-center overflow-hidden rounded-full border border-border/60 bg-white p-[2px] dark:bg-white/10">
+      {logo ? <img src={logo} alt={institution || "Bank"} className="h-full w-full object-contain" onError={(event) => { event.currentTarget.style.display = "none"; const fallback = event.currentTarget.nextElementSibling; if (fallback) fallback.style.display = "block"; }} /> : null}
+      <Wallet className="h-3.5 w-3.5 text-muted-foreground" style={logo ? { display: "none" } : undefined} aria-hidden="true" />
+    </span>
+    {showName && <span className="max-w-[165px] min-w-0 truncate">{name}</span>}
   </span>;
+}
+
+export function getTransactionStatus(transaction) {
+  if (transaction?.approval_status === "failed") return { label: "Failed", className: "bg-ruby/10 text-ruby" };
+  if (transaction?.approval_status === "unapproved" || transaction?.category_approval_status === "unapproved") return { label: "Unapproved", className: "bg-topaz/10 text-topaz" };
+  if (transaction?.pending) return { label: "Pending", className: "bg-sky/10 text-sky" };
+  return { label: "Approved", className: "bg-emerald/10 text-emerald" };
+}
+
+export function TransactionStatusBadge({ transaction }) {
+  const status = getTransactionStatus(transaction);
+  return <span className={"inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-medium " + status.className}>{status.label}</span>;
 }
 
 export function transactionDateKey(transaction) {
@@ -55,19 +70,19 @@ export function formatTransactionDay(dateKey) {
 
 export function groupTransactionsByDate(transactions) {
   const groups = [];
-  (transactions || []).forEach((transaction) => {
+  (transactions || []).forEach((transaction, index) => {
     const key = transactionDateKey(transaction);
     const last = groups[groups.length - 1];
     if (last?.date === key) last.items.push(transaction);
-    else groups.push({ date: key, items: [transaction] });
+    else groups.push({ date: key, startIndex: index, items: [transaction] });
   });
   return groups;
 }
 
 export function TransactionDateHeading({ date, count, sticky = true }) {
-  return <div className={(sticky ? "sticky top-0 z-20 " : "") + "flex min-h-[39px] items-center justify-between gap-3 border-y border-primary/10 bg-[#f0efff] px-4 py-2 text-[11px] font-semibold text-foreground shadow-[0_1px_0_rgba(75,85,240,0.08)] dark:bg-[#252441] sm:px-5"}>
-    <span className="inline-flex min-w-0 items-center gap-2"><CalendarDays className="h-3.5 w-3.5 shrink-0 text-primary" /><span className="truncate">{formatTransactionDay(date)}</span></span>
-    {count != null && <span className="shrink-0 text-[10px] font-medium text-muted-foreground">{count} transaction{count === 1 ? "" : "s"}</span>}
+  return <div role="heading" aria-level={3} className={(sticky ? "sticky top-0 z-20 " : "") + "penni-tx-date-heading flex min-h-[42px] items-center justify-between gap-3 border-y border-primary/10 bg-[#f0efff]/95 px-4 py-2 text-[12px] font-semibold text-foreground shadow-[0_2px_10px_rgba(75,85,240,0.06)] backdrop-blur-xl dark:bg-[#252441]/95 sm:px-5"} data-transaction-date={date}>
+    <span className="inline-flex min-w-0 items-center gap-2.5"><CalendarDays className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" /><span className="truncate">{formatTransactionDay(date)}</span></span>
+    {count != null && <span className="shrink-0 rounded-full bg-background/80 px-2.5 py-1 text-[10px] font-medium tabular-nums text-muted-foreground">{count} transaction{count === 1 ? "" : "s"}</span>}
   </div>;
 }
 
@@ -78,25 +93,26 @@ export function UnifiedTransactionItem({ transaction: t, account, onSelect, onEd
   const title = t.description || t.merchant || "Transaction";
   const merchant = t.merchant || t.normalized_merchant;
   const subtitle = merchant && merchant.toLowerCase() !== title.toLowerCase() ? merchant : t.is_split ? "Split across categories" : "";
-  const status = t.approval_status === "failed" ? "Failed" : t.pending ? "Pending" : (t.approval_status === "unapproved" || t.category_approval_status === "unapproved") ? "Unapproved" : "Approved";
+
   return <div className={"flex min-w-0 items-center border-b border-border/50 last:border-0 transition-colors hover:bg-secondary/30 " + (active ? "bg-primary/5 " : "")}>
-    <button type="button" onClick={() => onSelect?.(t)} className="flex min-h-[78px] min-w-0 flex-1 items-center gap-3 px-4 py-3.5 text-left focus-visible:outline-2 focus-visible:outline-primary sm:px-5" aria-label={"View " + title}>
+    <button type="button" onClick={() => onSelect?.(t)} className="flex min-h-[82px] min-w-0 flex-1 items-center gap-3 px-4 py-3.5 text-left focus-visible:outline-2 focus-visible:outline-primary sm:px-5" aria-label={"View " + title}>
       <TransactionTypeMark transaction={t} />
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="min-w-0 max-w-full truncate text-[13px] font-semibold tracking-[-0.015em]">{title}</span>
-          <TransactionTypeMark transaction={t} badge />
-          {t.is_split && <span className="rounded-full bg-violet/10 px-2 py-0.5 text-[10px] font-medium text-violet">Split</span>}
+          <span className="block min-w-0 max-w-full truncate text-[13px] font-semibold tracking-[-0.015em]" title={title}>{title}</span>
         </span>
         {subtitle && <span className="mt-0.5 block max-w-full truncate text-[10.5px] text-muted-foreground">{subtitle}</span>}
-        <span className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
+        <span className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
+          <TransactionTypeMark transaction={t} badge />
           <CategoryBadge category={type === "transfer" ? "Transfer" : t.category || "uncategorized"} size="sm" truncate showIcon className="max-w-[160px]" />
           <TransactionBankMark transaction={t} account={account} />
+          {t.is_split && <span className="rounded-full bg-violet/10 px-2 py-0.5 text-[10px] font-medium text-violet">Split</span>}
+          {t.transfer_pair_id && <span className="text-[10px] font-medium text-sky">Matched</span>}
         </span>
       </span>
       <span className="ml-auto flex shrink-0 flex-col items-end gap-1">
         <span className={"money-tabular whitespace-nowrap text-[13px] font-semibold " + tone.amount}>{amount > 0 ? "+" : amount < 0 ? "−" : ""}{formatCurrency(Math.abs(amount))}</span>
-        <span className={"rounded-full px-2 py-0.5 text-[10px] font-medium " + (status === "Unapproved" ? "bg-topaz/10 text-topaz" : status === "Failed" ? "bg-ruby/10 text-ruby" : status === "Pending" ? "bg-sky/10 text-sky" : "bg-emerald/10 text-emerald")}>{status}</span>
+        <TransactionStatusBadge transaction={t} />
       </span>
     </button>
     {(onEdit || onDelete) && <DropdownMenu>

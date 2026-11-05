@@ -34,7 +34,7 @@ import {
 } from "../components/ui/dropdown-menu";
 import { EmptyPanel, PageHeader, Surface } from "../components/ui/page";
 import AccountFormModal from "../components/AccountFormModal";
-import GroupedTransactionItems from "../components/GroupedTransactionItems";
+import GroupedTransactionItems, { getTransactionType } from "../components/GroupedTransactionItems";
 
 const ACCOUNT_TYPE_META = {
   current: { icon: Wallet, label: "Current account" },
@@ -319,9 +319,10 @@ export default function AccountsPage() {
     return ()=>{active=false;};
   },[selectedId]);
   const filteredTransactions = useMemo(()=>accountTransactions.filter(t=>{
-    const text=(t.description||t.merchant||t.category||"").toLowerCase();
-    const matches=text.includes(transactionQuery.toLowerCase());
-    return matches && (transactionType==="all"||(transactionType==="in"?Number(t.amount)>0:Number(t.amount)<0));
+    const text=[t.description,t.merchant,t.normalized_merchant,t.category,t.source_label].filter(Boolean).join(" ").toLowerCase();
+    const matches=text.includes(transactionQuery.toLowerCase().trim());
+    const kind=getTransactionType(t);
+    return matches && (transactionType==="all" || (transactionType==="transfer" ? kind === "transfer" : transactionType==="in" ? kind === "income" : kind === "expense"));
   }),[accountTransactions,transactionQuery,transactionType]);
   const selectedHistory = useMemo(()=>buildDailyBalanceTrend(
     accountTransactions, Number(selectedAccount?.balance||0), 90, new Date(), selectedId?[selectedId]:[]
@@ -496,8 +497,8 @@ export default function AccountsPage() {
                 <input aria-label="Search this account" placeholder="Search this account..."
                   value={transactionQuery} onChange={e=>setTransactionQuery(e.target.value)}
                   className="h-10 min-w-[180px] flex-1 rounded-xl border border-border bg-secondary/50 px-3 text-xs"/>
-                <div className="inline-flex items-center rounded-xl border border-border bg-secondary/40 p-1" role="group" aria-label="Transaction direction">
-                  {[{v:"all",t:"All"},{v:"in",t:"In"},{v:"out",t:"Out"}].map(x=>
+                <div className="inline-flex flex-wrap items-center rounded-xl border border-border bg-secondary/40 p-1" role="group" aria-label="Transaction direction">
+                  {[{v:"all",t:"All"},{v:"in",t:"Income"},{v:"out",t:"Expense"},{v:"transfer",t:"Transfer"}].map(x=>
                     <button type="button" key={x.v} aria-pressed={transactionType===x.v}
                       onClick={()=>setTransactionType(x.v)}
                       className={`h-8 rounded-lg px-3 text-xs ${transactionType===x.v?"bg-card font-semibold shadow-sm":"text-muted-foreground"}`}>{x.t}</button>)}

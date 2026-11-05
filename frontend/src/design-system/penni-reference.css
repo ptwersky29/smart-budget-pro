@@ -729,3 +729,47 @@ html.dark[data-penni-accent="violet"] .penni-v2 {--penni-accent:#a07bff;}
   .penni-composer .penni-composer-segment, .penni-composer .penni-composer-kind-option,
   .penni-composer .penni-composer-swap, .penni-composer .penni-composer-add {transition:none;}
 }
+
+
+/* Unified transaction v2: account history is the scrollport for sticky dates. */
+.penni-v2 .accounts-workspace .penni-account-history {
+  min-height: 0;
+  overflow: hidden;
+}
+.penni-v2 .accounts-workspace .penni-account-history-list {
+  min-height: 0;
+  max-height: min(62dvh, 620px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.penni-v2 .penni-tx-date-heading {
+  border-left: 3px solid hsl(var(--primary) / .55);
+  isolation: isolate;
+  letter-spacing: -.012em;
+}
+.penni-v2 .penni-tx-date-row th {
+  background: hsl(var(--card));
+  box-shadow: 0 2px 9px -6px hsl(var(--foreground) / .18);
+}
+.penni-v2 .transaction-table-scroll {
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.penni-v2 .transaction-table-scroll .workspace-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.penni-v2 .transaction-table-scroll .workspace-table > thead th {
+  height: 42px;
+  background: hsl(var(--card));
+}
+@media (max-width: 640px) {
+  .penni-v2 .accounts-workspace .penni-account-history-list {
+    max-height: min(62dvh, 500px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .penni-v2 .penni-tx-date-heading { scroll-behavior: auto; }
+}

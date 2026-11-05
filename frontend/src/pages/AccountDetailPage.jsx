@@ -533,7 +533,7 @@ export default function AccountDetailPage() {
           ) : (
             <>
 
-              <div ref={scrollRef} className="account-detail-list subtle-scroll min-h-0 flex-1 overflow-y-visible overflow-x-hidden lg:overflow-y-auto lg:overscroll-contain" role="list" aria-label="Account transactions">
+              <div ref={scrollRef} className="account-detail-list subtle-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain" role="region" aria-label="Account transactions">
                 <GroupedTransactionItems transactions={txs} account={account} onSelect={setInspectedTransaction}
                   onEdit={openEditTx} onDelete={t => { setInspectedTransaction(null); deleteTx(t.transaction_id); }}
                   activeId={inspectedTransaction?.transaction_id} groupDates={filters.sort === "date"} />

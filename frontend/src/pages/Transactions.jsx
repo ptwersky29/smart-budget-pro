@@ -35,7 +35,7 @@ import {
 } from "../components/ui/sheet";
 import ComparePeriods from "../components/ComparePeriods";
 import TransactionRow from "../components/TransactionRow";
-import { TransactionDateHeading, TransactionTypeMark, TransactionBankMark, groupTransactionsByDate, transactionDateKey, getTransactionType } from "../components/GroupedTransactionItems";
+import { TransactionDateHeading, TransactionTypeMark, TransactionBankMark, TransactionStatusBadge, groupTransactionsByDate, transactionDateKey, getTransactionType } from "../components/GroupedTransactionItems";
 import TransactionInspectorPanel from "../components/TransactionInspectorPanel";
 import { getBankLogoOrFallback, pickBankInstitution } from "../data/bankLogos";
 const CategoryPieChart = React.lazy(() => import("../components/CategoryPieChart"));
@@ -1252,12 +1252,14 @@ const Transactions = React.memo(function Transactions() {
   )).length;
 
   const mobileRows = aiResults?.transactions || txs;
-  const dateGroupCounts = useMemo(() => mobileRows.reduce((counts, tx) => { const key = transactionDateKey(tx); counts[key] = (counts[key] || 0) + 1; return counts; }, {}), [mobileRows]);
   const panelTransaction = inspectTx || txs[0] || null;
   const mobileDateGroups = useMemo(() => {
     if (filters.sort !== "date" || mobileRows.length === 0) return null;
     return groupTransactionsByDate(mobileRows);
   }, [mobileRows, filters.sort]);
+  const desktopDateGroups = useMemo(() => (
+    filters.sort === "date" ? groupTransactionsByDate(mobileRows) : [{ date: null, startIndex: 0, items: mobileRows }]
+  ), [mobileRows, filters.sort]);
 
   const exportCsv = useCallback(() => {
     const rows = aiResults?.transactions || txs;
@@ -1681,7 +1683,7 @@ const Transactions = React.memo(function Transactions() {
           ) : (
             <>
               {/* Mobile list */}
-              <div className="block sm:hidden">
+              <div className="block max-h-[min(72dvh,760px)] overflow-y-auto overscroll-contain subtle-scroll sm:hidden">
                 {mobileDateGroups ? (
                   mobileDateGroups.map((group) => (
                     <section key={group.date || "unknown"}>
@@ -1735,73 +1737,91 @@ const Transactions = React.memo(function Transactions() {
                 )}
               </div>
               {viewMode === "grid" ? (
-                <div className="hidden gap-3 p-3 sm:grid sm:grid-cols-2 xl:grid-cols-2">
-                  {(aiResults?.transactions || txs).map((transaction) => {
-                    const account = accountsById[transaction.account_id];
-                    const negative = Number(transaction.amount) < 0;
-                    const merchant = transaction.merchant || transaction.normalized_merchant || transaction.source_label;
-                    const showsDistinctMerchant = merchant && merchant.trim().toLowerCase() !== (transaction.description || "").trim().toLowerCase();
-                    return (
-                      <button
-                        key={transaction.transaction_id}
-                        type="button"
-                        onClick={() => selectTransactionRow(transaction)}
-                        className={`rounded-xl border p-3 text-left transition hover:border-emerald/30 hover:bg-emerald/[0.03] ${selectedIds.has(transaction.transaction_id) ? "border-emerald/30 bg-emerald/5" : "border-border bg-card"}`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="truncate text-[12.5px] font-medium">{transaction.description || merchant || "Transaction"}</p>
-                            {showsDistinctMerchant ? <p className="mt-0.5 truncate text-[10.5px] text-muted-foreground">{merchant}</p> : null}
-                          </div>
-                          <span className={`money-tabular shrink-0 text-[12px] font-semibold ${negative ? "text-ruby" : "text-emerald"}`}>{formatCurrency(transaction.amount, { signed: true })}</span>
-                        </div>
-                        <div className="mt-3 flex items-center justify-between gap-2">
-              <CategoryBadge category={transaction.category || "uncategorized"} size="sm" truncate showIcon={false} />
-                          <span className="truncate text-[10.5px] text-muted-foreground">{account?.name || transaction.source_label || "Manual"}</span>
-                        </div>
-                      </button>
-                    );
-                  })}
+                <div className="hidden min-h-0 overflow-y-auto subtle-scroll sm:block lg:flex-1" aria-label="Transactions in grid view">
+                  {desktopDateGroups.map((group, groupIndex) => (
+                    <section key={(group.date || "ungrouped") + "-" + groupIndex}>
+                      {group.date && <TransactionDateHeading date={group.date} count={group.items.length} />}
+                      <div className="grid grid-cols-1 gap-3 p-3 xl:grid-cols-2">
+                        {group.items.map((transaction, index) => {
+                          const account = accountsById[transaction.account_id];
+                          const type = getTransactionType(transaction);
+                          const amount = Number(transaction.amount) || 0;
+                          const title = transaction.description || transaction.merchant || "Transaction";
+                          return (
+                            <button key={transaction.transaction_id || index} type="button"
+                              onClick={() => selectTransactionRow(transaction)} title={title}
+                              className={`min-w-0 rounded-2xl border p-4 text-left shadow-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary ${selectedIds.has(transaction.transaction_id) ? "border-primary/40 bg-primary/5" : "border-border/70 bg-card hover:border-primary/30 hover:bg-secondary/30"}`}>
+                              <div className="flex min-w-0 items-start gap-3">
+                                <TransactionTypeMark transaction={transaction} />
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-[13px] font-semibold">{title}</p>
+                                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                    <TransactionTypeMark transaction={transaction} badge />
+                                    {transaction.is_split && <span className="rounded-full bg-violet/10 px-2 py-0.5 text-[10px] font-medium text-violet">Split</span>}
+                                    <TransactionStatusBadge transaction={transaction} />
+                                  </div>
+                                  {filters.sort !== "date" && <span className="mt-1 text-[10px] text-muted-foreground">{transactionDayLabel(transaction.date)}</span>}
+                                </div>
+                                <span className={`money-tabular shrink-0 text-[13px] font-semibold ${type === "transfer" ? "text-foreground" : amount < 0 ? "text-ruby" : "text-emerald"}`}>
+                                  {formatCurrency(amount, { signed: true })}
+                                </span>
+                              </div>
+                              <div className="mt-3 flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3">
+                                <CategoryBadge category={type === "transfer" ? "Transfer" : transaction.category || "uncategorized"} size="sm" truncate showIcon />
+                                <TransactionBankMark transaction={transaction} account={account} />
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  ))}
                 </div>
               ) : (
-                <div className="transaction-table-scroll hidden min-h-0 overflow-x-auto sm:block lg:flex-1 lg:overflow-auto">
-                  <table className="workspace-table w-full min-w-[980px] table-fixed text-sm">
+                <div className="transaction-table-scroll hidden min-h-0 overflow-x-auto sm:block lg:flex-1 lg:overflow-auto" aria-label="Transaction ledger">
+                  <table className={`workspace-table w-full table-fixed text-sm ${filters.sort === "date" ? "min-w-[890px]" : "min-w-[980px]"}`}>
                     <thead className="sticky top-0 z-30 bg-card">
-                      <tr className="border-b border-border text-left text-[11px] font-medium text-muted-foreground">
-                        <th className="w-[40px] px-2.5 py-2.5">
+                      <tr className="h-[42px] border-b border-border text-left text-[11px] font-medium text-muted-foreground">
+                        <th className="w-[42px] px-2.5 py-2.5">
                           <input type="checkbox" checked={allDisplayedSelected} onChange={toggleSelectAll}
                             className="mx-auto block h-3.5 w-3.5 cursor-pointer rounded border-border accent-emerald" aria-label="Select all transactions" />
                         </th>
-                        <th className="w-[111px] px-2 py-2.5">Date</th>
-                        <th className="px-3 py-2.5">Description</th>
-                        <th className="w-[135px] px-2 py-2.5">Category</th>
-                        <th className="w-[148px] px-2 py-2.5">Account</th>
-                        <th className="w-[98px] px-2 py-2.5 text-right">Amount</th>
-                        <th className="w-[123px] px-2 py-2.5">Status</th>
-                        <th className="w-[57px] px-1 py-2.5"></th>
+                        {filters.sort !== "date" && <th className="w-[108px] px-2 py-2.5">Date</th>}
+                        <th className="px-3 py-2.5">Transaction</th>
+                        <th className="w-[151px] px-2 py-2.5">Category</th>
+                        <th className="w-[172px] px-2 py-2.5">Bank / Account</th>
+                        <th className="w-[108px] px-2 py-2.5 text-right">Amount</th>
+                        <th className="w-[112px] px-2 py-2.5">Status</th>
+                        <th className="w-[52px] px-1 py-2.5"></th>
                       </tr>
                     </thead>
-                    <tbody>
-                      {(aiResults?.transactions || txs).map((t, idx) => (
-                        <React.Fragment key={t.transaction_id}>
-                          {filters.sort === "date" && (idx === 0 || transactionDateKey(mobileRows[idx - 1]) !== transactionDateKey(t)) && (
-                            <tr className="sticky top-[38px] z-20"><td colSpan={8} className="p-0"><TransactionDateHeading date={transactionDateKey(t)} count={dateGroupCounts[transactionDateKey(t)]} sticky={false} /></td></tr>
-                          )}
-                        <TransactionRow t={t}
-                          account={accountsById[t.account_id]}
-                          isSelected={selectedIds.has(t.transaction_id)}
-                          isFocused={focusedIndex === idx}
-                          onToggleSelect={toggleSelect} onSelectRow={selectTransactionRow} onEdit={openEdit}
-                          onInspect={openInspector} onDelete={del}
-                          onApprove={approveTx}
-                          onClassify={classifySavedTx}
-                          onSplit={splitTx}
-                          onPairTransfer={pairTransfer}
-                          onUnpairTransfer={unpairTransfer}
-                          onSetFocus={() => setFocusedIndex(idx)} />
-                        </React.Fragment>
-                      ))}
-                    </tbody>
+                    {desktopDateGroups.map((group, groupIndex) => (
+                      <tbody key={(group.date || "ungrouped") + "-" + groupIndex}>
+                        {group.date && (
+                          <tr className="penni-tx-date-row">
+                            <th scope="rowgroup" colSpan={7} className="sticky top-[42px] z-20 p-0 text-left">
+                              <TransactionDateHeading date={group.date} count={group.items.length} sticky={false} />
+                            </th>
+                          </tr>
+                        )}
+                        {group.items.map((t, index) => {
+                          const rowIndex = group.startIndex + index;
+                          return <TransactionRow key={t.transaction_id || rowIndex} t={t}
+                            account={accountsById[t.account_id]}
+                            showDate={filters.sort !== "date"}
+                            isSelected={selectedIds.has(t.transaction_id)}
+                            isFocused={focusedIndex === rowIndex}
+                            onToggleSelect={toggleSelect} onSelectRow={selectTransactionRow} onEdit={openEdit}
+                            onInspect={openInspector} onDelete={del}
+                            onApprove={approveTx}
+                            onClassify={classifySavedTx}
+                            onSplit={splitTx}
+                            onPairTransfer={pairTransfer}
+                            onUnpairTransfer={unpairTransfer}
+                            onSetFocus={() => setFocusedIndex(rowIndex)} />;
+                        })}
+                      </tbody>
+                    ))}
                   </table>
                 </div>
               )}
@@ -2423,17 +2443,8 @@ function SwipeableCard({ t, account, isSelected, swipedId, setSwipedId, onToggle
     50,
   );
   const deleting = swipedId === t.transaction_id;
-  const brandInstitution = pickBankInstitution(account?.provider, account?.name, t.institution, t.source_label);
   const unapproved = t.approval_status === "unapproved" || t.category_approval_status === "unapproved";
-  const status = t.approval_status === "failed"
-    ? { label: "Failed", className: "bg-ruby/10 text-ruby" }
-    : unapproved
-      ? { label: "Unapproved", className: "bg-topaz/10 text-topaz" }
-      : t.is_transfer
-        ? { label: "Transfer", className: "bg-sky/10 text-sky" }
-        : t.is_split
-          ? { label: "Split", className: "bg-violet/10 text-violet" }
-          : null;
+
 
   return (
     <div className="relative overflow-hidden tap-highlight-none" {...handlers} onClick={(event) => { if (deleting) { setSwipedId(null); return; } if (event.target.closest("button, input, a, [role='menuitem'], [data-radix-collection-item]")) return; onInspect?.(t); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onInspect?.(t); } }} role="button" tabIndex={0}>
@@ -2458,11 +2469,7 @@ function SwipeableCard({ t, account, isSelected, swipedId, setSwipedId, onToggle
             <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
               <TransactionTypeMark transaction={t} badge />
               <CategoryBadge category={getTransactionType(t) === "transfer" ? "Transfer" : t.category || "uncategorized"} size="sm" truncate className="min-w-0" />
-              {status && (
-                <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${status.className}`}>
-                  {status.label}
-                </span>
-              )}
+              {t.is_split && <span className="rounded-full bg-violet/10 px-2 py-0.5 text-[10px] font-medium text-violet">Split</span>}
               {showDate && (
                 <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground/60">
                   {transactionDayLabel(t.date, { weekday: false })}
@@ -2472,9 +2479,10 @@ function SwipeableCard({ t, account, isSelected, swipedId, setSwipedId, onToggle
             </div>
           </div>
           <div className="flex shrink-0 flex-col items-end justify-between self-stretch pl-0.5">
-            <span className={`whitespace-nowrap text-[13px] font-semibold leading-5 tabular-nums ${getTransactionType(t) === "transfer" ? "text-foreground" : t.amount > 0 ? "text-emerald" : "text-ruby"}`}>
-              {t.amount > 0 ? "+" : ""}£{Math.abs(t.amount).toFixed(2)}
+            <span className={`money-tabular whitespace-nowrap text-[13px] font-semibold leading-5 ${getTransactionType(t) === "transfer" ? "text-foreground" : t.amount > 0 ? "text-emerald" : "text-ruby"}`}>
+              {formatCurrency(t.amount, { signed: true })}
             </span>
+            <TransactionStatusBadge transaction={t} />
             <DropdownMenu>
               <DropdownMenuTrigger className="-mb-1 -mr-1 grid h-10 w-10 place-items-center rounded-xl text-muted-foreground transition-transform hover:bg-secondary/50 hover:text-foreground active:scale-95" aria-label="Transaction actions">
                 <MoreHorizontal className="h-5 w-5" />
