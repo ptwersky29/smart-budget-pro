@@ -18,11 +18,11 @@ const tones = {
   transfer: { label: "Transfer", icon: ArrowLeftRight, mark: "bg-sky/10 text-sky", chip: "bg-sky/10 text-sky", amount: "text-foreground" },
 };
 
-export function TransactionTypeMark({ transaction, badge = false }) {
+export function TransactionTypeMark({ transaction, badge = false, compact = false }) {
   const tone = tones[getTransactionType(transaction)];
   const Icon = tone.icon;
-  if (badge) return <span className={"inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold " + tone.chip}><Icon className="h-3 w-3" />{tone.label}</span>;
-  return <span className={"grid h-9 w-9 shrink-0 place-items-center rounded-xl " + tone.mark} title={tone.label} aria-label={tone.label}><Icon className="h-4 w-4" /></span>;
+  if (badge) return <span className={"inline-flex shrink-0 items-center gap-1 rounded-full text-[10px] font-semibold " + (compact ? "px-1.5 py-0.5 " : "px-2 py-1 ") + tone.chip}><Icon className="h-3 w-3" />{tone.label}</span>;
+  return <span className={"grid shrink-0 place-items-center rounded-[10px] " + (compact ? "h-[30px] w-[30px] " : "h-9 w-9 ") + tone.mark} title={tone.label} aria-label={tone.label}><Icon className="h-3.5 w-3.5" /></span>;
 }
 
 export function TransactionBankMark({ transaction, account, showName = true }) {
@@ -80,9 +80,9 @@ export function groupTransactionsByDate(transactions) {
 }
 
 export function TransactionDateHeading({ date, count, sticky = true }) {
-  return <div role="heading" aria-level={3} className={(sticky ? "sticky top-0 z-20 " : "") + "penni-tx-date-heading flex min-h-[42px] items-center justify-between gap-3 border-y border-primary/10 bg-[#f0efff]/95 px-4 py-2 text-[12px] font-semibold text-foreground shadow-[0_2px_10px_rgba(75,85,240,0.06)] backdrop-blur-xl dark:bg-[#252441]/95 sm:px-5"} data-transaction-date={date}>
-    <span className="inline-flex min-w-0 items-center gap-2.5"><CalendarDays className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" /><span className="truncate">{formatTransactionDay(date)}</span></span>
-    {count != null && <span className="shrink-0 rounded-full bg-background/80 px-2.5 py-1 text-[10px] font-medium tabular-nums text-muted-foreground">{count} transaction{count === 1 ? "" : "s"}</span>}
+  return <div role="heading" aria-level={3} className={(sticky ? "sticky top-0 z-20 " : "") + "penni-tx-date-heading flex min-h-[34px] items-center justify-between gap-3 border-y border-primary/10 bg-[#f0efff]/95 px-4 py-1 text-[11px] font-semibold text-foreground shadow-[0_2px_10px_rgba(75,85,240,0.06)] backdrop-blur-xl dark:bg-[#252441]/95 sm:px-5"} data-transaction-date={date}>
+    <span className="inline-flex min-w-0 items-center gap-2"><CalendarDays className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" /><span className="truncate">{formatTransactionDay(date)}</span></span>
+    {count != null && <span className="shrink-0 rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">{count} transaction{count === 1 ? "" : "s"}</span>}
   </div>;
 }
 
@@ -95,15 +95,15 @@ export function UnifiedTransactionItem({ transaction: t, account, onSelect, onEd
   const subtitle = merchant && merchant.toLowerCase() !== title.toLowerCase() ? merchant : t.is_split ? "Split across categories" : "";
 
   return <div className={"flex min-w-0 items-center border-b border-border/50 last:border-0 transition-colors hover:bg-secondary/30 " + (active ? "bg-primary/5 " : "")}>
-    <button type="button" onClick={() => onSelect?.(t)} className="flex min-h-[82px] min-w-0 flex-1 items-center gap-3 px-4 py-3.5 text-left focus-visible:outline-2 focus-visible:outline-primary sm:px-5" aria-label={"View " + title}>
-      <TransactionTypeMark transaction={t} />
+    <button type="button" onClick={() => onSelect?.(t)} className="flex min-h-[68px] min-w-0 flex-1 items-center gap-2.5 px-4 py-2.5 text-left focus-visible:outline-2 focus-visible:outline-primary sm:px-5" aria-label={"View " + title}>
+      <TransactionTypeMark transaction={t} compact />
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <span className="block min-w-0 max-w-full truncate text-[13px] font-semibold tracking-[-0.015em]" title={title}>{title}</span>
         </span>
         {subtitle && <span className="mt-0.5 block max-w-full truncate text-[10.5px] text-muted-foreground">{subtitle}</span>}
-        <span className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
-          <TransactionTypeMark transaction={t} badge />
+        <span className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <TransactionTypeMark transaction={t} badge compact />
           <CategoryBadge category={type === "transfer" ? "Transfer" : t.category || "uncategorized"} size="sm" truncate showIcon className="max-w-[160px]" />
           <TransactionBankMark transaction={t} account={account} />
           {t.is_split && <span className="rounded-full bg-violet/10 px-2 py-0.5 text-[10px] font-medium text-violet">Split</span>}

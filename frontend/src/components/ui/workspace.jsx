@@ -23,8 +23,22 @@ export function WorkspaceMetrics({ children, columns = 3 }) {
   );
 }
 
-export function WorkspaceMetric({ label, value, compactValue, note, icon: Icon, tone = "emerald", progress, className = "" }) {
+export function WorkspaceMetric({ label, value, compactValue, note, icon: Icon, tone = "emerald", progress, dense = false, className = "" }) {
   const toneStyle = tone === "ruby" ? "bg-ruby/10 text-ruby" : tone === "topaz" ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald";
+  if (dense) {
+    return (
+      <div className={`surface workspace-metric workspace-metric-dense flex min-h-[66px] min-w-0 items-center gap-3 rounded-[15px] px-3 py-2 ${className}`} title={note || undefined}>
+        {Icon && <span className={`grid h-[32px] w-[32px] shrink-0 place-items-center rounded-[10px] ${toneStyle}`}><Icon className="h-[16px] w-[16px]" /></span>}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[11px] font-medium leading-4 text-muted-foreground">{label}</p>
+          <p className="money-tabular min-w-0 truncate text-[18px] font-semibold leading-6 tracking-[-0.03em]" title={String(value)}>
+            {compactValue != null ? <><span className="sm:hidden" aria-hidden="true">{compactValue}</span><span className="sr-only sm:not-sr-only">{value}</span></> : value}
+          </p>
+          {note && <p className="hidden truncate text-[10px] leading-4 text-muted-foreground md:block">{note}</p>}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className={`surface workspace-metric min-w-0 rounded-[20px] p-2.5 sm:p-4 ${className}`}>
       <div className="flex min-h-[48px] min-w-0 items-center gap-2 sm:min-h-[58px] sm:gap-3">

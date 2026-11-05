@@ -773,3 +773,71 @@ html.dark[data-penni-accent="violet"] .penni-v2 {--penni-accent:#a07bff;}
 @media (prefers-reduced-motion: reduce) {
   .penni-v2 .penni-tx-date-heading { scroll-behavior: auto; }
 }
+
+
+/* Compact transaction workspace — priority to the ledger over surrounding chrome.
+   All changes are scoped to Transactions; other pages keep their normal metrics. */
+.penni-v2 .transactions-ledger .workspace-metric-dense {
+  min-height: 66px;
+  padding: 7px 12px;
+  border-radius: 15px;
+}
+.penni-v2 .transactions-ledger .workspace-metric-dense .money-tabular {
+  letter-spacing: -.025em;
+}
+.penni-v2 .transactions-ledger [role="tablist"] {
+  min-height: 36px;
+}
+.penni-v2 .transactions-ledger [role="tablist"] > button {
+  height: 35px;
+}
+.penni-v2 .transactions-ledger .transaction-ledger-panel {
+  min-height: 0;
+  flex: 1 1 auto;
+}
+.penni-v2 .transactions-ledger .transaction-table-scroll .workspace-table > thead th {
+  height: 38px;
+  padding-block: 6px;
+}
+.penni-v2 .transactions-ledger .penni-tx-date-heading {
+  min-height: 34px;
+  padding-block: 4px;
+}
+.penni-v2 .transactions-ledger .transaction-table-scroll .workspace-table > tbody > tr:not(.penni-tx-date-row) > td {
+  padding-block: 7px;
+}
+.penni-v2 .transactions-ledger .transaction-table-scroll .workspace-table > tbody > tr:not(.penni-tx-date-row) > td:first-child {
+  padding-block: 4px;
+}
+@media (min-width: 1024px) {
+  .penni-v2 .workspace-main:has(.transactions-ledger) {
+    padding-top: 10px;
+    padding-bottom: 8px;
+  }
+  .penni-v2 .transactions-ledger {
+    gap: 6px;
+  }
+  .penni-v2 .transactions-ledger .transactions-primary {
+    gap: 8px;
+  }
+  .penni-v2 .transactions-ledger .workspace-page-header {
+    min-height: 38px;
+    padding-bottom: 0;
+  }
+  .penni-v2 .transactions-ledger .workspace-metrics {
+    gap: 10px;
+  }
+  .penni-v2 .transactions-ledger .transaction-ledger-panel {
+    flex: 1 1 auto;
+  }
+}
+/* Tablet and compact laptop: keep transactions usable instead of allowing
+   the summary strip to crowd out the list. */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .penni-v2 .transactions-ledger .workspace-metrics {
+    gap: 8px;
+  }
+  .penni-v2 .transactions-ledger .workspace-metric-dense {
+    padding-inline: 9px;
+  }
+}

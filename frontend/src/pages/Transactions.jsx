@@ -1284,10 +1284,10 @@ const Transactions = React.memo(function Transactions() {
   }, [txs, aiResults]);
 
   return (
-    <div className={`transactions-reference page-stack pb-4 ${activeTab === "ledger" ? "transactions-ledger" : "transactions-other"}`} data-testid="transactions-root">
+    <div className={`transactions-reference page-stack pb-2 ${activeTab === "ledger" ? "transactions-ledger" : "transactions-other"}`} data-testid="transactions-root">
 
       <div className={`grid min-h-0 items-start gap-4 lg:items-stretch ${activeTab === "ledger" && inspectorOpen ? "xl:grid-cols-[minmax(0,1fr)_328px]" : ""}`}>
-        <div className="transactions-primary min-w-0 space-y-4 lg:flex lg:min-h-0 lg:flex-col lg:gap-3 lg:space-y-0">
+        <div className="transactions-primary min-w-0 space-y-3 lg:flex lg:min-h-0 lg:flex-col lg:gap-2 lg:space-y-0">
           <div className="shrink-0 xl:pl-[14px]">
             <WorkspaceHeader
               title={activeTab === "maaser" ? "Maaser" : "Transactions"}
@@ -1371,13 +1371,13 @@ const Transactions = React.memo(function Transactions() {
             <>
               <div className="xl:px-[14px]">
                 <WorkspaceMetrics columns={3}>
-                  <WorkspaceMetric label="Income" value={formatCurrency(shownIncome)} compactValue={formatCurrency(shownIncome, { compact: true })}
+                  <WorkspaceMetric dense label="Income" value={formatCurrency(shownIncome)} compactValue={formatCurrency(shownIncome, { compact: true })}
                     icon={TrendingUp} tone="emerald"
                     note={filteredSummary ? "Approved matching transactions" : incomeDelta === null ? monthLabel : `${incomeDelta >= 0 ? "↑" : "↓"} ${Math.abs(incomeDelta)}% vs ${previousMonthName?.slice(0,3)}`} />
-                  <WorkspaceMetric label="Expenses" value={formatCurrency(shownExpenses)} compactValue={formatCurrency(shownExpenses, { compact: true })}
+                  <WorkspaceMetric dense label="Expenses" value={formatCurrency(shownExpenses)} compactValue={formatCurrency(shownExpenses, { compact: true })}
                     icon={TrendingDown} tone="ruby"
                     note={filteredSummary ? "Approved matching transactions" : expenseDelta === null ? monthLabel : `${expenseDelta >= 0 ? "↑" : "↓"} ${Math.abs(expenseDelta)}% vs ${previousMonthName?.slice(0,3)}`} />
-                  <WorkspaceMetric label="Net" value={formatCurrency(shownNet, { signed: true })} compactValue={formatCurrency(shownNet, { compact: true })}
+                  <WorkspaceMetric dense label="Net" value={formatCurrency(shownNet, { signed: true })} compactValue={formatCurrency(shownNet, { compact: true })}
                     icon={Calculator} tone={shownNet >= 0 ? "emerald" : "ruby"} note={filteredSummary ? "Approved totals · " + rangeLabel : monthLabel} />
                 </WorkspaceMetrics>
               </div>
@@ -1623,7 +1623,7 @@ const Transactions = React.memo(function Transactions() {
                 </div>
               ) : null}
 
-              <div className="flex min-w-0 flex-col gap-2 border-b border-border pt-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 flex-col gap-1 border-b border-border pt-0 sm:flex-row sm:items-center sm:justify-between">
                 <WorkspaceTabs
                   label="Transaction categories"
                   tabs={[
@@ -1683,7 +1683,7 @@ const Transactions = React.memo(function Transactions() {
           ) : (
             <>
               {/* Mobile list */}
-              <div className="block max-h-[min(72dvh,760px)] overflow-y-auto overscroll-contain subtle-scroll sm:hidden">
+              <div className="block max-h-[min(80dvh,900px)] overflow-y-auto overscroll-contain subtle-scroll sm:hidden">
                 {mobileDateGroups ? (
                   mobileDateGroups.map((group) => (
                     <section key={group.date || "unknown"}>
@@ -1741,7 +1741,7 @@ const Transactions = React.memo(function Transactions() {
                   {desktopDateGroups.map((group, groupIndex) => (
                     <section key={(group.date || "ungrouped") + "-" + groupIndex}>
                       {group.date && <TransactionDateHeading date={group.date} count={group.items.length} />}
-                      <div className="grid grid-cols-1 gap-3 p-3 xl:grid-cols-2">
+                      <div className="grid grid-cols-1 gap-2 p-2.5 xl:grid-cols-2">
                         {group.items.map((transaction, index) => {
                           const account = accountsById[transaction.account_id];
                           const type = getTransactionType(transaction);
@@ -1750,13 +1750,13 @@ const Transactions = React.memo(function Transactions() {
                           return (
                             <button key={transaction.transaction_id || index} type="button"
                               onClick={() => selectTransactionRow(transaction)} title={title}
-                              className={`min-w-0 rounded-2xl border p-4 text-left shadow-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary ${selectedIds.has(transaction.transaction_id) ? "border-primary/40 bg-primary/5" : "border-border/70 bg-card hover:border-primary/30 hover:bg-secondary/30"}`}>
+                              className={`min-w-0 rounded-xl border p-3 text-left shadow-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary ${selectedIds.has(transaction.transaction_id) ? "border-primary/40 bg-primary/5" : "border-border/70 bg-card hover:border-primary/30 hover:bg-secondary/30"}`}>
                               <div className="flex min-w-0 items-start gap-3">
-                                <TransactionTypeMark transaction={transaction} />
+                                <TransactionTypeMark transaction={transaction} compact />
                                 <div className="min-w-0 flex-1">
                                   <p className="truncate text-[13px] font-semibold">{title}</p>
                                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                                    <TransactionTypeMark transaction={transaction} badge />
+                                    <TransactionTypeMark transaction={transaction} badge compact />
                                     {transaction.is_split && <span className="rounded-full bg-violet/10 px-2 py-0.5 text-[10px] font-medium text-violet">Split</span>}
                                     <TransactionStatusBadge transaction={transaction} />
                                   </div>
@@ -1781,7 +1781,7 @@ const Transactions = React.memo(function Transactions() {
                 <div className="transaction-table-scroll hidden min-h-0 overflow-x-auto sm:block lg:flex-1 lg:overflow-auto" aria-label="Transaction ledger">
                   <table className={`workspace-table w-full table-fixed text-sm ${filters.sort === "date" ? "min-w-[890px]" : "min-w-[980px]"}`}>
                     <thead className="sticky top-0 z-30 bg-card">
-                      <tr className="h-[42px] border-b border-border text-left text-[11px] font-medium text-muted-foreground">
+                      <tr className="h-[38px] border-b border-border text-left text-[11px] font-medium text-muted-foreground">
                         <th className="w-[42px] px-2.5 py-2.5">
                           <input type="checkbox" checked={allDisplayedSelected} onChange={toggleSelectAll}
                             className="mx-auto block h-3.5 w-3.5 cursor-pointer rounded border-border accent-emerald" aria-label="Select all transactions" />
@@ -1799,7 +1799,7 @@ const Transactions = React.memo(function Transactions() {
                       <tbody key={(group.date || "ungrouped") + "-" + groupIndex}>
                         {group.date && (
                           <tr className="penni-tx-date-row">
-                            <th scope="rowgroup" colSpan={7} className="sticky top-[42px] z-20 p-0 text-left">
+                            <th scope="rowgroup" colSpan={7} className="sticky top-[38px] z-20 p-0 text-left">
                               <TransactionDateHeading date={group.date} count={group.items.length} sticky={false} />
                             </th>
                           </tr>
@@ -2451,14 +2451,14 @@ function SwipeableCard({ t, account, isSelected, swipedId, setSwipedId, onToggle
       <div
         className={`transition-transform duration-200 ease-out ${deleting ? "-translate-x-20" : "translate-x-0"} ${isSelected ? "bg-emerald/5" : ""}`}
       >
-        <div className="flex items-start gap-3 px-3 py-3.5">
+        <div className="flex items-start gap-2.5 px-3 py-2.5">
           <label className="-ml-0.5 flex h-11 w-7 shrink-0 items-center justify-center">
             <input type="checkbox" checked={isSelected}
               onChange={() => onToggleSelect(t.transaction_id)}
               aria-label="Select transaction"
               className="h-[18px] w-[18px] rounded-[5px] border-border accent-emerald cursor-pointer shrink-0" />
           </label>
-          <TransactionTypeMark transaction={t} />
+          <TransactionTypeMark transaction={t} compact />
           <div className="min-w-0 flex-1 pt-0.5">
             <p
               className="truncate text-[13px] font-medium leading-5 text-foreground"
@@ -2467,7 +2467,7 @@ function SwipeableCard({ t, account, isSelected, swipedId, setSwipedId, onToggle
               {t.description}
             </p>
             <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
-              <TransactionTypeMark transaction={t} badge />
+              <TransactionTypeMark transaction={t} badge compact />
               <CategoryBadge category={getTransactionType(t) === "transfer" ? "Transfer" : t.category || "uncategorized"} size="sm" truncate className="min-w-0" />
               {t.is_split && <span className="rounded-full bg-violet/10 px-2 py-0.5 text-[10px] font-medium text-violet">Split</span>}
               {showDate && (
