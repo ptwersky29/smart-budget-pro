@@ -20,7 +20,7 @@ def frontend_base_url() -> str:
     return frontend or DEFAULT_FRONTEND_URL
 
 
-def connections_redirect_url(status: str, reason: str = None) -> str:
+def connections_redirect_url(status: str, reason: str | None = None) -> str:
     params = {"status": status}
     if reason:
         params["reason"] = reason

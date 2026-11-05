@@ -19,6 +19,6 @@ def _request_with_preview_tls_disabled(self, method, url, **kwargs):
     return _original_request(self, method, url, **kwargs)
 
 
-requests.sessions.Session.request = _request_with_preview_tls_disabled
+setattr(requests.sessions.Session, "request", _request_with_preview_tls_disabled)
 
 os.environ.setdefault("PYTHONHTTPSVERIFY", "0")

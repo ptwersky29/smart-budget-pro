@@ -93,7 +93,9 @@ logger = logging.getLogger("financeai")
 SENTRY_DSN = os.environ.get("SENTRY_DSN")
 if SENTRY_DSN:
     try:
-        import sentry_sdk
+        import importlib
+
+        sentry_sdk = importlib.import_module("sentry_sdk")
         sentry_sdk.init(dsn=SENTRY_DSN, traces_sample_rate=0.1)
         logger.info("Sentry error monitoring enabled")
     except ImportError:
@@ -155,7 +157,7 @@ async def health():
                 except Exception:
                     if attempt == 0:
                         await asyncio.sleep(1.5)
-                        session.close()
+                        await session.close()
                         continue
                     raise
             if db_ok:
@@ -326,7 +328,7 @@ def _cors_headers(request: StarletteRequest):
     return {}
 
 
-def _error_payload(request: StarletteRequest, detail, code: str = None, **extra):
+def _error_payload(request: StarletteRequest, detail, code: str | None = None, **extra):
     payload = {"detail": detail}
     if code:
         payload["code"] = code

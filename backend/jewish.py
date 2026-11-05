@@ -159,13 +159,15 @@ def build_router() -> APIRouter:
             except (ValueError, TypeError):
                 return None
 
-    async def _get_pref(session, user_id: str, key: str, default=None):
+    async def _get_pref(session, user_id: str, key: str, default: dict | None = None) -> dict:
         result = await session.execute(select(User).where(User.user_id == user_id))
         u = result.scalar_one_or_none()
+        fallback = default if default is not None else {}
         if not u:
-            return default
+            return fallback
         prefs = u.preferences or {}
-        return prefs.get(key, default)
+        value = prefs.get(key, fallback)
+        return value if isinstance(value, dict) else fallback
 
     async def _set_pref(session, user_id: str, key: str, value):
         result = await session.execute(select(User).where(User.user_id == user_id))

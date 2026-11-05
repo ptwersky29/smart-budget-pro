@@ -1,6 +1,9 @@
 import asyncio
 import sys
 from pathlib import Path
+from typing import cast
+
+from fastapi import Request
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -32,6 +35,11 @@ async def _raise_error(_request):
     raise RuntimeError("boom")
 
 
+async def _noop_asgi(scope, receive, send):
+    """Valid no-op ASGI application for middleware unit tests."""
+    return None
+
+
 def test_truelayer_callback_path_detection():
     assert is_truelayer_callback_path("/api/truelayer/callback")
     assert not is_truelayer_callback_path("/api/health")
@@ -46,10 +54,10 @@ def test_connections_redirect_url(monkeypatch):
 
 def test_error_monitor_redirects_callback_failures(monkeypatch):
     monkeypatch.setenv("FRONTEND_URL", "https://app.example.com/")
-    middleware = ErrorMonitorMiddleware(app=lambda scope, receive, send: None)
+    middleware = ErrorMonitorMiddleware(app=_noop_asgi)
 
     response = asyncio.run(
-        middleware.dispatch(_Request("/api/truelayer/callback"), _raise_error)
+        middleware.dispatch(cast(Request, _Request("/api/truelayer/callback")), _raise_error)
     )
 
     assert response.status_code == 302
@@ -59,8 +67,8 @@ def test_error_monitor_redirects_callback_failures(monkeypatch):
 
 
 def test_error_monitor_keeps_json_for_other_failures():
-    middleware = ErrorMonitorMiddleware(app=lambda scope, receive, send: None)
+    middleware = ErrorMonitorMiddleware(app=_noop_asgi)
 
-    response = asyncio.run(middleware.dispatch(_Request("/api/health"), _raise_error))
+    response = asyncio.run(middleware.dispatch(cast(Request, _Request("/api/health")), _raise_error))
 
     assert response.status_code == 500

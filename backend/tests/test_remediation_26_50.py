@@ -2,9 +2,11 @@
 import asyncio
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 from fastapi import HTTPException
+from fastapi.routing import APIRoute
 from sqlalchemy import select
 
 from auth import build_router as auth_router
@@ -24,11 +26,11 @@ from statements import build_router as statement_router
 
 
 def route(router, path, method):
-    return next(r.endpoint for r in router.routes if r.path == path and method in r.methods)
+    return next(r.endpoint for r in router.routes if isinstance(r, APIRoute) and r.path == path and method in r.methods)
 
 
 def test_auth_debug_token_endpoint_is_not_public():
-    routes = {(r.path, tuple(r.methods)) for r in auth_router().routes}
+    routes = {(r.path, tuple(r.methods)) for r in auth_router().routes if isinstance(r, APIRoute)}
     assert not any(path == "/auth/debug-cookies" for path, _ in routes)
 
 
@@ -96,7 +98,8 @@ def test_reimport_requires_explicit_duplicate_review(tmp_path):
                 await save(f"stmt_{statement_id}", req, account_id="acct_statement",
                            transactions_json=None, allow_duplicates=False, user={"user_id":"u2"})
             assert error.value.status_code == 409
-            assert error.value.detail["code"] == "duplicate_statement_transactions"
+            detail = cast(dict[str, object], error.value.detail)
+            assert detail["code"] == "duplicate_statement_transactions"
             async with sm() as session:
                 txs = (await session.execute(select(Transaction))).scalars().all()
                 assert len(txs) == 1

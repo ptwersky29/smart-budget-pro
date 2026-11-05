@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
+from typing import cast
 
 from auth import _effective_tier, _resolve_role
+from db import User
 
 NOW = datetime.now(timezone.utc)
 
@@ -17,7 +19,8 @@ def make_user(**overrides):
         "premium_until": None,
     }
     values.update(overrides)
-    return SimpleNamespace(**values)
+    # The test fixture deliberately only supplies the attributes used by auth.
+    return cast(User, SimpleNamespace(**values))
 
 
 def test_admin_is_always_premium():

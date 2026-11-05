@@ -26,9 +26,8 @@ jobs:
       # Pin analyzer versions for reproducible baseline fingerprints.
       - run: pip install -r requirements.txt ruff==0.17.3 pyright==1.1.414
       - run: ruff check . --output-format=github
-      # Analyze the entire backend. Legacy errors are tracked explicitly;
-      # newly introduced errors always fail the job.
-      - run: python tools/typecheck_baseline.py
+      # All legacy typing errors have been fixed. Gate on direct Pyright.
+      - run: pyright . --pythonpath "$(command -v python)"
 
   backend-test:
     name: Backend tests

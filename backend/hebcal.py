@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 from typing import Optional
 from zoneinfo import ZoneInfo
 
-from astral import LocationInfo, SunDirection
+from astral import LocationInfo, Observer, SunDirection
 from astral.sun import sun as astral_sun
 from astral.sun import time_at_elevation
 from fastapi import APIRouter, HTTPException, Query
@@ -39,7 +39,7 @@ ZMAN_ANGLE_KEYS = [
 
 
 def _get_zman_times(
-    observer: LocationInfo,
+    observer: Observer,
     dt: date,
     tz: ZoneInfo,
 ) -> dict[str, str]:

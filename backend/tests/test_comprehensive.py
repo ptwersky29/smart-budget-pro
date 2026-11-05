@@ -148,7 +148,7 @@ class TestAPIEndpoints:
         from onboarding import build_router
         r = build_router()
         assert r.prefix == "/onboarding"
-        paths = [route.path for route in r.routes]
+        paths = [getattr(route, "path", "") for route in r.routes]
         assert any("progress" in p for p in paths)
         assert any("skip" in p for p in paths)
         assert any("health" in p for p in paths)
@@ -157,7 +157,7 @@ class TestAPIEndpoints:
         from admin import build_router
         r = build_router()
         assert r.prefix == "/admin"
-        paths = [route.path for route in r.routes]
+        paths = [getattr(route, "path", "") for route in r.routes]
         assert any("dashboard" in p for p in paths)
         assert any("users" in p for p in paths)
 
@@ -165,21 +165,21 @@ class TestAPIEndpoints:
         from support import build_router
         r = build_router()
         assert r.prefix == "/support"
-        paths = [route.path for route in r.routes]
+        paths = [getattr(route, "path", "") for route in r.routes]
         assert any("tickets" in p for p in paths)
 
     def test_app_settings_router(self):
         from app_settings import build_router
         r = build_router()
         assert r.prefix == "/settings"
-        paths = [route.path for route in r.routes]
+        paths = [getattr(route, "path", "") for route in r.routes]
         assert any("app" in p for p in paths)
 
     def test_analytics_router(self):
         from analytics import build_router
         r = build_router()
         assert r.prefix == "/analytics"
-        paths = [route.path for route in r.routes]
+        paths = [getattr(route, "path", "") for route in r.routes]
         assert any("track" in p for p in paths)
         assert any("events" in p for p in paths)
         assert any("summary" in p for p in paths)
@@ -188,7 +188,7 @@ class TestAPIEndpoints:
         from empty_states import build_router
         r = build_router()
         assert r.prefix == "/empty-states"
-        paths = [route.path for route in r.routes]
+        paths = [getattr(route, "path", "") for route in r.routes]
         assert any("check" in p for p in paths)
         assert any("health" in p for p in paths)
 

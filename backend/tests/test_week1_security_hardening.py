@@ -8,6 +8,10 @@ import os
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
+
+from fastapi import Request
+from starlette.responses import Response
 
 os.environ.setdefault("JWT_SECRET", "week1-security-test-secret-value-32-chars")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -134,13 +138,17 @@ class _Request:
         self.state = SimpleNamespace()
 
 
-async def _ok(_request):
-    return SimpleNamespace(status_code=200, headers={})
+async def _ok(_request: Request) -> Response:
+    return Response(status_code=200)
+
+
+async def _noop_asgi(scope, receive, send) -> None:
+    return None
 
 
 def _csrf(path, headers=None):
-    middleware = CsrfProtectionMiddleware(app=lambda scope, receive, send: None)
-    return asyncio.run(middleware.dispatch(_Request(path, headers=headers), _ok))
+    middleware = CsrfProtectionMiddleware(app=_noop_asgi)
+    return asyncio.run(middleware.dispatch(cast(Request, _Request(path, headers=headers)), _ok))
 
 
 def test_csrf_exact_auth_path_is_exempt():

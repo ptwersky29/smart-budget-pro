@@ -40,6 +40,7 @@ def test_smtp_settings_parse_environment(monkeypatch):
     monkeypatch.setenv("SMTP_STARTTLS", "false")
 
     cfg = email_service._smtp_settings()
+    assert cfg is not None
 
     assert cfg["host"] == "smtp.example.com"
     assert cfg["port"] == 2525

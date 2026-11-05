@@ -40,7 +40,7 @@ def build_router() -> APIRouter:
     async def list_accounts(
         request: Request,
         user: dict = Depends(get_current_user),
-        type: str = None,
+        type: str | None = None,
         limit: int = Query(100, ge=1, le=1000),
         offset: int = Query(0, ge=0),
     ):

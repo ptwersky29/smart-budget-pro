@@ -2,6 +2,7 @@
 import logging
 import os
 from datetime import datetime, timezone
+from typing import Any
 
 import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -48,6 +49,14 @@ def _payment_confirmed(status: str | None) -> bool:
 
 def _subscription_grants_premium(status: str | None) -> bool:
     return (status or "").lower() in {"active", "trialing"}
+
+
+def _stripe_resource_id(resource: object) -> str | None:
+    """Stripe expandable fields are either IDs, expanded objects, or null."""
+    if isinstance(resource, str):
+        return resource
+    candidate = getattr(resource, "id", None)
+    return candidate if isinstance(candidate, str) else None
 
 
 class CheckoutIn(BaseModel):
@@ -151,9 +160,10 @@ def build_router() -> APIRouter:
                     u = u_result.scalar_one_or_none()
                     if u:
                         u.subscription_status = "active"
-                        if cs.subscription:
-                            sub = stripe.Subscription.retrieve(cs.subscription)
-                            u.stripe_subscription_id = cs.subscription
+                        subscription_id = _stripe_resource_id(cs.subscription)
+                        if subscription_id:
+                            sub = stripe.Subscription.retrieve(subscription_id)
+                            u.stripe_subscription_id = subscription_id
                             u.subscription_status = sub.status
                             u.tier = (
                                 "premium"
@@ -269,9 +279,10 @@ def build_router() -> APIRouter:
                     u.subscription_status = "active"
                     u.tier = "premium"
                 elif sub.status == "past_due":
-                    invoice = stripe.Invoice.retrieve(sub.latest_invoice)
+                    invoice_id = _stripe_resource_id(sub.latest_invoice)
+                    invoice = stripe.Invoice.retrieve(invoice_id) if invoice_id else None
                     if invoice and invoice.status == "open":
-                        stripe.Invoice.pay(invoice.id)
+                        invoice.pay()
                         u.tier = "premium"
                         u.subscription_status = "active"
                 await session.commit()
@@ -297,17 +308,17 @@ def build_router() -> APIRouter:
         except ValueError as e:
             logger.error("webhook value error: %s", e)
             raise HTTPException(400, "Invalid payload")
-        except stripe.error.SignatureVerificationError as e:
+        except stripe.SignatureVerificationError as e:
             logger.error("webhook signature verification failed: %s", e)
             raise HTTPException(400, "Invalid signature")
-        except stripe.error.StripeError as e:
+        except stripe.StripeError as e:
             logger.error("webhook stripe error: %s", e)
             raise HTTPException(400, f"Stripe error: {e}")
 
         sm = request.app.state.db
         async with sm() as session:
             if evt.type == "checkout.session.completed":
-                session_obj = evt.data.object
+                session_obj: Any = evt.data.object
                 user_id = (session_obj.metadata or {}).get("user_id", "")
                 paid = _payment_confirmed(session_obj.payment_status)
                 if user_id and paid:
@@ -329,7 +340,7 @@ def build_router() -> APIRouter:
                         rec.status = "complete"
 
             elif evt.type in ("customer.subscription.updated", "customer.subscription.created"):
-                sub = evt.data.object
+                sub: Any = evt.data.object
                 user_id = (sub.metadata or {}).get("user_id", "")
                 if not user_id and sub.customer:
                     c_result = await session.execute(
@@ -350,7 +361,7 @@ def build_router() -> APIRouter:
                             u.tier = "free"
 
             elif evt.type == "customer.subscription.deleted":
-                sub = evt.data.object
+                sub: Any = evt.data.object
                 c_result = await session.execute(
                     select(User).where(User.stripe_subscription_id == sub.id)
                 )
@@ -361,7 +372,7 @@ def build_router() -> APIRouter:
                     u.stripe_subscription_id = None
 
             elif evt.type == "invoice.paid":
-                invoice = evt.data.object
+                invoice: Any = evt.data.object
                 sub_id = invoice.subscription
                 if sub_id:
                     c_result = await session.execute(
@@ -373,7 +384,7 @@ def build_router() -> APIRouter:
                         u.subscription_status = "active"
 
             elif evt.type == "invoice.payment_failed":
-                invoice = evt.data.object
+                invoice: Any = evt.data.object
                 sub_id = invoice.subscription
                 if sub_id:
                     c_result = await session.execute(

@@ -195,21 +195,22 @@ async def _is_configured(session=None) -> bool:
 async def _get_valid_token(session, conn: BankConnection) -> str:
     if conn.expires_at and conn.expires_at.tzinfo is None:
         conn.expires_at = conn.expires_at.replace(tzinfo=timezone.utc)
-    if conn.expires_at and conn.expires_at > datetime.now(timezone.utc) + timedelta(minutes=5):
+    if conn.expires_at and conn.expires_at > datetime.now(timezone.utc) + timedelta(minutes=5) and conn.access_token:
         return _decrypt(conn.access_token)
     if not conn.refresh_token:
         raise HTTPException(401, "Token expired and no refresh token available — reconnect your bank")
     token_data = await _refresh_access_token(_decrypt(conn.refresh_token), session)
-    conn.access_token = _encrypt(token_data["access_token"])
+    encrypted_access = _encrypt(token_data["access_token"])
+    conn.access_token = encrypted_access
     refresh_token = _token_value(token_data.get("refresh_token"))
     if refresh_token:
         conn.refresh_token = _encrypt(refresh_token)
     conn.expires_at = datetime.now(timezone.utc) + timedelta(seconds=token_data.get("expires_in", 3600))
     await session.commit()
-    return _decrypt(conn.access_token)
+    return _decrypt(encrypted_access)
 
 
-async def _tl_get(session, conn: BankConnection, path: str, params: dict = None) -> dict:
+async def _tl_get(session, conn: BankConnection, path: str, params: dict | None = None) -> dict:
     token = await _get_valid_token(session, conn)
     cfg = await _tl_config_from_db(session)
     url = f"{cfg['api_url']}{path}"
@@ -238,6 +239,7 @@ async def _tl_get(session, conn: BankConnection, path: str, params: dict = None)
                 await asyncio.sleep(2 ** attempt)
                 continue
             raise RuntimeError(f"TrueLayer network error {path}: {e}")
+    raise RuntimeError(f"TrueLayer API exhausted retries for {path}")
 
 
 # ── Auth helpers ──────────────────────────────────────────────────────────
@@ -335,7 +337,7 @@ async def _fetch_and_store_balances(session, conn: BankConnection):
 
 # ── Logging ───────────────────────────────────────────────────────────────
 
-async def _mark_connection_state(session, conn: BankConnection, *, status: str, error: str = None, synced_at: datetime = None):
+async def _mark_connection_state(session, conn: BankConnection, *, status: str, error: str | None = None, synced_at: datetime | None = None):
     conn.status = status
     conn.last_sync_status = status
     if synced_at:
@@ -348,7 +350,7 @@ async def _mark_connection_state(session, conn: BankConnection, *, status: str, 
         conn.last_error_at = None
     await session.commit()
 
-async def _log_sync(session, user_id: str, connection_id: str, event: str, status: str = "info", message: str = None, details: dict = None):
+async def _log_sync(session, user_id: str, connection_id: str, event: str, status: str = "info", message: str | None = None, details: dict | None = None):
     try:
         session.add(SyncLog(user_id=user_id, connection_id=connection_id, provider="truelayer", event=event, status=status, message=message, details=details))
         await session.commit()
@@ -844,7 +846,7 @@ async def _sync_connection(session, conn: BankConnection, user_id: str) -> tuple
 
     try:
         while has_more:
-            params = {
+            params: dict[str, int | str] = {
                 "page": page,
                 "page_size": SYNC_PAGE_SIZE,
             }

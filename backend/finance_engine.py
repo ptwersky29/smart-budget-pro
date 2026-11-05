@@ -779,7 +779,7 @@ SOURCE_LABELS = {
 
 
 def _tx_to_dict(
-    t: Transaction, institution_map: dict = None, label_map: dict = None
+    t: Transaction, institution_map: dict | None = None, label_map: dict | None = None
 ) -> dict:
     source_label = SOURCE_LABELS.get(t.source, t.source)
     institution = None
@@ -820,9 +820,7 @@ def _tx_to_dict(
         "ai_selected_category": getattr(t, "ai_selected_category", None),
         "ai_confidence": getattr(t, "ai_confidence", None),
         "ai_reason": getattr(t, "ai_reason", None),
-        "approved_at": t.approved_at.isoformat()
-        if getattr(t, "approved_at", None)
-        else None,
+        "approved_at": t.approved_at.isoformat() if t.approved_at is not None else None,
         "transfer_pair_id": getattr(t, "transfer_pair_id", None),
         "failed_reason": getattr(t, "failed_reason", None),
         "is_split": False,
@@ -1008,8 +1006,8 @@ async def _effective_transaction_lines(
     session,
     user_id: str,
     *,
-    date_from: datetime | None = None,
-    date_to: datetime | None = None,
+    date_from: date | datetime | None = None,
+    date_to: date | datetime | None = None,
     category: str | None = None,
     include_unapproved: bool = False,
 ) -> list[dict]:
@@ -1188,9 +1186,9 @@ def build_router() -> APIRouter:
                     < datetime.fromisoformat(date_to) + timedelta(days=1)
                 )
             if amount_min is not None:
-                stmt = stmt.where(abs(Transaction.amount) >= amount_min)
+                stmt = stmt.where(func.abs(Transaction.amount) >= amount_min)
             if amount_max is not None:
-                stmt = stmt.where(abs(Transaction.amount) <= amount_max)
+                stmt = stmt.where(func.abs(Transaction.amount) <= amount_max)
             if search:
                 term = f"%{search}%"
                 stmt = stmt.where(
@@ -1299,9 +1297,9 @@ def build_router() -> APIRouter:
                     < datetime.fromisoformat(date_to) + timedelta(days=1)
                 )
             if amount_min is not None:
-                count_stmt = count_stmt.where(abs(Transaction.amount) >= amount_min)
+                count_stmt = count_stmt.where(func.abs(Transaction.amount) >= amount_min)
             if amount_max is not None:
-                count_stmt = count_stmt.where(abs(Transaction.amount) <= amount_max)
+                count_stmt = count_stmt.where(func.abs(Transaction.amount) <= amount_max)
             if merchant:
                 count_stmt = count_stmt.where(Transaction.merchant_name.ilike(f"%{merchant}%"))
             if search:
@@ -1363,9 +1361,9 @@ def build_router() -> APIRouter:
                     < datetime.fromisoformat(date_to) + timedelta(days=1)
                 )
             if amount_min is not None:
-                agg_stmt = agg_stmt.where(abs(Transaction.amount) >= amount_min)
+                agg_stmt = agg_stmt.where(func.abs(Transaction.amount) >= amount_min)
             if amount_max is not None:
-                agg_stmt = agg_stmt.where(abs(Transaction.amount) <= amount_max)
+                agg_stmt = agg_stmt.where(func.abs(Transaction.amount) <= amount_max)
             if merchant:
                 agg_stmt = agg_stmt.where(Transaction.merchant_name.ilike(f"%{merchant}%"))
             if search:
@@ -1926,21 +1924,19 @@ Output ONLY valid JSON, no markdown, no explanation:
                     v = abs(float(amin))
                     amt_comp = filters.get("amount_comparator")
                     if amt_comp == "under":
-                        stmt = stmt.where(func.abs(Transaction.amount) <= v)
+                        stmt = stmt.where(func.func.abs(Transaction.amount) <= v)
                     else:
-                        stmt = stmt.where(func.abs(Transaction.amount) >= v)
+                        stmt = stmt.where(func.func.abs(Transaction.amount) >= v)
                 except Exception:
                     pass
             amax = filters.get("amount_max")
             if amax is not None and amax != "null":
                 try:
-                    stmt = stmt.where(func.abs(Transaction.amount) <= abs(float(amax)))
+                    stmt = stmt.where(func.func.abs(Transaction.amount) <= abs(float(amax)))
                 except Exception:
                     pass
             keywords = filters.get("merchant_keywords") or []
             if isinstance(keywords, list) and keywords:
-                from sqlalchemy import or_ as _or
-
                 kw_filters = []
                 for kw in keywords[:5]:
                     if isinstance(kw, str) and kw.strip():
@@ -1955,7 +1951,7 @@ Output ONLY valid JSON, no markdown, no explanation:
                             func.lower(Transaction.normalized_merchant).like(pattern)
                         )
                 if kw_filters:
-                    stmt = stmt.where(_or(*kw_filters))
+                    stmt = stmt.where(or_(*kw_filters))
             search_text = filters.get("search_text")
             if (
                 not search_text
@@ -1968,7 +1964,7 @@ Output ONLY valid JSON, no markdown, no explanation:
             if search_text and search_text != "null":
                 pattern = f"%{str(search_text).lower()}%"
                 stmt = stmt.where(
-                    _or(
+                    or_(
                         func.lower(Transaction.description).like(pattern),
                         func.lower(Transaction.merchant_name).like(pattern),
                         func.lower(Transaction.normalized_merchant).like(pattern),
@@ -2109,7 +2105,10 @@ Output ONLY valid JSON, no markdown, no explanation:
             if not name:
                 raise HTTPException(400, "Choose a category for every split")
             try:
-                number = float(line.get("amount"))
+                raw_amount = line.get("amount")
+                if not isinstance(raw_amount, (str, int, float)):
+                    raise ValueError("Invalid split amount")
+                number = float(raw_amount)
             except (ValueError, TypeError):
                 raise HTTPException(400, "Enter an amount for every split")
             if not (number > 0 and math.isfinite(number)) or abs(round(number * 100) / 100 - number) > 0.000001:
@@ -2962,9 +2961,9 @@ Output ONLY valid JSON, no markdown, no explanation:
                     Transaction.category.ilike(term),
                 ))
             if payload.amount_min is not None:
-                base = base.where(func.abs(Transaction.amount) >= abs(payload.amount_min))
+                base = base.where(func.func.abs(Transaction.amount) >= abs(payload.amount_min))
             if payload.amount_max is not None:
-                base = base.where(func.abs(Transaction.amount) <= abs(payload.amount_max))
+                base = base.where(func.func.abs(Transaction.amount) <= abs(payload.amount_max))
             if payload.account_id:
                 base = base.where(Transaction.account_id == payload.account_id)
             if payload.date_from:
@@ -4670,7 +4669,7 @@ Output ONLY valid JSON, no markdown, no explanation:
                 cur_by_cat[t.category] += -t.amount
 
             # Aggregate past 3 months per category, compute monthly avg
-            past_by_cat = defaultdict(list)
+            past_by_cat = defaultdict(float)
             for t in past_txns:
                 month_key = f"{t.date.year}-{t.date.month:02d}"
                 past_by_cat[(t.category, month_key)] += -t.amount

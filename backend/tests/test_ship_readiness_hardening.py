@@ -2,10 +2,15 @@ import asyncio
 import os
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
+from typing import cast
+
+from fastapi import Request
+from starlette.responses import Response
 
 os.environ.setdefault("JWT_SECRET", "ship_readiness_test_secret_value_32_chars_minimum")
 
 from auth import _token_issued_before_password_change
+from db import User
 from rate_limit import CsrfProtectionMiddleware, RateLimiter, RateLimitMiddleware
 
 
@@ -26,15 +31,20 @@ class _Request:
     state = SimpleNamespace()
 
 
-async def _ok(_request):
-    return SimpleNamespace(status_code=200, headers={})
+async def _ok(_request: Request) -> Response:
+    return Response(status_code=200)
+
+
+async def _noop_asgi(scope, receive, send) -> None:
+    """Valid ASGI application stub; the middleware handles the response."""
+    return None
 
 
 def test_rate_limit_returns_traceable_json_error():
     request = _Request()
-    middleware = RateLimitMiddleware(app=lambda scope, receive, send: None, limiter=RateLimiter(limit=0, window=60))
+    middleware = RateLimitMiddleware(app=_noop_asgi, limiter=RateLimiter(limit=0, window=60))
 
-    response = asyncio.run(middleware.dispatch(request, _ok))
+    response = asyncio.run(middleware.dispatch(cast(Request, request), _ok))
 
     assert response.status_code == 429
     assert b"rate_limited" in response.body
@@ -43,9 +53,9 @@ def test_rate_limit_returns_traceable_json_error():
 
 def test_csrf_returns_traceable_json_error():
     request = _Request()
-    middleware = CsrfProtectionMiddleware(app=lambda scope, receive, send: None)
+    middleware = CsrfProtectionMiddleware(app=_noop_asgi)
 
-    response = asyncio.run(middleware.dispatch(request, _ok))
+    response = asyncio.run(middleware.dispatch(cast(Request, request), _ok))
 
     assert response.status_code == 403
     assert b"csrf_missing" in response.body
@@ -54,7 +64,7 @@ def test_csrf_returns_traceable_json_error():
 
 def test_tokens_before_password_change_are_rejected():
     changed_at = datetime.now(timezone.utc)
-    user = SimpleNamespace(password_changed_at=changed_at)
+    user = cast(User, SimpleNamespace(password_changed_at=changed_at))
     old_payload = {"iat": int((changed_at - timedelta(minutes=5)).timestamp())}
     fresh_payload = {"iat": int((changed_at + timedelta(minutes=5)).timestamp())}
 

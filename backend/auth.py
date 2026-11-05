@@ -81,7 +81,7 @@ async def verify_password_async(plain: str, hashed: str) -> bool:
     return await asyncio.to_thread(verify_password, plain, hashed)
 
 
-def create_access_token(user_id: str, email: str, jti: str = None) -> str:
+def create_access_token(user_id: str, email: str, jti: str | None = None) -> str:
     now = datetime.now(timezone.utc)
     payload = {
         "sub": user_id,
@@ -94,7 +94,7 @@ def create_access_token(user_id: str, email: str, jti: str = None) -> str:
     return pyjwt.encode(payload, _require_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
-def create_refresh_token(user_id: str, remember_me: bool = False, jti: str = None) -> str:
+def create_refresh_token(user_id: str, remember_me: bool = False, jti: str | None = None) -> str:
     now = datetime.now(timezone.utc)
     days = REMEMBER_ME_DAYS if remember_me else REFRESH_TOKEN_DAYS
     payload = {
@@ -723,7 +723,7 @@ def build_router() -> APIRouter:
         return RedirectResponse(url)
 
     @router.get("/google/callback")
-    async def google_callback(code: str, state: str = None, request: Request = None):
+    async def google_callback(code: str, request: Request, state: str | None = None):
         client_id = os.environ.get("GOOGLE_CLIENT_ID")
         client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
         if not client_id or not client_secret:

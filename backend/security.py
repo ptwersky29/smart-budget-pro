@@ -71,7 +71,7 @@ def validate_password(password: str) -> tuple[bool, str]:
     return True, ""
 
 
-def sanitize_input(value: str, max_len: int = 255) -> str:
+def sanitize_input(value: str | None, max_len: int = 255) -> str:
     if not value:
         return ""
     cleaned = re.sub(r"[<>\";']", "", value.strip())

@@ -296,7 +296,7 @@ def build_router() -> APIRouter:
 </html>""")
 
     async def _process_tyl_response(db_maker, data: dict, user_id: str | None = None) -> dict:
-        sig_ok = _verify_response_hash(data, TYL_SHARED_SECRET) if data.get("extended_response_hash") else False
+        sig_ok = _verify_response_hash(data, TYL_SHARED_SECRET) if TYL_SHARED_SECRET and data.get("extended_response_hash") else False
         approval = (data.get("approval_code") or "")
         status_u = (data.get("status") or "").upper()
         approved = _tyl_approved(sig_ok, approval, status_u)

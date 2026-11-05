@@ -73,7 +73,7 @@ def evaluate_entitlement(user, latest_payment, now=None):
         and (getattr(latest_payment, "payment_status", "") or "").lower() == "paid"
     ):
         package = getattr(latest_payment, "package_id", None)
-        duration = TYL_DURATIONS.get(package)
+        duration = TYL_DURATIONS.get(package) if isinstance(package, str) else None
         started = _utc(
             getattr(latest_payment, "created_at", None)
             or getattr(latest_payment, "notify_received_at", None)

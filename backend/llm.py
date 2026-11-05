@@ -74,6 +74,7 @@ async def _call_gemini(system: str, prompt: str, model: str, api_key: str,
         "generationConfig": generation_config,
     }
     client = await get_llm_client()
+    resp: httpx.Response | None = None
     for attempt in range(4):
         resp = await client.post(url, params={"key": api_key}, json=payload)
         if resp.status_code == 429 and attempt < 3:
@@ -85,6 +86,8 @@ async def _call_gemini(system: str, prompt: str, model: str, api_key: str,
             logger.error(f"Gemini error {resp.status_code}: {resp.text[:500]}")
             raise RuntimeError(f"LLM call failed ({resp.status_code})")
         break
+    if resp is None:
+        raise RuntimeError("LLM returned no HTTP response")
     data = resp.json()
     try:
         text = (data.get("candidates", [{}])[0]
@@ -106,7 +109,7 @@ async def call_llm(
     system: str,
     prompt: str,
     model: str = "openrouter/free",
-    api_key: str = None,
+    api_key: str | None = None,
     max_tokens: int = 4096,
     temperature: float = 0.1,
     json_mode: bool = True,
@@ -150,6 +153,7 @@ async def call_llm(
 
     client = await get_llm_client()
     # Retry up to 3 times with exponential backoff on 429
+    resp: httpx.Response | None = None
     for attempt in range(4):
         resp = await client.post(OPENROUTER_API, headers=headers, json=body)
         if resp.status_code == 429 and attempt < 3:
@@ -161,6 +165,8 @@ async def call_llm(
             logger.error(f"OpenRouter error {resp.status_code}: {resp.text[:500]}")
             raise RuntimeError(f"LLM call failed ({resp.status_code})")
         break
+    if resp is None:
+        raise RuntimeError("LLM returned no HTTP response")
     data = resp.json()
 
     choices = data.get("choices", [])

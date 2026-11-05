@@ -164,13 +164,14 @@ def build_router() -> APIRouter:
             # Delete children before parents in FK-safe dependency order,
             # including new models added in future migrations.
             for table in reversed(Base.metadata.sorted_tables):
-                if table.name == User.__table__.name or "user_id" not in table.c:
+                if table.name == User.__tablename__ or "user_id" not in table.c:
                     continue
                 result = await session.execute(
                     sa_delete(table).where(table.c.user_id == uid)
                 )
-                if result.rowcount:
-                    deleted_counts[table.name] = result.rowcount
+                row_count = getattr(result, "rowcount", 0)
+                if row_count:
+                    deleted_counts[table.name] = row_count
 
             u.email = f"deleted-{secrets.token_hex(16)}@anonymized.invalid"
             u.name = "Deleted User"

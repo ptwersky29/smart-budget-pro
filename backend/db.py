@@ -1,7 +1,7 @@
 """SQLAlchemy 2.0 async models for PostgreSQL (Supabase)."""
 
 from datetime import date, datetime, timezone
-from typing import List, Optional
+from typing import AsyncIterator, List, Optional
 
 from sqlalchemy import (
     JSON,
@@ -51,7 +51,11 @@ def init_engine(database_url: str, echo: bool = False):
     _async_session_maker = async_sessionmaker(_engine, expire_on_commit=False)
 
 
-def get_session_maker():
+def get_session_maker() -> async_sessionmaker[AsyncSession]:
+    # The engine must be initialised before database access. Treating a missing
+    # factory as a valid None led to optional-call errors throughout the API.
+    if _async_session_maker is None:
+        raise RuntimeError("Database engine has not been initialised")
     return _async_session_maker
 
 
@@ -774,7 +778,7 @@ async def create_tables():
             )
 
 
-async def get_session() -> AsyncSession:
+async def get_session() -> AsyncIterator[AsyncSession]:
     sm = get_session_maker()
     async with sm() as session:
         yield session

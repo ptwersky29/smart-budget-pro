@@ -261,7 +261,7 @@ def _csv_to_text(content: bytes) -> str:
     return "\n".join(lines)
 
 
-async def _ai_parse_statement(text: str, session=None, user_id: str = None) -> dict:
+async def _ai_parse_statement(text: str, session=None, user_id: str | None = None) -> dict:
     from llm import call_llm, track_ai_usage
     from llm import parse_json as llm_parse
     raw, provider, model, pt, ct, cost = await call_llm(
@@ -422,7 +422,7 @@ def _fix_sign(tx: dict) -> dict:
     return tx
 
 
-async def _ai_categorise(description: str, merchant: str | None, amount: float, session=None, user_id: str = None) -> str:
+async def _ai_categorise(description: str, merchant: str | None, amount: float, session=None, user_id: str | None = None) -> str:
     from db import CategoryRule
     from llm import call_llm, track_ai_usage
     from llm import parse_json as llm_parse

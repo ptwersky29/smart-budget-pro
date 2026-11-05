@@ -1,5 +1,8 @@
 import asyncio
 from types import SimpleNamespace
+from typing import cast
+
+from fastapi import Request
 
 from rate_limit import AUTH_RATE_LIMIT_PATHS, RateLimiter
 
@@ -16,7 +19,7 @@ def make_request(user_id=None):
     state = SimpleNamespace()
     if user_id:
         state.user_id = user_id
-    return SimpleNamespace(client=_Client(), url=_Url(), state=state)
+    return cast(Request, SimpleNamespace(client=_Client(), url=_Url(), state=state))
 
 
 class FakeRedis:

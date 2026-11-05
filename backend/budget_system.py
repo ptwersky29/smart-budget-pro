@@ -1466,6 +1466,8 @@ def build_router() -> APIRouter:
             end_dt = hb_rows[0].end_date
 
             # Get transactions from previous year around same dates
+            prev_start = None
+            prev_end = None
             if start_dt and end_dt:
                 prev_start = start_dt - timedelta(days=365)
                 prev_end = end_dt - timedelta(days=365)
@@ -1481,7 +1483,7 @@ def build_router() -> APIRouter:
             else:
                 historical_txs = []
 
-            if not historical_txs:
+            if not historical_txs or prev_start is None or prev_end is None:
                 # No historical data — use existing holiday_budgets as-is
                 return {
                     "holiday": payload.holiday_name,
