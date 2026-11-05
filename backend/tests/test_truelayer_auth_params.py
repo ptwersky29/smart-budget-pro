@@ -1,15 +1,17 @@
-from pathlib import Path
 import os
 import sys
+from pathlib import Path
 
 os.environ.setdefault("JWT_SECRET", "test-jwt-secret-for-truelayer-auth-params")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from truelayer import _build_auth_link_params
-from truelayer import _connections_url
-from truelayer import _frontend_base_url
-from truelayer import _normalize_accounts_payload
-from truelayer import _token_value
+from truelayer import (
+    _build_auth_link_params,
+    _connections_url,
+    _frontend_base_url,
+    _normalize_accounts_payload,
+    _token_value,
+)
 
 
 def test_build_auth_link_params_sandbox():

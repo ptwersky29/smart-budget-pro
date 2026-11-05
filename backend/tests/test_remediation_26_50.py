@@ -7,13 +7,20 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy import select
 
-from db import (
-    BankAccount, Statement, Transaction, User, create_tables, dispose_engine,
-    get_session_maker, init_engine,
-)
-from finance_engine import TransferPairIn, build_router as finance_router
-from statements import build_router as statement_router
 from auth import build_router as auth_router
+from db import (
+    BankAccount,
+    Statement,
+    Transaction,
+    User,
+    create_tables,
+    dispose_engine,
+    get_session_maker,
+    init_engine,
+)
+from finance_engine import TransferPairIn
+from finance_engine import build_router as finance_router
+from statements import build_router as statement_router
 
 
 def route(router, path, method):

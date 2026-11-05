@@ -2,32 +2,49 @@
 
 Roles hierarchy: guest < free_user < premium_user < admin.
 """
-import os
-import uuid
-import secrets
+import asyncio
 import logging
-from datetime import datetime, timezone, timedelta
+import os
+import secrets
+import urllib.parse
+import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-import asyncio
 import bcrypt
-import jwt as pyjwt
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response, Depends
-from pydantic import BaseModel, EmailStr, Field
-import json
-from sqlalchemy import select, update, delete
 import httpx
-import urllib.parse
+import jwt as pyjwt
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Request,
+    Response,
+)
+from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy import delete, select, update
 from starlette.responses import RedirectResponse
 
-from db import User, UserSession, PasswordResetToken, TokenBlacklist, TrueLayerState, AuditLog
-from security import validate_password, _require_jwt_secret, generate_csrf_token, verify_csrf_token
+from db import (
+    AuditLog,
+    PasswordResetToken,
+    TokenBlacklist,
+    TrueLayerState,
+    User,
+    UserSession,
+)
 from email_service import (
     EmailDeliveryError,
     EmailNotConfigured,
     send_password_reset_email_safe,
     send_verification_email,
     send_verification_email_safe,
+)
+from security import (
+    _require_jwt_secret,
+    generate_csrf_token,
+    validate_password,
 )
 
 logger = logging.getLogger(__name__)

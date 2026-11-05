@@ -1,12 +1,12 @@
 import asyncio
 import os
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 os.environ.setdefault("JWT_SECRET", "ship_readiness_test_secret_value_32_chars_minimum")
 
-from rate_limit import RateLimiter, RateLimitMiddleware, CsrfProtectionMiddleware
 from auth import _token_issued_before_password_change
+from rate_limit import CsrfProtectionMiddleware, RateLimiter, RateLimitMiddleware
 
 
 class _Client:

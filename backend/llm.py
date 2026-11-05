@@ -1,10 +1,9 @@
 """Shared LLM helper — direct Google Gemini API (preferred) + OpenRouter fallback."""
 import asyncio
-import os
 import json
 import logging
+import os
 from datetime import datetime, timezone
-from typing import Optional
 
 import httpx
 

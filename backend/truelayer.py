@@ -1,29 +1,35 @@
 """TrueLayer Open Banking — OAuth, auto-refresh, transaction sync, dedup, retry, encrypted tokens."""
-import os
-import uuid
-import secrets
+import asyncio
 import hashlib
 import hmac
-import json
 import logging
-import asyncio
-from base64 import b64encode, b64decode
-from datetime import datetime, timezone, timedelta, date
-from urllib.parse import urlencode, urlparse
+import os
+import secrets
+import uuid
+from base64 import b64decode, b64encode
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
+from urllib.parse import urlencode, urlparse
 
 import httpx
-from fastapi import APIRouter, HTTPException, Request, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select, delete, func
+from sqlalchemy import delete, func, select
 
-from db import TrueLayerState, BankAccount, BankConnection, TrueLayerLog, SyncLog, Transaction
 from auth import get_current_user
 from bank_sync_utils import (
-    parse_import_from_date,
-    is_reauth_error,
     connection_error_message,
+    is_reauth_error,
+    parse_import_from_date,
     transaction_sync_id,
+)
+from db import (
+    BankAccount,
+    BankConnection,
+    SyncLog,
+    Transaction,
+    TrueLayerLog,
+    TrueLayerState,
 )
 
 # Lock to prevent concurrent syncs for the same connection
@@ -788,7 +794,7 @@ def build_router() -> APIRouter:
         async with sm() as session:
             result = await session.execute(select(SyncLog).where(SyncLog.user_id == user["user_id"]).order_by(SyncLog.created_at.desc()).limit(50))
             logs = result.scalars().all()
-            return {"logs": [{"id": str(l.id), "event": l.event, "status": l.status, "message": l.message, "created_at": l.created_at.isoformat() if l.created_at else None} for l in logs]}
+            return {"logs": [{"id": str(log_entry.id), "event": log_entry.event, "status": log_entry.status, "message": log_entry.message, "created_at": log_entry.created_at.isoformat() if log_entry.created_at else None} for log_entry in logs]}
 
     return router
 
@@ -849,7 +855,7 @@ async def _sync_connection(session, conn: BankConnection, user_id: str) -> tuple
             except Exception as e:
                 try:
                     data = await _tl_get(session, conn, f"/data/v1/cards/{conn.account_id}/transactions", params=params)
-                except Exception as e2:
+                except Exception:
                     await _log_sync(session, user_id, conn.connection_id, "sync_page_failed", "error", str(e)[:500])
                     raise
 

@@ -1,12 +1,14 @@
 import asyncio
-from pathlib import Path
 import sys
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from middleware import ErrorMonitorMiddleware
-from middleware import connections_redirect_url
-from middleware import is_truelayer_callback_path
+from middleware import (
+    ErrorMonitorMiddleware,
+    connections_redirect_url,
+    is_truelayer_callback_path,
+)
 
 
 class _State:

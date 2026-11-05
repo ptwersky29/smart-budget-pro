@@ -1,24 +1,27 @@
 """Phase 9 — PDF report generation via reportlab."""
 import io
 import logging
-from datetime import datetime, timezone, timedelta
 from collections import defaultdict
+from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Request, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
-
-from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak,
+    PageBreak,
+    Paragraph,
+    SimpleDocTemplate,
+    Table,
+    TableStyle,
 )
+from sqlalchemy import select
 
-from db import Transaction, Budget, MaaserLedger, SplitTransaction
 from auth import get_current_user
+from db import Budget, MaaserLedger, SplitTransaction, Transaction
 
 logger = logging.getLogger("reports")
 

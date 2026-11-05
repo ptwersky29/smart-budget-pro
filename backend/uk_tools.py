@@ -2,8 +2,9 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Request, Depends, Query
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
+
 from auth import get_current_user
 
 logger = logging.getLogger("uk_tools")

@@ -1,16 +1,16 @@
 """Phase 5 — AI Intelligence Layer: multi-model (Claude, GPT, Gemini), real data context, cost tracking, rate limiting."""
+import logging
 import os
 import uuid
-import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func, text
+from sqlalchemy import select, text
 
-from db import AiMessage, AiUsage, User, Transaction, Budget
 from auth import get_current_user
+from db import AiMessage, AiUsage, Budget, Transaction, User
 from llm import call_llm
 from security import sanitize_input
 

@@ -1,13 +1,13 @@
 """Manual (offline) accounts — CRUD for BankConnection records with provider="manual"."""
-import uuid
 import logging
+import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Request, Depends
-from sqlalchemy import select, delete
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import select
 
-from db import BankAccount, BankConnection, Transaction
 from auth import get_current_user
+from db import BankAccount, BankConnection
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +135,7 @@ def build_router() -> APIRouter:
             if "account_type" in body:
                 at = body["account_type"].lower()
                 if at not in VALID_TYPES:
-                    raise HTTPException(400, f"invalid account_type")
+                    raise HTTPException(400, "invalid account_type")
                 bc.account_type = at
                 if ba and at in ("current", "savings", "cash", "credit"):
                     ba.type = at

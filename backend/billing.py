@@ -1,15 +1,15 @@
 """Real Stripe subscription billing — monthly (£5) and yearly (£48)."""
-import os
 import logging
+import os
 from datetime import datetime, timezone
 
 import stripe
-from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from db import PaymentTransaction, User
 from auth import _effective_tier, get_current_user
+from db import PaymentTransaction, User
 
 logger = logging.getLogger("billing")
 

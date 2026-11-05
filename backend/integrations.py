@@ -2,11 +2,12 @@
 System-wide Twilio config is in sms.py; other integrations are detected by checking env vars."""
 import logging
 import os
-from fastapi import APIRouter, HTTPException, Request, Depends
-from auth import get_current_user, require_admin
-from sqlalchemy import select
-from db import get_session_maker
+
 import httpx
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import select
+
+from auth import get_current_user, require_admin
 
 logger = logging.getLogger("integrations")
 

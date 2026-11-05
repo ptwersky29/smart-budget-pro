@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
-from tyl import apply_tyl_entitlement, extend_premium_until, _tyl_payment_status
+from tyl import _tyl_payment_status, apply_tyl_entitlement, extend_premium_until
 
 NOW = datetime(2026, 10, 21, tzinfo=timezone.utc)
 

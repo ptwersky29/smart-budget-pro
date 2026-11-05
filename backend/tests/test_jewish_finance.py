@@ -1,14 +1,13 @@
 """Tests for Jewish Finance Engine — Maaser, Tzedakah, Yom Tov, Chasuna, Hebcal."""
 import os
 import sys
-from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 os.environ["JWT_SECRET"] = "test-secret-key-for-testing-purposes-only"
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite://"
 
-from jewish import HOLIDAY_DEFAULTS, CHASUNA_CATEGORIES, INCOME_CATEGORIES
+from jewish import CHASUNA_CATEGORIES, HOLIDAY_DEFAULTS, INCOME_CATEGORIES
 
 
 class TestHolidayDefaults:

@@ -1,23 +1,48 @@
 """Phase 9 — Admin dashboard: system stats, user management, feature flags."""
-import asyncio
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func, delete
+from sqlalchemy import delete, func, select
 
-from db import User, Transaction, AuditLog, FeatureFlag, SupportTicket
-from db import SmsMessage, SmsSender
-from db import (PasswordResetToken, TrueLayerState, SyncLog,
-    SplitTransaction, AccountNickname, Budget, RecurringTransaction,
-    Category, Subscription, PendingUpdate, MaaserLedger, AiMessage,
-    AiUsage, AiProvider, CategoryRule, PaymentTransaction, BillingRecord,
-    Statement, ConsentRecord, InvestmentHolding, HolidayBudget,
-    ChasunaPlan, Integration, BudgetOccasion, AISuggestion)
-from auth import require_admin
 from audit import log_action
+from auth import require_admin
+from db import (
+    AccountNickname,
+    AiMessage,
+    AiProvider,
+    AISuggestion,
+    AiUsage,
+    AuditLog,
+    BillingRecord,
+    Budget,
+    BudgetOccasion,
+    Category,
+    CategoryRule,
+    ChasunaPlan,
+    ConsentRecord,
+    FeatureFlag,
+    HolidayBudget,
+    Integration,
+    InvestmentHolding,
+    MaaserLedger,
+    PasswordResetToken,
+    PaymentTransaction,
+    PendingUpdate,
+    RecurringTransaction,
+    SmsMessage,
+    SmsSender,
+    SplitTransaction,
+    Statement,
+    Subscription,
+    SupportTicket,
+    SyncLog,
+    Transaction,
+    TrueLayerState,
+    User,
+)
 
 logger = logging.getLogger("admin")
 
@@ -331,11 +356,11 @@ def build_router() -> APIRouter:
             )
             rows = result.all()
             return {"total_audit_rows": total, "distinct_actions": list(actions_raw), "logins": [
-                {"user_id": l.user_id, "email": email, "name": name,
-                 "action": l.action, "success": l.success,
-                 "ip_address": l.ip_address, "user_agent": l.user_agent,
-                 "created_at": l.created_at.isoformat() if l.created_at else None}
-                for l, email, name in rows
+                {"user_id": audit_entry.user_id, "email": email, "name": name,
+                 "action": audit_entry.action, "success": audit_entry.success,
+                 "ip_address": audit_entry.ip_address, "user_agent": audit_entry.user_agent,
+                 "created_at": audit_entry.created_at.isoformat() if audit_entry.created_at else None}
+                for audit_entry, email, name in rows
             ]}
 
     @router.get("/health")

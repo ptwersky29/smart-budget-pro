@@ -8,6 +8,10 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel
+from sqlalchemy import delete, func, or_, select, update
+
 import maaser
 from auth import get_current_user
 from cache import TTLCache
@@ -19,9 +23,7 @@ from category_catalog import (
     slugify_category_name,
 )
 from db import (
-    AccountNickname,
     BankAccount,
-    BankConnection,
     Budget,
     Category,
     CategoryRule,
@@ -30,18 +32,12 @@ from db import (
     Subscription,
     Transaction,
     TransactionTransferPair,
-    User,
-    get_session_maker,
 )
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from llm import call_llm, parse_json, track_ai_usage
-from pydantic import BaseModel
 from security import sanitize_input
-from sqlalchemy import delete, func, or_, select, update
 from statements import (
     CATEGORIES,
     CATEGORISE_KEYWORDS,
-    CATEGORY_HIERARCHY,
     INCOME_CATEGORIES,
 )
 
@@ -1113,7 +1109,7 @@ def _insight_reason(cat: str, current: float, avg: float, budget: float) -> str:
         return f"Average spending on {cat} is £{avg:.0f} — consider setting a budget."
     if current > 0:
         return f"Current spend £{current:.0f} — suggested budget aligns with actuals."
-    return f"Based on your spending patterns."
+    return "Based on your spending patterns."
 
 
 # ── Router ───────────────────────────────────────────────────────────────
@@ -1490,7 +1486,6 @@ def build_router() -> APIRouter:
         "dentist": "medical",
         "optician": "medical",
         "glasses": "medical",
-        "pharmacy": "chemist",
         "boots": "chemist",
         "gym": "miscellaneous",
         "fitness": "miscellaneous",
@@ -2434,7 +2429,6 @@ Output ONLY valid JSON, no markdown, no explanation:
                 tx.merchant_name = sanitize_input(payload.merchant, max_len=255)
                 tx.normalized_merchant = normalize_merchant(payload.merchant)
             category_changed = False
-            old_category = tx.category
             if payload.category is not None and payload.category != tx.category:
                 from statements import resolve_category as _rc
 
@@ -3081,7 +3075,6 @@ Output ONLY valid JSON, no markdown, no explanation:
             existing = result.scalar() or 0
             if existing > 0:
                 return {"ok": True, "skipped": True}
-            from statements import resolve_category as _rc
 
             # Create a default demo account
             demo_acct_id = f"acct_{uuid.uuid4().hex[:12]}"

@@ -1,19 +1,21 @@
 """Statement upload + AI-parsed transactions (CSV / PDF)."""
-import io
 import csv
+import io
 import json
+import logging
 import math
 import uuid
-import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
-from fastapi import APIRouter, Request, Depends, UploadFile, File, HTTPException, Form
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 from pypdf import PdfReader
-from sqlalchemy import select, func, delete
-from db import BankAccount, Transaction, Statement, MaaserLedger
-from auth import get_current_user
+from sqlalchemy import select
+
 import maaser as maaser_mod
+from auth import get_current_user
+from db import BankAccount, Statement, Transaction
 
 logger = logging.getLogger("statements")
 
@@ -260,7 +262,8 @@ def _csv_to_text(content: bytes) -> str:
 
 
 async def _ai_parse_statement(text: str, session=None, user_id: str = None) -> dict:
-    from llm import call_llm, parse_json as llm_parse, track_ai_usage
+    from llm import call_llm, track_ai_usage
+    from llm import parse_json as llm_parse
     raw, provider, model, pt, ct, cost = await call_llm(
         "You are a precise UK bank statement parser. Always output valid JSON only.",
         PARSE_PROMPT + text[:MAX_CHARS_TO_AI],
@@ -420,8 +423,9 @@ def _fix_sign(tx: dict) -> dict:
 
 
 async def _ai_categorise(description: str, merchant: str | None, amount: float, session=None, user_id: str = None) -> str:
-    from llm import call_llm, parse_json as llm_parse, track_ai_usage
     from db import CategoryRule
+    from llm import call_llm, track_ai_usage
+    from llm import parse_json as llm_parse
     # Fast path: keyword matching for obvious cases
     fast = _keyword_categorise(description, merchant, amount)
     if fast:
@@ -439,7 +443,8 @@ async def _ai_categorise(description: str, merchant: str | None, amount: float, 
                 rule = r.scalar_one_or_none()
                 if rule:
                     rule.match_count = (rule.match_count or 0) + 1
-                    from datetime import datetime, timezone as _tz
+                    from datetime import datetime
+                    from datetime import timezone as _tz
                     rule.last_used_at = datetime.now(_tz.utc)
                     return rule.category
         except Exception:

@@ -1,13 +1,13 @@
 """Bank Account CRUD — first-class account entity (separate from BankConnection)."""
-import uuid
 import logging
+import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Request, Depends, Query
-from sqlalchemy import select, delete, func, or_
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import func, or_, select
 
-from db import BankAccount, BankConnection, Transaction
 from auth import get_current_user
+from db import BankAccount, BankConnection, Transaction
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +48,7 @@ def build_router() -> APIRouter:
         async with sm() as session:
             # Auto-migrate any old BankConnections to the new BankAccount table
             from sqlalchemy import select
+
             from db import BankConnection
             conn_result = await session.execute(
                 select(BankConnection).where(
@@ -271,7 +272,7 @@ def build_router() -> APIRouter:
             if "type" in body:
                 t = body["type"].lower()
                 if t not in VALID_TYPES:
-                    raise HTTPException(400, f"invalid type")
+                    raise HTTPException(400, "invalid type")
                 ba.type = t
             if "balance" in body:
                 bal = body["balance"]
@@ -392,7 +393,7 @@ def build_router() -> APIRouter:
 
             bal_type = (body.get("balance_type") or "available").lower()
             if bal_type not in VALID_BALANCE_TYPES:
-                raise HTTPException(400, f"invalid balance_type; use available or savings")
+                raise HTTPException(400, "invalid balance_type; use available or savings")
             if bal_type == "savings" and ba.type != "savings":
                 ba.type = "savings"
             await session.commit()

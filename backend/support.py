@@ -3,13 +3,13 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func
+from sqlalchemy import select
 
-from db import SupportTicket
-from auth import get_current_user, require_admin
 from audit import log_action
+from auth import get_current_user, require_admin
+from db import SupportTicket
 
 logger = logging.getLogger("support")
 

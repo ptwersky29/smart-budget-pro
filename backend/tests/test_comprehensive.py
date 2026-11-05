@@ -2,7 +2,6 @@
 import os
 import sys
 import time
-import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -11,11 +10,16 @@ os.environ["STRIPE_MONTHLY_PRICE_ID"] = "price_test_monthly"
 os.environ["STRIPE_YEARLY_PRICE_ID"] = "price_test_yearly"
 os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
 
-from security import validate_password, encrypt_value, decrypt_value, hash_email, sanitize_input
 from cache import TTLCache
-from rate_limit import RateLimiter
 from db import ONBOARDING_STEPS
-
+from rate_limit import RateLimiter
+from security import (
+    decrypt_value,
+    encrypt_value,
+    hash_email,
+    sanitize_input,
+    validate_password,
+)
 
 # ── SECURITY TESTS ───────────────────────────────────────────────────────
 
@@ -191,12 +195,13 @@ class TestAPIEndpoints:
     def test_all_routers_mount(self):
         """Verify all routers can be included in a parent router without conflicts."""
         from fastapi import APIRouter
-        from onboarding import build_router as r1
+
         from admin import build_router as r2
-        from support import build_router as r3
-        from app_settings import build_router as r4
         from analytics import build_router as r5
+        from app_settings import build_router as r4
         from empty_states import build_router as r6
+        from onboarding import build_router as r1
+        from support import build_router as r3
         parent = APIRouter()
         parent.include_router(r1())
         parent.include_router(r2())
@@ -283,8 +288,9 @@ class TestJWTAuth:
         assert len(token.split(".")) == 3
 
     def test_decode_access_token_valid(self):
-        from auth import create_access_token
         import jwt
+
+        from auth import create_access_token
         token = create_access_token("user_decode", "decode@test.com")
         payload = jwt.decode(token, options={"verify_signature": False})
         assert payload["sub"] == "user_decode"
@@ -292,8 +298,9 @@ class TestJWTAuth:
         assert payload["type"] == "access"
 
     def test_access_token_has_expiry(self):
-        from auth import create_access_token
         import jwt
+
+        from auth import create_access_token
         token = create_access_token("user_exp", "exp@test.com")
         payload = jwt.decode(token, options={"verify_signature": False})
         assert "exp" in payload
@@ -307,8 +314,9 @@ class TestJWTAuth:
         assert "jti" in payload
 
     def test_different_tokens_have_different_jti(self):
-        from auth import create_access_token
         import jwt
+
+        from auth import create_access_token
         t1 = jwt.decode(create_access_token("u1", "u1@t.com"), options={"verify_signature": False})
         t2 = jwt.decode(create_access_token("u2", "u2@t.com"), options={"verify_signature": False})
         assert t1["jti"] != t2["jti"]

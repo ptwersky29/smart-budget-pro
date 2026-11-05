@@ -2,13 +2,14 @@
 Falls back to env vars when DB value is missing.
 """
 import os
-from fastapi import APIRouter, HTTPException, Request, Depends
-from pydantic import BaseModel
-from sqlalchemy import select
 from typing import Optional
 
-from db import AppConfig
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
+from sqlalchemy import select
+
 from auth import get_current_user
+from db import AppConfig
 
 
 async def get_config(session, key: str, env_var: str) -> str:

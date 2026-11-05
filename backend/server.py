@@ -1,62 +1,73 @@
 """FinanceAI - main FastAPI app."""
-from dotenv import load_dotenv
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 load_dotenv(ROOT_DIR / ".env.local", override=True)
 
-import os
-import sys
+import asyncio
 import json
 import logging
 import logging.config
+import os
+import sys
 from datetime import datetime, timezone
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends
+
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
+from sqlalchemy import select, text
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import JSONResponse, Response
 from starlette.requests import Request as StarletteRequest
-from sqlalchemy import text
+from starlette.responses import JSONResponse, Response
 
-import asyncio
-from db import init_engine, dispose_engine, get_session_maker, Base, create_tables, BankConnection
-from sqlalchemy import select
-
-import auth
-import truelayer
-import ai_service
+import admin as admin_module
 import ai_insights
-import finance_engine
-import billing
-import tyl
+import ai_service
+import analytics
 import app_config
-import sms
-import prices
-import reports
-import statements
-import integrations
+import app_settings
+import auth
+import bank_accounts
+import billing
+import budget_system
+import empty_states
+import finance_engine
+import gdpr
 import hebcal
+import integrations
+import investments
 import jewish
 import jewish_reports
-import investments
-import uk_tools
-import gdpr
-import onboarding
-import admin as admin_module
-import support
-import app_settings
-import analytics
-import empty_states
-import budget_system
-import notifications
 import manual_accounts
-import bank_accounts
+import notifications
+import onboarding
+import prices
+import reports
+import sms
+import statements
+import support
+import truelayer
+import tyl
+import uk_tools
+from db import (
+    create_tables,
+    dispose_engine,
+    get_session_maker,
+    init_engine,
+)
 from exceptions import FinanceAIError
-from rate_limit import RateLimiter, RateLimitMiddleware, CsrfProtectionMiddleware
-from middleware import ErrorMonitorMiddleware, RequestTimerMiddleware, RequestIdMiddleware, SecurityHeadersMiddleware
-from security import generate_csrf_token, _require_jwt_secret
+from middleware import (
+    ErrorMonitorMiddleware,
+    RequestIdMiddleware,
+    RequestTimerMiddleware,
+    SecurityHeadersMiddleware,
+)
+from rate_limit import CsrfProtectionMiddleware, RateLimiter, RateLimitMiddleware
+from security import _require_jwt_secret, generate_csrf_token
+
 
 # Optional Sentry integration
 class JsonFormatter(logging.Formatter):
@@ -218,12 +229,16 @@ api.include_router(bank_accounts.build_router())
 @api.post("/uk/hmrc-estimate")
 async def hmrc_estimate(payload: HmrcEstimateIn, user: dict = Depends(get_current_user)):
     income = payload.annual_income
-    from uk_tools import _calc_income_tax, PERSONAL_ALLOWANCE, PA_TAPER_THRESHOLD
+    from uk_tools import PA_TAPER_THRESHOLD, PERSONAL_ALLOWANCE, _calc_income_tax
     pa = PERSONAL_ALLOWANCE
     if income > PA_TAPER_THRESHOLD:
         pa = max(0, pa - (income - PA_TAPER_THRESHOLD) / 2)
-    from uk_tools import (NI_THRESHOLD_PRIMARY, NI_UPPER_LIMIT,
-                          NI_BASIC_RATE, NI_HIGHER_RATE)
+    from uk_tools import (
+        NI_BASIC_RATE,
+        NI_HIGHER_RATE,
+        NI_THRESHOLD_PRIMARY,
+        NI_UPPER_LIMIT,
+    )
     income_tax, _ = _calc_income_tax(income, pa)
     ni = 0
     if income > NI_THRESHOLD_PRIMARY:
@@ -243,9 +258,11 @@ async def hmrc_estimate(payload: HmrcEstimateIn, user: dict = Depends(get_curren
 
 @api.get("/jewish/reports/download/year-end-{year}.pdf")
 async def download_jewish_report(year: int, request: Request, user: dict = Depends(get_current_user)):
+    import io
+
     from reportlab.lib.pagesizes import A4
     from reportlab.pdfgen import canvas
-    import io
+
     from jewish_reports import jewish_finance_year_end_report
     sm = request.app.state.db
     async with sm() as session:
@@ -396,7 +413,7 @@ async def startup():
 
     # Start background sync loop for TrueLayer
     try:
-        from truelayer import run_background_sync, SYNC_INTERVAL_SECONDS
+        from truelayer import SYNC_INTERVAL_SECONDS, run_background_sync
 
         async def _background_sync_loop():
             logger.info("Background TrueLayer sync loop started (interval=%ss)", SYNC_INTERVAL_SECONDS)

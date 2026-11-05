@@ -1,6 +1,6 @@
 """Simple in-memory TTL cache for frequently accessed data."""
-import time
 import logging
+import time
 from typing import Any, Optional
 
 logger = logging.getLogger("cache")

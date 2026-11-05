@@ -1,10 +1,9 @@
 """Audit logging: track important user actions."""
 import logging
-from typing import Optional
 import re
+from typing import Optional
 
 from fastapi import Request
-from sqlalchemy import select
 
 from db import AuditLog, get_session_maker
 

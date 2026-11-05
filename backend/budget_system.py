@@ -1,24 +1,28 @@
 """Budget System: master dashboard, day-to-day, AI classification & forecast."""
-import uuid
 import logging
-from datetime import datetime, timezone, timedelta
-from typing import Optional
+import uuid
 from calendar import monthrange
+from datetime import datetime, timedelta, timezone
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
-from sqlalchemy import select, func, and_
+from sqlalchemy import func, select
 
-from db import (
-    BankAccount,
-    BudgetOccasion, BudgetOccasionCategory, AISuggestion,
-    Transaction, HolidayBudget, RecurringTransaction, CategoryRule,
-    get_session_maker,
-)
 from auth import get_current_user
-from llm import call_llm, track_ai_usage, parse_json
+from db import (
+    AISuggestion,
+    BankAccount,
+    BudgetOccasion,
+    BudgetOccasionCategory,
+    CategoryRule,
+    HolidayBudget,
+    RecurringTransaction,
+    Transaction,
+)
+from llm import call_llm, parse_json
 from security import sanitize_input
-from statements import CATEGORY_HIERARCHY, SECTION_FOR_CATEGORY
+from statements import CATEGORY_HIERARCHY
 
 # Build the LLM prompt category list from a user's active (non-deleted) categories
 
@@ -154,8 +158,9 @@ DEFAULT_MONTHLY_BUDGETS = {
 
 async def seed_default_budget_entries(session, user_id: str):
     """Seed DEFAULT_MONTHLY_BUDGETS into the Budget table (idempotent)."""
-    from db import Budget
     from datetime import datetime, timezone
+
+    from db import Budget
     now_dt = datetime.now(timezone.utc)
     month = f"{now_dt.year}-{now_dt.month:02d}"
     result = await session.execute(
@@ -1176,7 +1181,6 @@ def build_router() -> APIRouter:
             await session.commit()
 
             # Mark suggestion as approved if provided
-            chosen_suggestion = None
             if payload.suggestion_id:
                 s_result = await session.execute(
                     select(AISuggestion).where(
@@ -1186,10 +1190,6 @@ def build_router() -> APIRouter:
                 )
                 sug = s_result.scalar_one_or_none()
                 if sug:
-                    if payload.suggestion_index is not None and isinstance(sug.data, dict):
-                        suggestions_list = sug.data.get("suggestions", [])
-                        if 0 <= payload.suggestion_index < len(suggestions_list):
-                            chosen_suggestion = suggestions_list[payload.suggestion_index]
                     sug.status = "approved"
                     sug.applied_at = datetime.now(timezone.utc)
                     await session.commit()
@@ -1407,11 +1407,9 @@ def build_router() -> APIRouter:
                 hb_rows = hb_result.scalars().all()
 
                 start_date = None
-                end_date = None
                 estimated_amount = 0
                 if hb_rows:
                     start_date = hb_rows[0].start_date
-                    end_date = hb_rows[0].end_date
                     for hb in hb_rows:
                         estimated_amount += hb.budgeted_amount
 
@@ -1617,10 +1615,9 @@ def build_router() -> APIRouter:
             # Create BudgetOccasion + categories
             try:
                 sd = datetime.fromisoformat(payload.start_date)
-                ed = datetime.fromisoformat(payload.end_date)
+                datetime.fromisoformat(payload.end_date)  # Still validate the end date.
             except Exception:
                 sd = datetime.now(timezone.utc)
-                ed = sd + timedelta(days=7)
 
             occ = BudgetOccasion(
                 user_id=user["user_id"],

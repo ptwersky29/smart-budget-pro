@@ -11,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 os.environ.setdefault("JWT_SECRET", "local-only-jwt-secret-long-enough-for-tests")
 from auth import get_current_user
-from db import Base, BankAccount, Transaction, TransactionTransferPair, User
+from db import BankAccount, Base, Transaction, TransactionTransferPair, User
 from finance_engine import build_router
 
 

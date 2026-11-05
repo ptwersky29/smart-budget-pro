@@ -1,16 +1,16 @@
 """Phase 5 — AI insights: dashboard, budget, forecast, report with real user data, cost tracking."""
-import os
 import json
 import logging
-from datetime import datetime, timezone, timedelta
+import os
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy import select, func
+from sqlalchemy import select
 
-from db import Transaction, Budget, AiUsage
 from auth import get_current_user
+from db import AiUsage, Budget, Transaction
 from llm import call_llm, parse_json
 
 logger = logging.getLogger("ai_insights")

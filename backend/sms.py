@@ -1,24 +1,24 @@
 """Phase 4 — SMS Automation: Twilio webhook, sender-based ID, AI parsing, dedup."""
-import uuid
+import base64
 import hashlib
 import hmac
-import base64
-import re
-import os
-import secrets
 import logging
-from datetime import datetime, timezone, timedelta
+import os
+import re
+import secrets
+import uuid
+from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 
-from db import User, Transaction, SmsMessage, SmsSender, AppConfig, Budget
-from auth import get_current_user
+import maaser as maaser_mod
 from app_config import get_config
+from auth import get_current_user
+from db import AppConfig, Budget, SmsMessage, SmsSender, Transaction, User
 from llm import call_llm, parse_json, track_ai_usage
 from security import sanitize_input
-import maaser as maaser_mod
 
 logger = logging.getLogger("sms")
 
@@ -234,8 +234,9 @@ async def _send_twilio_sms(session, to: str, body: str) -> bool:
     from_number = await get_config(session, "twilio_phone_number", "TWILIO_PHONE_NUMBER")
     if not sid or not token or not from_number:
         raise HTTPException(500, "Twilio not configured")
-    import httpx
     from base64 import b64encode
+
+    import httpx
     auth = b64encode(f"{sid}:{token}".encode()).decode()
     async with httpx.AsyncClient(timeout=15.0) as client:
         resp = await client.post(
@@ -392,14 +393,14 @@ async def _build_transaction_reply(session, user_id: str, parsed: dict) -> str:
 
     if is_income:
         lines = [
-            f"Income recorded.",
+            "Income recorded.",
             f"Amount: £{amt:.2f}",
             f"Source: {merchant}",
             f"Category: {category}",
         ]
     else:
         lines = [
-            f"Transaction recorded.",
+            "Transaction recorded.",
             f"Amount: £{amt:.2f}",
             f"Merchant: {merchant}",
             f"Category: {category}",

@@ -7,10 +7,18 @@ from types import SimpleNamespace
 from sqlalchemy import func, select
 
 from db import (
-    BankAccount, Budget, Statement, Transaction, User,
-    create_tables, dispose_engine, get_session_maker, init_engine,
+    BankAccount,
+    Budget,
+    Statement,
+    Transaction,
+    User,
+    create_tables,
+    dispose_engine,
+    get_session_maker,
+    init_engine,
 )
-from finance_engine import BulkUpdateIn, build_router as finance_router
+from finance_engine import BulkUpdateIn
+from finance_engine import build_router as finance_router
 from gdpr import build_router as gdpr_router
 
 

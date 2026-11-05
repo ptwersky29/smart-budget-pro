@@ -13,6 +13,7 @@ os.environ.setdefault("JWT_SECRET", "week1-security-test-secret-value-32-chars")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from datetime import datetime, timezone
+
 from db import User
 from rate_limit import CsrfProtectionMiddleware
 from sms import (

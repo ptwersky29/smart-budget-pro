@@ -3,12 +3,12 @@ import copy
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from db import User
 from auth import get_current_user
+from db import User
 
 logger = logging.getLogger("app_settings")
 

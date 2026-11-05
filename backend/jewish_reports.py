@@ -1,11 +1,12 @@
 """Year-end Jewish Finance Reports - Maaser summaries and holiday budgets."""
 import logging
 from datetime import datetime, timezone
-from typing import Optional
-from fastapi import APIRouter, Request, HTTPException, Depends, Query
-from sqlalchemy import select, and_
-from db import User, Transaction, MaaserLedger, HolidayBudget, Budget
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import and_, select
+
 from auth import get_current_user
+from db import HolidayBudget, MaaserLedger, Transaction, User
 from maaser import INCOME_CATEGORIES
 
 logger = logging.getLogger("jewish_reports")
@@ -218,8 +219,6 @@ async def jewish_finance_year_end_report(
     year: int = Query(None),
 ):
     """Generate comprehensive year-end Jewish finance report."""
-    sm = request.app.state.db
-    
     # Get both reports
     maaser_report = await annual_maaser_summary(request, user, year)
     holiday_report = await holiday_budget_report(request, user, year)

@@ -1,6 +1,6 @@
 """Phase 6 — Live market prices via CoinGecko (free, keyless)."""
-import time
 import logging
+import time
 from typing import Optional
 
 import httpx

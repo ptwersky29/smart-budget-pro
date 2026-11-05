@@ -5,14 +5,14 @@ Skip: pytest -m "not stress"  (default)
 Only: pytest -m stress
 """
 import os
-import uuid
 import random
-import time
 import threading
-from datetime import datetime, timezone, timedelta
+import time
+import uuid
+from datetime import datetime, timedelta, timezone
 
-import pytest
 import httpx
+import pytest
 
 pytestmark = pytest.mark.stress
 

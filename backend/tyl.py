@@ -1,22 +1,22 @@
 """Tyl by NatWest — UK-hosted card-payment gateway checkout."""
-import os
-import uuid
+import base64
 import hashlib
 import hmac
-import base64
-import logging
-from datetime import datetime, timedelta, timezone
 import html
+import logging
+import os
 import urllib.parse
+import uuid
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
-from sqlalchemy import select, or_
+from sqlalchemy import or_, select
 
-from db import PaymentTransaction, User
 from auth import get_current_user
+from db import PaymentTransaction, User
 
 logger = logging.getLogger("tyl")
 

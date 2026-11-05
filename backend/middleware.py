@@ -1,9 +1,10 @@
 """Error monitoring, request ID, and performance middleware."""
+import logging
 import os
 import time
 import uuid
-import logging
 from urllib.parse import urlencode
+
 from fastapi import Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware

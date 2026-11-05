@@ -1,11 +1,10 @@
 """Auto-Maaser hook: when a salary/income lands, accrue 10% (configurable) Maaser obligation."""
-import uuid
 import logging
 from datetime import datetime, timezone
 
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 
-from db import User, MaaserLedger, Transaction
+from db import MaaserLedger, Transaction, User
 
 logger = logging.getLogger("maaser")
 

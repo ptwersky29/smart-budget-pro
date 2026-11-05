@@ -4,6 +4,7 @@ Set REACT_APP_BACKEND_URL to point elsewhere (e.g. a deployed instance)."""
 import os
 import time
 import urllib.parse as up
+
 import pytest
 import requests
 
@@ -12,6 +13,7 @@ API = f"{BASE_URL}/api"
 
 # Prefer .env admin credentials; fall back to test defaults
 from dotenv import load_dotenv
+
 load_dotenv()
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@financeai.app")
 ADMIN_PASS = os.environ.get("ADMIN_PASSWORD", "")

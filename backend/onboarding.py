@@ -1,15 +1,14 @@
 """Phase 9 — Onboarding flow: step tracking, progress, guided setup."""
 import logging
 from datetime import datetime, timezone
-from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from db import User, OnboardingProgress, ONBOARDING_STEPS
-from auth import get_current_user
 from audit import log_action
+from auth import get_current_user
+from db import ONBOARDING_STEPS, OnboardingProgress, User
 
 logger = logging.getLogger("onboarding")
 
@@ -45,7 +44,6 @@ def build_router() -> APIRouter:
                         "ai_intro": "Try AI insights",
                     }.get(s, s),
                 })
-            all_done = all(s["completed"] for s in steps)
             return {
                 "current_step": prog.step if prog else "connect_bank",
                 "steps": steps,

@@ -1,25 +1,48 @@
 """GDPR compliance: data export, deletion, consent management."""
-import json
-import secrets
 import logging
+import secrets
 from datetime import datetime, timezone
-from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy import select, delete as sa_delete, func
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import select
 
-from db import (
-    Base, get_session_maker, User, Transaction, MaaserLedger, HolidayBudget,
-    ChasunaPlan, InvestmentHolding, ConsentRecord, Budget, BankAccount,
-    BankConnection, Subscription, RecurringTransaction, SplitTransaction,
-    Category, CategoryRule, SmsMessage, SmsSender, Notification,
-    PaymentTransaction, TrueLayerLog, SyncLog, AuditLog,
-    UserSession, TokenBlacklist, AccountNickname, AiMessage, AiUsage,
-    Statement, Integration, SupportTicket,
-)
-from auth import get_current_user
 from audit import log_action
+from auth import get_current_user
+from db import (
+    AccountNickname,
+    AiMessage,
+    AiUsage,
+    AuditLog,
+    BankAccount,
+    BankConnection,
+    Base,
+    Budget,
+    Category,
+    CategoryRule,
+    ChasunaPlan,
+    ConsentRecord,
+    HolidayBudget,
+    Integration,
+    InvestmentHolding,
+    MaaserLedger,
+    Notification,
+    PaymentTransaction,
+    RecurringTransaction,
+    SmsMessage,
+    SmsSender,
+    SplitTransaction,
+    Statement,
+    Subscription,
+    SupportTicket,
+    SyncLog,
+    Transaction,
+    TrueLayerLog,
+    User,
+    UserSession,
+    get_session_maker,
+)
 
 logger = logging.getLogger("gdpr")
 

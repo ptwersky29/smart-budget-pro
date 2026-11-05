@@ -4,12 +4,14 @@ import os
 import sys
 from pathlib import Path
 from urllib.parse import unquote
+
 from dotenv import load_dotenv
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
 from sqlalchemy import create_engine, text
+
 from db import Base
 
 DATABASE_URL = os.environ.get("DATABASE_URL")

@@ -1,0 +1,16 @@
+# Stable, actionable Python lint gate for Penni's FastAPI backend.
+# Avoid enabling every Ruff rule: that mixes opinionated refactor rules with
+# correctness checks and produces a legacy backlog unrelated to new changes.
+target-version = "py312"
+line-length = 110
+exclude = [".venv", ".ruff_cache", "__pycache__"]
+
+[lint]
+# Parse/import errors, unused and duplicate names, import ordering, and
+# basic correctness. Additional rule families can be enabled as they are
+# cleaned up and adopted consistently.
+select = ["E4", "E7", "E9", "F", "I"]
+# E402: startup configuration deliberately precedes optional imports.
+# E701: existing compact guards are valid and not a correctness concern.
+# E712: SQLAlchemy expressions must use SQL comparisons, not Python truthiness.
+ignore = ["E402", "E701", "E712"]

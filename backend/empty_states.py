@@ -1,11 +1,11 @@
 """Phase 9 — Empty states: contextual guides when user has no data yet."""
 import logging
 
-from fastapi import APIRouter, Request, Depends
-from sqlalchemy import select, func
+from fastapi import APIRouter, Depends, Request
+from sqlalchemy import func, select
 
-from db import Transaction, HolidayBudget, ChasunaPlan, InvestmentHolding, SupportTicket
 from auth import get_current_user
+from db import ChasunaPlan, HolidayBudget, InvestmentHolding, SupportTicket, Transaction
 
 logger = logging.getLogger("empty_states")
 

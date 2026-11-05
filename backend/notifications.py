@@ -1,13 +1,12 @@
 """Notification system for budget alerts, bank sync status, and user reminders."""
 import logging
 from datetime import datetime, timezone
-from typing import Optional
 
-from fastapi import APIRouter, Request, HTTPException, Depends
-from sqlalchemy import select, and_, desc
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import and_, desc, select
 
-from db import Notification, User
 from auth import get_current_user
+from db import Notification
 
 logger = logging.getLogger("notifications")
 

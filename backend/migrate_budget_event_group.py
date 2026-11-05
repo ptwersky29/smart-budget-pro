@@ -4,6 +4,7 @@ import os
 import sys
 from pathlib import Path
 from urllib.parse import unquote
+
 from dotenv import load_dotenv
 
 ROOT_DIR = Path(__file__).parent

@@ -1,7 +1,5 @@
 """SQLAlchemy 2.0 async models for PostgreSQL (Supabase)."""
 
-import enum
-import uuid
 from datetime import date, datetime, timezone
 from typing import List, Optional
 
@@ -10,7 +8,6 @@ from sqlalchemy import (
     Boolean,
     Date,
     DateTime,
-    Float,
     ForeignKey,
     Index,
     Integer,
@@ -19,9 +16,6 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     text,
-)
-from sqlalchemy import (
-    Enum as SAEnum,
 )
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
