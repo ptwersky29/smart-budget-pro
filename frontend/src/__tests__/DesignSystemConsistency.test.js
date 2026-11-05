@@ -44,6 +44,8 @@ describe("Penni consistent workspace and overlay contracts", () => {
     expect(select).toContain('role="combobox"');
     expect(select).toContain('aria-expanded={open}');
     expect(select).toContain('role="listbox"');
-    expect(category).toContain('w-[var(--radix-popover-trigger-width)]');
+    expect(category).toContain('penni-category-menu');
+    expect(category).toContain('360px');
+    expect(category).toContain('whitespace-normal break-words');
   });
 });

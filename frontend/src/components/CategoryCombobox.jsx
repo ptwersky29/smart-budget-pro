@@ -12,7 +12,6 @@ import {
   CommandList,
   CommandSeparator,
 } from "./ui/command";
-import CategoryBadge from "./CategoryBadge";
 import CategoryEditorDialog from "./CategoryEditorDialog";
 import { useCategories } from "../contexts/CategoriesContext";
 import { formatApiError } from "../lib/api";
@@ -126,39 +125,40 @@ export default function CategoryCombobox({
             aria-label={label}
             aria-expanded={open}
             className={cn(
-              "flex h-12 w-full items-center justify-between gap-3 rounded-2xl border border-transparent bg-secondary/50 px-4 text-left text-[15px] transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50",
+              "flex min-h-11 w-full items-center justify-between gap-2 rounded-[11px] border border-border bg-card px-3 text-left text-[13px] text-foreground transition-colors hover:border-primary/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50",
               !selected && "text-muted-foreground",
               className,
             )}
           >
-            <div className="min-w-0 flex-1">
+            <span className="flex min-w-0 flex-1 items-center gap-2" title={selected?.display_name || selected?.label || selected?.name || placeholder}>
               {selected ? (
-                <CategoryBadge
-                  category={selected}
-                  size="md"
-                  className="max-w-full"
-                  truncate
-                />
+                <>
+                  <span aria-hidden="true" className="shrink-0 text-base leading-none">{selected.emoji || selected.icon || "🏷️"}</span>
+                  <span className="min-w-0 flex-1 truncate font-medium text-foreground">
+                    {selected.display_name || selected.label || selected.name}
+                  </span>
+                </>
               ) : (
-                <span>{placeholder}</span>
+                <span className="truncate text-muted-foreground">{placeholder}</span>
               )}
-            </div>
+            </span>
             <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
           </button>
         </PopoverTrigger>
         <PopoverContent
-          className="flex w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-24px)] max-h-[min(75dvh,var(--radix-popover-content-available-height))] flex-col overflow-hidden p-0"
+          className="penni-category-menu flex !w-[min(360px,calc(100vw-24px))] !min-w-[min(320px,calc(100vw-24px))] max-h-[min(75dvh,var(--radix-popover-content-available-height))] flex-col overflow-hidden rounded-xl border border-border bg-popover p-0 shadow-xl"
           align="start"
           side="bottom"
           collisionPadding={12}
+          sideOffset={6}
           avoidCollisions
         >
           <Command shouldFilter={false} className="flex min-h-0 flex-col overflow-hidden">
             <CommandInput aria-label="Search categories"
               value={search} onValueChange={setSearch}
               placeholder="Search categories…"
-              className="h-11 text-sm" />
-            <CommandList className="min-h-0 max-h-[min(50dvh,240px)] overflow-y-auto overscroll-contain">
+              className="h-11 text-[13px]" />
+            <CommandList className="min-h-0 max-h-[min(55dvh,360px)] overflow-y-auto overscroll-contain px-1.5 py-1">
               <CommandEmpty>
                 {search ? "No categories found" : "No categories yet"}
               </CommandEmpty>
@@ -169,18 +169,16 @@ export default function CategoryCombobox({
                       key={category.category_id || category.name}
                       value={category.name}
                       onSelect={handleSelect}
-                      className="gap-2 py-2.5"
+                      className="penni-category-menu-item min-h-11 gap-3 rounded-lg px-2.5 py-2 text-[13px] text-foreground data-[selected=true]:bg-secondary/70 data-[selected=true]:text-foreground"
                     >
-                      <div className="min-w-0 flex-1">
-                        <CategoryBadge
-                          category={category}
-                          size="md"
-                          className="max-w-full"
-                          truncate
-                        />
-                      </div>
+                      <span aria-hidden="true" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-secondary/50 text-base leading-none">
+                        {category.emoji || category.icon || "🏷️"}
+                      </span>
+                      <span className="min-w-0 flex-1 whitespace-normal break-words text-left leading-snug">
+                        {category.display_name || category.label || category.name}
+                      </span>
                       {value === category.name && (
-                        <Check className="h-4 w-4 shrink-0 text-primary" />
+                        <Check aria-label="Selected" className="h-4 w-4 shrink-0 text-primary" />
                       )}
                     </CommandItem>
                   ))}
@@ -190,13 +188,14 @@ export default function CategoryCombobox({
               <CommandItem
                 value="__add__"
                 onSelect={handleSelect}
-                className="gap-2 py-2.5"
+                className="min-h-10 gap-2 rounded-lg px-3 py-2 text-[13px] data-[selected=true]:bg-secondary/70 data-[selected=true]:text-foreground"
               >
                 <Plus className="h-4 w-4" />
                 Create category
               </CommandItem>
               {allowClear && value && (
-                <CommandItem value="__clear__" onSelect={handleSelect}>
+                <CommandItem value="__clear__" onSelect={handleSelect}
+                  className="min-h-10 rounded-lg px-3 text-[13px] data-[selected=true]:bg-secondary/70 data-[selected=true]:text-foreground">
                   Clear selection
                 </CommandItem>
               )}
