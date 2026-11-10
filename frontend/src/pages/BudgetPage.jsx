@@ -1,4 +1,5 @@
 import PenniSelect from "../components/PenniSelect";
+import "../design-system/transactions-reference.css";
 import { useActions } from "../contexts/ActionContext";
 import NativePopup from "../components/ui/NativePopup";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -10,7 +11,7 @@ import {
   Lock, PiggyBank, Home, AlertCircle, ExternalLink,
   Car, Utensils, Zap, Gift, Film, Heart, BookOpen,
   Shirt, Gamepad2, Plane, Coffee, Briefcase, Smartphone,
-  ArrowUpRight,
+  ArrowUpRight, ChevronLeft, ChevronRight,
   List, LayoutGrid, Bell, FolderCog, BarChart3,
 } from "lucide-react";
 import { api } from "../lib/api";
@@ -303,45 +304,63 @@ const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
   ];
 
   return (
-    <div className="budget-workspace hidden min-h-0 xl:flex xl:flex-col">
-      <div className="shrink-0 px-[14px]">
+    <div className="budget-workspace transactions-primary hidden min-h-0 xl:flex xl:flex-col gap-[14px]">
+      <div className="penni-reference-page-top shrink-0">
         <WorkspaceHeader title="Budgets" description="Track your spending, set budgets and stay in control."
           actions={<>
-            {monthControl}
-            <button type="button" onClick={() => onAdd()} className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#5b57f5] px-4 text-[12px] font-semibold text-white shadow-[0_6px_16px_rgba(91,87,245,0.20)] hover:bg-[#4f46e5]"><Plus className="h-3.5 w-3.5" /> Add budget</button>
-            <DropdownMenu><DropdownMenuTrigger asChild><button aria-label="More budget actions" className="grid h-9 w-9 place-items-center rounded-[10px] border border-border bg-card text-muted-foreground"><MoreHorizontal className="h-4 w-4" /></button></DropdownMenuTrigger>
-              <DropdownMenuContent align="end"><DropdownMenuItem onClick={onCopyPrevious}><Copy className="mr-2 h-4 w-4" /> Copy previous month</DropdownMenuItem><DropdownMenuItem onClick={onRefresh}><RefreshCw className="mr-2 h-4 w-4" /> Refresh</DropdownMenuItem><DropdownMenuItem onClick={onSeedDefaults}><Download className="mr-2 h-4 w-4" /> Load defaults</DropdownMenuItem></DropdownMenuContent>
+            <div className="penni-reference-month-switcher inline-flex h-[43px] items-center rounded-[13px] border border-border bg-card px-1">
+              <button type="button" onClick={monthControl.props.onPrev} aria-label="Previous month" className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-secondary"><ChevronLeft className="h-3.5 w-3.5" /></button>
+              <span className="min-w-[112px] px-1 text-center text-[12px] font-medium">{monthControl.props.label}</span>
+              <button type="button" onClick={monthControl.props.onNext} aria-label="Next month" className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-secondary"><ChevronRight className="h-3.5 w-3.5" /></button>
+            </div>
+            <button type="button" onClick={() => onAdd()} className="penni-primary-action inline-flex h-[43px] items-center justify-center gap-2 rounded-xl px-4 text-[13px] font-semibold text-white"><Plus className="h-4 w-4" /> Add budget</button>
+            <DropdownMenu><DropdownMenuTrigger asChild><button aria-label="More budget actions" className="penni-reference-more-button grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-muted-foreground"><MoreHorizontal className="h-4 w-4" /></button></DropdownMenuTrigger>
+              <DropdownMenuContent align="end"><DropdownMenuItem onClick={() => setShowInsights(true)}><BarChart3 className="mr-2 h-4 w-4" /> Insights</DropdownMenuItem><DropdownMenuItem onClick={onCopyPrevious}><Copy className="mr-2 h-4 w-4" /> Copy previous month</DropdownMenuItem><DropdownMenuItem onClick={onRefresh}><RefreshCw className="mr-2 h-4 w-4" /> Refresh</DropdownMenuItem><DropdownMenuItem onClick={onSeedDefaults}><Download className="mr-2 h-4 w-4" /> Load defaults</DropdownMenuItem></DropdownMenuContent>
             </DropdownMenu>
           </>} />
       </div>
-      <div className="mt-4 px-[14px]"><WorkspaceMetrics columns={4}>
-        {statCards.map(({ label, value, note, icon, tone, progress }) => <WorkspaceMetric key={label} label={label} value={value} note={note} icon={icon} tone={tone} progress={progress} />)}
-      </WorkspaceMetrics></div>
-      <div className="relative mt-4 flex min-h-0 flex-1 px-[14px]">
+      <div className="penni-reference-kpis" aria-label="Budget summary">
+        {statCards.map(({ label, value, note, icon: Icon, tone }, index) => (
+          <article key={label} className={`penni-reference-kpi penni-reference-kpi--${["income", "expenses", "transfers", "net"][index]}`}>
+            <span className="penni-reference-kpi-icon"><Icon size={22} strokeWidth={2.2} /></span>
+            <div className="penni-reference-kpi-copy">
+              <span className="penni-reference-kpi-label">{label}</span>
+              <strong className="penni-reference-kpi-amount">{value}</strong>
+              <span className="penni-reference-kpi-detail">{note}</span>
+            </div>
+            <svg className="penni-reference-sparkline" viewBox="0 0 116 42" aria-hidden="true"><path d="M3 30 H113" fill="none" stroke="currentColor" strokeWidth="1.4" strokeDasharray="3 5" opacity=".17" /></svg>
+          </article>
+        ))}
+      </div>
+      <div className="relative flex min-h-0 flex-1">
         <div className="budget-primary flex min-h-0 min-w-0 flex-1 flex-col gap-3">
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <label className="relative min-w-[130px] flex-1" aria-label="Search budgets">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <div className="penni-reference-toolbar" role="group" aria-label="Search and filter budgets">
+            <label className="penni-reference-search">
+              <Search className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
               <input type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search budgets, categories or amounts..." className="h-10 w-full rounded-xl border border-border bg-card pl-8 pr-3 text-[12px] outline-none focus:border-[#5b57f5]/40" />
+                aria-label="Search budgets" placeholder="Search budgets and categories..." />
+              {searchQuery && <button type="button" onClick={() => setSearchQuery("")} aria-label="Clear search"><X className="h-4 w-4" /></button>}
+              <kbd className="hidden lg:block">Ctrl K</kbd>
             </label>
             <PenniSelect value={sortOption} onChange={(e) => setSortOption(e.target.value)}
-              aria-label="Sort budgets" className="h-10 min-w-[145px] rounded-xl border border-border bg-card px-3 text-xs">
+              aria-label="Sort budgets" className="penni-reference-filter-control penni-reference-select-extra min-w-[155px]">
               <option value="progress">Sort: Progress</option><option value="name">Sort: Name</option>
               <option value="limit">Sort: Budget</option><option value="spent">Sort: Spent</option><option value="remaining">Sort: Remaining</option>
             </PenniSelect>
-            <button type="button" onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")} aria-label="Reverse sort" className="grid h-10 w-10 place-items-center rounded-xl border border-border bg-card">
-              {sortOrder === "desc" ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-            </button>
+            <button type="button" onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")} aria-label="Reverse sort"
+              className="penni-reference-filter-control">{sortOrder === "desc" ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}</button>
+            <button type="button" onClick={() => setShowInsights(true)} className="penni-reference-filter-control"><BarChart3 className="h-4 w-4" /> Insights</button>
+            <button type="button" onClick={() => { setSearchQuery(""); setBudgetView("all"); }} className="penni-reference-filter-control">Clear</button>
+            <div className="penni-reference-view-toggle"><WorkspaceViewToggle value={displayMode} onChange={setDisplayMode} label="Budget view" /></div>
           </div>
-          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-[16px] border border-border bg-card p-2">
+          <div className="penni-reference-tabs-bar">
             <WorkspaceTabs tabs={tabs} active={budgetView} onChange={setBudgetView} label="Budget category status" />
-            <div className="flex shrink-0 items-center gap-2">
-              <button type="button" onClick={() => setShowInsights(true)} aria-label="Open budget insights" className="inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-card px-3 text-xs font-medium hover:bg-secondary/50"><BarChart3 className="h-4 w-4" /> Insights</button>
-              <WorkspaceViewToggle value={displayMode} onChange={setDisplayMode} label="Budget view" />
-            </div>
+            <PenniSelect value={sortOption} onChange={(e) => setSortOption(e.target.value)} aria-label="Sort budgets" className="penni-reference-sort">
+              <option value="progress">Sort: Progress</option><option value="name">Sort: Name</option>
+              <option value="limit">Sort: Budget</option><option value="spent">Sort: Spent</option><option value="remaining">Sort: Remaining</option>
+            </PenniSelect>
           </div>
-          {loading ? <WorkspaceSkeleton /> : loadError ? <WorkspaceBlank title="Could not load budgets" description={loadError} error action={<button onClick={onRetry} className="rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white">Try again</button>} /> : displayMode === "list" ? (<div data-testid="budget-list" className="workspace-table-panel budget-ledger-scroll surface min-h-0 flex-1 overflow-auto rounded-[20px] border border-border/70"><table className="workspace-table w-full text-left"><thead className="sticky top-0 z-10 bg-secondary/60"><tr className="border-b border-border text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground"><th className="px-4 py-3">Category</th><th className="px-3 py-3 text-right">Spent</th><th className="px-3 py-3 text-right">Budget</th><th className="w-[180px] px-3 py-3">Progress</th><th className="px-3 py-3">Status</th><th className="w-[90px]" /></tr></thead><tbody>{budgetTableRows.map((budget) => { const pct = Number(budget.progress_pct) || 0; const risk = pct >= 80; const over = pct >= 100; const Icon = CATEGORY_ICONS[budget.category.toLowerCase().trim()] || Target; return <tr key={budget.budget_id} onClick={() => openBudgetTransactions(budget)} className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-[#5b57f5]/[0.045] focus-within:bg-secondary/30"><td className="px-4 py-2.5"><span className="flex items-center gap-2.5"><span className={`grid h-8 w-8 place-items-center rounded-xl ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}><Icon className="h-4 w-4" /></span><span className="text-[13px] font-semibold capitalize">{humanizeCategoryName(budget.category)}</span></span></td><td className="money-tabular px-3 py-2.5 text-right text-[12px]">£{Number(budget.spent || 0).toFixed(2)}</td><td className="money-tabular px-3 py-2.5 text-right text-[12px] text-muted-foreground">£{Number(budget.limit || 0).toFixed(2)}</td><td className="px-3 py-2.5"><div className="flex items-center gap-2"><div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary"><div className={`h-full rounded-full ${over ? "bg-ruby" : risk ? "bg-gradient-to-r from-topaz to-ruby/70" : "bg-gradient-to-r from-emerald to-sky"}`} style={{ width: `${Math.min(100, pct)}%` }} /></div><span className="w-7 text-right text-[10px] text-muted-foreground">{Math.round(pct)}%</span></div></td><td className="px-3 py-2.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-medium ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}>{over ? "Exceeded" : risk ? "At risk" : "On track"}</span></td><td className="px-3 py-2.5"><button type="button" aria-label={`Edit ${budget.category} budget`} onClick={(event) => { event.stopPropagation(); startEdit(budget); }} className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2 text-[11px] font-medium text-foreground hover:bg-secondary"><Pencil className="h-3 w-3" />Edit</button></td></tr>; })}</tbody></table>{budgetTableRows.length === 0 ? <WorkspaceBlank title={searchQuery || budgetView !== "all" ? "No matching budgets" : "No budgets yet"} description={searchQuery || budgetView !== "all" ? "Try clearing your search or changing the status tab." : "Create a budget to track spending, or choose a category from the unbudgeted list."} action={!searchQuery && budgetView === "all" ? <button type="button" onClick={() => onAdd()} className="rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white">Create budget</button> : null} /> : null}</div> ) : (
+          {loading ? <WorkspaceSkeleton /> : loadError ? <WorkspaceBlank title="Could not load budgets" description={loadError} error action={<button onClick={onRetry} className="rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white">Try again</button>} /> : displayMode === "list" ? (<div data-testid="budget-list" className="workspace-table-panel transaction-ledger-panel penni-reference-ledger budget-ledger-scroll surface min-h-0 flex-1 overflow-auto rounded-[21px] p-0"><table className="workspace-table w-full text-left penni-reference-budget-table"><thead className="sticky top-0 z-10 bg-[#f8f7fc]"><tr className="border-b border-border text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground"><th className="px-4 py-3">Category</th><th className="px-3 py-3 text-right">Spent</th><th className="px-3 py-3 text-right">Budget</th><th className="w-[180px] px-3 py-3">Progress</th><th className="px-3 py-3">Status</th><th className="w-[90px]" /></tr></thead><tbody>{budgetTableRows.map((budget) => { const pct = Number(budget.progress_pct) || 0; const risk = pct >= 80; const over = pct >= 100; const Icon = CATEGORY_ICONS[budget.category.toLowerCase().trim()] || Target; return <tr key={budget.budget_id} onClick={() => openBudgetTransactions(budget)} className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-[#f5f2ff] focus-within:bg-secondary/30"><td className="px-4 py-2.5"><span className="flex items-center gap-2.5"><span className={`grid h-8 w-8 place-items-center rounded-xl ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}><Icon className="h-4 w-4" /></span><span className="text-[13px] font-semibold capitalize">{humanizeCategoryName(budget.category)}</span></span></td><td className="money-tabular px-3 py-2.5 text-right text-[12px]">£{Number(budget.spent || 0).toFixed(2)}</td><td className="money-tabular px-3 py-2.5 text-right text-[12px] text-muted-foreground">£{Number(budget.limit || 0).toFixed(2)}</td><td className="px-3 py-2.5"><div className="flex items-center gap-2"><div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary"><div className={`h-full rounded-full ${over ? "bg-ruby" : risk ? "bg-gradient-to-r from-topaz to-ruby/70" : "bg-gradient-to-r from-emerald to-sky"}`} style={{ width: `${Math.min(100, pct)}%` }} /></div><span className="w-7 text-right text-[10px] text-muted-foreground">{Math.round(pct)}%</span></div></td><td className="px-3 py-2.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-medium ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}>{over ? "Exceeded" : risk ? "At risk" : "On track"}</span></td><td className="px-3 py-2.5"><button type="button" aria-label={`Edit ${budget.category} budget`} onClick={(event) => { event.stopPropagation(); startEdit(budget); }} className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2 text-[11px] font-medium text-foreground hover:bg-secondary"><Pencil className="h-3 w-3" />Edit</button></td></tr>; })}</tbody></table>{budgetTableRows.length === 0 ? <WorkspaceBlank title={searchQuery || budgetView !== "all" ? "No matching budgets" : "No budgets yet"} description={searchQuery || budgetView !== "all" ? "Try clearing your search or changing the status tab." : "Create a budget to track spending, or choose a category from the unbudgeted list."} action={!searchQuery && budgetView === "all" ? <button type="button" onClick={() => onAdd()} className="rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white">Create budget</button> : null} /> : null}</div> ) : (
             <div data-testid="budget-grid" className="budget-ledger-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 {budgetTableRows.map((budget) => {
@@ -869,7 +888,7 @@ export default React.memo(function BudgetPage() {
   };
 
   return (
-    <div className="budgets-route page-stack pb-4">
+    <div className="budgets-route transactions-reference penni-reference-transactions-shell page-stack min-h-0 pb-0" style={{ background: "radial-gradient(ellipse at 48% 0%,#f0eeff 0%,#f9f8ff 55%,#f6f4ff 100%)" }}>
 
       <BudgetReferenceDesktop
         monthControl={<MonthPicker label={monthLabel} onPrev={() => setMonth(addMonth(month, -1))} onNext={() => setMonth(addMonth(month, 1))} onToday={() => setMonth(fmtMonth(now.getFullYear(), now.getMonth() + 1))} isToday={isCurrentMonth} />}
