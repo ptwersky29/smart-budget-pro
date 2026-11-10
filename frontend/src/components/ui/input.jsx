@@ -1,8 +1,10 @@
 import * as React from "react"
 
 import { cn } from "../../lib/utils"
+import PenniDateInput from "./PenniDateInput"
 
 const Input = React.forwardRef(({ className, type, ...props }, ref) => {
+  if (type === "date") return <PenniDateInput ref={ref} className={className} {...props} />;
   return (
     <input
       type={type}
