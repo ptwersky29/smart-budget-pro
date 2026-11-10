@@ -1,4 +1,5 @@
 import React, { lazy, Suspense, useEffect, useRef, useState } from "react";
+import PenniDateInput from "../ui/PenniDateInput";
 import { Building2, Loader2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "../../lib/api";
@@ -320,7 +321,7 @@ export default function GlobalActionHost() {
           <div className="rounded-xl border border-border bg-secondary/30 p-4"><Building2 className="h-6 w-6 text-emerald"/><p className="mt-3 text-sm font-semibold">Secure Open Banking connection</p>
             <p className="mt-1 text-xs text-muted-foreground">You will be taken to your bank's secure authorization screen, then returned to Penni.</p></div>
           <div><label className="mb-1.5 block text-xs font-medium">Import transactions from</label>
-            <input type="date" value={fromDate} onChange={e=>setFromDate(e.target.value)} className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"/></div>
+            <PenniDateInput value={fromDate} onChange={e=>setFromDate(e.target.value)} className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"/></div>
           <Button variant="primary" onClick={connectBank} disabled={connecting} className="w-full">
             {connecting?<Loader2 className="mr-2 h-4 w-4 animate-spin"/>:<Wallet className="mr-2 h-4 w-4"/>} Continue to bank
           </Button>
