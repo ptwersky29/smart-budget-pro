@@ -13,6 +13,7 @@ import {
   buildFallbackCategory,
   buildSectionOptions,
   slugifyCategoryName,
+  withCategoryEmoji,
 } from "../lib/categories";
 
 const CategoriesContext = createContext(null);
@@ -34,7 +35,7 @@ export function CategoriesProvider({ children }) {
     if (!silent) setLoading(true);
     try {
       const { data } = await api.get("/categories");
-      const nextCategories = data.categories || [];
+      const nextCategories = (data.categories || []).map(withCategoryEmoji);
       const nextHierarchy = data.hierarchy || {};
       setCategories(nextCategories);
       setHierarchy(nextHierarchy);
@@ -84,7 +85,8 @@ export function CategoriesProvider({ children }) {
   const resolveCategory = useCallback((value, overrides = {}) => {
     if (!value) return buildFallbackCategory("uncategorized", overrides);
     const normalized = slugifyCategoryName(value);
-    return categoryMap[normalized] || categoryMap[value] || buildFallbackCategory(value, overrides);
+    const stored = categoryMap[normalized] || categoryMap[value];
+    return stored ? withCategoryEmoji({ ...stored, ...overrides }) : buildFallbackCategory(value, overrides);
   }, [categoryMap]);
 
   const getReplacementOptions = useCallback((currentName) => {
