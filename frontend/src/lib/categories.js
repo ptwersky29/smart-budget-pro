@@ -46,13 +46,154 @@ const FALLBACK_CATEGORY_COLORS = {
   maaser_tzedakah: "#eab308",
 };
 
+// All 52 default budget categories, plus common transaction/category aliases.
+// A user's explicitly chosen emoji always takes precedence over these suggestions.
+export const DEFAULT_CATEGORY_EMOJIS = Object.freeze({
+  "fruit_veg": "🥬",
+  "grocery": "🛒",
+  "bakery": "🥖",
+  "fish": "🐟",
+  "meat": "🥩",
+  "paper_goods": "🧻",
+  "takeaway": "🥡",
+  "wine": "🍇",
+  "house_supplies": "🧼",
+  "chemist": "💊",
+  "rent_mortgage": "🏠",
+  "electricity": "⚡",
+  "heating": "🌡️",
+  "gas": "🔥",
+  "water": "💧",
+  "council_tax": "🏛️",
+  "telephone": "☎️",
+  "mobile": "📱",
+  "cleaning_help": "🧹",
+  "public_transport": "🚌",
+  "car_lease": "🚗",
+  "petrol_diesel": "⛽",
+  "dart_charge": "🌉",
+  "tolls": "🛣️",
+  "tickets": "🎟️",
+  "taxi": "🚕",
+  "loan_payoff": "💳",
+  "interest": "📉",
+  "investments": "📈",
+  "petty_cash": "💵",
+  "taxes": "🧾",
+  "upcoming_savings": "🐷",
+  "trust_savings": "🏦",
+  "school_fees": "🎓",
+  "bus_fee": "🚍",
+  "babysitting": "🧸",
+  "nappies": "🍼",
+  "toys": "🪀",
+  "tutor": "📚",
+  "therapy": "🩺",
+  "medical": "🏥",
+  "maaser_tzedakah": "🪙",
+  "charity": "🤝",
+  "other_charity": "💝",
+  "mikva": "🕯️",
+  "clothing_husband": "👔",
+  "clothing_wife": "👚",
+  "clothing_kids": "🧥",
+  "shoes": "👟",
+  "life_insurance": "🛡️",
+  "buildings_insurance": "🏢",
+  "miscellaneous": "📦",
+  "restaurants": "🍽️",
+  "parking": "🅿️",
+  "internet": "🌐",
+  "salary": "💼",
+  "income": "💰",
+  "travel": "🧳",
+  "entertainment": "🎭",
+  "shopping": "🛍️",
+  "subscriptions": "🔁",
+  "transfer": "🔄",
+  "uncategorized": "📁",
+});
+const CATEGORY_EMOJI_ALIASES = Object.freeze({
+  "groceries": "grocery",
+  "vegetables": "fruit_veg",
+  "fruit_and_veg": "fruit_veg",
+  "restaurant": "restaurants",
+  "restaurants": "restaurants",
+  "dining": "restaurants",
+  "food": "grocery",
+  "transport": "public_transport",
+  "tfl": "public_transport",
+  "tfl_travel": "public_transport",
+  "bus": "bus_fee",
+  "petrol": "petrol_diesel",
+  "fuel": "petrol_diesel",
+  "parking": "parking",
+  "rent": "rent_mortgage",
+  "mortgage": "rent_mortgage",
+  "housing": "rent_mortgage",
+  "mobile_phone": "mobile",
+  "phone": "mobile",
+  "internet": "internet",
+  "phone_internet": "internet",
+  "utilities": "electricity",
+  "salary": "salary",
+  "income": "income",
+  "wages": "salary",
+  "savings": "upcoming_savings",
+  "education": "school_fees",
+  "school": "school_fees",
+  "health": "medical",
+  "pharmacy": "chemist",
+  "donations": "charity",
+  "maaser": "maaser_tzedakah",
+  "tzedakah": "maaser_tzedakah",
+  "insurance": "life_insurance",
+  "travel": "travel",
+  "entertainment": "entertainment",
+  "shopping": "shopping",
+  "subscriptions": "subscriptions",
+  "transfer": "transfer",
+  "uncategorized": "uncategorized",
+  "uncategorised": "uncategorized",
+});
+const GENERIC_CATEGORY_EMOJIS = new Set(["🏷️", "📁", "❓"]);
+
+export function suggestCategoryEmoji(name) {
+  const key = slugifyCategoryName(name);
+  const canonical = CATEGORY_EMOJI_ALIASES[key] || key;
+  if (DEFAULT_CATEGORY_EMOJIS[canonical]) return DEFAULT_CATEGORY_EMOJIS[canonical];
+  // Specific words, not arbitrary substrings, to avoid e.g. 'car' inside 'cards'.
+  const words = key.split("_");
+  const candidates = [
+    ["parking", "🅿️"], ["bus", "🚌"], ["train", "🚆"], ["taxi", "🚕"],
+    ["petrol", "⛽"], ["grocery", "🛒"], ["bakery", "🥖"], ["coffee", "☕"],
+    ["restaurant", "🍽️"], ["school", "🎓"], ["charity", "🤝"],
+    ["insurance", "🛡️"], ["medical", "🏥"], ["rent", "🏠"],
+    ["phone", "📱"], ["savings", "🐷"], ["salary", "💼"],
+  ];
+  return candidates.find(([word]) => words.includes(word))?.[1] || "📁";
+}
+
+export function withCategoryEmoji(category) {
+  if (!category) return category;
+  const existing = category.emoji || category.icon;
+  // Generic placeholder values are replaced by a useful default at display-time;
+  // custom values remain untouched and no backend category data is modified.
+  const emoji = existing && !GENERIC_CATEGORY_EMOJIS.has(existing)
+    ? existing : suggestCategoryEmoji(category.name || category.slug || category.label);
+  return { ...category, emoji, icon: emoji };
+}
+
 export const CATEGORY_EMOJI_OPTIONS = [
-  "🛒", "🥬", "🥖", "🐟", "🥩", "🥡", "🍷", "🧼", "💊", "🏡",
-  "⚡", "🔥", "💧", "🏛️", "☎️", "📱", "🧹", "🛡️", "🎓", "🚌",
-  "🧸", "🍼", "🪀", "📚", "🫶", "🩺", "🚇", "🚗", "⛽", "🛣️",
-  "🚧", "🎫", "💳", "📈", "📊", "💵", "🏷️", "🚕", "🕯️", "🧾",
-  "📦", "💼", "💷", "🗂️", "🤝", "💝", "👔", "👗", "🧒", "👟",
-  "💠", "✨", "⭐", "🎯", "🏠", "🏦", "💰", "🎉", "🎁", "🧳",
+  "🥬",  "🛒",  "🥖",  "🐟",  "🥩",  "🧻",  "🥡",  "🍇",  "🧼",  "💊",
+  "🏠",  "⚡",  "🌡️",  "🔥",  "💧",  "🏛️",  "☎️",  "📱",  "🧹",  "🚌",
+  "🚗",  "⛽",  "🌉",  "🛣️",  "🎟️",  "🚕",  "💳",  "📉",  "📈",  "💵",
+  "🧾",  "🐷",  "🏦",  "🎓",  "🚍",  "🧸",  "🍼",  "🪀",  "📚",  "🩺",
+  "🏥",  "🪙",  "🤝",  "💝",  "🕯️",  "👔",  "👚",  "🧥",  "👟",  "🛡️",
+  "🏢",  "📦",  "🍽️",  "🅿️",  "🌐",  "💼",  "💰",  "🧳",  "🎭",  "🛍️",
+  "🔁",  "🔄",  "📁",  "🍷",  "🏡",  "🫶",  "🚇",  "🚧",  "🎫",  "📊",
+  "🏷️",  "💷",  "🗂️",  "👗",  "🧒",  "💠",  "✨",  "⭐",  "🎯",  "🎉",
+  "🎁",
 ];
 
 export function slugifyCategoryName(value) {
@@ -99,8 +240,8 @@ export function buildFallbackCategory(name, overrides = {}) {
     slug,
     label,
     display_name: label,
-    emoji: overrides.emoji || overrides.icon || "🏷️",
-    icon: overrides.icon || overrides.emoji || "🏷️",
+    emoji: overrides.emoji || overrides.icon || suggestCategoryEmoji(name),
+    icon: overrides.icon || overrides.emoji || suggestCategoryEmoji(name),
     color: overrides.color || FALLBACK_CATEGORY_COLORS[slug] || "#64748b",
     description: overrides.description || null,
     section: overrides.section || "🧩 Ungrouped",
