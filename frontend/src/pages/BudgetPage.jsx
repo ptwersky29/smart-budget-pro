@@ -288,6 +288,7 @@ const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
   loading, loadError, onRetry, onSeedDefaults, unbudgetedCategories, eventGroups,
   onDeleteEvent, monthlyTrend, insights, onApplyInsight, applyingInsight,
 }) {
+  const [showInsights, setShowInsights] = useState(false);
   const statCards = [
     { label: "Total Budgeted", value: `£${summary.totalPlanned.toFixed(2)}`, note: `${summary.count} categories`, icon: Target, tone: "emerald" },
     { label: "Total Spent", value: `£${summary.totalSpent.toFixed(2)}`, note: `${summary.totalPlanned ? Math.round((summary.totalSpent / summary.totalPlanned) * 100) : 0}% of budget`, icon: TrendingDown, tone: "ruby", progress: summary.totalPlanned ? (summary.totalSpent / summary.totalPlanned) * 100 : 0 },
@@ -295,19 +296,19 @@ const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
     { label: "At Risk", value: String(atRiskCount), note: atRiskCount ? `${atRiskCount} categories over 80% spent` : "All budgets on track", icon: AlertCircle, tone: "topaz" },
   ];
   const tabs = [
-    { key: "all", label: "All Categories", count: everyday.length },
+    { key: "all", label: "All Budgets", count: everyday.length },
     { key: "track", label: "On Track", count: everyday.filter((b) => (Number(b.progress_pct) || 0) < 80).length },
     { key: "risk", label: "At Risk", count: atRiskCount },
     { key: "exceeded", label: "Exceeded", count: summary.overCount },
   ];
 
   return (
-    <div className="budget-workspace hidden xl:flex xl:flex-col">
+    <div className="budget-workspace hidden min-h-0 xl:flex xl:flex-col">
       <div className="shrink-0 px-[14px]">
         <WorkspaceHeader title="Budgets" description="Track your spending, set budgets and stay in control."
           actions={<>
             {monthControl}
-            <button type="button" onClick={() => onAdd()} className="inline-flex h-9 items-center gap-2 rounded-[10px] bg-emerald px-4 text-[12px] font-semibold text-white shadow-[0_6px_16px_hsl(var(--emerald)/0.18)]"><Plus className="h-3.5 w-3.5" /> Add budget</button>
+            <button type="button" onClick={() => onAdd()} className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#5b57f5] px-4 text-[12px] font-semibold text-white shadow-[0_6px_16px_rgba(91,87,245,0.20)] hover:bg-[#4f46e5]"><Plus className="h-3.5 w-3.5" /> Add budget</button>
             <DropdownMenu><DropdownMenuTrigger asChild><button aria-label="More budget actions" className="grid h-9 w-9 place-items-center rounded-[10px] border border-border bg-card text-muted-foreground"><MoreHorizontal className="h-4 w-4" /></button></DropdownMenuTrigger>
               <DropdownMenuContent align="end"><DropdownMenuItem onClick={onCopyPrevious}><Copy className="mr-2 h-4 w-4" /> Copy previous month</DropdownMenuItem><DropdownMenuItem onClick={onRefresh}><RefreshCw className="mr-2 h-4 w-4" /> Refresh</DropdownMenuItem><DropdownMenuItem onClick={onSeedDefaults}><Download className="mr-2 h-4 w-4" /> Load defaults</DropdownMenuItem></DropdownMenuContent>
             </DropdownMenu>
@@ -316,28 +317,31 @@ const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
       <div className="mt-4 px-[14px]"><WorkspaceMetrics columns={4}>
         {statCards.map(({ label, value, note, icon, tone, progress }) => <WorkspaceMetric key={label} label={label} value={value} note={note} icon={icon} tone={tone} progress={progress} />)}
       </WorkspaceMetrics></div>
-      <div className="mt-4 grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(305px,32%)] gap-4 px-[14px]">
-        <div className="budget-primary flex min-h-0 min-w-0 flex-col gap-3">
-          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-            <WorkspaceTabs tabs={tabs} active={budgetView} onChange={setBudgetView} label="Budget category status" />
-            <WorkspaceViewToggle value={displayMode} onChange={setDisplayMode} label="Budget view" />
-          </div>
+      <div className="relative mt-4 flex min-h-0 flex-1 px-[14px]">
+        <div className="budget-primary flex min-h-0 min-w-0 flex-1 flex-col gap-3">
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             <label className="relative min-w-[130px] flex-1" aria-label="Search budgets">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <input type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search categories and budgets" className="h-9 w-full rounded-[9px] border border-border bg-card pl-8 pr-3 text-[12px] outline-none focus:border-emerald/40" />
+                placeholder="Search budgets, categories or amounts..." className="h-10 w-full rounded-xl border border-border bg-card pl-8 pr-3 text-[12px] outline-none focus:border-[#5b57f5]/40" />
             </label>
             <PenniSelect value={sortOption} onChange={(e) => setSortOption(e.target.value)}
-              aria-label="Sort budgets" className="h-9 min-w-[130px] rounded-[9px] border border-border bg-card px-3 text-xs">
+              aria-label="Sort budgets" className="h-10 min-w-[145px] rounded-xl border border-border bg-card px-3 text-xs">
               <option value="progress">Sort: Progress</option><option value="name">Sort: Name</option>
               <option value="limit">Sort: Budget</option><option value="spent">Sort: Spent</option><option value="remaining">Sort: Remaining</option>
             </PenniSelect>
-            <button type="button" onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")} aria-label="Reverse sort" className="grid h-9 w-9 place-items-center rounded-[9px] border border-border bg-card">
+            <button type="button" onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")} aria-label="Reverse sort" className="grid h-10 w-10 place-items-center rounded-xl border border-border bg-card">
               {sortOrder === "desc" ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
             </button>
           </div>
-          {loading ? <WorkspaceSkeleton /> : loadError ? <WorkspaceBlank title="Could not load budgets" description={loadError} error action={<button onClick={onRetry} className="rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white">Try again</button>} /> : displayMode === "list" ? (<div data-testid="budget-list" className="workspace-table-panel budget-ledger-scroll surface min-h-0 flex-1 overflow-auto rounded-[16px]"><table className="workspace-table w-full text-left"><thead className="sticky top-0 z-10 bg-card"><tr className="border-b border-border text-[11px] font-medium text-muted-foreground"><th className="px-4 py-3">Category</th><th className="px-3 py-3 text-right">Spent</th><th className="px-3 py-3 text-right">Budget</th><th className="w-[180px] px-3 py-3">Progress</th><th className="px-3 py-3">Status</th><th className="w-[90px]" /></tr></thead><tbody>{budgetTableRows.map((budget) => { const pct = Number(budget.progress_pct) || 0; const risk = pct >= 80; const over = pct >= 100; const Icon = CATEGORY_ICONS[budget.category.toLowerCase().trim()] || Target; return <tr key={budget.budget_id} onClick={() => openBudgetTransactions(budget)} className="cursor-pointer border-b border-border/70 last:border-0 hover:bg-secondary/30"><td className="px-4 py-2.5"><span className="flex items-center gap-2.5"><span className={`grid h-8 w-8 place-items-center rounded-xl ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}><Icon className="h-4 w-4" /></span><span className="text-[12px] font-medium capitalize">{humanizeCategoryName(budget.category)}</span></span></td><td className="money-tabular px-3 py-2.5 text-right text-[12px]">£{Number(budget.spent || 0).toFixed(2)}</td><td className="money-tabular px-3 py-2.5 text-right text-[12px] text-muted-foreground">£{Number(budget.limit || 0).toFixed(2)}</td><td className="px-3 py-2.5"><div className="flex items-center gap-2"><div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary"><div className={`h-full rounded-full ${over ? "bg-ruby" : risk ? "bg-gradient-to-r from-topaz to-ruby/70" : "bg-gradient-to-r from-emerald to-sky"}`} style={{ width: `${Math.min(100, pct)}%` }} /></div><span className="w-7 text-right text-[10px] text-muted-foreground">{Math.round(pct)}%</span></div></td><td className="px-3 py-2.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-medium ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}>{over ? "Exceeded" : risk ? "At risk" : "On track"}</span></td><td className="px-3 py-2.5"><button type="button" aria-label={`Edit ${budget.category} budget`} onClick={(event) => { event.stopPropagation(); startEdit(budget); }} className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2 text-[11px] font-medium text-foreground hover:bg-secondary"><Pencil className="h-3 w-3" />Edit</button></td></tr>; })}</tbody></table>{budgetTableRows.length === 0 ? <WorkspaceBlank title={searchQuery || budgetView !== "all" ? "No matching budgets" : "No budgets yet"} description={searchQuery || budgetView !== "all" ? "Try clearing your search or changing the status tab." : "Create a budget to track spending, or choose a category from the unbudgeted list."} action={!searchQuery && budgetView === "all" ? <button type="button" onClick={() => onAdd()} className="rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white">Create budget</button> : null} /> : null}</div> ) : (
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-[16px] border border-border bg-card p-2">
+            <WorkspaceTabs tabs={tabs} active={budgetView} onChange={setBudgetView} label="Budget category status" />
+            <div className="flex shrink-0 items-center gap-2">
+              <button type="button" onClick={() => setShowInsights(true)} aria-label="Open budget insights" className="inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-card px-3 text-xs font-medium hover:bg-secondary/50"><BarChart3 className="h-4 w-4" /> Insights</button>
+              <WorkspaceViewToggle value={displayMode} onChange={setDisplayMode} label="Budget view" />
+            </div>
+          </div>
+          {loading ? <WorkspaceSkeleton /> : loadError ? <WorkspaceBlank title="Could not load budgets" description={loadError} error action={<button onClick={onRetry} className="rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white">Try again</button>} /> : displayMode === "list" ? (<div data-testid="budget-list" className="workspace-table-panel budget-ledger-scroll surface min-h-0 flex-1 overflow-auto rounded-[20px] border border-border/70"><table className="workspace-table w-full text-left"><thead className="sticky top-0 z-10 bg-secondary/60"><tr className="border-b border-border text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground"><th className="px-4 py-3">Category</th><th className="px-3 py-3 text-right">Spent</th><th className="px-3 py-3 text-right">Budget</th><th className="w-[180px] px-3 py-3">Progress</th><th className="px-3 py-3">Status</th><th className="w-[90px]" /></tr></thead><tbody>{budgetTableRows.map((budget) => { const pct = Number(budget.progress_pct) || 0; const risk = pct >= 80; const over = pct >= 100; const Icon = CATEGORY_ICONS[budget.category.toLowerCase().trim()] || Target; return <tr key={budget.budget_id} onClick={() => openBudgetTransactions(budget)} className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-[#5b57f5]/[0.045] focus-within:bg-secondary/30"><td className="px-4 py-2.5"><span className="flex items-center gap-2.5"><span className={`grid h-8 w-8 place-items-center rounded-xl ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}><Icon className="h-4 w-4" /></span><span className="text-[13px] font-semibold capitalize">{humanizeCategoryName(budget.category)}</span></span></td><td className="money-tabular px-3 py-2.5 text-right text-[12px]">£{Number(budget.spent || 0).toFixed(2)}</td><td className="money-tabular px-3 py-2.5 text-right text-[12px] text-muted-foreground">£{Number(budget.limit || 0).toFixed(2)}</td><td className="px-3 py-2.5"><div className="flex items-center gap-2"><div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary"><div className={`h-full rounded-full ${over ? "bg-ruby" : risk ? "bg-gradient-to-r from-topaz to-ruby/70" : "bg-gradient-to-r from-emerald to-sky"}`} style={{ width: `${Math.min(100, pct)}%` }} /></div><span className="w-7 text-right text-[10px] text-muted-foreground">{Math.round(pct)}%</span></div></td><td className="px-3 py-2.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-medium ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}>{over ? "Exceeded" : risk ? "At risk" : "On track"}</span></td><td className="px-3 py-2.5"><button type="button" aria-label={`Edit ${budget.category} budget`} onClick={(event) => { event.stopPropagation(); startEdit(budget); }} className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2 text-[11px] font-medium text-foreground hover:bg-secondary"><Pencil className="h-3 w-3" />Edit</button></td></tr>; })}</tbody></table>{budgetTableRows.length === 0 ? <WorkspaceBlank title={searchQuery || budgetView !== "all" ? "No matching budgets" : "No budgets yet"} description={searchQuery || budgetView !== "all" ? "Try clearing your search or changing the status tab." : "Create a budget to track spending, or choose a category from the unbudgeted list."} action={!searchQuery && budgetView === "all" ? <button type="button" onClick={() => onAdd()} className="rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white">Create budget</button> : null} /> : null}</div> ) : (
             <div data-testid="budget-grid" className="budget-ledger-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 {budgetTableRows.map((budget) => {
@@ -368,7 +372,13 @@ const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
           )}
 
         </div>
-        <aside className="budget-insights-sidebar subtle-scroll min-h-0 min-w-0 space-y-3 overflow-y-auto overscroll-contain pb-2 pr-1">
+        {showInsights && <div className="absolute inset-0 z-30 flex justify-end rounded-[18px]" role="presentation">
+          <button type="button" className="absolute inset-0 bg-background/55 backdrop-blur-[2px]" aria-label="Close budget insights" onClick={() => setShowInsights(false)} />
+          <aside role="dialog" aria-modal="true" aria-label="Budget insights" className="budget-insights-sidebar subtle-scroll relative z-10 h-full w-[min(420px,100%)] min-w-0 space-y-3 overflow-y-auto overscroll-contain rounded-[18px] border border-border bg-background p-4 shadow-2xl">
+            <div className="sticky top-0 z-20 flex items-center justify-between rounded-xl border border-border bg-card p-3">
+              <h2 className="text-sm font-semibold">Budget insights</h2>
+              <button type="button" onClick={() => setShowInsights(false)} aria-label="Close budget insights" className="grid h-8 w-8 place-items-center rounded-lg border border-border hover:bg-secondary"><X className="h-4 w-4" /></button>
+            </div>
           {unbudgetedCategories?.length > 0 && <section className="surface rounded-[16px] p-4">
             <h2 className="text-[14px] font-semibold">Unbudgeted spending</h2>
             <p className="mt-1 text-xs text-muted-foreground">Spending in categories without a budget</p>
@@ -423,7 +433,7 @@ const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
               {[{label:"Add Budget",icon:Plus,action:()=>onAdd()}, {label:"Manage Categories",icon:FolderCog,action:onManageCategories}, {label:"View Reports",icon:BarChart3,action:onViewReports},{label:"Set Alerts",icon:Bell,action:onAlerts}].map(({label,icon:Icon,action})=><button key={label} onClick={action} className="flex flex-col items-start gap-2 rounded-xl border border-border/70 p-3 text-left text-[11px] font-medium hover:bg-secondary/40"><Icon className="h-4 w-4 text-emerald" />{label}</button>)}
             </div>
           </section>
-        </aside>
+        </aside></div>}
       </div>
     </div>
   );
