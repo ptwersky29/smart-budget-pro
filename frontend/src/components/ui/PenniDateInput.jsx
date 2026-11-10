@@ -1,6 +1,6 @@
 import * as React from "react";
-import { CalendarDays, ChevronDown, X } from "lucide-react";
-import { format, isValid, parseISO } from "date-fns";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { addMonths, format, isValid, parseISO } from "date-fns";
 import { cn } from "../../lib/utils";
 import { Calendar } from "./calendar";
 import { Popover, PopoverTrigger, PopoverContent } from "./popover";
@@ -62,10 +62,16 @@ const PenniDateInput = React.forwardRef(function PenniDateInput({
       {name && <input type="hidden" name={name} value={value || ""} />}
       <PopoverContent
         side="bottom" align="start" sideOffset={8} collisionPadding={12} style={{ zIndex: 10060 }}
-        className="penni-calendar-popover w-auto max-w-[calc(100vw-24px)] rounded-[20px] border border-border/80 bg-popover p-3 shadow-[0_18px_55px_rgba(36,28,89,.17)]"
+        className="penni-calendar-popover w-[300px] max-w-[calc(100vw-24px)] max-h-[calc(100dvh-24px)] overflow-y-auto rounded-[20px] border border-border/80 bg-popover p-3 shadow-[0_18px_55px_rgba(36,28,89,.17)]"
       >
+        <div className="penni-calendar-header flex items-center justify-between gap-2 px-1 pb-2" aria-label="Calendar month navigation">
+          <button type="button" aria-label="Previous month" onClick={() => setMonth(current => addMonths(current, -1))} className="grid h-9 w-9 place-items-center rounded-xl border border-border/70 text-foreground hover:bg-secondary"><ChevronLeft className="h-4 w-4" /></button>
+          <span className="text-center text-[14px] font-semibold text-foreground tabular-nums" aria-live="polite">{format(month, "MMMM yyyy")}</span>
+          <button type="button" aria-label="Next month" onClick={() => setMonth(current => addMonths(current, 1))} className="grid h-9 w-9 place-items-center rounded-xl border border-border/70 text-foreground hover:bg-secondary"><ChevronRight className="h-4 w-4" /></button>
+        </div>
         <Calendar
           mode="single"
+          captionLayout="buttons"
           selected={selected}
           month={month}
           onMonthChange={setMonth}
