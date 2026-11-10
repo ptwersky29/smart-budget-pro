@@ -1,7 +1,6 @@
 import React from "react";
 import { useCategories } from "../contexts/CategoriesContext";
 import { cn } from "../lib/utils";
-import { hexToRgba } from "../lib/categories";
 
 const SIZE_STYLES = {
   sm: {
@@ -33,26 +32,18 @@ export default function CategoryBadge({
     : resolveCategory(category.name || category.slug || category.label || "uncategorized", category);
 
   const styles = SIZE_STYLES[size] || SIZE_STYLES.md;
-  const color = meta.color || "#64748b";
-  const background = muted ? hexToRgba(color, 0.08) : hexToRgba(color, 0.14);
-  const border = hexToRgba(color, muted ? 0.16 : 0.22);
   const label = meta.display_name || meta.label || meta.name;
 
   return (
     <span
       className={cn(
-        "inline-flex max-w-full items-center border font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]",
+        "inline-flex max-w-full items-center border border-border/70 bg-secondary/50 font-medium text-foreground",
         styles.wrap,
         className,
       )}
-      style={{
-        backgroundColor: background,
-        borderColor: border,
-        color,
-      }}
       title={label}
     >
-      <span className={cn(styles.emoji, !showIcon && "hidden")} aria-hidden="true">{meta.emoji || meta.icon || "🏷️"}</span>
+      <span className={cn(styles.emoji, "inline-grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-card/80", !showIcon && "hidden")} aria-hidden="true">{meta.emoji || meta.icon || "📁"}</span>
       <span className={cn("min-w-0", truncate && "truncate")}>{label}</span>
       {showSource && meta.source && (
         <span className="ml-0.5 rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground/70 dark:bg-white/10 dark:text-white/70">
