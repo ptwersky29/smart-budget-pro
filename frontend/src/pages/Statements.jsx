@@ -1,4 +1,5 @@
 import PenniSelect from "../components/PenniSelect";
+import PenniDateInput from "../components/ui/PenniDateInput";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
@@ -196,9 +197,9 @@ export default function Statements() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       {editingCell?.idx === i && editingCell?.field === "date" ? (
-                        <input type="date" value={val.date ?? t.date} onChange={e => { setEdits(p => ({...p, [i]: {...p[i], date: e.target.value}})); setEditingCell(null); }}
+                        <PenniDateInput value={val.date ?? t.date} onChange={e => { setEdits(p => ({...p, [i]: {...p[i], date: e.target.value}})); setEditingCell(null); }}
                           className="w-full text-xs bg-secondary/40 rounded px-1 py-0.5 border border-emerald/50 focus:outline-none"
-                          autoFocus onBlur={() => setEditingCell(null)} />
+                          autoFocus />
                       ) : (
                         <button type="button" aria-label={`Edit date for ${t.description || "transaction"}`} className="text-xs text-muted-foreground cursor-pointer hover:text-emerald flex items-center gap-1"
                            onClick={() => setEditingCell({ idx: i, field: "date" })}>
@@ -209,7 +210,7 @@ export default function Statements() {
                         <input type="text" defaultValue={val.description ?? t.description}
                           onChange={e => setEdits(p => ({...p, [i]: {...p[i], description: e.target.value}}))}
                           className="w-full text-sm bg-secondary/40 rounded px-1 py-0.5 border border-emerald/50 focus:outline-none"
-                          autoFocus onBlur={() => setEditingCell(null)} />
+                          autoFocus />
                       ) : (
                         <button type="button" aria-label={`Edit description for ${t.description || "transaction"}`} className="font-medium text-sm truncate max-w-[40vw] cursor-pointer hover:text-emerald flex items-center gap-1"
                            title={t.description} onClick={() => setEditingCell({ idx: i, field: "description" })}>
@@ -221,7 +222,7 @@ export default function Statements() {
                       <input type="number" step="0.01" defaultValue={val.amount ?? t.amount}
                         onChange={e => setEdits(p => ({...p, [i]: {...p[i], amount: parseFloat(e.target.value)}}))}
                         className="w-24 text-right text-sm bg-secondary/40 rounded px-1 py-0.5 border border-emerald/50 focus:outline-none tabular-nums"
-                        autoFocus onBlur={() => setEditingCell(null)} />
+                        autoFocus />
                     ) : (
                       <button type="button" aria-label={`Edit amount for ${t.description || "transaction"}`} className={`shrink-0 font-medium tabular-nums cursor-pointer hover:text-emerald flex items-center gap-1 ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}
                             onClick={() => setEditingCell({ idx: i, field: "amount" })}>
@@ -263,9 +264,9 @@ export default function Statements() {
                     <tr key={`${orig.date}-${i}-${orig.description}`} className="transition-colors">
                       <td className="px-6 py-3 text-xs text-muted-foreground">
                         {editingCell?.idx === i && editingCell?.field === "date" ? (
-                          <input type="date" value={val.date ?? t.date} onChange={e => { setEdits(p => ({...p, [i]: {...p[i], date: e.target.value}})); }}
+                          <PenniDateInput value={val.date ?? t.date} onChange={e => { setEdits(p => ({...p, [i]: {...p[i], date: e.target.value}})); }}
                             className="w-full bg-secondary/40 rounded px-1 py-0.5 border border-emerald/50 focus:outline-none text-xs"
-                            autoFocus onBlur={() => setEditingCell(null)} />
+                            autoFocus />
                         ) : (
                           <button type="button" aria-label={`Edit date for ${t.description || "transaction"}`} className="cursor-pointer hover:text-emerald flex items-center gap-1"
                                 onClick={() => setEditingCell({ idx: i, field: "date" })}>
@@ -278,7 +279,7 @@ export default function Statements() {
                           <input type="text" defaultValue={val.description ?? t.description}
                             onChange={e => setEdits(p => ({...p, [i]: {...p[i], description: e.target.value}}))}
                             className="w-full bg-secondary/40 rounded px-1 py-0.5 border border-emerald/50 focus:outline-none text-sm"
-                            autoFocus onBlur={() => setEditingCell(null)} />
+                            autoFocus />
                         ) : (
                           <button type="button" aria-label={`Edit description for ${t.description || "transaction"}`} className="cursor-pointer hover:text-emerald flex items-center gap-1"
                                 title={t.description} onClick={() => setEditingCell({ idx: i, field: "description" })}>
@@ -306,7 +307,7 @@ export default function Statements() {
                           <input type="number" step="0.01" defaultValue={val.amount ?? t.amount}
                             onChange={e => setEdits(p => ({...p, [i]: {...p[i], amount: parseFloat(e.target.value)}}))}
                             className="w-28 text-right bg-secondary/40 rounded px-1 py-0.5 border border-emerald/50 focus:outline-none text-sm tabular-nums"
-                            autoFocus onBlur={() => setEditingCell(null)} />
+                            autoFocus />
                         ) : (
                           <button type="button" aria-label={`Edit amount for ${t.description || "transaction"}`} className={`cursor-pointer hover:text-emerald flex items-center gap-1 justify-end ${t.amount > 0 ? "text-emerald" : "text-foreground"}`}
                                 onClick={() => setEditingCell({ idx: i, field: "amount" })}>
