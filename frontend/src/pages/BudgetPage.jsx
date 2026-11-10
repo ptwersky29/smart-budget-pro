@@ -41,6 +41,66 @@ import CategoryPieChart from "../components/CategoryPieChart";
 import TransactionInspectorPanel from "../components/TransactionInspectorPanel";
 import { WorkspaceHeader, WorkspaceMetric, WorkspaceMetrics, WorkspaceTabs, WorkspaceViewToggle, WorkspaceBlank, WorkspaceSkeleton } from "../components/ui/workspace";
 
+/**
+ * Animate only the displayed number; calculations and stored values are unchanged.
+ * Each value starts at zero on page entry and animates when its row becomes visible.
+ */
+function BudgetCountUp({ value, duration = 750 }) {
+  const text = String(value ?? "");
+  const match = /^([^\\d-]*)(-?[\\d,]+(?:\\.\\d+)?)(.*)$/.exec(text);
+  const numeric = match ? Number(match[2].replace(/,/g, "")) : NaN;
+  const [shown, setShown] = useState(null);
+  const element = useRef(null);
+
+  useEffect(() => {
+    if (!Number.isFinite(numeric)) return undefined;
+    const node = element.current;
+    let frame = 0;
+    let observer;
+    let started = false;
+    const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced || numeric === 0) {
+      setShown(numeric);
+      return undefined;
+    }
+    setShown(0);
+    const start = () => {
+      if (started) return;
+      started = true;
+      let startTime;
+      const tick = (timestamp) => {
+        if (startTime == null) startTime = timestamp;
+        const progress = Math.min(1, (timestamp - startTime) / duration);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        setShown(numeric * eased);
+        if (progress < 1) frame = requestAnimationFrame(tick);
+        else setShown(numeric);
+      };
+      frame = requestAnimationFrame(tick);
+    };
+    if (typeof IntersectionObserver !== "undefined" && node) {
+      observer = new IntersectionObserver(entries => {
+        if (entries.some(entry => entry.isIntersecting)) {
+          observer.disconnect();
+          start();
+        }
+      }, { threshold: 0.01 });
+      observer.observe(node);
+    } else start();
+    return () => { cancelAnimationFrame(frame); observer?.disconnect(); };
+  }, [numeric, duration]);
+
+  if (!match || !Number.isFinite(numeric)) return <>{text}</>;
+  const decimals = (match[2].split(".")[1] || "").length;
+  const number = shown == null ? numeric : shown;
+  const formatted = Math.abs(number).toLocaleString("en-GB", {
+    minimumFractionDigits: decimals, maximumFractionDigits: decimals,
+  });
+  return <span ref={element} className="tabular-nums" aria-label={text}>
+    <span aria-hidden="true">{match[1]}{numeric < 0 ? "-" : ""}{formatted}{match[3]}</span>
+  </span>;
+}
+
 function fmtMonth(y, m) { return `${y}-${String(m).padStart(2, "0")}`; }
 
 function parseMonth(str) {
@@ -167,7 +227,7 @@ const BudgetCard = React.memo(({ budget, isCurrentMonth, currentDay, monthElapse
           <div className="flex-1 h-2 rounded-full bg-secondary/50 overflow-hidden shadow-inner">
             <div className={`h-full rounded-full ${over ? "bg-ruby" : "bg-gradient-to-r from-emerald to-topaz"}`} style={{ width: `${Math.min(100, pct)}%`, transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)" }} />
           </div>
-          <span className="text-[11px] font-bold tabular-nums text-muted-foreground">{Math.round(pct)}%</span>
+          <span className="text-[11px] font-bold tabular-nums text-muted-foreground"><BudgetCountUp value={`${Math.round(pct)}%`} /></span>
         </div>
       </div>
       <div className="absolute inset-x-0 bottom-0 h-7 bg-gradient-to-t from-emerald/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-1">
@@ -219,7 +279,7 @@ const EventGroupCard = React.memo(({ group, setConfirmDelete, fetchData }) => {
           <div className="flex-1 h-2.5 rounded-full bg-secondary/50 overflow-hidden shadow-inner">
             <div className={`h-full rounded-full ${over ? "bg-ruby" : "bg-gradient-to-r from-emerald to-topaz"}`} style={{ width: `${Math.min(100, pct)}%`, transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)" }} />
           </div>
-          <span className="text-[11px] font-bold tabular-nums text-muted-foreground">{Math.round(pct)}%</span>
+          <span className="text-[11px] font-bold tabular-nums text-muted-foreground"><BudgetCountUp value={`${Math.round(pct)}%`} /></span>
         </div>
       </div>
       {group.items && group.items.length > 0 && (
@@ -297,10 +357,10 @@ const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
     { label: "At Risk", value: String(atRiskCount), note: atRiskCount ? `${atRiskCount} categories over 80% spent` : "All budgets on track", icon: AlertCircle, tone: "topaz" },
   ];
   const tabs = [
-    { key: "all", label: "All Budgets", count: everyday.length },
-    { key: "track", label: "On Track", count: everyday.filter((b) => (Number(b.progress_pct) || 0) < 80).length },
-    { key: "risk", label: "At Risk", count: atRiskCount },
-    { key: "exceeded", label: "Exceeded", count: summary.overCount },
+    { key: "all", label: "All Budgets", count: <BudgetCountUp value={everyday.length} /> },
+    { key: "track", label: "On Track", count: <BudgetCountUp value={everyday.filter((b) => (Number(b.progress_pct) || 0) < 80).length} /> },
+    { key: "risk", label: "At Risk", count: <BudgetCountUp value={atRiskCount} /> },
+    { key: "exceeded", label: "Exceeded", count: <BudgetCountUp value={summary.overCount} /> },
   ];
 
   return (
@@ -325,8 +385,8 @@ const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
             <span className="penni-reference-kpi-icon"><Icon size={22} strokeWidth={2.2} /></span>
             <div className="penni-reference-kpi-copy">
               <span className="penni-reference-kpi-label">{label}</span>
-              <strong className="penni-reference-kpi-amount">{value}</strong>
-              <span className="penni-reference-kpi-detail">{note}</span>
+              <strong className="penni-reference-kpi-amount"><BudgetCountUp value={value} /></strong>
+              <span className="penni-reference-kpi-detail"><BudgetCountUp value={note} /></span>
             </div>
             <svg className="penni-reference-sparkline" viewBox="0 0 116 42" aria-hidden="true"><path d="M3 30 H113" fill="none" stroke="currentColor" strokeWidth="1.4" strokeDasharray="3 5" opacity=".17" /></svg>
           </article>
@@ -360,7 +420,7 @@ const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
               <option value="limit">Sort: Budget</option><option value="spent">Sort: Spent</option><option value="remaining">Sort: Remaining</option>
             </PenniSelect>
           </div>
-          {loading ? <WorkspaceSkeleton /> : loadError ? <WorkspaceBlank title="Could not load budgets" description={loadError} error action={<button onClick={onRetry} className="rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white">Try again</button>} /> : displayMode === "list" ? (<div data-testid="budget-list" className="workspace-table-panel transaction-ledger-panel penni-reference-ledger budget-ledger-scroll surface min-h-0 flex-1 rounded-[21px] p-0" style={{ overflowY: "auto", overflowX: "auto", overscrollBehavior: "contain", scrollbarWidth: "thin" }}><table className="workspace-table w-full text-left penni-reference-budget-table"><thead className="sticky top-0 z-10 bg-[#f8f7fc]"><tr className="border-b border-border text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground"><th className="px-4 py-3">Category</th><th className="px-3 py-3 text-right">Spent</th><th className="px-3 py-3 text-right">Budget</th><th className="w-[180px] px-3 py-3">Progress</th><th className="px-3 py-3">Status</th><th className="w-[90px]" /></tr></thead><tbody>{budgetTableRows.map((budget) => { const pct = Number(budget.progress_pct) || 0; const risk = pct >= 80; const over = pct >= 100; const Icon = CATEGORY_ICONS[budget.category.toLowerCase().trim()] || Target; return <tr key={budget.budget_id} onClick={() => openBudgetTransactions(budget)} className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-[#f5f2ff] focus-within:bg-secondary/30"><td className="px-4 py-2.5"><span className="flex items-center gap-2.5"><span className={`grid h-8 w-8 place-items-center rounded-xl ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}><Icon className="h-4 w-4" /></span><span className="text-[13px] font-semibold capitalize">{humanizeCategoryName(budget.category)}</span></span></td><td className="money-tabular px-3 py-2.5 text-right text-[12px]">£{Number(budget.spent || 0).toFixed(2)}</td><td className="money-tabular px-3 py-2.5 text-right text-[12px] text-muted-foreground">£{Number(budget.limit || 0).toFixed(2)}</td><td className="px-3 py-2.5"><div className="flex items-center gap-2"><div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary"><div className={`h-full rounded-full ${over ? "bg-ruby" : risk ? "bg-gradient-to-r from-topaz to-ruby/70" : "bg-gradient-to-r from-emerald to-sky"}`} style={{ width: `${Math.min(100, pct)}%` }} /></div><span className="w-7 text-right text-[10px] text-muted-foreground">{Math.round(pct)}%</span></div></td><td className="px-3 py-2.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-medium ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}>{over ? "Exceeded" : risk ? "At risk" : "On track"}</span></td><td className="px-3 py-2.5"><button type="button" aria-label={`Edit ${budget.category} budget`} onClick={(event) => { event.stopPropagation(); startEdit(budget); }} className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2 text-[11px] font-medium text-foreground hover:bg-secondary"><Pencil className="h-3 w-3" />Edit</button></td></tr>; })}</tbody></table>{budgetTableRows.length === 0 ? <WorkspaceBlank title={searchQuery || budgetView !== "all" ? "No matching budgets" : "No budgets yet"} description={searchQuery || budgetView !== "all" ? "Try clearing your search or changing the status tab." : "Create a budget to track spending, or choose a category from the unbudgeted list."} action={!searchQuery && budgetView === "all" ? <button type="button" onClick={() => onAdd()} className="rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white">Create budget</button> : null} /> : null}</div> ) : (
+          {loading ? <WorkspaceSkeleton /> : loadError ? <WorkspaceBlank title="Could not load budgets" description={loadError} error action={<button onClick={onRetry} className="rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white">Try again</button>} /> : displayMode === "list" ? (<div data-testid="budget-list" className="workspace-table-panel transaction-ledger-panel penni-reference-ledger budget-ledger-scroll surface min-h-0 flex-1 rounded-[21px] p-0" style={{ overflowY: "auto", overflowX: "auto", overscrollBehavior: "contain", scrollbarWidth: "thin" }}><table className="workspace-table w-full text-left penni-reference-budget-table"><thead className="sticky top-0 z-10 bg-[#f8f7fc]"><tr className="border-b border-border text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground"><th className="px-4 py-3">Category</th><th className="px-3 py-3 text-right">Spent</th><th className="px-3 py-3 text-right">Budget</th><th className="w-[180px] px-3 py-3">Progress</th><th className="px-3 py-3">Status</th><th className="w-[90px]" /></tr></thead><tbody>{budgetTableRows.map((budget) => { const pct = Number(budget.progress_pct) || 0; const risk = pct >= 80; const over = pct >= 100; const Icon = CATEGORY_ICONS[budget.category.toLowerCase().trim()] || Target; return <tr key={budget.budget_id} onClick={() => openBudgetTransactions(budget)} className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-[#f5f2ff] focus-within:bg-secondary/30"><td className="px-4 py-2.5"><span className="flex items-center gap-2.5"><span className={`grid h-8 w-8 place-items-center rounded-xl ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}><Icon className="h-4 w-4" /></span><span className="text-[13px] font-semibold capitalize">{humanizeCategoryName(budget.category)}</span></span></td><td className="money-tabular px-3 py-2.5 text-right text-[12px]"><BudgetCountUp value={`£${Number(budget.spent || 0).toFixed(2)}`} /></td><td className="money-tabular px-3 py-2.5 text-right text-[12px] text-muted-foreground"><BudgetCountUp value={`£${Number(budget.limit || 0).toFixed(2)}`} /></td><td className="px-3 py-2.5"><div className="flex items-center gap-2"><div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary"><div className={`h-full rounded-full ${over ? "bg-ruby" : risk ? "bg-gradient-to-r from-topaz to-ruby/70" : "bg-gradient-to-r from-emerald to-sky"}`} style={{ width: `${Math.min(100, pct)}%` }} /></div><span className="w-7 text-right text-[10px] text-muted-foreground"><BudgetCountUp value={`${Math.round(pct)}%`} /></span></div></td><td className="px-3 py-2.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-medium ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}>{over ? "Exceeded" : risk ? "At risk" : "On track"}</span></td><td className="px-3 py-2.5"><button type="button" aria-label={`Edit ${budget.category} budget`} onClick={(event) => { event.stopPropagation(); startEdit(budget); }} className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2 text-[11px] font-medium text-foreground hover:bg-secondary"><Pencil className="h-3 w-3" />Edit</button></td></tr>; })}</tbody></table>{budgetTableRows.length === 0 ? <WorkspaceBlank title={searchQuery || budgetView !== "all" ? "No matching budgets" : "No budgets yet"} description={searchQuery || budgetView !== "all" ? "Try clearing your search or changing the status tab." : "Create a budget to track spending, or choose a category from the unbudgeted list."} action={!searchQuery && budgetView === "all" ? <button type="button" onClick={() => onAdd()} className="rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white">Create budget</button> : null} /> : null}</div> ) : (
             <div data-testid="budget-grid" className="budget-ledger-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1" style={{ scrollbarWidth: "thin" }}>
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 {budgetTableRows.map((budget) => {
@@ -378,9 +438,9 @@ const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
                         <button type="button" aria-label={`Edit ${budget.category} budget`} onClick={() => startEdit(budget)} className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border px-2 py-1.5 text-xs font-medium hover:bg-secondary"><Pencil className="h-3.5 w-3.5" />Edit</button>
                       </div>
                       <button type="button" onClick={() => openBudgetTransactions(budget)} className="mt-4 w-full text-left" aria-label={`View transactions for ${budget.category}`}>
-                        <div className="flex items-baseline justify-between gap-2"><span className="text-xl font-semibold tabular-nums">£{Number(budget.spent || 0).toFixed(2)}</span><span className="text-xs text-muted-foreground">of £{Number(budget.limit || 0).toFixed(2)}</span></div>
+                        <div className="flex items-baseline justify-between gap-2"><span className="text-xl font-semibold tabular-nums"><BudgetCountUp value={`£${Number(budget.spent || 0).toFixed(2)}`} /></span><span className="text-xs text-muted-foreground">of <BudgetCountUp value={`£${Number(budget.limit || 0).toFixed(2)}`} /></span></div>
                         <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary"><div className={`h-full rounded-full ${over ? "bg-ruby" : risk ? "bg-topaz" : "bg-emerald"}`} style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} /></div>
-                        <div className="mt-2 flex items-center justify-between gap-2 text-xs"><span className="text-muted-foreground">{Math.round(pct)}% used</span><span className={over ? "text-ruby" : risk ? "text-topaz" : "text-emerald"}>{over ? "Exceeded" : risk ? "At risk" : "On track"}</span></div>
+                        <div className="mt-2 flex items-center justify-between gap-2 text-xs"><span className="text-muted-foreground"><BudgetCountUp value={`${Math.round(pct)}%`} /> used</span><span className={over ? "text-ruby" : risk ? "text-topaz" : "text-emerald"}>{over ? "Exceeded" : risk ? "At risk" : "On track"}</span></div>
                       </button>
                     </article>
                   );
@@ -946,10 +1006,10 @@ export default React.memo(function BudgetPage() {
         </>}
       />
       <WorkspaceMetrics columns={4}>
-        <WorkspaceMetric label="Total Budgeted" value={formatCurrency(summary.totalPlanned)} compactValue={formatCurrency(summary.totalPlanned, { compact: true })} note={`${summary.count} categories`} icon={Target} />
-        <WorkspaceMetric label="Total Spent" value={formatCurrency(summary.totalSpent)} compactValue={formatCurrency(summary.totalSpent, { compact: true })} note={summary.totalPlanned ? `${Math.round(summary.totalSpent/summary.totalPlanned*100)}% of budget` : "No budget set"} icon={TrendingDown} tone="ruby" progress={summary.totalPlanned ? summary.totalSpent/summary.totalPlanned*100 : 0} />
-        <WorkspaceMetric label={summary.totalRemaining < 0 ? "Over budget" : "Remaining"} value={formatCurrency(Math.abs(summary.totalRemaining))} compactValue={formatCurrency(Math.abs(summary.totalRemaining), { compact: true })} note={summary.totalPlanned ? "Across your budgets" : "No budget set"} icon={PiggyBank} tone={summary.totalRemaining < 0 ? "ruby" : "emerald"} />
-        <WorkspaceMetric label="At Risk" value={String(atRiskCount)} note={atRiskCount ? "Categories over 80% spent" : "All budgets on track"} icon={AlertCircle} tone="topaz" />
+        <WorkspaceMetric label="Total Budgeted" value={<BudgetCountUp value={formatCurrency(summary.totalPlanned)} />} compactValue={formatCurrency(summary.totalPlanned, { compact: true })} note={`${summary.count} categories`} icon={Target} />
+        <WorkspaceMetric label="Total Spent" value={<BudgetCountUp value={formatCurrency(summary.totalSpent)} />} compactValue={formatCurrency(summary.totalSpent, { compact: true })} note={summary.totalPlanned ? `${Math.round(summary.totalSpent/summary.totalPlanned*100)}% of budget` : "No budget set"} icon={TrendingDown} tone="ruby" progress={summary.totalPlanned ? summary.totalSpent/summary.totalPlanned*100 : 0} />
+        <WorkspaceMetric label={summary.totalRemaining < 0 ? "Over budget" : "Remaining"} value={<BudgetCountUp value={formatCurrency(Math.abs(summary.totalRemaining))} />} compactValue={formatCurrency(Math.abs(summary.totalRemaining), { compact: true })} note={summary.totalPlanned ? "Across your budgets" : "No budget set"} icon={PiggyBank} tone={summary.totalRemaining < 0 ? "ruby" : "emerald"} />
+        <WorkspaceMetric label="At Risk" value={<BudgetCountUp value={atRiskCount} />} note={atRiskCount ? "Categories over 80% spent" : "All budgets on track"} icon={AlertCircle} tone="topaz" />
       </WorkspaceMetrics>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <label className="relative min-w-[160px] flex-1">
@@ -967,10 +1027,10 @@ export default React.memo(function BudgetPage() {
       </div>
       <div className="flex min-w-0 items-center justify-between gap-3">
         <WorkspaceTabs tabs={[
-          {key:"all",label:"All Categories",count:everyday.length},
-          {key:"track",label:"On Track",count:everyday.filter(b=>(Number(b.progress_pct)||0)<80).length},
-          {key:"risk",label:"At Risk",count:atRiskCount},
-          {key:"exceeded",label:"Exceeded",count:summary.overCount},
+          {key:"all",label:"All Categories",count:<BudgetCountUp value={everyday.length}/>},
+          {key:"track",label:"On Track",count:<BudgetCountUp value={everyday.filter(b=>(Number(b.progress_pct)||0)<80).length}/>},
+          {key:"risk",label:"At Risk",count:<BudgetCountUp value={atRiskCount}/>},
+          {key:"exceeded",label:"Exceeded",count:<BudgetCountUp value={summary.overCount}/>},
         ]} active={budgetView} onChange={setBudgetView} label="Budget status"/>
         <WorkspaceViewToggle value={displayMode} onChange={setDisplayMode} label="Budget view"/>
       </div>
