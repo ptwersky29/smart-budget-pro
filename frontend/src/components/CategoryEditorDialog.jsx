@@ -10,12 +10,13 @@ import {
   CATEGORY_COLOR_PALETTE,
   CATEGORY_EMOJI_OPTIONS,
   hexToRgba,
+  suggestCategoryEmoji,
 } from "../lib/categories";
 
 function buildInitialState(category, sectionOptions) {
   return {
     name: category?.label || category?.display_name || category?.name || "",
-    emoji: category?.emoji || category?.icon || "🛒",
+    emoji: category?.emoji || category?.icon || suggestCategoryEmoji(category?.name || category?.label),
     color: category?.color || "#22c55e",
     description: category?.description || "",
     section: category?.section || sectionOptions[0] || "🧩 Ungrouped",
@@ -103,7 +104,7 @@ export default function CategoryEditorDialog({
                 <label className="mb-1.5 block text-sm font-medium">Name</label>
                 <Input
                   value={form.name}
-                  onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                  onChange={(event) => setForm((current) => ({ ...current, name: event.target.value, emoji: !initialCategory && current.emoji === suggestCategoryEmoji(current.name) ? suggestCategoryEmoji(event.target.value) : current.emoji }))}
                   placeholder="e.g. Public Transport"
                   autoFocus
                 />
