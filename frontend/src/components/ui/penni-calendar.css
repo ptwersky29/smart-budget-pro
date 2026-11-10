@@ -23,3 +23,11 @@
 @media (prefers-reduced-motion: reduce) {
  .penni-calendar-widget *, .penni-date-trigger { transition: none !important; animation: none !important; }
 }
+
+/* Month navigation is rendered in the fixed header above the calendar grid.
+   Hide DayPicker's second caption so it cannot overlap or be clipped. */
+.penni-calendar-popover .rdp-caption { display: none !important; }
+.penni-calendar-popover .penni-calendar-header { position: relative; z-index: 2; min-height: 42px; }
+.penni-calendar-popover .rdp-months { justify-content: center; }
+.penni-calendar-popover .rdp-table { margin-inline: auto; }
+.penni-calendar-popover .rdp { margin: 0; }
