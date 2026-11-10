@@ -15,6 +15,7 @@ import {
 import CategoryEditorDialog from "./CategoryEditorDialog";
 import { useCategories } from "../contexts/CategoriesContext";
 import { formatApiError } from "../lib/api";
+import { withCategoryEmoji } from "../lib/categories";
 
 function groupBySection(categories) {
   const groups = {};
@@ -51,7 +52,7 @@ export default function CategoryCombobox({
   const incoming = Array.isArray(categoriesProp) && categoriesProp.length ? categoriesProp : sharedCategories;
   const categories = (Array.isArray(incoming) ? incoming : []).filter(
     category => category && typeof category === "object" && typeof category.name === "string"
-  );
+  ).map(withCategoryEmoji);
   const selected = value ? resolveCategory(value) : null;
 
   const filteredGroups = useMemo(() => {
