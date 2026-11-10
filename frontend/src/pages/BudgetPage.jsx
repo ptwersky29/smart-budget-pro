@@ -24,6 +24,7 @@ import ConfirmModal from "../components/ui/ConfirmModal";
 import CategoryCombobox from "../components/CategoryCombobox";
 import MonthPicker from "../components/MonthPicker";
 import { humanizeCategoryName } from "../lib/categories";
+import { useCategories } from "../contexts/CategoriesContext";
 import { formatCurrency } from "../lib/format";
 import {
   DropdownMenu,
@@ -127,23 +128,12 @@ const SECTION_ICONS = {
   other: Home,
 };
 
-const CATEGORY_ICONS = {
-  food: ShoppingCart, groceries: ShoppingCart,
-  dining: Utensils, restaurant: Utensils, takeaway: Utensils,
-  transport: Car, fuel: Car, petrol: Car, parking: Car,
-  housing: Home, rent: Home, mortgage: Home,
-  utilities: Zap, electricity: Zap, gas: Zap, water: Zap,
-  entertainment: Film, leisure: Film,
-  shopping: ShoppingCart, clothing: Shirt, fashion: Shirt,
-  health: Heart, medical: Heart, pharmacy: Heart,
-  education: BookOpen,
-  subscriptions: Smartphone, phone: Smartphone,
-  travel: Plane, holiday: Plane, vacation: Plane,
-  gifts: Gift, charity: Gift, donation: Gift,
-  general: Briefcase, business: Briefcase,
-  coffee: Coffee, snacks: Coffee,
-  gaming: Gamepad2, games: Gamepad2,
-};
+
+function BudgetCategoryEmoji({ category, className = "" }) {
+  const { resolveCategory } = useCategories();
+  const meta = resolveCategory(category || "uncategorized");
+  return <span aria-hidden="true" className={`inline-flex shrink-0 items-center justify-center text-[18px] leading-none ${className}`}>{meta.emoji}</span>;
+}
 
 function ProgressRing({ pct, size = 40, stroke = 3.5, color }) {
   const r = (size - stroke) / 2;
@@ -180,12 +170,11 @@ const BudgetCard = React.memo(({ budget, isCurrentMonth, currentDay, monthElapse
     if (e.target.closest("button, input, select, a")) return;
     openBudgetTransactions(budget);
   };
-  const CatIcon = CATEGORY_ICONS[budget.category.toLowerCase().trim()] || (pct >= 100 ? TrendingDown : Target);
   return (
     <div key={budget.budget_id} role="button" tabIndex={0} aria-label={`View ${budget.category} budget transactions`} onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget) { event.preventDefault(); openBudgetTransactions(budget); } }} onClick={handleCardClick} className={`group rounded-xl border ${isSelected ? "border-emerald bg-emerald/[0.03] ring-1 ring-emerald/30" : "border-border/50 bg-background/40"} backdrop-blur-xl p-3 shadow-sm hover:shadow-lg hover:translate-y-0 hover:border-border transition-all duration-300 relative overflow-hidden border-l-[3px] cursor-pointer ${over ? "border-l-ruby" : pct >= 80 ? "border-l-topaz" : "border-l-emerald"}`}>
       <div className="flex items-start gap-2 mb-2">
         <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${over ? "from-ruby to-ruby/70" : pct >= 80 ? "from-topaz to-topaz/70" : "from-emerald to-emerald/70"} flex items-center justify-center text-white shrink-0 shadow-sm`}>
-          <CatIcon className="h-3.5 w-3.5" />
+          <BudgetCategoryEmoji category={budget.category} />
         </div>
         <h3 className="text-sm font-semibold capitalize truncate leading-tight tracking-tight flex-1 pt-0.5">{humanizeCategoryName(budget.category)}</h3>
         <input type="checkbox" checked={isSelected} onChange={() => {
@@ -420,19 +409,18 @@ const BudgetReferenceDesktop = React.memo(function BudgetReferenceDesktop({
               <option value="limit">Sort: Budget</option><option value="spent">Sort: Spent</option><option value="remaining">Sort: Remaining</option>
             </PenniSelect>
           </div>
-          {loading ? <WorkspaceSkeleton /> : loadError ? <WorkspaceBlank title="Could not load budgets" description={loadError} error action={<button onClick={onRetry} className="rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white">Try again</button>} /> : displayMode === "list" ? (<div data-testid="budget-list" className="workspace-table-panel transaction-ledger-panel penni-reference-ledger budget-ledger-scroll surface min-h-0 flex-1 rounded-[21px] p-0" style={{ overflowY: "auto", overflowX: "auto", overscrollBehavior: "contain", scrollbarWidth: "thin" }}><table className="workspace-table w-full text-left penni-reference-budget-table"><thead className="sticky top-0 z-10 bg-[#f8f7fc]"><tr className="border-b border-border text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground"><th className="px-4 py-3">Category</th><th className="px-3 py-3 text-right">Spent</th><th className="px-3 py-3 text-right">Budget</th><th className="w-[180px] px-3 py-3">Progress</th><th className="px-3 py-3">Status</th><th className="w-[90px]" /></tr></thead><tbody>{budgetTableRows.map((budget) => { const pct = Number(budget.progress_pct) || 0; const risk = pct >= 80; const over = pct >= 100; const Icon = CATEGORY_ICONS[budget.category.toLowerCase().trim()] || Target; return <tr key={budget.budget_id} onClick={() => openBudgetTransactions(budget)} className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-[#f5f2ff] focus-within:bg-secondary/30"><td className="px-4 py-2.5"><span className="flex items-center gap-2.5"><span className={`grid h-8 w-8 place-items-center rounded-xl ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}><Icon className="h-4 w-4" /></span><span className="text-[13px] font-semibold capitalize">{humanizeCategoryName(budget.category)}</span></span></td><td className="money-tabular px-3 py-2.5 text-right text-[12px]"><BudgetCountUp value={`£${Number(budget.spent || 0).toFixed(2)}`} /></td><td className="money-tabular px-3 py-2.5 text-right text-[12px] text-muted-foreground"><BudgetCountUp value={`£${Number(budget.limit || 0).toFixed(2)}`} /></td><td className="px-3 py-2.5"><div className="flex items-center gap-2"><div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary"><div className={`h-full rounded-full ${over ? "bg-ruby" : risk ? "bg-gradient-to-r from-topaz to-ruby/70" : "bg-gradient-to-r from-emerald to-sky"}`} style={{ width: `${Math.min(100, pct)}%` }} /></div><span className="w-7 text-right text-[10px] text-muted-foreground"><BudgetCountUp value={`${Math.round(pct)}%`} /></span></div></td><td className="px-3 py-2.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-medium ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}>{over ? "Exceeded" : risk ? "At risk" : "On track"}</span></td><td className="px-3 py-2.5"><button type="button" aria-label={`Edit ${budget.category} budget`} onClick={(event) => { event.stopPropagation(); startEdit(budget); }} className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2 text-[11px] font-medium text-foreground hover:bg-secondary"><Pencil className="h-3 w-3" />Edit</button></td></tr>; })}</tbody></table>{budgetTableRows.length === 0 ? <WorkspaceBlank title={searchQuery || budgetView !== "all" ? "No matching budgets" : "No budgets yet"} description={searchQuery || budgetView !== "all" ? "Try clearing your search or changing the status tab." : "Create a budget to track spending, or choose a category from the unbudgeted list."} action={!searchQuery && budgetView === "all" ? <button type="button" onClick={() => onAdd()} className="rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white">Create budget</button> : null} /> : null}</div> ) : (
+          {loading ? <WorkspaceSkeleton /> : loadError ? <WorkspaceBlank title="Could not load budgets" description={loadError} error action={<button onClick={onRetry} className="rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white">Try again</button>} /> : displayMode === "list" ? (<div data-testid="budget-list" className="workspace-table-panel transaction-ledger-panel penni-reference-ledger budget-ledger-scroll surface min-h-0 flex-1 rounded-[21px] p-0" style={{ overflowY: "auto", overflowX: "auto", overscrollBehavior: "contain", scrollbarWidth: "thin" }}><table className="workspace-table w-full text-left penni-reference-budget-table"><thead className="sticky top-0 z-10 bg-[#f8f7fc]"><tr className="border-b border-border text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground"><th className="px-4 py-3">Category</th><th className="px-3 py-3 text-right">Spent</th><th className="px-3 py-3 text-right">Budget</th><th className="w-[180px] px-3 py-3">Progress</th><th className="px-3 py-3">Status</th><th className="w-[90px]" /></tr></thead><tbody>{budgetTableRows.map((budget) => { const pct = Number(budget.progress_pct) || 0; const risk = pct >= 80; const over = pct >= 100; return <tr key={budget.budget_id} onClick={() => openBudgetTransactions(budget)} className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-[#f5f2ff] focus-within:bg-secondary/30"><td className="px-4 py-2.5"><span className="flex items-center gap-2.5"><span className={`grid h-8 w-8 place-items-center rounded-xl ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}><BudgetCategoryEmoji category={budget.category} /></span><span className="text-[13px] font-semibold capitalize">{humanizeCategoryName(budget.category)}</span></span></td><td className="money-tabular px-3 py-2.5 text-right text-[12px]"><BudgetCountUp value={`£${Number(budget.spent || 0).toFixed(2)}`} /></td><td className="money-tabular px-3 py-2.5 text-right text-[12px] text-muted-foreground"><BudgetCountUp value={`£${Number(budget.limit || 0).toFixed(2)}`} /></td><td className="px-3 py-2.5"><div className="flex items-center gap-2"><div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary"><div className={`h-full rounded-full ${over ? "bg-ruby" : risk ? "bg-gradient-to-r from-topaz to-ruby/70" : "bg-gradient-to-r from-emerald to-sky"}`} style={{ width: `${Math.min(100, pct)}%` }} /></div><span className="w-7 text-right text-[10px] text-muted-foreground"><BudgetCountUp value={`${Math.round(pct)}%`} /></span></div></td><td className="px-3 py-2.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-medium ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}>{over ? "Exceeded" : risk ? "At risk" : "On track"}</span></td><td className="px-3 py-2.5"><button type="button" aria-label={`Edit ${budget.category} budget`} onClick={(event) => { event.stopPropagation(); startEdit(budget); }} className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2 text-[11px] font-medium text-foreground hover:bg-secondary"><Pencil className="h-3 w-3" />Edit</button></td></tr>; })}</tbody></table>{budgetTableRows.length === 0 ? <WorkspaceBlank title={searchQuery || budgetView !== "all" ? "No matching budgets" : "No budgets yet"} description={searchQuery || budgetView !== "all" ? "Try clearing your search or changing the status tab." : "Create a budget to track spending, or choose a category from the unbudgeted list."} action={!searchQuery && budgetView === "all" ? <button type="button" onClick={() => onAdd()} className="rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white">Create budget</button> : null} /> : null}</div> ) : (
             <div data-testid="budget-grid" className="budget-ledger-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1" style={{ scrollbarWidth: "thin" }}>
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 {budgetTableRows.map((budget) => {
                   const pct = Number(budget.progress_pct) || 0;
                   const over = pct >= 100;
                   const risk = pct >= 80;
-                  const Icon = CATEGORY_ICONS[budget.category.toLowerCase().trim()] || Target;
                   return (
                     <article key={budget.budget_id} className="surface rounded-[16px] p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-2">
-                          <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}><Icon className="h-4 w-4" /></span>
+                          <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${over ? "bg-ruby/10 text-ruby" : risk ? "bg-topaz/10 text-topaz" : "bg-emerald/10 text-emerald"}`}><BudgetCategoryEmoji category={budget.category} /></span>
                           <h3 className="truncate text-sm font-semibold capitalize">{humanizeCategoryName(budget.category)}</h3>
                         </div>
                         <button type="button" aria-label={`Edit ${budget.category} budget`} onClick={() => startEdit(budget)} className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border px-2 py-1.5 text-xs font-medium hover:bg-secondary"><Pencil className="h-3.5 w-3.5" />Edit</button>
@@ -1165,12 +1153,11 @@ export default React.memo(function BudgetPage() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {unbudgetedCategories.map((cat, idx) => {
-                  const UnCatIcon = CATEGORY_ICONS[cat.name.toLowerCase().trim()] || AlertCircle;
                   return (
                   <div key={cat.name} className={`rounded-xl border border-dashed border-topaz/30 bg-background/40 backdrop-blur-xl p-3 shadow-sm hover:shadow-lg hover:translate-y-0 hover:border-topaz/50 transition-all duration-300 relative overflow-hidden border-l-[3px] border-l-topaz fade-up delay-${Math.min(idx, 5)}`}>
                     <div className="flex items-start gap-2.5 mb-2">
                       <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-topaz to-topaz/70 flex items-center justify-center text-white shrink-0 shadow-sm">
-                        <UnCatIcon className="h-3.5 w-3.5" />
+                        <BudgetCategoryEmoji category={cat.name} />
                       </div>
                       <h3 className="text-sm font-semibold capitalize truncate leading-tight flex-1 pt-0.5">{cat.name}</h3>
                       <button onClick={() => openAddBudget("everyday", cat.name)} className="p-1.5 rounded-lg bg-emerald/10 hover:bg-emerald/20 text-emerald transition-all" aria-label={`Create budget for ${cat.name}`}>
