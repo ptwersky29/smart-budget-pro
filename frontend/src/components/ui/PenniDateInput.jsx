@@ -4,6 +4,7 @@ import { format, isValid, parseISO } from "date-fns";
 import { cn } from "../../lib/utils";
 import { Calendar } from "./calendar";
 import { Popover, PopoverTrigger, PopoverContent } from "./popover";
+import "./penni-calendar.css";
 
 /** Shared calendar field used by transaction forms, budget dates and date filters.
  * Values remain YYYY-MM-DD and onChange retains the input-style event contract.
@@ -60,7 +61,7 @@ const PenniDateInput = React.forwardRef(function PenniDateInput({
       </PopoverTrigger>
       {name && <input type="hidden" name={name} value={value || ""} />}
       <PopoverContent
-        side="bottom" align="start" sideOffset={8}
+        side="bottom" align="start" sideOffset={8} collisionPadding={12} style={{ zIndex: 10060 }}
         className="penni-calendar-popover w-auto max-w-[calc(100vw-24px)] rounded-[20px] border border-border/80 bg-popover p-3 shadow-[0_18px_55px_rgba(36,28,89,.17)]"
       >
         <Calendar
@@ -75,7 +76,7 @@ const PenniDateInput = React.forwardRef(function PenniDateInput({
         />
         <div className="mt-2 flex items-center justify-between border-t border-border/70 pt-2">
           <button type="button" className="rounded-lg px-3 py-2 text-xs font-medium text-primary hover:bg-primary/10"
-            onClick={() => select(new Date())}>Today</button>
+            onClick={() => { const today = new Date(); if ((!minDate || today >= minDate) && (!maxDate || today <= maxDate)) select(today); }}>Today</button>
           {value && !required && <button type="button" className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs text-muted-foreground hover:bg-secondary"
             onClick={() => { onChange?.({ target: { value: "", name, id }, currentTarget: { value: "", name, id } }); onValueChange?.(""); setOpen(false); }}>
             <X className="h-3 w-3" /> Clear
