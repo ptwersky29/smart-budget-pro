@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import PenniDateInput from "../components/ui/PenniDateInput";
 import { api } from "../lib/api";
 import {
   ShieldCheck,
@@ -169,8 +170,7 @@ export default function Reports() {
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <label className="flex items-center gap-2 text-[11px] text-muted-foreground sm:text-xs">
             <span className="w-8 shrink-0">From</span>
-            <input
-              type="date"
+            <PenniDateInput
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
               className="h-10 min-w-0 flex-1 px-2 sm:px-3 rounded-xl bg-secondary/50 border border-transparent text-xs sm:text-sm focus:border-ring focus:outline-none sm:w-auto sm:flex-none"
@@ -178,8 +178,7 @@ export default function Reports() {
           </label>
           <label className="flex items-center gap-2 text-[11px] text-muted-foreground sm:text-xs">
             <span className="w-8 shrink-0">To</span>
-            <input
-              type="date"
+            <PenniDateInput
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
               className="h-10 min-w-0 flex-1 px-2 sm:px-3 rounded-xl bg-secondary/50 border border-transparent text-xs sm:text-sm focus:border-ring focus:outline-none sm:w-auto sm:flex-none"
