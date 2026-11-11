@@ -62,6 +62,7 @@ function AccountLogo({ account, size = "md" }) {
     .slice(0, 2);
   const brandInstitution = pickBankInstitution(account?.institution, account?.provider, account?.name);
   const bankLogoUrl = !account?.image && brandInstitution ? getBankLogoOrFallback(brandInstitution) : null;
+  const trading212 = account?.provider === "trading212";
   const [imgError, setImgError] = useState(false);
 
   if (account.image && !imgError) {
@@ -75,7 +76,7 @@ function AccountLogo({ account, size = "md" }) {
   if (bankLogoUrl && !imgError) {
     return (
       <span className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-white ring-1 ring-black/[0.04] dark:bg-white/10 ${sizeClass}`}>
-        <img src={bankLogoUrl} alt={displayName} className="h-full w-full object-contain p-1.5" onError={() => setImgError(true)} />
+        <img src={bankLogoUrl} alt={displayName} className={trading212 ? "h-full w-full object-contain" : "h-full w-full object-contain p-1.5"} onError={() => setImgError(true)} />
       </span>
     );
   }

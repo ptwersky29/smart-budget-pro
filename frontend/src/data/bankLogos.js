@@ -2,6 +2,7 @@ const LOCAL_BASE = "/bank-logos";
 const TRUSTLY_BASE = "https://content.trustly.com/logos/banks/GB";
 
 export const BANK_LOGOS = {
+  "Trading 212": { color: "#00baf2", name: "Trading 212", file: "trading212.png" },
   NatWest: {
     color: "#4f0599",
     name: "NatWest",
@@ -146,6 +147,7 @@ Object.entries(BANK_LOGOS).forEach(([key, val]) => {
 });
 
 const ALIASES = {
+  trading212: "trading212",
   lloydsbank: "lloyds",
   lloydsbankgb: "lloyds",
   lloydsbankplc: "lloyds",

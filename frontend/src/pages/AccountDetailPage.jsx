@@ -330,6 +330,7 @@ export default function AccountDetailPage() {
   const isSavings = account?.type === "savings";
   const brandInstitution = pickBankInstitution(account?.provider, account?.name);
   const bankLogoUrl = !account?.image && brandInstitution ? getBankLogoOrFallback(brandInstitution) : null;
+  const trading212 = account?.provider === "trading212";
 
   if (loading && !error) return (
     <div className="space-y-6">
@@ -373,7 +374,7 @@ export default function AccountDetailPage() {
                 <img src={account.image} alt={account.name} className="h-12 w-12 object-cover" />
               </div>
             ) : bankLogoUrl ? (
-              <div className="shrink-0 h-12 w-12 rounded-full overflow-hidden ring-4 ring-white dark:ring-gray-800 shadow-md bg-white dark:bg-secondary/40 flex items-center justify-center p-2">
+              <div className="shrink-0 h-12 w-12 rounded-full overflow-hidden ring-4 ring-white dark:ring-gray-800 shadow-md bg-white dark:bg-secondary/40 flex items-center justify-center ${trading212 ? "p-0" : "p-2"}">
                 <img src={bankLogoUrl} alt={dispName} className="h-full w-full object-contain"
                   onError={(e) => { e.target.onerror = null; e.target.style.display = "none"; e.target.parentElement.className = "shrink-0 h-12 w-12 rounded-full flex items-center justify-center text-xl font-bold text-white shadow-md ring-4 ring-white dark:ring-gray-800"; e.target.parentElement.style.background = account.color || "#059669"; e.target.parentElement.innerText = initials; }} />
               </div>
