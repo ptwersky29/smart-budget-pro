@@ -15,6 +15,7 @@ from sqlalchemy import delete, func, or_, select, update
 import maaser
 from auth import get_current_user
 from cache import TTLCache
+from trading212 import sync_savings_account
 from category_catalog import (
     build_category_payload,
     combine_categories,
@@ -858,6 +859,8 @@ async def _adjust_account_balance(session, user_id: str, account_id: str, delta:
     )
     acct = result.scalar_one_or_none()
     if acct:
+        if acct.provider == "trading212":
+            raise HTTPException(400, "Trading 212 balance is read-only and synced from the API")
         acct.balance = round(float(acct.balance or 0) + float(delta), 2)
         acct.balance_updated_at = datetime.now(timezone.utc)
 
@@ -4123,6 +4126,11 @@ Output ONLY valid JSON, no markdown, no explanation:
         date_from: str = Query(None), date_to: str = Query(None),
     ):
         uid = user["user_id"]
+        try:
+            if await sync_savings_account(request, user):
+                _query_cache.delete(f"dash:{uid}")
+        except HTTPException as exc:
+            logger.warning("Trading 212 account sync unavailable (%s)", exc.status_code)
         custom_range = bool(date_from or date_to)
         cached = None if custom_range else _query_cache.get(f"dash:{uid}")
         if cached:

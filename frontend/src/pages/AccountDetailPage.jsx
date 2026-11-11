@@ -423,12 +423,12 @@ export default function AccountDetailPage() {
             <Button onClick={() => setUploadOpen(true)} variant="outlinePill" size="pillSm">
               <Upload className="mr-1.5 h-3.5 w-3.5" /> Import statement
             </Button>
-            <Button onClick={() => setShowEdit(true)} variant="outlinePill" size="pillSm">
+            {account?.provider !== "trading212" ? <Button onClick={() => setShowEdit(true)} variant="outlinePill" size="pillSm">
               <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
-            </Button>
-            <Button onClick={deleteAccount} variant="outlinePill" size="pillSm" className="text-ruby border-ruby/30 hover:bg-ruby/5">
+            </Button> : null}
+            {account?.provider !== "trading212" ? <Button onClick={deleteAccount} variant="outlinePill" size="pillSm" className="text-ruby border-ruby/30 hover:bg-ruby/5">
               <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Remove
-            </Button>
+            </Button> : null}
           </div>
 
           {needsReconnect && (

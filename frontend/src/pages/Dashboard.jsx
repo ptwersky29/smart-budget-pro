@@ -34,7 +34,6 @@ import Sparkline from "../components/ui/Sparkline";
 import ReferenceCashFlowChart from "../components/finance/ReferenceCashFlowChart";
 import ReferenceBalanceHero from "../components/finance/ReferenceBalanceHero";
 import AccountTile from "../components/finance/AccountTile";
-import Trading212BalanceCard from "../components/Trading212BalanceCard";
 import GroupedTransactionItems from "../components/GroupedTransactionItems";
 import CategoryDonut from "../components/finance/CategoryDonut";
 import {
@@ -228,7 +227,6 @@ export default function Dashboard() {
   if (empty) {
     return (
       <div className="page-stack" data-testid="dashboard-root">
-        <Trading212BalanceCard compact />
         <Surface>
           <EmptyPanel
             icon={Wallet}
@@ -261,7 +259,6 @@ export default function Dashboard() {
         budgets={budgets} onRefresh={()=>loadAll(true)} refreshing={refreshing}
         onAssistant={()=>openAssistant()} />
 
-      <Trading212BalanceCard compact />
 
       {topAlerts.length > 0 ? (
         <section

@@ -8,6 +8,7 @@ from sqlalchemy import func, or_, select
 
 from auth import get_current_user
 from db import BankAccount, BankConnection, Transaction
+from trading212 import sync_savings_account
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,12 @@ def build_router() -> APIRouter:
         type: str | None = None,
         limit: int = Query(100, ge=1, le=1000),
         offset: int = Query(0, ge=0),
+        refresh_trading212: bool = Query(False),
     ):
+        try:
+            await sync_savings_account(request, user, refresh=refresh_trading212)
+        except HTTPException as exc:
+            logger.warning("Trading 212 account sync unavailable (%s)", exc.status_code)
         sm = request.app.state.db
         async with sm() as session:
             # Auto-migrate any old BankConnections to the new BankAccount table
@@ -261,6 +267,8 @@ def build_router() -> APIRouter:
             ba = result.scalar_one_or_none()
             if not ba:
                 raise HTTPException(404, "Account not found")
+            if ba.provider == "trading212":
+                raise HTTPException(403, "Trading 212 is a read-only synced account")
 
             if "name" in body:
                 n = (body["name"] or "").strip()
@@ -342,6 +350,8 @@ def build_router() -> APIRouter:
             ba = result.scalar_one_or_none()
             if not ba:
                 raise HTTPException(404, "Account not found")
+            if ba.provider == "trading212":
+                raise HTTPException(403, "Trading 212 is managed by the read-only connection")
 
             # Check for orphaned transactions
             tx_count = await session.execute(
@@ -442,6 +452,10 @@ def build_router() -> APIRouter:
         request: Request,
         user: dict = Depends(get_current_user),
     ):
+        try:
+            await sync_savings_account(request, user)
+        except HTTPException as exc:
+            logger.warning("Trading 212 account sync unavailable (%s)", exc.status_code)
         sm = request.app.state.db
         async with sm() as session:
             result = await session.execute(

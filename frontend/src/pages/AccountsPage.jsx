@@ -34,7 +34,6 @@ import {
 } from "../components/ui/dropdown-menu";
 import { EmptyPanel, PageHeader, Surface } from "../components/ui/page";
 import AccountFormModal from "../components/AccountFormModal";
-import Trading212BalanceCard from "../components/Trading212BalanceCard";
 import GroupedTransactionItems, { getTransactionType } from "../components/GroupedTransactionItems";
 
 const ACCOUNT_TYPE_META = {
@@ -204,10 +203,12 @@ export default function AccountsPage() {
     return date.toISOString().slice(0, 10);
   });
 
-  const loadAccounts = useCallback(async () => {
+  const loadAccounts = useCallback(async (refreshTrading212 = false) => {
     setLoading(true);
     try {
-      const { data } = await api.get("/accounts");
+      const { data } = await api.get("/accounts", {
+        params: refreshTrading212 === true ? { refresh_trading212: true } : {},
+      });
       setAccounts(data.accounts || []);
     } catch (error) {
       toast.error(formatApiError(error) || "Could not load accounts");
@@ -241,16 +242,18 @@ export default function AccountsPage() {
   const doSync = useCallback(async () => {
     setSyncing(true);
     try {
-      const { data } = await api.post("/truelayer/sync");
-      toast.success(`Synced: ${data.new_transactions} new, ${data.duplicates_skipped} duplicates`);
-      await loadConns();
-      await loadAccounts();
+      if (conns.length) {
+        const { data } = await api.post("/truelayer/sync");
+        toast.success(`Synced: ${data.new_transactions} new, ${data.duplicates_skipped} duplicates`);
+        await loadConns();
+      }
+      await loadAccounts(true);
     } catch (error) {
       toast.error(formatApiError(error.response?.data?.detail) || "Sync failed");
     } finally {
       setSyncing(false);
     }
-  }, [loadConns, loadAccounts]);
+  }, [loadConns, loadAccounts, conns.length]);
 
   useEffect(() => {
     const result = searchParams.get("status");
@@ -342,7 +345,7 @@ export default function AccountsPage() {
         description="All your bank accounts, savings and manual balances, kept in one place."
         actions={
           <>
-            <Button variant="outlinePill" size="pill" onClick={doSync} disabled={syncing || conns.length === 0}>
+            <Button variant="outlinePill" size="pill" onClick={doSync} disabled={syncing || (conns.length === 0 && !accounts.some(a => a.provider === "trading212"))}>
               {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
               Sync now
             </Button>
@@ -379,8 +382,6 @@ export default function AccountsPage() {
         onSync={doSync}
         syncing={syncing}
       />
-
-      <Trading212BalanceCard />
 
       {(needsSetup || needsReconnect) ? (
         <div className={`flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-[11px] ${needsReconnect ? "border-ruby/30 bg-ruby/[0.05] text-ruby" : "border-topaz/30 bg-topaz/[0.05] text-topaz"}`}>
