@@ -96,8 +96,10 @@ function AccountCard({ account, connection, onSelect }) {
   const Icon = meta.icon;
   const isSavings = account.type === "savings";
   const displayName = getDisplayName(account);
-  const isTokenExpired = connection?.expires_at && new Date(connection.expires_at) < new Date();
-  const needsReconnect = connection && (connection.status === "reconnect_required" || isTokenExpired);
+  // TrueLayer refreshes short-lived access tokens automatically. An expired
+  // access-token timestamp does not mean the bank consent is disconnected.
+  const needsReconnect = connection?.status === "reconnect_required" || connection?.last_sync_status === "reconnect_required";
+  const hasConnectionError = connection?.status === "error" || connection?.last_sync_status === "error";
 
   return (
     <Link
@@ -137,6 +139,10 @@ function AccountCard({ account, connection, onSelect }) {
         ) : needsReconnect ? (
           <span className="inline-flex items-center gap-1 rounded-full border border-ruby/20 bg-ruby/10 px-2 py-0.5 text-[9px] text-ruby">
             <AlertCircle className="h-2.5 w-2.5" /> Reconnect
+          </span>
+        ) : hasConnectionError ? (
+          <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[9px] text-amber-700 dark:text-amber-400">
+            <AlertCircle className="h-2.5 w-2.5" /> Sync error
           </span>
         ) : (
           <span className="inline-flex items-center gap-1 rounded-full border border-emerald/15 bg-emerald/10 px-2 py-0.5 text-[9px] text-emerald">
@@ -306,8 +312,7 @@ export default function AccountsPage() {
     }
   };
 
-  const isTokenExpired = (connection) => connection.expires_at && new Date(connection.expires_at) < new Date();
-  const needsReconnectConn = (connection) => connection.status === "reconnect_required" || isTokenExpired(connection);
+  const needsReconnectConn = (connection) => connection.status === "reconnect_required" || connection.last_sync_status === "reconnect_required";
   const needsReconnect = conns.some(needsReconnectConn);
   const connByAccountId = Object.fromEntries(conns.map((connection) => [connection.account_id, connection]));
   const connecting = status === "connecting" || status === "redirecting";
