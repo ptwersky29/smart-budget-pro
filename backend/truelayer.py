@@ -617,6 +617,52 @@ def build_router() -> APIRouter:
                 ],
             }
 
+    @router.post("/connections/{connection_id}/verify")
+    async def verify_connection(connection_id: str, request: Request, user: dict = Depends(get_current_user)):
+        """Validate a saved TrueLayer connection before requesting bank reauthorisation.
+
+        A stale sync failure or expired access token alone is not proof that the
+        bank consent has expired. Only clear a reconnect warning after a real
+        successful authenticated balance request.
+        """
+        sm = request.app.state.db
+        async with sm() as session:
+            result = await session.execute(select(BankConnection).where(
+                BankConnection.connection_id == connection_id,
+                BankConnection.user_id == user["user_id"],
+                BankConnection.provider == "truelayer",
+            ))
+            conn = result.scalar_one_or_none()
+            if not conn:
+                raise HTTPException(404, "Bank connection not found")
+            if not conn.account_id:
+                raise HTTPException(400, "Bank account reference unavailable")
+            # The existing API function refreshes short-lived access tokens.
+            last_error = None
+            for path in (
+                f"/data/v1/accounts/{conn.account_id}/balance",
+                f"/data/v1/cards/{conn.account_id}/balance",
+            ):
+                try:
+                    data = await _tl_get(session, conn, path)
+                    if not isinstance(data, dict) or not data.get("results"):
+                        continue
+                    await _mark_connection_state(
+                        session, conn, status="active",
+                    )
+                    return {"status": "active", "connected": True, "connection_id": conn.connection_id}
+                except Exception as exc:
+                    last_error = exc
+            # Do not pretend that intermittent API failures are successful,
+            # but do not overwrite a genuine active connection on a network error.
+            if last_error and is_reauth_error(last_error):
+                await _mark_connection_state(
+                    session, conn, status="reconnect_required",
+                    error=connection_error_message(last_error),
+                )
+                return {"status": "reconnect_required", "connected": False}
+            return {"status": "unverified", "connected": False}
+
     @router.get("/connections/{connection_id}")
     async def get_connection(connection_id: str, request: Request, user: dict = Depends(get_current_user)):
         sm = request.app.state.db

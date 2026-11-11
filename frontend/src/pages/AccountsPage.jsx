@@ -98,8 +98,8 @@ function AccountCard({ account, connection, onSelect }) {
   const displayName = getDisplayName(account);
   // TrueLayer refreshes short-lived access tokens automatically. An expired
   // access-token timestamp does not mean the bank consent is disconnected.
-  const needsReconnect = connection?.status === "reconnect_required" || connection?.last_sync_status === "reconnect_required";
-  const hasConnectionError = connection?.status === "error" || connection?.last_sync_status === "error";
+  const needsReconnect = connection?.status === "reconnect_required";
+  const hasConnectionError = connection?.status === "error";
 
   return (
     <Link
@@ -312,9 +312,14 @@ export default function AccountsPage() {
     }
   };
 
-  const needsReconnectConn = (connection) => connection.status === "reconnect_required" || connection.last_sync_status === "reconnect_required";
+  const needsReconnectConn = (connection) => connection.status === "reconnect_required";
   const needsReconnect = conns.some(needsReconnectConn);
-  const connByAccountId = Object.fromEntries(conns.map((connection) => [connection.account_id, connection]));
+  // A new bank authorisation can leave an older connection record for the same
+  // account. Prefer an active connection over stale reconnect-required records.
+  const connByAccountId = Object.fromEntries(
+    [...conns].sort((a, b) => (a.status === "active" ? 1 : 0) - (b.status === "active" ? 1 : 0))
+      .map(connection => [connection.account_id, connection]),
+  );
   const connecting = status === "connecting" || status === "redirecting";
   const selectedAccount = accounts.find(a => String(a.account_id) === String(selectedAccountId)) || accounts[0] || null;
   const selectedId = selectedAccount?.account_id;

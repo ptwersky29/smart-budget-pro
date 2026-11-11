@@ -69,6 +69,8 @@ export default function AccountDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pendingDeleteTxId, setPendingDeleteTxId] = useState(null);
   const [tlConn, setTlConn] = useState(null);
+  const [verifyingConnection, setVerifyingConnection] = useState(false);
+  const verifiedIdsRef = useRef(new Set());
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadHistory, setUploadHistory] = useState([]);
   const [dragOver, setDragOver] = useState(false);
@@ -77,14 +79,34 @@ export default function AccountDetailPage() {
   const loadTlConn = useCallback(async () => {
     try {
       const { data } = await api.get("/truelayer/connections");
-      const conn = (data.connections || []).find(c => c.account_id === accountId);
-      setTlConn(conn || null);
+      const matches = (data.connections || []).filter(c => c.account_id === accountId && c.provider === "truelayer");
+      // Choose the newest active authorisation rather than an older expired one.
+      const conn = matches.find(c => c.status === "active") || matches[0] || null;
+      setTlConn(conn);
     } catch { }
   }, [accountId]);
 
   // Access tokens routinely expire and are refreshed by the server.
   // Reconnect only when TrueLayer reports an actual reauthorisation failure.
-  const needsReconnect = tlConn && (tlConn.status === "reconnect_required" || tlConn.last_sync_status === "reconnect_required");
+  const needsReconnect = tlConn?.status === "reconnect_required";
+
+  useEffect(() => {
+    if (!needsReconnect || !tlConn?.connection_id || verifiedIdsRef.current.has(tlConn.connection_id)) return;
+    verifiedIdsRef.current.add(tlConn.connection_id);
+    let cancelled = false;
+    setVerifyingConnection(true);
+    api.post(`/truelayer/connections/${tlConn.connection_id}/verify`)
+      .then(({ data }) => {
+        if (!cancelled && data.connected) {
+          setTlConn(previous => previous?.connection_id === tlConn.connection_id
+            ? { ...previous, status: "active", last_sync_status: "active" } : previous);
+          window.dispatchEvent(new Event("penni:data-changed"));
+        }
+      })
+      .catch(() => { /* Keep the genuine reconnect warning if verification fails. */ })
+      .finally(() => { if (!cancelled) setVerifyingConnection(false); });
+    return () => { cancelled = true; };
+  }, [needsReconnect, tlConn?.connection_id]);
 
   const reconnectConn = async () => {
     if (!tlConn) return;
@@ -436,8 +458,8 @@ export default function AccountDetailPage() {
           {needsReconnect && (
             <div className="mt-3 w-full rounded-xl border border-ruby/40 bg-ruby/5 p-3 flex items-center gap-3">
               <AlertCircle className="h-4 w-4 text-ruby shrink-0" />
-              <p className="text-xs text-ruby flex-1">This bank connection has expired. Reconnect it to resume syncing transactions.</p>
-              <Button onClick={reconnectConn} variant="danger" size="pillSm">
+              <p className="text-xs text-ruby flex-1">{verifyingConnection ? "Checking whether this bank is still connected…" : "This connection needs reauthorisation or could not be verified. Try reconnecting if syncing has stopped."}</p>
+              <Button onClick={reconnectConn} disabled={verifyingConnection} variant="danger" size="pillSm">
                 <RefreshCcw className="h-3.5 w-3.5 mr-1.5" /> Reconnect
               </Button>
             </div>
