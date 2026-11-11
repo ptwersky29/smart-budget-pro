@@ -40,8 +40,25 @@ def parse_import_from_date(value: Optional[str]) -> Optional[str]:
 
 
 def is_reauth_error(error: Exception) -> bool:
+    """Only definitive authorisation failures need bank re-consent.
+
+    In particular "Refresh failed: 500" must NOT be classed as an expired
+    consent. Temporary TrueLayer failures can be retried using existing tokens.
+    """
     message = str(error).lower()
-    return any(token in message for token in ("token expired", "refresh", "401", "unauthori", "invalid grant", "reconnect"))
+    return any(token in message for token in (
+        "token expired and no refresh token",
+        "invalid_grant",
+        "invalid grant",
+        "invalid_refresh_token",
+        "refresh token expired",
+        "refresh token revoked",
+        "consent expired",
+        "401",
+        "unauthorised",
+        "unauthorized",
+        "reconnect your bank",
+    ))
 
 
 def classify_sync_error(error: Exception) -> BankSyncError:

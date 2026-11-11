@@ -34,6 +34,9 @@ from db import (
 
 # Lock to prevent concurrent syncs for the same connection
 _sync_lock = asyncio.Lock()
+# OAuth refresh tokens rotate. A concurrent background sync and user request
+# must never refresh the same old token twice.
+_token_refresh_locks: dict[str, asyncio.Lock] = {}
 from statements import _ai_categorise
 
 logger = logging.getLogger("truelayer")
@@ -193,21 +196,38 @@ async def _is_configured(session=None) -> bool:
 # ── TrueLayer API calls with auto-refresh ────────────────────────────────
 
 async def _get_valid_token(session, conn: BankConnection) -> str:
-    if conn.expires_at and conn.expires_at.tzinfo is None:
-        conn.expires_at = conn.expires_at.replace(tzinfo=timezone.utc)
-    if conn.expires_at and conn.expires_at > datetime.now(timezone.utc) + timedelta(minutes=5) and conn.access_token:
+    def _usable() -> bool:
+        expiry = conn.expires_at
+        if expiry and expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)
+        return bool(
+            expiry and expiry > datetime.now(timezone.utc) + timedelta(minutes=5)
+            and conn.access_token
+        )
+
+    if _usable():
         return _decrypt(conn.access_token)
-    if not conn.refresh_token:
-        raise HTTPException(401, "Token expired and no refresh token available — reconnect your bank")
-    token_data = await _refresh_access_token(_decrypt(conn.refresh_token), session)
-    encrypted_access = _encrypt(token_data["access_token"])
-    conn.access_token = encrypted_access
-    refresh_token = _token_value(token_data.get("refresh_token"))
-    if refresh_token:
-        conn.refresh_token = _encrypt(refresh_token)
-    conn.expires_at = datetime.now(timezone.utc) + timedelta(seconds=token_data.get("expires_in", 3600))
-    await session.commit()
-    return _decrypt(encrypted_access)
+
+    lock = _token_refresh_locks.setdefault(conn.connection_id, asyncio.Lock())
+    async with lock:
+        # Another request may already have rotated the refresh token.
+        # Reload from the database under this lock before deciding to refresh.
+        await session.refresh(conn)
+        if _usable():
+            return _decrypt(conn.access_token)
+        if not conn.refresh_token:
+            raise HTTPException(401, "Token expired and no refresh token available — reconnect your bank")
+        token_data = await _refresh_access_token(_decrypt(conn.refresh_token), session)
+        encrypted_access = _encrypt(token_data["access_token"])
+        conn.access_token = encrypted_access
+        refreshed = _token_value(token_data.get("refresh_token"))
+        if refreshed:
+            conn.refresh_token = _encrypt(refreshed)
+        conn.expires_at = datetime.now(timezone.utc) + timedelta(
+            seconds=token_data.get("expires_in", 3600)
+        )
+        await session.commit()
+        return _decrypt(encrypted_access)
 
 
 async def _tl_get(session, conn: BankConnection, path: str, params: dict | None = None) -> dict:
@@ -367,6 +387,60 @@ async def _log_oauth(session, user_id, event, payload):
 
 
 # ── Router ────────────────────────────────────────────────────────────────
+
+async def _recover_connection(session, conn: BankConnection) -> bool:
+    """Try to restore an erroneously inactive connection without OAuth.
+
+    Probe the exact account linked to this TrueLayer record. An HTTP 200 with
+    its balance proves the saved tokens still work. Do not reattach unrelated
+    bank accounts by name or conceal a genuinely revoked consent.
+    """
+    if conn.status == "active":
+        return True
+    if not conn.account_id or not (conn.refresh_token or conn.access_token):
+        return False
+
+    last_error = None
+    for path in (
+        f"/data/v1/accounts/{conn.account_id}/balance",
+        f"/data/v1/cards/{conn.account_id}/balance",
+    ):
+        try:
+            data = await _tl_get(session, conn, path)
+            if isinstance(data, dict) and data.get("results"):
+                await _mark_connection_state(session, conn, status="active")
+                logger.info("Recovered previously inactive TrueLayer connection %s", conn.connection_id)
+                return True
+        except Exception as exc:
+            last_error = exc
+
+    if last_error:
+        conn.last_sync_status = (
+            "reconnect_required" if is_reauth_error(last_error) else "error"
+        )
+        conn.status = conn.last_sync_status
+        conn.last_error = connection_error_message(last_error)
+    conn.last_error_at = datetime.now(timezone.utc)
+    await session.commit()
+    return False
+
+
+def _eligible_for_background_recovery(conn: BankConnection) -> bool:
+    if conn.status == "active":
+        return True
+    if not (conn.refresh_token or conn.access_token):
+        return False
+    # Retry temporary failures after 15 min, but avoid repeatedly probing
+    # genuinely revoked bank authorisations every five minutes.
+    interval = timedelta(hours=6) if conn.status == "reconnect_required" else timedelta(minutes=15)
+    last = conn.last_error_at
+    if last is not None:
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) - last < interval:
+            return False
+    return True
+
 
 def build_router() -> APIRouter:
     router = APIRouter(prefix="/truelayer", tags=["truelayer"])
@@ -638,30 +712,10 @@ def build_router() -> APIRouter:
             if not conn.account_id:
                 raise HTTPException(400, "Bank account reference unavailable")
             # The existing API function refreshes short-lived access tokens.
-            last_error = None
-            for path in (
-                f"/data/v1/accounts/{conn.account_id}/balance",
-                f"/data/v1/cards/{conn.account_id}/balance",
-            ):
-                try:
-                    data = await _tl_get(session, conn, path)
-                    if not isinstance(data, dict) or not data.get("results"):
-                        continue
-                    await _mark_connection_state(
-                        session, conn, status="active",
-                    )
-                    return {"status": "active", "connected": True, "connection_id": conn.connection_id}
-                except Exception as exc:
-                    last_error = exc
-            # Do not pretend that intermittent API failures are successful,
-            # but do not overwrite a genuine active connection on a network error.
-            if last_error and is_reauth_error(last_error):
-                await _mark_connection_state(
-                    session, conn, status="reconnect_required",
-                    error=connection_error_message(last_error),
-                )
-                return {"status": "reconnect_required", "connected": False}
-            return {"status": "unverified", "connected": False}
+            connected = await _recover_connection(session, conn) if conn.status != "active" else True
+            if connected:
+                return {"status": "active", "connected": True, "connection_id": conn.connection_id}
+            return {"status": conn.status, "connected": False, "connection_id": conn.connection_id}
 
     @router.get("/connections/{connection_id}")
     async def get_connection(connection_id: str, request: Request, user: dict = Depends(get_current_user)):
@@ -766,7 +820,7 @@ def build_router() -> APIRouter:
                 result = await session.execute(
                     select(BankConnection).where(
                         BankConnection.user_id == user["user_id"],
-                        BankConnection.status == "active",
+                        BankConnection.status.in_(("active", "error", "reconnect_required")),
                         BankConnection.provider == "truelayer",
                     )
                 )
@@ -776,18 +830,25 @@ def build_router() -> APIRouter:
                 total_new = 0
                 total_dup = 0
                 errors = []
+                successful = 0
                 for conn in conns:
                     try:
+                        if not await _recover_connection(session, conn):
+                            errors.append({"connection_id": conn.connection_id, "error": "Connection could not be verified"})
+                            continue
                         new, dup = await _sync_connection(session, conn, user["user_id"])
                         total_new += new
                         total_dup += dup
+                        successful += 1
                     except Exception as e:
                         logger.error(f"sync failed for {conn.connection_id}: {e}")
                         errors.append({"connection_id": conn.connection_id, "error": str(e)[:200]})
                         await _log_sync(session, user["user_id"], conn.connection_id, "sync_failed", "error", str(e)[:500])
+                if not successful:
+                    raise HTTPException(409, "No bank connections could be verified. Reconnect only if your bank authorisation has genuinely expired.")
                 await _log_sync(session, user["user_id"], "all", "sync_complete", "success",
-                               f"Imported {total_new} new, skipped {total_dup} duplicates across {len(conns)} connections")
-                return {"ok": True, "connections_synced": len(conns), "new_transactions": total_new, "duplicates_skipped": total_dup, "errors": errors}
+                               f"Imported {total_new} new, skipped {total_dup} duplicates across {successful} connections")
+                return {"ok": True, "connections_synced": successful, "new_transactions": total_new, "duplicates_skipped": total_dup, "errors": errors}
 
     @router.post("/sync/all")
     async def sync_all_users(request: Request):
@@ -849,29 +910,35 @@ def build_router() -> APIRouter:
 
 # Exported for background scheduler (module-level, not inside build_router)
 async def run_background_sync(db_maker) -> dict:
-    """Sync all active connections. Can be called from scheduler or endpoint."""
+    """Sync active connections and safely recover previously failed ones."""
     async with _sync_lock:
         sm = db_maker
         async with sm() as session:
             result = await session.execute(
                 select(BankConnection).where(
-                    BankConnection.status == "active",
+                    BankConnection.status.in_(("active", "error", "reconnect_required")),
                     BankConnection.provider == "truelayer",
                 )
             )
             conns = result.scalars().all()
             total_new = 0
             total_dup = 0
+            synced = 0
             for conn in conns:
+                if not _eligible_for_background_recovery(conn):
+                    continue
                 try:
+                    if not await _recover_connection(session, conn):
+                        continue
                     new, dup = await _sync_connection(session, conn, conn.user_id)
                     total_new += new
                     total_dup += dup
+                    synced += 1
                 except Exception as e:
                     logger.error(f"background sync failed for {conn.connection_id}: {e}")
                     await _log_sync(session, conn.user_id, conn.connection_id, "background_sync_failed", "error", str(e)[:500])
-            logger.info(f"Background sync: {total_new} new, {total_dup} duplicates, {len(conns)} connections")
-            return {"ok": True, "connections_synced": len(conns), "new_transactions": total_new, "duplicates_skipped": total_dup}
+            logger.info(f"Background sync: {total_new} new, {total_dup} duplicates, {synced} connections")
+            return {"ok": True, "connections_synced": synced, "new_transactions": total_new, "duplicates_skipped": total_dup}
 
 
 # ── Sync engine ───────────────────────────────────────────────────────────
