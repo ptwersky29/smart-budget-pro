@@ -34,6 +34,7 @@ import {
 } from "../components/ui/dropdown-menu";
 import { EmptyPanel, PageHeader, Surface } from "../components/ui/page";
 import AccountFormModal from "../components/AccountFormModal";
+import Trading212BalanceCard from "../components/Trading212BalanceCard";
 import GroupedTransactionItems, { getTransactionType } from "../components/GroupedTransactionItems";
 
 const ACCOUNT_TYPE_META = {
@@ -378,6 +379,8 @@ export default function AccountsPage() {
         onSync={doSync}
         syncing={syncing}
       />
+
+      <Trading212BalanceCard />
 
       {(needsSetup || needsReconnect) ? (
         <div className={`flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-[11px] ${needsReconnect ? "border-ruby/30 bg-ruby/[0.05] text-ruby" : "border-topaz/30 bg-topaz/[0.05] text-topaz"}`}>

@@ -39,6 +39,7 @@ import gdpr
 import hebcal
 import integrations
 import investments
+import trading212
 import jewish
 import jewish_reports
 import manual_accounts
@@ -213,6 +214,7 @@ api.include_router(hebcal.build_router())
 api.include_router(jewish.build_router())
 api.include_router(jewish_reports.router)
 api.include_router(investments.build_router())
+api.include_router(trading212.build_router())
 api.include_router(uk_tools.build_router())
 api.include_router(gdpr.build_router())
 api.include_router(onboarding.build_router())

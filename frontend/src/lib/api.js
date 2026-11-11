@@ -42,6 +42,8 @@ function writeOfflineCache(entries) {
 }
 
 function cacheOfflineResponse(config, data) {
+  // Never persist brokerage balances to localStorage / the offline cache.
+  if (String(config?.url || "").startsWith("/trading212/")) return;
   if (config?.method?.toLowerCase() !== "get" || !config?.url) return;
   const entries = readOfflineCache();
   entries[offlineCacheKey(config.url, config.params)] = { data, savedAt: Date.now() };
@@ -49,6 +51,7 @@ function cacheOfflineResponse(config, data) {
 }
 
 function getOfflineResponse(config) {
+  if (String(config?.url || "").startsWith("/trading212/")) return null;
   const entry = readOfflineCache()[offlineCacheKey(config?.url, config?.params)];
   return entry?.data ?? offlineDemoResponse(config);
 }
