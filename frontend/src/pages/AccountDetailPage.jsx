@@ -82,8 +82,9 @@ export default function AccountDetailPage() {
     } catch { }
   }, [accountId]);
 
-  const isTokenExpired = tlConn && tlConn.expires_at && new Date(tlConn.expires_at) < new Date();
-  const needsReconnect = tlConn && (tlConn.status === "reconnect_required" || isTokenExpired);
+  // Access tokens routinely expire and are refreshed by the server.
+  // Reconnect only when TrueLayer reports an actual reauthorisation failure.
+  const needsReconnect = tlConn && (tlConn.status === "reconnect_required" || tlConn.last_sync_status === "reconnect_required");
 
   const reconnectConn = async () => {
     if (!tlConn) return;
