@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from auth import get_current_user
@@ -318,7 +318,7 @@ async def _process_one(session_maker) -> bool:
             )
         except asyncio.CancelledError:
             raise
-        except Exception as exc:
+        except Exception:
             logger.exception("Classification job %s failed", job.job_id)
             await session.rollback()
             job = await session.get(ClassificationJob, job_id)
