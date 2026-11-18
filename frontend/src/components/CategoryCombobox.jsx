@@ -15,7 +15,7 @@ import {
 import CategoryEditorDialog from "./CategoryEditorDialog";
 import { useCategories } from "../contexts/CategoriesContext";
 import { formatApiError } from "../lib/api";
-import { withCategoryEmoji } from "../lib/categories";
+import { defaultCategoryFallbacks, withCategoryEmoji } from "../lib/categories";
 
 function groupBySection(categories) {
   const groups = {};
@@ -39,6 +39,8 @@ export default function CategoryCombobox({
 }) {
   const {
     categories: sharedCategories,
+    loading: categoriesLoading,
+    refreshCategories,
     createCategory,
     resolveCategory,
   } = useCategories();
@@ -50,9 +52,22 @@ export default function CategoryCombobox({
   // Older accounts may contain incomplete custom-category records.
   // A malformed category must never crash the transaction modal on open.
   const incoming = Array.isArray(categoriesProp) && categoriesProp.length ? categoriesProp : sharedCategories;
-  const categories = (Array.isArray(incoming) ? incoming : []).filter(
-    category => category && typeof category === "object" && typeof category.name === "string"
-  ).map(withCategoryEmoji);
+  const validCategories = (Array.isArray(incoming) ? incoming : []).filter(
+    category => category && typeof category === "object" && typeof category.name === "string" && !category.is_archived
+  );
+  // The dropdown must never be empty just because a category request is slow
+  // or has failed. Show valid built-in categories until the saved list arrives.
+  const usingFallback = validCategories.length === 0;
+  const categories = usingFallback ? defaultCategoryFallbacks() : validCategories.map(withCategoryEmoji);
+  const handlePopoverChange = useCallback((nextOpen) => {
+    setOpen(nextOpen);
+    if (nextOpen) {
+      setSearch("");
+      if (usingFallback && typeof refreshCategories === "function") {
+        refreshCategories({ silent: true }).catch(() => {});
+      }
+    }
+  }, [usingFallback, refreshCategories]);
   const selected = value ? resolveCategory(value) : null;
 
   const filteredGroups = useMemo(() => {
@@ -118,7 +133,7 @@ export default function CategoryCombobox({
 
   return (
     <>
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={handlePopoverChange}>
         <PopoverTrigger asChild>
           <button
             type="button"
@@ -159,7 +174,11 @@ export default function CategoryCombobox({
               value={search} onValueChange={setSearch}
               placeholder="Search categories…"
               className="h-11 text-[13px]" />
-            <CommandList className="min-h-0 max-h-[min(55dvh,360px)] overflow-y-auto overscroll-contain px-1.5 py-1">
+            {usingFallback && <div className="flex items-center justify-between gap-2 border-b border-border/50 px-3 py-2 text-[11px] text-muted-foreground">
+              <span>{categoriesLoading ? "Loading saved categories…" : "Standard categories shown"}</span>
+              <button type="button" className="shrink-0 font-medium text-primary hover:underline" onClick={() => refreshCategories?.({ silent: true })?.catch?.(() => {})}>Retry</button>
+            </div>}
+            <CommandList className="min-h-[148px] max-h-[min(55dvh,360px)] overflow-y-auto overscroll-contain px-1.5 py-1">
               <CommandEmpty>
                 {search ? "No categories found" : "No categories yet"}
               </CommandEmpty>
