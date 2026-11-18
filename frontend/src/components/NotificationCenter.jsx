@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { formatDateTime } from "../lib/format";
-import { Bell, AlertTriangle, CheckCircle, Info, AlertCircle, Trash2 } from "lucide-react";
+import { Bell, Trash2 } from "lucide-react";
+import NotificationGlyph from "./ui/NotificationGlyph";
 import { api } from "../lib/api";
 
 export default function NotificationCenter() {
@@ -8,7 +9,6 @@ export default function NotificationCenter() {
   const triggerRef = useRef(null);
   const [notifications, setNotifications] = useState([]);
   const [unread, setUnread] = useState(0);
-  const [loading, setLoading] = useState(false);
 
   const fetchNotifications = async () => {
     try {
@@ -69,32 +69,6 @@ export default function NotificationCenter() {
     }
   };
 
-  const getIcon = (type) => {
-    switch (type) {
-      case "success":
-        return <CheckCircle className="h-4 w-4 text-emerald" />;
-      case "error":
-        return <AlertCircle className="h-4 w-4 text-ruby" />;
-      case "warning":
-        return <AlertTriangle className="h-4 w-4 text-topaz" />;
-      default:
-        return <Info className="h-4 w-4 text-sky" />;
-    }
-  };
-
-  const getBackgroundColor = (type) => {
-    switch (type) {
-      case "success":
-        return "bg-emerald/5 border-emerald/20";
-      case "error":
-        return "bg-ruby/5 border-ruby/20";
-      case "warning":
-        return "bg-topaz/5 border-topaz/20";
-      default:
-        return "bg-sky/5 border-sky/20";
-    }
-  };
-
   return (
     <div className="relative">
       {/* Bell Icon Button */}
@@ -104,13 +78,13 @@ export default function NotificationCenter() {
         aria-expanded={open}
         aria-controls="penni-notification-panel"
         onClick={() => setOpen(!open)}
-        className="relative h-11 w-11 grid place-items-center rounded-full border border-border bg-card/80 hover:bg-secondary transition-colors"
+        className="penni-notification-trigger relative grid h-11 w-11 place-items-center rounded-full border border-border bg-card/80 transition-colors hover:bg-secondary"
         aria-label={`Notifications ${unread > 0 ? `(${unread} unread)` : ""}`}
         data-testid="notifications-bell"
       >
         <Bell className="h-4 w-4" />
         {unread > 0 && (
-          <span className="absolute top-1 right-1 h-5 w-5 rounded-full bg-ruby grid place-items-center text-xs font-bold text-white">
+          <span className="absolute right-1 top-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
@@ -118,7 +92,7 @@ export default function NotificationCenter() {
 
       {/* Dropdown Notification Center */}
       {open && (
-        <div id="penni-notification-panel" role="region" aria-label="Notifications" className="absolute right-0 top-full z-50 mt-2 flex max-h-[min(80dvh,450px)] w-[min(90vw,384px)] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
+        <div id="penni-notification-panel" role="region" aria-label="Notifications" className="penni-notification-panel absolute right-0 top-full z-50 mt-2 flex max-h-[min(80dvh,450px)] w-[min(92vw,388px)] flex-col overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between gap-2 p-4 border-b border-border/50">
             <h3 className="font-semibold">Notifications</h3>
@@ -141,19 +115,21 @@ export default function NotificationCenter() {
                 <p className="text-sm">No notifications yet</p>
               </div>
             ) : (
-              <div className="divide-y divide-border/50">
+              <div className="divide-y divide-border/50" role="list">
                 {notifications.map((n) => (
                   <div
                     key={n.id}
-                    className={`p-4 border-l-4 ${getBackgroundColor(n.type)} ${
-                      !n.read ? "bg-opacity-100" : "opacity-70"
-                    } group cursor-pointer hover:bg-opacity-75 transition-all`}
+                    role="listitem"
+                    className={`penni-notification-row group cursor-pointer p-3.5 transition-colors ${!n.read ? "is-unread" : ""}`}
                     onClick={() => !n.read && markAsRead(n.id)}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="mt-0.5">{getIcon(n.type)}</div>
+                      <NotificationGlyph type={n.type} />
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm">{n.title}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="min-w-0 flex-1 text-sm font-semibold leading-snug">{n.title}</p>
+                          {!n.read && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-label="Unread" />}
+                        </div>
                         <p className="text-xs text-muted-foreground mt-0.5">{n.message}</p>
                         <p className="text-xs text-muted-foreground/50 mt-1">
                           {formatDateTime(n.created_at)}

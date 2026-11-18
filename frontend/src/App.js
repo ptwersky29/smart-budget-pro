@@ -6,7 +6,7 @@ import { AssistantProvider } from "./contexts/AssistantContext";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { CategoriesProvider } from "./contexts/CategoriesContext";
 import AssistantPanel from "./components/assistant/AssistantPanel";
-import { Toaster } from "sonner";
+import { Toaster } from "./components/ui/sonner";
 import { ThemeProvider } from "next-themes";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
@@ -148,7 +148,7 @@ export default function App() {
                   {!isPublicDemo() && <ConsentBanner />}
                   {!isPublicDemo() && <NetworkStatus />}
                   <UpdatePrompt />
-                  <Toaster richColors position="top-right" />
+                  <Toaster />
                 </ErrorBoundary>
               </CategoriesProvider>
             </SettingsProvider>

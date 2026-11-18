@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { WifiOff } from "lucide-react";
+import NotificationGlyph from "./ui/NotificationGlyph";
 import { toast } from "sonner";
 
 function formatSavedAt(value) {
@@ -58,9 +58,9 @@ export default function NetworkStatus() {
     <div
       role="status"
       aria-live="polite"
-      className="fixed inset-x-0 bottom-4 z-[80] mx-auto flex w-fit max-w-[92vw] items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-[12px] font-medium text-muted-foreground shadow-lg"
+      className="penni-system-notice fixed bottom-4 left-1/2 z-[10060] flex w-max max-w-[calc(100vw-24px)] items-center gap-3 px-4 py-3"
     >
-      <WifiOff className="h-4 w-4 text-amber-500" aria-hidden="true" />
+      <NotificationGlyph type="warning" />
       {cachedAt ? (
         <span>Offline — showing data saved at {formatSavedAt(cachedAt)}</span>
       ) : (

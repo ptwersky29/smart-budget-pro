@@ -809,3 +809,139 @@ html { font-size: calc(var(--fs-base, 1rem) * var(--fs-multiplier, 1)); }
 @media (max-width: 1279px) {
   .budgets-route { overflow-x: hidden; }
 }
+
+
+/* ─── Unified Penni notification surfaces ───
+   One card, icon and typography system for toasts, the notification centre,
+   inline status notices, dark mode and mobile. */
+.penni-notification-glyph {
+  --penni-notification-tone: var(--primary);
+  display: inline-grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  border: 1px solid hsl(var(--penni-notification-tone) / .14);
+  border-radius: 12px;
+  background: hsl(var(--penni-notification-tone) / .10);
+  color: hsl(var(--penni-notification-tone));
+}
+.penni-notification-glyph[data-kind="success"] { --penni-notification-tone: var(--emerald); }
+.penni-notification-glyph[data-kind="error"] { --penni-notification-tone: var(--ruby); }
+.penni-notification-glyph[data-kind="warning"] { --penni-notification-tone: var(--topaz); }
+.penni-notification-glyph[data-kind="loading"] { --penni-notification-tone: var(--primary); }
+
+[data-sonner-toaster].penni-toaster {
+  --width: 380px;
+  z-index: 10070;
+  font-family: var(--font-body);
+}
+[data-sonner-toast].penni-notification-toast,
+.penni-notification-panel,
+.penni-system-notice {
+  border: 1px solid hsl(var(--border) / .82) !important;
+  border-radius: 18px !important;
+  background: hsl(var(--card) / .97) !important;
+  color: hsl(var(--card-foreground)) !important;
+  box-shadow: var(--shadow-dropdown) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  backdrop-filter: blur(18px) saturate(150%);
+}
+[data-sonner-toast].penni-notification-toast {
+  box-sizing: border-box;
+  min-height: 66px;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 42px 14px 14px !important;
+}
+[data-sonner-toast].penni-notification-toast [data-icon] {
+  width: 36px;
+  height: 36px;
+  margin: 0 !important;
+  align-self: flex-start;
+}
+[data-sonner-toast] .penni-notification-content {
+  min-width: 0;
+  flex: 1;
+  gap: 3px;
+  padding-top: 1px;
+  overflow-wrap: anywhere;
+}
+[data-sonner-toast] .penni-notification-title {
+  color: hsl(var(--card-foreground));
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.4;
+  letter-spacing: -.01em;
+}
+[data-sonner-toast] .penni-notification-description {
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+[data-sonner-toast].penni-notification-toast [data-close-button] {
+  left: auto !important;
+  right: 10px !important;
+  top: 10px !important;
+  transform: none !important;
+  width: 25px;
+  height: 25px;
+  border: 0;
+  border-radius: 8px;
+  background: hsl(var(--secondary) / .8);
+  color: hsl(var(--muted-foreground));
+  box-shadow: none;
+}
+[data-sonner-toast].penni-notification-toast [data-close-button]:hover {
+  background: hsl(var(--secondary));
+  color: hsl(var(--foreground));
+}
+[data-sonner-toast].penni-notification-toast [data-close-button]:focus-visible,
+.penni-notification-row:focus-visible,
+.penni-notification-trigger:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+[data-sonner-toast] .penni-notification-action,
+[data-sonner-toast] .penni-notification-cancel {
+  min-height: 30px;
+  border-radius: 9px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+[data-sonner-toast] .penni-notification-action {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+[data-sonner-toast] .penni-notification-cancel {
+  background: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+}
+.penni-notification-panel { overflow: hidden; }
+.penni-notification-row { border-left: 2px solid transparent; }
+.penni-notification-row.is-unread {
+  border-left-color: hsl(var(--primary) / .8);
+  background: hsl(var(--primary) / .045);
+}
+.penni-notification-row:hover,
+.penni-notification-row:focus-within { background: hsl(var(--secondary) / .55); }
+.penni-system-notice {
+  transform: translateX(-50%);
+  min-height: 60px;
+  font-size: 12px;
+  font-weight: 550;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  [data-sonner-toaster].penni-toaster { --width: calc(100vw - 24px); }
+  [data-sonner-toast].penni-notification-toast { min-height: 60px; }
+  .penni-notification-panel { max-width: calc(100vw - 24px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .penni-notification-glyph[data-kind="loading"] svg { animation: none; }
+  .penni-notification-row { transition: none; }
+}
