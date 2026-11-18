@@ -44,8 +44,11 @@ beforeEach(() => {
 });
 
 test("a failed background category load does not show a generic toast on app open", async () => {
+  let rejectRequest;
   api.swrGet.mockReturnValue({
-    fresh: Promise.reject(new Error("network unavailable")),
+    fresh: new Promise((resolve, reject) => {
+      rejectRequest = reject;
+    }),
   });
 
   render(
@@ -54,11 +57,14 @@ test("a failed background category load does not show a generic toast on app ope
     </CategoriesProvider>,
   );
 
+  await waitFor(() => expect(api.swrGet).toHaveBeenCalledTimes(1));
+  await act(async () => {
+    rejectRequest(new Error("network unavailable"));
+  });
   await waitFor(() => {
     expect(screen.getByTestId("category-error")).toHaveTextContent("network unavailable");
   });
   expect(toast.error).not.toHaveBeenCalled();
-  expect(api.swrGet).toHaveBeenCalledTimes(1);
 });
 
 test("refreshing the auth profile for the same user does not reload categories twice", async () => {
