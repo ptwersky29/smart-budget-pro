@@ -32,7 +32,7 @@ def normalise_text(value: str | None) -> str:
 
 def _safe_description(value: str | None) -> str:
     text = normalise_text(value)
-    return text if len(text) >= 6 and text not in GENERIC_DESCRIPTIONS else ""
+    return text if len(text) >= 6 and text not in GENERIC_DESCRIPTIONS and text not in MULTI_CATEGORY_MERCHANTS else ""
 
 
 def _diverse_merchant(key: str) -> bool:
