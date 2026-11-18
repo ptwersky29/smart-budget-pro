@@ -1670,6 +1670,8 @@ const Transactions = React.memo(function Transactions() {
                             onDelete={del}
                             onApprove={approveTx}
                             onClassify={classifySavedTx}
+                            classificationJob={jobsByTransaction[t.transaction_id]}
+                            onReview={openCategoryReview}
                             onSplit={splitTx}
                             onPairTransfer={pairTransfer}
                             onUnpairTransfer={unpairTransfer}
@@ -1786,6 +1788,8 @@ const Transactions = React.memo(function Transactions() {
                             onInspect={openInspector} onDelete={del}
                             onApprove={approveTx}
                             onClassify={classifySavedTx}
+                            classificationJob={jobsByTransaction[t.transaction_id]}
+                            onReview={openCategoryReview}
                             onSplit={splitTx}
                             onPairTransfer={pairTransfer}
                             onUnpairTransfer={unpairTransfer}
@@ -2411,7 +2415,7 @@ const Transactions = React.memo(function Transactions() {
   );
 });
 
-function SwipeableCard({ t, account, isSelected, swipedId, setSwipedId, onToggleSelect, onEdit, onInspect, onDelete, onApprove, onClassify, onSplit, onPairTransfer, onUnpairTransfer, showDate = false }) {
+function SwipeableCard({ t, account, isSelected, swipedId, setSwipedId, onToggleSelect, onEdit, onInspect, onDelete, onApprove, onClassify, onReview, classificationJob, onSplit, onPairTransfer, onUnpairTransfer, showDate = false }) {
   const handlers = useSwipe(
     () => setSwipedId(t.transaction_id),
     () => setSwipedId(null),
@@ -2444,6 +2448,9 @@ function SwipeableCard({ t, account, isSelected, swipedId, setSwipedId, onToggle
             <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
               <TransactionTypeMark transaction={t} badge compact />
               <CategoryBadge category={getTransactionType(t) === "transfer" ? "Transfer" : t.category || "uncategorized"} size="sm" truncate className="min-w-0" />
+              {classificationJob && (classificationJob.status === "queued" || classificationJob.status === "running") && <span className="inline-flex items-center gap-1 text-[10px] text-violet"><Loader2 className="h-3 w-3 animate-spin" /> Classifying</span>}
+              {classificationJob?.status === "failed" && <span className="text-[10px] text-topaz">Retry AI</span>}
+              {classificationJob?.status === "completed" && classificationJob.result?.needs_review && <span className="text-[10px] text-topaz">Review category</span>}
               {t.is_split && <span className="rounded-full bg-violet/10 px-2 py-0.5 text-[10px] font-medium text-violet">Split</span>}
               {showDate && (
                 <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground/60">
@@ -2469,6 +2476,9 @@ function SwipeableCard({ t, account, isSelected, swipedId, setSwipedId, onToggle
                 <DropdownMenuItem onClick={() => onClassify?.(t)}>
                   <Sparkles className="h-4 w-4 mr-2" /> AI classify
                 </DropdownMenuItem>
+                {t.ai_suggested_categories?.suggestions?.length > 0 && <DropdownMenuItem onClick={() => onReview?.(t)}>
+                  <CheckCircle2 className="h-4 w-4 mr-2" /> Review AI suggestions
+                </DropdownMenuItem>}
                 {unapproved && (
                   <DropdownMenuItem onClick={() => onApprove?.(t)}>
                     <CheckCircle2 className="h-4 w-4 mr-2" /> Approve
