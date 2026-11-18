@@ -287,10 +287,18 @@ async def _process_one(session_maker) -> bool:
                 session, job.user_id, tx.description or "", tx.merchant_name, float(tx.amount or 0)
             )
 
-            # Re-read after the network request to avoid a stale identity-map row.
+            # Lock the row before applying results. Manual edits happening during
+            # the network call win, even if they race with this worker's commit.
             session.expire(tx)
-            await session.refresh(tx)
-            if not _eligible(tx) or _snapshot(tx) != job.input_snapshot:
+            tx = (
+                await session.execute(
+                    select(Transaction)
+                    .where(Transaction.transaction_id == job.transaction_id,
+                           Transaction.user_id == job.user_id)
+                    .with_for_update()
+                )
+            ).scalar_one_or_none()
+            if not tx or not _eligible(tx) or _snapshot(tx) != job.input_snapshot:
                 await _finish_job(session, job, "skipped", error="Transaction changed during classification")
                 return True
 
