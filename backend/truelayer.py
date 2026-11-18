@@ -205,7 +205,7 @@ async def _get_valid_token(session, conn: BankConnection) -> str:
             and conn.access_token
         )
 
-    if _usable():
+    if conn.access_token and _usable():
         return _decrypt(conn.access_token)
 
     lock = _token_refresh_locks.setdefault(conn.connection_id, asyncio.Lock())
@@ -213,7 +213,7 @@ async def _get_valid_token(session, conn: BankConnection) -> str:
         # Another request may already have rotated the refresh token.
         # Reload from the database under this lock before deciding to refresh.
         await session.refresh(conn)
-        if _usable():
+        if conn.access_token and _usable():
             return _decrypt(conn.access_token)
         if not conn.refresh_token:
             raise HTTPException(401, "Token expired and no refresh token available — reconnect your bank")
@@ -415,10 +415,8 @@ async def _recover_connection(session, conn: BankConnection) -> bool:
             last_error = exc
 
     if last_error:
-        conn.last_sync_status = (
-            "reconnect_required" if is_reauth_error(last_error) else "error"
-        )
-        conn.status = conn.last_sync_status
+        conn.status = "reconnect_required" if is_reauth_error(last_error) else "error"
+        conn.last_sync_status = conn.status
         conn.last_error = connection_error_message(last_error)
     conn.last_error_at = datetime.now(timezone.utc)
     await session.commit()
