@@ -34,13 +34,11 @@ export function CategoriesProvider({ children }) {
   const [hierarchy, setHierarchy] = useState(() => cachedCategories?.hierarchy || {});
   const [loading, setLoading] = useState(false);
   const [version, setVersion] = useState(0);
-  const [loadError, setLoadError] = useState("");
 
   const refreshCategories = useCallback(async ({ silent = false } = {}) => {
     if (!userKey) {
       setCategories([]);
       setHierarchy({});
-      setLoadError("");
       setLoading(false);
       return { categories: [], hierarchy: {} };
     }
@@ -53,19 +51,16 @@ export function CategoriesProvider({ children }) {
     const request = (async () => {
       const hasCached = Boolean(cacheGetEntry("/categories", {})?.data);
       if (!hasCached) setLoading(true);
-      setLoadError("");
       try {
         const { data } = await api.swrGet("/categories", {}, 5 * 60_000).fresh;
         const nextCategories = (data.categories || []).map(withCategoryEmoji);
         const nextHierarchy = data.hierarchy || {};
         setCategories(nextCategories);
         setHierarchy(nextHierarchy);
-        setLoadError("");
         setVersion((current) => current + 1);
         return { categories: nextCategories, hierarchy: nextHierarchy };
       } catch (error) {
         const message = formatApiError(error);
-        setLoadError(message);
         // Category loading is optional during shell startup. Keep cached or
         // built-in categories visible; explicit refreshes can still show errors.
         if (!silent) toast.error(message);
@@ -183,7 +178,6 @@ export function CategoriesProvider({ children }) {
     groupedCategories,
     hierarchy,
     loading,
-    error: loadError,
     version,
     sectionOptions,
     resolveCategory,
@@ -200,7 +194,6 @@ export function CategoriesProvider({ children }) {
     groupedCategories,
     hierarchy,
     loading,
-    loadError,
     version,
     sectionOptions,
     resolveCategory,
