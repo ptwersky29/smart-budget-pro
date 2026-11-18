@@ -40,7 +40,6 @@ export default function CategoryCombobox({
   const {
     categories: sharedCategories,
     loading: categoriesLoading,
-    error: categoriesError,
     refreshCategories,
     createCategory,
     resolveCategory,
@@ -176,7 +175,7 @@ export default function CategoryCombobox({
               placeholder="Search categories…"
               className="h-11 text-[13px]" />
             {usingFallback && <div className="flex items-center justify-between gap-2 border-b border-border/50 px-3 py-2 text-[11px] text-muted-foreground">
-              <span>{categoriesLoading ? "Loading saved categories…" : categoriesError ? "Saved categories unavailable — showing standard list" : "Standard categories shown"}</span>
+              <span>{categoriesLoading ? "Loading saved categories…" : "Standard categories shown"}</span>
               <button type="button" className="shrink-0 font-medium text-primary hover:underline" onClick={() => refreshCategories?.({ silent: true })?.catch?.(() => {})}>Retry</button>
             </div>}
             <CommandList className="min-h-[148px] max-h-[min(55dvh,360px)] overflow-y-auto overscroll-contain px-1.5 py-1">
