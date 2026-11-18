@@ -170,6 +170,14 @@ def build_router() -> APIRouter:
             or_(Transaction.tx_type.is_(None), Transaction.tx_type != "transfer"),
             Transaction.transfer_pair_id.is_(None),
             Transaction.parent_id.is_(None),
+            # Skip already-queued transactions so a second click can enqueue
+            # the next page of up to 200, even when the first batch is running.
+            ~Transaction.transaction_id.in_(
+                select(ClassificationJob.transaction_id).where(
+                    ClassificationJob.user_id == user["user_id"],
+                    ClassificationJob.status.in_(ACTIVE),
+                )
+            ),
         )
         try:
             if payload.date_from:
