@@ -1,7 +1,7 @@
 """SQLAlchemy 2.0 async models for PostgreSQL (Supabase)."""
 
-from datetime import date, datetime, timezone
 import os
+from datetime import date, datetime, timezone
 from typing import AsyncIterator, List, Optional
 
 from sqlalchemy import (
@@ -1167,6 +1167,33 @@ class Transaction(Base, TimestampMixin):
         Index("idx_transactions_balance_type", "user_id", "balance_type"),
         Index("idx_transactions_approval", "user_id", "approval_status"),
         Index("idx_transactions_transfer_pair", "user_id", "transfer_pair_id"),
+    )
+
+
+
+class ClassificationJob(Base, TimestampMixin):
+    """Durable, user-scoped background transaction categorisation request."""
+
+    __tablename__ = "classification_jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    job_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    user_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("users.user_id"), nullable=False, index=True
+    )
+    transaction_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    # Unique for non-terminal work; NULL permits historical completed attempts.
+    active_key: Mapped[Optional[str]] = mapped_column(String(180), nullable=True, unique=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="queued")
+    input_snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
+    result: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    error: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index("idx_classification_jobs_user_created", "user_id", "created_at"),
+        Index("idx_classification_jobs_status_created", "status", "created_at"),
     )
 
 

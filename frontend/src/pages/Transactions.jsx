@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { EmptyState } from "../components/ui/layout";
 import { SkeletonTable } from "../components/ui/Skeleton";
 import { useAssistant } from "../contexts/AssistantContext";
+import { useClassification } from "../contexts/ClassificationContext";
 import { formatCurrency, formatLongDate, formatShortDate } from "../lib/format";
 import Sparkline from "../components/ui/Sparkline";
 import { withUndo } from "../lib/undo";
@@ -246,6 +247,7 @@ function TransactionInspector({ transaction, onClose, onEdit, onDelete, onApprov
 const Transactions = React.memo(function Transactions() {
   useEffect(() => { document.title = "Transactions | Penni"; }, []);
   const { openAssistant } = useAssistant();
+  const { jobsByTransaction, enqueue, enqueueUncategorized } = useClassification();
   const { openAction } = useActions();
   const [txs, setTxs] = useState([]);
   const [total, setTotal] = useState(0);
@@ -1042,26 +1044,40 @@ const Transactions = React.memo(function Transactions() {
     }
   }, []);
 
+  // Queue AI work without opening a modal or blocking transaction entry.
   const classifySavedTx = useCallback(async (t) => {
-    setReviewTx(t);
-    setReviewSuggestions([]);
-    setReviewOpen(true);
-    setReviewLoading(true);
     try {
-      const { data } = await api.post(`/transactions/${t.transaction_id}/classify`);
-      const nextTx = data.transaction || t;
-      const suggestions = data.suggestions || nextTx.ai_suggested_categories?.suggestions || [];
-      setTxs(prev => prev.map(row => row.transaction_id === t.transaction_id ? nextTx : row));
-      setReviewTx(nextTx);
-      setReviewSuggestions(suggestions.slice(0, 3));
-      toast.success("AI suggestions added");
-    } catch (e) {
-      toast.error(formatApiError(e?.response?.data?.detail) || "AI classification failed");
-    } finally {
-      setReviewLoading(false);
-    }
+      const result = await enqueue([t.transaction_id]);
+      if (result.queued) toast.success("Classification started in background");
+      else if (result.already_queued) toast.info("Already classifying this transaction");
+      else toast.info("This transaction cannot be classified");
+    } catch (e) { toast.error(formatApiError(e) || "Could not queue classification"); }
+  }, [enqueue]);
+
+  const openCategoryReview = useCallback((t) => {
+    setReviewTx(t);
+    setReviewSuggestions(t.ai_suggested_categories?.suggestions || []);
+    setReviewLoading(false);
+    setReviewOpen(true);
   }, []);
 
+  const classifySelected = useCallback(async () => {
+    if (!selectedIds.size) return;
+    try {
+      const result = await enqueue(Array.from(selectedIds));
+      if (result.queued) toast.success(result.queued + " transactions queued in background");
+      else toast.info(result.already_queued ? "Already classifying selected transactions" : "No eligible transactions selected");
+      setSelectedIds(new Set());
+    } catch (e) { toast.error(formatApiError(e) || "Could not queue classification"); }
+  }, [selectedIds, enqueue]);
+
+  const classifyUncategorized = useCallback(async () => {
+    try {
+      const result = await enqueueUncategorized(filters);
+      if (result.queued) toast.success(result.queued + " uncategorized transactions queued");
+      else toast.info("No new uncategorized transactions to classify");
+    } catch (e) { toast.error(formatApiError(e) || "Could not start classification"); }
+  }, [enqueueUncategorized, filters]);
   const bulkApprove = useCallback(async (highConfidenceOnly = false) => {
     try {
       const candidates = selectedIds.size
@@ -1379,6 +1395,9 @@ const Transactions = React.memo(function Transactions() {
                       <DropdownMenuItem onClick={() => setCompareOpen(true)}>
                         <BarChart3 className="mr-2 h-4 w-4" /> Compare periods
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={classifyUncategorized}>
+                        <Sparkles className="mr-2 h-4 w-4" /> Classify uncategorized
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={exportCsv}>
                         <Download className="mr-2 h-4 w-4" /> Export CSV
                       </DropdownMenuItem>
@@ -1581,6 +1600,11 @@ const Transactions = React.memo(function Transactions() {
                   active={effectiveLedgerTab}
                   onChange={selectLedgerTab}
                 />
+                <button type="button" onClick={classifyUncategorized}
+                  className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-[11px] font-medium text-[var(--penni-accent)] hover:bg-secondary"
+                  title="Classify uncategorized transactions in the current filters; no popup">
+                  <Sparkles className="h-3.5 w-3.5" /> <span className="hidden sm:inline">AI Classify</span>
+                </button>
                 <PenniSelect aria-label="Sort transactions" value={filters.sort} onChange={event => setFilter("sort", event.target.value)} className="penni-reference-sort">
                   <option value="date">Sort: Date (newest)</option>
                   <option value="amount">Sort: Amount</option>
@@ -1646,6 +1670,8 @@ const Transactions = React.memo(function Transactions() {
                             onDelete={del}
                             onApprove={approveTx}
                             onClassify={classifySavedTx}
+                            classificationJob={jobsByTransaction[t.transaction_id]}
+                            onReview={openCategoryReview}
                             onSplit={splitTx}
                             onPairTransfer={pairTransfer}
                             onUnpairTransfer={unpairTransfer}
@@ -1670,6 +1696,8 @@ const Transactions = React.memo(function Transactions() {
                         onDelete={del}
                         onApprove={approveTx}
                         onClassify={classifySavedTx}
+                        classificationJob={jobsByTransaction[t.transaction_id]}
+                        onReview={openCategoryReview}
                         onSplit={splitTx}
                         onPairTransfer={pairTransfer}
                         onUnpairTransfer={unpairTransfer}
@@ -1760,6 +1788,8 @@ const Transactions = React.memo(function Transactions() {
                             onInspect={openInspector} onDelete={del}
                             onApprove={approveTx}
                             onClassify={classifySavedTx}
+                            classificationJob={jobsByTransaction[t.transaction_id]}
+                            onReview={openCategoryReview}
                             onSplit={splitTx}
                             onPairTransfer={pairTransfer}
                             onUnpairTransfer={unpairTransfer}
@@ -1800,6 +1830,9 @@ const Transactions = React.memo(function Transactions() {
             <span className="mr-3 hidden text-[11.5px] text-muted-foreground sm:inline">
               Total: <span className={`money-tabular font-semibold ${selectedTotal < 0 ? "text-ruby" : "text-emerald"}`}>{formatCurrency(selectedTotal, { signed: true })}</span>
             </span>
+            <button type="button" onClick={classifySelected} className="inline-flex h-[34px] items-center gap-1.5 rounded-[8px] border border-border bg-card px-3 text-[11px] font-semibold text-[var(--penni-accent)] transition hover:bg-secondary/60">
+              <Sparkles className="h-3.5 w-3.5" /> AI Classify
+            </button>
             <button onClick={() => bulkApprove(false)} disabled={selectedUnapprovedCount === 0} className="inline-flex h-[34px] items-center gap-1.5 rounded-[8px] bg-emerald px-3 text-[11px] font-semibold text-white transition hover:bg-emerald/90 disabled:cursor-not-allowed disabled:opacity-45" aria-label={selectedUnapprovedCount === 0 ? "No selected transactions need approval" : `Approve ${selectedUnapprovedCount} selected transaction${selectedUnapprovedCount === 1 ? "" : "s"}`}>
               <CheckCircle2 className="h-3.5 w-3.5" /> Approve{selectedUnapprovedCount > 0 ? ` ${selectedUnapprovedCount}` : ""}
             </button>
@@ -2382,7 +2415,7 @@ const Transactions = React.memo(function Transactions() {
   );
 });
 
-function SwipeableCard({ t, account, isSelected, swipedId, setSwipedId, onToggleSelect, onEdit, onInspect, onDelete, onApprove, onClassify, onSplit, onPairTransfer, onUnpairTransfer, showDate = false }) {
+function SwipeableCard({ t, account, isSelected, swipedId, setSwipedId, onToggleSelect, onEdit, onInspect, onDelete, onApprove, onClassify, onReview, classificationJob, onSplit, onPairTransfer, onUnpairTransfer, showDate = false }) {
   const handlers = useSwipe(
     () => setSwipedId(t.transaction_id),
     () => setSwipedId(null),
@@ -2415,6 +2448,9 @@ function SwipeableCard({ t, account, isSelected, swipedId, setSwipedId, onToggle
             <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
               <TransactionTypeMark transaction={t} badge compact />
               <CategoryBadge category={getTransactionType(t) === "transfer" ? "Transfer" : t.category || "uncategorized"} size="sm" truncate className="min-w-0" />
+              {classificationJob && (classificationJob.status === "queued" || classificationJob.status === "running") && <span className="inline-flex items-center gap-1 text-[10px] text-violet"><Loader2 className="h-3 w-3 animate-spin" /> Classifying</span>}
+              {classificationJob?.status === "failed" && <span className="text-[10px] text-topaz">Retry AI</span>}
+              {classificationJob?.status === "completed" && classificationJob.result?.needs_review && <span className="text-[10px] text-topaz">Review category</span>}
               {t.is_split && <span className="rounded-full bg-violet/10 px-2 py-0.5 text-[10px] font-medium text-violet">Split</span>}
               {showDate && (
                 <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground/60">
@@ -2440,6 +2476,9 @@ function SwipeableCard({ t, account, isSelected, swipedId, setSwipedId, onToggle
                 <DropdownMenuItem onClick={() => onClassify?.(t)}>
                   <Sparkles className="h-4 w-4 mr-2" /> AI classify
                 </DropdownMenuItem>
+                {t.ai_suggested_categories?.suggestions?.length > 0 && <DropdownMenuItem onClick={() => onReview?.(t)}>
+                  <CheckCircle2 className="h-4 w-4 mr-2" /> Review AI suggestions
+                </DropdownMenuItem>}
                 {unapproved && (
                   <DropdownMenuItem onClick={() => onApprove?.(t)}>
                     <CheckCircle2 className="h-4 w-4 mr-2" /> Approve

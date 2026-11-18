@@ -52,6 +52,8 @@ const TransactionRow = React.memo(
     onSetFocus,
     onApprove,
     onClassify,
+    onReview,
+    classificationJob,
     onSplit,
     onPairTransfer,
     onUnpairTransfer,
@@ -162,6 +164,9 @@ const TransactionRow = React.memo(
                   showIcon
                 />
                 {t.is_split ? <span className="shrink-0 rounded-full bg-violet/10 px-1.5 py-0.5 text-[11px] font-medium text-violet">Split</span> : null}
+                {classificationJob && ["queued", "running"].includes(classificationJob.status) && <span className="inline-flex shrink-0 items-center gap-1 text-[10px] text-violet" title="AI classification is running in the background"><Sparkles className="h-3 w-3" /> Classifying</span>}
+                {classificationJob?.status === "failed" && <span className="shrink-0 text-[10px] text-topaz">Retry AI</span>}
+                {classificationJob?.status === "completed" && classificationJob.result?.needs_review && <span className="shrink-0 text-[10px] text-topaz">Review</span>}
               </div>
             </td>
             <td className="penni-reference-tx-bank px-2 py-2">
@@ -188,6 +193,11 @@ const TransactionRow = React.memo(
                   {onClassify && (
                     <DropdownMenuItem onClick={() => onClassify(t)}>
                       <Sparkles className="h-4 w-4 mr-2" /> AI classify
+                    </DropdownMenuItem>
+                  )}
+                  {onReview && t.ai_suggested_categories?.suggestions?.length > 0 && (
+                    <DropdownMenuItem onClick={() => onReview(t)}>
+                      <CheckCircle2 className="h-4 w-4 mr-2" /> Review AI suggestions
                     </DropdownMenuItem>
                   )}
                   {onApprove && (t.approval_status === "unapproved" || t.category_approval_status === "unapproved") && (
@@ -255,6 +265,8 @@ const TransactionRow = React.memo(
     prev.t.category === next.t.category &&
     prev.t.approval_status === next.t.approval_status &&
     prev.t.category_approval_status === next.t.category_approval_status &&
+    prev.classificationJob?.status === next.classificationJob?.status &&
+    prev.classificationJob?.result?.needs_review === next.classificationJob?.result?.needs_review &&
     prev.t.is_split === next.t.is_split &&
     prev.t.transfer_pair_id === next.t.transfer_pair_id &&
     prev.showDate === next.showDate &&
