@@ -8,10 +8,9 @@ const FINISHED = new Set(["completed", "failed", "skipped"]);
 
 function mergeJobs(current, incoming) {
   const byTransaction = new Map();
-  [...current, ...incoming].forEach((job) => {
-    const old = byTransaction.get(job.transaction_id);
-    if (!old || old.optimistic || !job.optimistic) byTransaction.set(job.transaction_id, job);
-  });
+  // Newly submitted work must immediately replace an earlier completed state.
+  current.forEach((job) => byTransaction.set(job.transaction_id, job));
+  incoming.forEach((job) => byTransaction.set(job.transaction_id, job));
   return Array.from(byTransaction.values());
 }
 
