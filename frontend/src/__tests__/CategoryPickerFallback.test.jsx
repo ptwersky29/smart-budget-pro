@@ -16,6 +16,7 @@ beforeAll(() => {
 beforeEach(() => {
   useCategories.mockReturnValue({
     categories: [],
+    sectionOptions: ["❤️ Charity", "👕 Clothing", "🏠 Household"],
     loading: false,
     resolveCategory: (name) => buildFallbackCategory(name),
     refreshCategories: jest.fn().mockResolvedValue({ categories: [], hierarchy: {} }),
