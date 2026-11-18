@@ -2586,7 +2586,7 @@ Output ONLY valid JSON, no markdown, no explanation:
                         and float(top.get("confidence") or 0) >= 0.90)
                 )
             )
-            if allowed_to_apply and (not tx.category or tx.category == "uncategorized"):
+            if allowed_to_apply and top is not None and (not tx.category or tx.category == "uncategorized"):
                 tx.category = top["category"]
                 tx.category_approval_status = "unapproved"
             # A new suggestion must not revoke approval of an existing manually
