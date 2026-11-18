@@ -8,6 +8,32 @@ export const DEFAULT_CATEGORY_SECTIONS = [
   "🧩 Ungrouped",
 ];
 
+// Offline-safe catalogue for transaction category pickers. The API remains the
+// source of truth; use this only while the account's categories are unavailable.
+// The slugs match the backend's standard categories so selections remain valid.
+export const STANDARD_CATEGORY_GROUPS = Object.freeze({
+  "❤️ Charity": ["maaser_tzedakah", "charity", "other_charity"],
+  "👕 Clothing": ["clothing_husband", "clothing_wife", "clothing_kids", "shoes"],
+  "🏠 Household": ["fruit_veg", "grocery", "bakery", "fish", "meat", "paper_goods", "takeaway", "wine", "house_supplies", "chemist"],
+  "🏠 Housing": ["rent_mortgage", "electricity", "heating", "gas", "water", "council_tax", "telephone", "mobile", "cleaning_help", "life_insurance", "buildings_insurance"],
+  "👦 Kids": ["school_fees", "bus_fee", "babysitting", "nappies", "trust_savings", "toys", "tutor", "therapy", "medical"],
+  "🧩 Ungrouped": ["public_transport", "car_lease", "petrol_diesel", "dart_charge", "tolls", "tickets", "loan_payoff", "interest", "investments", "petty_cash", "miscellaneous", "taxi", "mikva", "taxes", "upcoming_savings", "uncategorized"],
+  "💰 Income": ["salary", "income"],
+});
+
+export function defaultCategoryFallbacks() {
+  return Object.entries(STANDARD_CATEGORY_GROUPS).flatMap(([section, names]) =>
+    names.map((name) => buildFallbackCategory(name, {
+      section,
+      is_income: section === "💰 Income",
+      is_default: true,
+      source: "System",
+      can_delete: false,
+      category_id: "system:" + name,
+    }))
+  );
+}
+
 export const CATEGORY_COLOR_PALETTE = [
   "#22c55e",
   "#10b981",
