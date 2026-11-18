@@ -1,7 +1,7 @@
 """SQLAlchemy 2.0 async models for PostgreSQL (Supabase)."""
 
-from datetime import date, datetime, timezone
 import os
+from datetime import date, datetime, timezone
 from typing import AsyncIterator, List, Optional
 
 from sqlalchemy import (
