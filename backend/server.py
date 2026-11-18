@@ -33,6 +33,7 @@ import app_config
 import app_settings
 import auth
 import bank_accounts
+import classification_jobs
 import billing
 import budget_system
 import empty_states
@@ -206,6 +207,7 @@ api.include_router(truelayer.build_router())
 api.include_router(ai_service.build_router())
 api.include_router(ai_insights.build_router())
 api.include_router(finance_engine.build_router())
+api.include_router(classification_jobs.build_router())
 api.include_router(billing.build_router())
 api.include_router(tyl.build_router())
 api.include_router(app_config.build_router())
@@ -420,6 +422,12 @@ async def startup():
     if not os.environ.get("TRUELAYER_CLIENT_ID") or not os.environ.get("TRUELAYER_CLIENT_SECRET"):
         logger.warning("TRUELAYER_CLIENT_ID/SECRET not set — Open Banking sync disabled")
 
+    # Classification runs on the server independently of any browser tab, even
+    # when TrueLayer's dedicated background-sync process is disabled here.
+    app.state.classification_worker = asyncio.create_task(
+        classification_jobs.classification_worker(sm)
+    )
+
     # Start background sync loop for TrueLayer. Only one process should own it:
     # the web service sets RUN_BACKGROUND_SYNC=0 and the dedicated worker runs it.
     run_sync = os.environ.get("RUN_BACKGROUND_SYNC", "1").strip().lower() not in {
@@ -451,6 +459,13 @@ async def startup():
 
 @app.on_event("shutdown")
 async def shutdown():
+    worker = getattr(app.state, "classification_worker", None)
+    if worker:
+        worker.cancel()
+        try:
+            await worker
+        except asyncio.CancelledError:
+            pass
     from llm import close_llm_client
     await close_llm_client()
     await dispose_engine()
