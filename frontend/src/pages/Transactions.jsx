@@ -1395,6 +1395,9 @@ const Transactions = React.memo(function Transactions() {
                       <DropdownMenuItem onClick={() => setCompareOpen(true)}>
                         <BarChart3 className="mr-2 h-4 w-4" /> Compare periods
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={classifyUncategorized}>
+                        <Sparkles className="mr-2 h-4 w-4" /> Classify uncategorized
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={exportCsv}>
                         <Download className="mr-2 h-4 w-4" /> Export CSV
                       </DropdownMenuItem>
@@ -1686,6 +1689,8 @@ const Transactions = React.memo(function Transactions() {
                         onDelete={del}
                         onApprove={approveTx}
                         onClassify={classifySavedTx}
+                        classificationJob={jobsByTransaction[t.transaction_id]}
+                        onReview={openCategoryReview}
                         onSplit={splitTx}
                         onPairTransfer={pairTransfer}
                         onUnpairTransfer={unpairTransfer}
@@ -1816,6 +1821,9 @@ const Transactions = React.memo(function Transactions() {
             <span className="mr-3 hidden text-[11.5px] text-muted-foreground sm:inline">
               Total: <span className={`money-tabular font-semibold ${selectedTotal < 0 ? "text-ruby" : "text-emerald"}`}>{formatCurrency(selectedTotal, { signed: true })}</span>
             </span>
+            <button type="button" onClick={classifySelected} className="inline-flex h-[34px] items-center gap-1.5 rounded-[8px] border border-border bg-card px-3 text-[11px] font-semibold text-[var(--penni-accent)] transition hover:bg-secondary/60">
+              <Sparkles className="h-3.5 w-3.5" /> AI Classify
+            </button>
             <button onClick={() => bulkApprove(false)} disabled={selectedUnapprovedCount === 0} className="inline-flex h-[34px] items-center gap-1.5 rounded-[8px] bg-emerald px-3 text-[11px] font-semibold text-white transition hover:bg-emerald/90 disabled:cursor-not-allowed disabled:opacity-45" aria-label={selectedUnapprovedCount === 0 ? "No selected transactions need approval" : `Approve ${selectedUnapprovedCount} selected transaction${selectedUnapprovedCount === 1 ? "" : "s"}`}>
               <CheckCircle2 className="h-3.5 w-3.5" /> Approve{selectedUnapprovedCount > 0 ? ` ${selectedUnapprovedCount}` : ""}
             </button>
