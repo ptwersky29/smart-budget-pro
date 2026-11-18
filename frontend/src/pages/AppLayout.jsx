@@ -9,6 +9,7 @@ import { useKeyboardShortcut } from "../hooks/useKeyboardShortcut";
 import KeyboardShortcutsHelp from "../components/KeyboardShortcutsHelp";
 import CommandPalette from "../components/CommandPalette";
 import NotificationCenter from "../components/NotificationCenter";
+import ClassificationIndicator from "../components/ClassificationIndicator";
 import Logo from "../components/Logo";
 import { BOTTOM_NAV, NAV_SECTIONS, SETTINGS_NAV_ITEM, getRouteMeta, KEYBOARD_GOTO } from "../data/navigation";
 import { APP_NAME } from "../data/constants";
@@ -484,6 +485,7 @@ export default function AppLayout() {
         </div>
       </nav>
 
+      <ClassificationIndicator />
       <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
       <KeyboardShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
       {tourLoaded ? (
