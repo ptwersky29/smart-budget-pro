@@ -1600,6 +1600,11 @@ const Transactions = React.memo(function Transactions() {
                   active={effectiveLedgerTab}
                   onChange={selectLedgerTab}
                 />
+                <button type="button" onClick={classifyUncategorized}
+                  className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-[11px] font-medium text-[var(--penni-accent)] hover:bg-secondary"
+                  title="Classify uncategorized transactions in the current filters; no popup">
+                  <Sparkles className="h-3.5 w-3.5" /> <span className="hidden sm:inline">AI Classify</span>
+                </button>
                 <PenniSelect aria-label="Sort transactions" value={filters.sort} onChange={event => setFilter("sort", event.target.value)} className="penni-reference-sort">
                   <option value="date">Sort: Date (newest)</option>
                   <option value="amount">Sort: Amount</option>
