@@ -1964,29 +1964,28 @@ def build_router() -> APIRouter:
             start_dt, end_dt = _current_month_range()
             alerts = []
 
-            # 1. Budget overruns (actual > budgeted * 1.2)
-            occ_result = await session.execute(
-                select(BudgetOccasion).where(
+            # 1. Budget overruns (actual > budgeted * 1.2). One join instead of
+            # one query per occasion — the dashboard calls this on every load.
+            occ_rows = await session.execute(
+                select(BudgetOccasionCategory, BudgetOccasion.name)
+                .join(BudgetOccasion, BudgetOccasion.id == BudgetOccasionCategory.occasion_id)
+                .where(
                     BudgetOccasion.user_id == user["user_id"],
                     BudgetOccasion.status == "approved",
                 )
             )
-            for occ in occ_result.scalars().all():
-                cat_result = await session.execute(
-                    select(BudgetOccasionCategory).where(
-                        BudgetOccasionCategory.occasion_id == occ.id,
-                    )
-                )
-                for cat in cat_result.scalars().all():
-                    if cat.actual_amount > 0 and cat.budgeted_amount > 0 and cat.actual_amount > cat.budgeted_amount * 1.2:
-                        alerts.append({
-                            "type": "overrun",
-                            "severity": "warning" if cat.actual_amount <= cat.budgeted_amount * 1.5 else "critical",
-                            "message": f"{cat.name} in {occ.name} is £{cat.actual_amount - cat.budgeted_amount:.0f} over budget",
-                            "category": cat.name, "occasion": occ.name,
-                            "budgeted": round(cat.budgeted_amount, 2),
-                            "actual": round(cat.actual_amount, 2),
-                        })
+            for cat, occasion_name in occ_rows:
+                actual = float(cat.actual_amount or 0)
+                budgeted = float(cat.budgeted_amount or 0)
+                if actual > 0 and budgeted > 0 and actual > budgeted * 1.2:
+                    alerts.append({
+                        "type": "overrun",
+                        "severity": "warning" if actual <= budgeted * 1.5 else "critical",
+                        "message": f"{cat.name} in {occasion_name} is £{actual - budgeted:.0f} over budget",
+                        "category": cat.name, "occasion": occasion_name,
+                        "budgeted": round(budgeted, 2),
+                        "actual": round(actual, 2),
+                    })
 
             # 2. Unusual spending (last 30 days vs previous 30 days)
             period_end = now

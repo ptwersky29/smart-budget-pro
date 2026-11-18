@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import { toast } from "sonner";
 import { api, formatApiError } from "../lib/api";
+import { cacheGetEntry } from "../lib/cache";
 import { useAuth } from "./AuthContext";
 import {
   buildFallbackCategory,
@@ -20,8 +21,11 @@ const CategoriesContext = createContext(null);
 
 export function CategoriesProvider({ children }) {
   const { user, loading: authLoading } = useAuth();
-  const [categories, setCategories] = useState([]);
-  const [hierarchy, setHierarchy] = useState({});
+  const cachedCategories = cacheGetEntry("/categories", {})?.data;
+  const [categories, setCategories] = useState(() =>
+    (cachedCategories?.categories || []).map(withCategoryEmoji)
+  );
+  const [hierarchy, setHierarchy] = useState(() => cachedCategories?.hierarchy || {});
   const [loading, setLoading] = useState(false);
   const [version, setVersion] = useState(0);
 
@@ -32,9 +36,10 @@ export function CategoriesProvider({ children }) {
       return { categories: [], hierarchy: {} };
     }
 
-    if (!silent) setLoading(true);
+    const hasCached = Boolean(cacheGetEntry("/categories", {})?.data);
+    if (!silent && !hasCached) setLoading(true);
     try {
-      const { data } = await api.get("/categories");
+      const { data } = await api.swrGet("/categories", {}, 5 * 60_000).fresh;
       const nextCategories = (data.categories || []).map(withCategoryEmoji);
       const nextHierarchy = data.hierarchy || {};
       setCategories(nextCategories);

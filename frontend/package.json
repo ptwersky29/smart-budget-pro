@@ -77,6 +77,7 @@
     "android:sync": "npx cap sync android",
     "android:apk": "npm run build && npx cap sync android && cd android && gradlew.bat assembleDebug",
     "test:ci": "react-scripts test --watchAll=false --coverage",
+    "check:bundle": "node scripts/check-bundle.js",
     "prestart": "node scripts/generate-pwa-icons.js",
     "prebuild": "node scripts/generate-pwa-icons.js"
   },

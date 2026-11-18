@@ -1,6 +1,7 @@
 """SQLAlchemy 2.0 async models for PostgreSQL (Supabase)."""
 
 from datetime import date, datetime, timezone
+import os
 from typing import AsyncIterator, List, Optional
 
 from sqlalchemy import (
@@ -43,9 +44,9 @@ def init_engine(database_url: str, echo: bool = False):
             clean_url,
             echo=echo,
             pool_pre_ping=True,
-            pool_recycle=250,
-            pool_size=5,
-            max_overflow=2,
+            pool_recycle=int(os.environ.get("DB_POOL_RECYCLE", "1800")),
+            pool_size=int(os.environ.get("DB_POOL_SIZE", "5")),
+            max_overflow=int(os.environ.get("DB_MAX_OVERFLOW", "2")),
             connect_args={"ssl": "require"},
         )
     _async_session_maker = async_sessionmaker(_engine, expire_on_commit=False)

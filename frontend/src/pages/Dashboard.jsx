@@ -16,6 +16,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { api, formatApiError } from "../lib/api";
+import { cacheGetEntry } from "../lib/cache";
 import { humanizeCategoryName } from "../lib/categories";
 import { formatDashboardAlertText } from "../lib/dashboardPresentation";
 import { useAssistant } from "../contexts/AssistantContext";
@@ -79,11 +80,11 @@ export default function Dashboard() {
   const { openAssistant } = useAssistant();
   const { openAction } = useActions();
   const accountsStripRef = useRef(null);
-  const [overview, setOverview] = useState(null);
-  const [budgets, setBudgets] = useState([]);
-  const [alerts, setAlerts] = useState([]);
-  const [upcoming, setUpcoming] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [overview, setOverview] = useState(() => cacheGetEntry("/dashboard/overview", {})?.data || null);
+  const [budgets, setBudgets] = useState(() => cacheGetEntry("/budgets", {})?.data?.budgets || []);
+  const [alerts, setAlerts] = useState(() => cacheGetEntry("/budget-system/alerts", {})?.data?.alerts || []);
+  const [upcoming, setUpcoming] = useState(() => cacheGetEntry("/budget-system/upcoming", {})?.data?.upcoming || []);
+  const [loading, setLoading] = useState(() => !cacheGetEntry("/dashboard/overview", {})?.data);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState("");
 
@@ -109,26 +110,27 @@ export default function Dashboard() {
 
   const loadAll = useCallback(async (silent) => {
     if (silent) setRefreshing(true);
-    else setLoading(true);
+    else if (!cacheGetEntry("/dashboard/overview", {})?.data) setLoading(true);
     try {
       const [ov, bd, al, up] = await Promise.allSettled([
-        api.get("/dashboard/overview"),
-        api.get("/budgets"),
-        api.get("/budget-system/alerts"),
-        api.get("/budget-system/upcoming"),
+        api.swrGet("/dashboard/overview", {}, 30_000).fresh,
+        api.swrGet("/budgets", {}, 30_000).fresh,
+        api.swrGet("/budget-system/alerts", {}, 30_000).fresh,
+        api.swrGet("/budget-system/upcoming", {}, 60_000).fresh,
       ]);
       if (ov.status === "fulfilled") {
-        setOverview(ov.value.data);
+        setOverview(ov.value);
         setLoadError("");
       } else {
         const message = formatApiError(ov.reason);
-        setOverview(null);
+        // Keep showing cached data when a background refresh fails.
+        if (!cacheGetEntry("/dashboard/overview", {})?.data) setOverview(null);
         setLoadError(message);
         if (silent) toast.error(message || "Could not refresh dashboard");
       }
-      if (bd.status === "fulfilled") setBudgets(bd.value.data.budgets || []);
-      if (al.status === "fulfilled") setAlerts(al.value.data.alerts || al.value.data || []);
-      if (up.status === "fulfilled") setUpcoming(up.value.data.upcoming || up.value.data || []);
+      if (bd.status === "fulfilled") setBudgets(bd.value.budgets || []);
+      if (al.status === "fulfilled") setAlerts(al.value.alerts || al.value || []);
+      if (up.status === "fulfilled") setUpcoming(up.value.upcoming || up.value || []);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -218,6 +220,16 @@ export default function Dashboard() {
     );
   }
 
+  const staleNotice = loadError && overview ? (
+    <div
+      role="status"
+      className="surface flex items-center gap-2 px-4 py-2 text-[12px] text-muted-foreground"
+    >
+      <AlertTriangle className="h-4 w-4 shrink-0 text-topaz" />
+      Showing saved data — the live refresh failed.
+    </div>
+  ) : null;
+
   const empty =
     (!overview.recent || overview.recent.length === 0) &&
     accounts.length === 0 &&
@@ -227,6 +239,7 @@ export default function Dashboard() {
   if (empty) {
     return (
       <div className="page-stack" data-testid="dashboard-root">
+        {staleNotice}
         <Surface>
           <EmptyPanel
             icon={Wallet}
@@ -254,6 +267,8 @@ export default function Dashboard() {
 
   return (
     <div className="page-stack dashboard-reference" data-testid="dashboard-root">
+
+      {staleNotice}
 
       <ReferenceBalanceHero balance={balance} accounts={accounts} income={income} spend={spend}
         budgets={budgets} onRefresh={()=>loadAll(true)} refreshing={refreshing}

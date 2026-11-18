@@ -13,7 +13,9 @@ describe("Public demo reuses the ACTUAL Penni offline app", () => {
   });
   test("demo profile bypasses cached private offline profile and stored tokens", () => {
     const auth = read("contexts/AuthContext.jsx"), session = read("lib/demoSession.js");
-    expect(auth).toContain("if (isPublicDemo()) { setUser(DEMO_USER); setLoading(false); return; }");
+    expect(auth).toContain("isPublicDemo() ? DEMO_USER : readOfflineProfile()");
+    expect(auth).toContain("if (isPublicDemo()) {");
+    expect(auth).toContain("setUser(DEMO_USER); setLoading(false);");
     expect(auth).toContain("if (!isPublicDemo()) syncTokensFromLocation()");
     expect(session).toContain("isOffline: true, isDemo: true");
     expect(session).toContain("window.sessionStorage.getItem(DEMO_SESSION_KEY)");

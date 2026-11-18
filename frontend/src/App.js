@@ -13,6 +13,8 @@ import AdminRoute from "./components/AdminRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ConsentBanner from "./components/ConsentBanner";
 import PageLoader from "./components/PageLoader";
+import NetworkStatus from "./components/NetworkStatus";
+import UpdatePrompt from "./components/UpdatePrompt";
 import { ActionProvider } from "./contexts/ActionContext";
 import GlobalActionHost from "./components/actions/GlobalActionHost";
 import { isPublicDemo, exitPublicDemo } from "./lib/demoSession";
@@ -71,57 +73,59 @@ function AppRouter() {
   }
 
   return (
-    <Routes>
-      <Route path="/" element={<Landing />} />
-      <Route path="/demo/*" element={<DemoEntry />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/verify-email" element={<VerifyEmail />} />
-      <Route path="/pricing" element={<Pricing />} />
-      <Route path="/privacy" element={<Privacy />} />
-      <Route path="/callback" element={<AuthCallback />} />
-      <Route
-        path="/onboarding"
-        element={
-          <ProtectedRoute>
-            <OnboardingWizard />
-          </ProtectedRoute>
-        }
-      />
-      <Route path="/billing/success" element={<PaymentSuccess />} />
-      <Route
-        element={
-          <ProtectedRoute>
-            <AppLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/more" element={<MorePage />} />
-        <Route path="/transactions" element={<Transactions />} />
-        <Route path="/budgets" element={<BudgetPage />} />
-        <Route path="/subscriptions" element={<Subscriptions />} />
-        <Route path="/import" element={<Navigate to="/accounts" replace />} />
-        <Route path="/investments" element={<Investments />} />
-        <Route path="/connections" element={<Connections />} />
-        <Route path="/integrations" element={<Integrations />} />
-        <Route path="/sms" element={<SMS />} />
-        <Route path="/statements" element={<Statements />} />
-        <Route path="/accounts" element={<AccountsPage />} />
-        <Route path="/accounts/:accountId" element={<AccountDetailPage />} />
-        <Route path="/accounts/legacy/:connectionId" element={<AccountPage />} />
-        <Route path="/jewish" element={<Jewish />} />
-        <Route path="/uk-tools" element={<UKTools />} />
-        <Route path="/reports" element={<Reports />} />
-        <Route path="/analytics" element={<Analytics />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/settings/categories" element={<CategoryManager />} />
-        <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-      </Route>
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <ErrorBoundary key={location.pathname}>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/demo/*" element={<DemoEntry />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/callback" element={<AuthCallback />} />
+        <Route
+          path="/onboarding"
+          element={
+            <ProtectedRoute>
+              <OnboardingWizard />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/billing/success" element={<PaymentSuccess />} />
+        <Route
+          element={
+            <ProtectedRoute>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/more" element={<MorePage />} />
+          <Route path="/transactions" element={<Transactions />} />
+          <Route path="/budgets" element={<BudgetPage />} />
+          <Route path="/subscriptions" element={<Subscriptions />} />
+          <Route path="/import" element={<Navigate to="/accounts" replace />} />
+          <Route path="/investments" element={<Investments />} />
+          <Route path="/connections" element={<Connections />} />
+          <Route path="/integrations" element={<Integrations />} />
+          <Route path="/sms" element={<SMS />} />
+          <Route path="/statements" element={<Statements />} />
+          <Route path="/accounts" element={<AccountsPage />} />
+          <Route path="/accounts/:accountId" element={<AccountDetailPage />} />
+          <Route path="/accounts/legacy/:connectionId" element={<AccountPage />} />
+          <Route path="/jewish" element={<Jewish />} />
+          <Route path="/uk-tools" element={<UKTools />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/settings/categories" element={<CategoryManager />} />
+          <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+        </Route>
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </ErrorBoundary>
   );
 }
 
@@ -142,6 +146,8 @@ export default function App() {
                   </ActionProvider>
                   {!isPublicDemo() && <AssistantPanel />}
                   {!isPublicDemo() && <ConsentBanner />}
+                  {!isPublicDemo() && <NetworkStatus />}
+                  <UpdatePrompt />
                   <Toaster richColors position="top-right" />
                 </ErrorBoundary>
               </CategoriesProvider>

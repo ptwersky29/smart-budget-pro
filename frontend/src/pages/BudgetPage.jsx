@@ -15,6 +15,7 @@ import {
   List, LayoutGrid, Bell, FolderCog, BarChart3,
 } from "lucide-react";
 import { api } from "../lib/api";
+import { cacheGetEntry } from "../lib/cache";
 import { toast } from "sonner";
 import { withUndo } from "../lib/undo";
 import { Button } from "../components/ui/button";
@@ -520,7 +521,9 @@ export default React.memo(function BudgetPage() {
     return () => clearInterval(id);
   }, []);
   const [month, setMonth] = useState(fmtMonth(now.getFullYear(), now.getMonth() + 1));
-  const [budgets, setBudgets] = useState([]);
+  const [budgets, setBudgets] = useState(
+    () => cacheGetEntry("/budgets", { month })?.data?.budgets || []
+  );
   const budgetsRef = useRef(budgets);
   budgetsRef.current = budgets;
   const [loading, setLoading] = useState(true);
@@ -692,9 +695,9 @@ export default React.memo(function BudgetPage() {
   }, [categorySpend, budgets]);
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
+    if (!cacheGetEntry("/budgets", { month })?.data) setLoading(true);
     try {
-      const { data } = await api.get("/budgets", { params: { month } });
+      const data = await api.swrGet("/budgets", { month }, 30_000).fresh;
       setBudgets(data.budgets || []);
       setEventGroups(data.event_groups || {});
       setLoadError(null);

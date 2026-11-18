@@ -1,5 +1,5 @@
 import axios from "axios";
-import { cacheGet, cacheSet, cacheInvalidate, dedupe } from "./cache";
+import { cacheInvalidate, dedupe, swr } from "./cache";
 import { getToken, setToken, clearTokens } from "./storage";
 import { isPublicDemo } from "./demoSession";
 
@@ -10,51 +10,203 @@ const DEFAULT_BACKEND = "https://budget-pro-4jlg.onrender.com";
 export const BACKEND_URL = (process.env.REACT_APP_BACKEND_URL || DEFAULT_BACKEND).replace(/\/+$/, "");
 export const API = `${BACKEND_URL}/api`;
 
+const API_TIMEOUT_MS = Number(process.env.REACT_APP_API_TIMEOUT) || 45_000;
+const SLOW_REQUEST_MS = 4_000;
+const MAX_RETRIES = 2;
+
 export const api = axios.create({
   baseURL: API,
   withCredentials: true,
+  timeout: API_TIMEOUT_MS,
 });
 
-const OFFLINE_CACHE_KEY = "penni.offline-api-cache.v1";
-const OFFLINE_CACHE_LIMIT = 80;
+// ── Offline cache (per-response keys, written off the request path) ──────────
+// The previous implementation parsed and re-stringified one 80-entry JSON blob
+// on every successful GET, on the main thread. Each response now owns a single
+// localStorage key and writes are coalesced into an idle callback.
 
-function offlineCacheKey(url, params) {
-  return `${url || ""}::${JSON.stringify(params || {})}`;
+const OFFLINE_PREFIX = "penni.api.v2:";
+const LEGACY_OFFLINE_KEY = "penni.offline-api-cache.v1";
+const OFFLINE_CACHE_LIMIT = 60;
+const OFFLINE_ENTRY_MAX_CHARS = 200_000;
+
+const pendingWrites = new Map();
+let flushHandle = null;
+let writesSincePrune = 0;
+let legacyMigrationDone = false;
+
+function offlineStorageKey(url, params) {
+  const raw = `${url || ""}::${JSON.stringify(params || {})}`;
+  let hash = 5381;
+  for (let i = 0; i < raw.length; i += 1) {
+    hash = ((hash << 5) + hash + raw.charCodeAt(i)) | 0;
+  }
+  const readable = raw.slice(0, 60).replace(/[^a-zA-Z0-9/_.:-]/g, "_");
+  return `${OFFLINE_PREFIX}${(hash >>> 0).toString(36)}:${readable}`;
 }
 
-function readOfflineCache() {
+function storageAvailable() {
   try {
-    return JSON.parse(localStorage.getItem(OFFLINE_CACHE_KEY) || "{}");
+    return typeof window !== "undefined" && Boolean(window.localStorage);
   } catch {
-    return {};
+    return false;
   }
 }
 
-function writeOfflineCache(entries) {
+function scheduleIdle(fn) {
+  if (typeof window === "undefined") return;
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(fn, { timeout: 2_000 });
+  } else {
+    setTimeout(fn, 0);
+  }
+}
+
+function pruneOfflineCache() {
+  if (!storageAvailable()) return;
   try {
-    const sorted = Object.entries(entries)
-      .sort(([, a], [, b]) => (b.savedAt || 0) - (a.savedAt || 0))
-      .slice(0, OFFLINE_CACHE_LIMIT);
-    localStorage.setItem(OFFLINE_CACHE_KEY, JSON.stringify(Object.fromEntries(sorted)));
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(OFFLINE_PREFIX)) keys.push(key);
+    }
+    if (keys.length <= OFFLINE_CACHE_LIMIT) return;
+    const dated = keys.map((key) => {
+      let savedAt = 0;
+      try { savedAt = JSON.parse(localStorage.getItem(key) || "{}").savedAt || 0; } catch { /* corrupt entry */ }
+      return { key, savedAt };
+    });
+    dated.sort((a, b) => a.savedAt - b.savedAt);
+    const excess = dated.length - OFFLINE_CACHE_LIMIT;
+    for (let i = 0; i < excess; i += 1) localStorage.removeItem(dated[i].key);
   } catch {
-    // Offline caching is best-effort; quota limits must not interrupt the app.
+    // Pruning is best-effort; quota errors must never interrupt the app.
+  }
+}
+
+function flushOfflineCache() {
+  flushHandle = null;
+  if (!storageAvailable() || pendingWrites.size === 0) return;
+  const entries = Array.from(pendingWrites.entries());
+  pendingWrites.clear();
+  for (const [key, payload] of entries) {
+    try {
+      const serialised = JSON.stringify(payload);
+      if (serialised.length > OFFLINE_ENTRY_MAX_CHARS) continue;
+      localStorage.setItem(key, serialised);
+    } catch {
+      // Quota exceeded — drop the write rather than break the request flow.
+    }
+  }
+  writesSincePrune += entries.length;
+  if (writesSincePrune >= 10) {
+    writesSincePrune = 0;
+    pruneOfflineCache();
+  }
+}
+
+function scheduleFlush() {
+  if (flushHandle !== null) return;
+  flushHandle = setTimeout(() => scheduleIdle(flushOfflineCache), 250);
+}
+
+function migrateLegacyCache() {
+  if (legacyMigrationDone || !storageAvailable()) return;
+  legacyMigrationDone = true;
+  try {
+    const raw = localStorage.getItem(LEGACY_OFFLINE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    for (const [compositeKey, entry] of Object.entries(parsed || {})) {
+      const [url, paramsJson] = String(compositeKey).split("::");
+      let params = {};
+      try { params = JSON.parse(paramsJson || "{}"); } catch { /* keep {} */ }
+      if (!url || !entry?.data) continue;
+      try {
+        localStorage.setItem(
+          offlineStorageKey(url, params),
+          JSON.stringify({ data: entry.data, savedAt: entry.savedAt || Date.now() })
+        );
+      } catch { break; }
+    }
+    localStorage.removeItem(LEGACY_OFFLINE_KEY);
+  } catch {
+    // Corrupt legacy cache — discard it.
+    try { localStorage.removeItem(LEGACY_OFFLINE_KEY); } catch { /* ignore */ }
   }
 }
 
 function cacheOfflineResponse(config, data) {
+  if (isPublicDemo()) return;
   // Never persist brokerage balances to localStorage / the offline cache.
   if (String(config?.url || "").startsWith("/trading212/")) return;
   if (config?.method?.toLowerCase() !== "get" || !config?.url) return;
-  const entries = readOfflineCache();
-  entries[offlineCacheKey(config.url, config.params)] = { data, savedAt: Date.now() };
-  writeOfflineCache(entries);
+  if (data == null) return;
+  pendingWrites.set(offlineStorageKey(config.url, config.params), {
+    data,
+    savedAt: Date.now(),
+  });
+  scheduleFlush();
 }
 
 function getOfflineResponse(config) {
+  if (!storageAvailable()) return null;
   if (String(config?.url || "").startsWith("/trading212/")) return null;
-  const entry = readOfflineCache()[offlineCacheKey(config?.url, config?.params)];
-  return entry?.data ?? offlineDemoResponse(config);
+  try {
+    const raw = localStorage.getItem(offlineStorageKey(config?.url, config?.params));
+    if (!raw) return null;
+    const entry = JSON.parse(raw);
+    return entry?.data != null ? entry : null;
+  } catch {
+    return null;
+  }
 }
+
+export function clearOfflineCache() {
+  pendingWrites.clear();
+  if (!storageAvailable()) return;
+  try {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(OFFLINE_PREFIX)) keys.push(key);
+    }
+    keys.forEach((key) => localStorage.removeItem(key));
+    localStorage.removeItem(LEGACY_OFFLINE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+if (typeof window !== "undefined") {
+  scheduleIdle(migrateLegacyCache);
+}
+
+function emit(name, detail) {
+  if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") return;
+  try {
+    window.dispatchEvent(new CustomEvent(name, { detail }));
+  } catch {
+    // CustomEvent unavailable in some test environments.
+  }
+}
+
+function armSlowTimer(config) {
+  if (typeof window === "undefined" || !config || config._slowTimer) return;
+  config._slowTimer = setTimeout(() => {
+    config._slowTimer = null;
+    emit("penni:slow-request", { url: config.url });
+  }, SLOW_REQUEST_MS);
+}
+
+function clearSlowTimer(config) {
+  if (config?._slowTimer) {
+    clearTimeout(config._slowTimer);
+    config._slowTimer = null;
+  }
+}
+
+// ── Demo mode ────────────────────────────────────────────────────────────────
 
 function offlineDemoResponse(config) {
   const url = String(config?.url || "").split("?")[0];
@@ -159,28 +311,6 @@ function offlineDemoResponse(config) {
   return null;
 }
 
-let _csrfToken = null;
-// One refresh request for all simultaneous 401 responses. Refresh tokens rotate.
-let refreshPromise = null;
-
-async function _ensureCsrf() {
-  if (_csrfToken) return _csrfToken;
-  try {
-    const { data } = await axios.get(`${API}/csrf-token`, { withCredentials: true });
-    _csrfToken = data.csrf_token;
-  } catch { console.warn("[csrf] failed to fetch token — unsafe requests may fail"); }
-  return _csrfToken;
-}
-
-const SAFE_METHODS = new Set(["get", "head", "options"]);
-
-export function demoReadOnlyError() {
-  const error = new Error("This is a read-only demo. Create a free account to save changes.");
-  error.code = "PENNI_DEMO_READ_ONLY";
-  error.response = { status: 403, data: { detail: error.message } };
-  return error;
-}
-
 function demoResponse(config) {
   const url = String(config.url || "").split("?")[0];
   const mock = offlineDemoResponse(config);
@@ -198,6 +328,110 @@ function demoResponse(config) {
   return { data: JSON.parse(JSON.stringify(data)), status:200, statusText:"Offline demo", headers:{ "x-penni-demo":"read-only" }, config, request:{} };
 }
 
+let _csrfToken = null;
+// One refresh request for all simultaneous 401 responses. Refresh tokens rotate.
+let refreshPromise = null;
+
+async function _ensureCsrf() {
+  if (_csrfToken) return _csrfToken;
+  try {
+    const { data } = await axios.get(`${API}/csrf-token`, { withCredentials: true, timeout: 10_000 });
+    _csrfToken = data.csrf_token;
+  } catch { console.warn("[csrf] failed to fetch token — unsafe requests may fail"); }
+  return _csrfToken;
+}
+
+const SAFE_METHODS = new Set(["get", "head", "options"]);
+
+export function demoReadOnlyError() {
+  const error = new Error("This is a read-only demo. Create a free account to save changes.");
+  error.code = "PENNI_DEMO_READ_ONLY";
+  error.response = { status: 403, data: { detail: error.message } };
+  return error;
+}
+
+function isCanceled(error) {
+  return error?.name === "CanceledError" || error?.code === "ERR_CANCELED";
+}
+
+function retryDelayMs(error, attempt) {
+  const retryAfter = error?.response?.headers?.["retry-after"];
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds)) return Math.min(seconds * 1000, 5_000);
+    const at = Date.parse(retryAfter);
+    if (Number.isFinite(at)) return Math.min(Math.max(at - Date.now(), 0), 5_000);
+  }
+  const base = Math.min(300 * 2 ** attempt, 2_000);
+  return base + Math.floor(Math.random() * 250);
+}
+
+function isRetryable(error, config) {
+  if (!config) return false;
+  if (isPublicDemo()) return false;
+  if (String(config.method || "get").toLowerCase() !== "get") return false;
+  if (config._retryCount >= MAX_RETRIES) return false;
+  if (config._skipRetry) return false;
+  if (isCanceled(error)) return false;
+  // Cancelled by the caller (route change) — never retry.
+  if (config.signal?.aborted) return false;
+  if (!error.response) {
+    // Network failure or connection reset — retry. Timeouts are surfaced so the
+    // user can decide rather than waiting through a second full timeout.
+    return error.code !== "ECONNABORTED" && error.code !== "ETIMEDOUT";
+  }
+  return [408, 425, 429, 500, 502, 503, 504].includes(error.response.status);
+}
+
+function wait(ms) {
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
+}
+
+async function refreshSession(originalRequest) {
+  const hadCredentials = Boolean(getToken("access_token") || getToken("refresh_token"));
+  try {
+    if (!refreshPromise) {
+      refreshPromise = (async () => {
+        const storedRt = getToken("refresh_token");
+        const csrf = await _ensureCsrf();
+        const refreshHeaders = {
+          ...(storedRt ? { Authorization: `Bearer ${storedRt}` } : {}),
+          ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+        };
+        const response = await axios.post(`${API}/auth/refresh`, {}, {
+          withCredentials: true,
+          headers: refreshHeaders,
+          timeout: API_TIMEOUT_MS,
+        });
+        if (response?.data?.access_token) {
+          setToken("access_token", response.data.access_token, true);
+        }
+        if (response?.data?.refresh_token) {
+          setToken("refresh_token", response.data.refresh_token, true);
+        }
+        return response;
+      })().finally(() => { refreshPromise = null; });
+    }
+    await refreshPromise;
+    return api(originalRequest);
+  } catch (refreshError) {
+    const status = refreshError?.response?.status;
+    console.warn("[auth] session refresh failed", status);
+    // Only an explicit auth rejection clears the session. A network blip must
+    // not log the user out of an app they can still read offline.
+    if (status === 401 || status === 403) {
+      clearTokens();
+      clearOfflineCache();
+      if (hadCredentials && typeof window !== "undefined" &&
+          !window.location.pathname.startsWith("/login")) {
+        window.location.assign("/login?expired=1");
+      }
+    }
+    throw refreshError;
+  }
+}
+
+// ── Interceptors ─────────────────────────────────────────────────────────────
 
 api.interceptors.request.use(async (config) => {
   if (isPublicDemo()) {
@@ -209,6 +443,7 @@ api.interceptors.request.use(async (config) => {
     delete config.headers.Authorization;
     return config;
   }
+  armSlowTimer(config);
   const token = getToken("access_token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -224,30 +459,44 @@ api.interceptors.request.use(async (config) => {
 
 api.interceptors.response.use(
   (response) => {
+    clearSlowTimer(response.config);
     if (isPublicDemo()) return response;
     const method = response.config?.method?.toLowerCase();
     cacheOfflineResponse(response.config, response.data);
+    emit("penni:request-ok", { url: response.config?.url });
     if (method && !SAFE_METHODS.has(method)) {
       cacheInvalidate(response.config.url);
     }
     return response;
   },
   async (error) => {
+    clearSlowTimer(error?.config);
     if (isPublicDemo()) return Promise.reject(error);
     const originalRequest = error.config || {};
     const requestUrl = String(originalRequest.url || "");
+
+    if (isCanceled(error)) return Promise.reject(error);
+
+    // Real cached data only. Demo fixtures are scoped to demo mode above; a
+    // logged-in user offline must never be shown invented balances.
     if (!error?.response && originalRequest.method?.toLowerCase() === "get") {
-      const cachedData = getOfflineResponse(originalRequest);
-      if (cachedData !== null) {
+      const cached = getOfflineResponse(originalRequest);
+      if (cached) {
+        emit("penni:offline-response", { url: originalRequest.url, savedAt: cached.savedAt });
         return {
-          data: cachedData,
+          data: cached.data,
           status: 200,
           statusText: "Offline cache",
-          headers: { "x-penni-offline": "true" },
+          headers: {
+            "x-penni-offline": "true",
+            "x-penni-cached-at": new Date(cached.savedAt).toISOString(),
+          },
           config: originalRequest,
+          request: {},
         };
       }
     }
+
     if (
       error?.response?.status === 401 &&
       !originalRequest._retry &&
@@ -261,53 +510,48 @@ api.interceptors.response.use(
       !requestUrl.includes("/gdpr/")
     ) {
       originalRequest._retry = true;
-      const hadCredentials = Boolean(getToken("access_token") || getToken("refresh_token"));
-      try {
-        if (!refreshPromise) {
-          refreshPromise = (async () => {
-            const storedRt = getToken("refresh_token");
-            const csrf = await _ensureCsrf();
-            const refreshHeaders = {
-              ...(storedRt ? { Authorization: `Bearer ${storedRt}` } : {}),
-              ...(csrf ? { "X-CSRF-Token": csrf } : {}),
-            };
-            const response = await axios.post(`${API}/auth/refresh`, {}, {
-              withCredentials: true, headers: refreshHeaders,
-            });
-            if (response?.data?.access_token) {
-              setToken("access_token", response.data.access_token, true);
-            }
-            if (response?.data?.refresh_token) {
-              setToken("refresh_token", response.data.refresh_token, true);
-            }
-            return response;
-          })().finally(() => { refreshPromise = null; });
-        }
-        await refreshPromise;
-        return api(originalRequest);
-      } catch (refreshError) {
-        console.warn("[auth] session refresh failed", refreshError?.response?.status);
-        clearTokens();
-        if (hadCredentials && typeof window !== "undefined" &&
-            !window.location.pathname.startsWith("/login")) {
-          window.location.assign("/login?expired=1");
-        }
-      }
+      return refreshSession(originalRequest);
     }
+
+    if (isRetryable(error, originalRequest)) {
+      const attempt = originalRequest._retryCount || 0;
+      originalRequest._retryCount = attempt + 1;
+      await wait(retryDelayMs(error, attempt));
+      return api(originalRequest);
+    }
+
     return Promise.reject(error);
   }
 );
 
+// ── Public helpers ───────────────────────────────────────────────────────────
+
 api.cachedGet = async (url, params = {}, ttl) => {
   if (isPublicDemo()) return (await api.get(url, {params})).data;
-  const cached = cacheGet(url, params);
-  if (cached) return cached;
-  const { data } = await dedupe(url, params, () => api.get(url, { params }));
-  cacheSet(url, params, data, ttl);
-  return data;
+  return swr(url, params, async () => (await api.get(url, { params })).data, ttl).fresh;
+};
+
+/** Cached value + background refresh. Never rejects when a cached value exists. */
+api.swrGet = (url, params = {}, ttl) => {
+  if (isPublicDemo()) {
+    return {
+      cached: null,
+      timestamp: null,
+      stale: false,
+      fresh: api.get(url, { params }).then((r) => r.data),
+    };
+  }
+  return swr(url, params, async () => (await api.get(url, { params })).data, ttl);
 };
 
 api.invalidate = (prefix) => cacheInvalidate(prefix);
+api.clearOfflineCache = clearOfflineCache;
+
+/** Wake a sleeping backend while the shell renders. Fire-and-forget. */
+api.warmup = () => {
+  if (isPublicDemo()) return Promise.resolve();
+  return axios.get(`${API}/health`, { timeout: 20_000 }).catch(() => {});
+};
 
 export function formatApiError(errorOrDetail) {
   const payload = errorOrDetail?.response?.data ?? errorOrDetail;

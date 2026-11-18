@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def test_budget_comparison_is_scoped_to_the_current_calendar_month():
-    source = (Path(__file__).resolve().parents[1] / "finance_engine.py").read_text()
+    source = (Path(__file__).resolve().parents[1] / "finance_engine.py").read_text(encoding="utf-8")
     block = source.split('    @router.get("/analytics/budget-comparison")', 1)[1]
     block = block.split('    @router.get("/analytics/period-comparison")', 1)[0]
     assert 'Budget.month == month_key' in block
@@ -17,7 +17,7 @@ def test_budget_comparison_is_scoped_to_the_current_calendar_month():
 
 
 def test_overbudget_remaining_and_percentage_not_artificially_capped():
-    source = (Path(__file__).resolve().parents[1] / "finance_engine.py").read_text()
+    source = (Path(__file__).resolve().parents[1] / "finance_engine.py").read_text(encoding="utf-8")
     block = source.split('    @router.get("/analytics/budget-comparison")', 1)[1]
     block = block.split('    @router.get("/analytics/period-comparison")', 1)[0]
     assert '"remaining": round(float(b.amount) - spent, 2)' in block

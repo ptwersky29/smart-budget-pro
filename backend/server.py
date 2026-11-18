@@ -13,6 +13,7 @@ import logging
 import logging.config
 import os
 import sys
+import time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
@@ -20,6 +21,7 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from starlette.requests import Request as StarletteRequest
 from starlette.responses import JSONResponse, Response
 
@@ -60,12 +62,7 @@ from db import (
     init_engine,
 )
 from exceptions import FinanceAIError
-from middleware import (
-    ErrorMonitorMiddleware,
-    RequestIdMiddleware,
-    RequestTimerMiddleware,
-    SecurityHeadersMiddleware,
-)
+from middleware import RequestContextMiddleware
 from rate_limit import CsrfProtectionMiddleware, RateLimiter, RateLimitMiddleware
 from security import _require_jwt_secret, generate_csrf_token
 
@@ -122,13 +119,13 @@ app = FastAPI(title="FinanceAI API", version="1.1.1")
 GIT_COMMIT = os.environ.get("GIT_COMMIT", "17a2c91")
 app.state.db = get_session_maker()
 
-# Middleware stack (order matters: outermost first)
-app.add_middleware(ErrorMonitorMiddleware)
-app.add_middleware(SecurityHeadersMiddleware)
+# Middleware stack (added innermost first: the last added is outermost).
+# RequestContext replaces four separate BaseHTTPMiddleware wrappers and adds
+# request id, timing and security headers in a single ASGI pass.
+app.add_middleware(GZipMiddleware, minimum_size=500)
 app.add_middleware(CsrfProtectionMiddleware)
-app.add_middleware(RequestTimerMiddleware)
-app.add_middleware(RequestIdMiddleware)
 app.add_middleware(RateLimitMiddleware, limiter=RateLimiter(limit=120, window=60))
+app.add_middleware(RequestContextMiddleware)
 
 api = APIRouter(prefix="/api")
 
@@ -144,39 +141,27 @@ async def root():
 
 @api.get("/health")
 async def health():
+    """Liveness probe. Never sleeps: Render restarts on health-check timeouts."""
     stripe_vars = ["STRIPE_API_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_MONTHLY_PRICE_ID", "STRIPE_YEARLY_PRICE_ID"]
     checks = {"database": "unavailable", "version": app.version, "uptime": None}
     db_ok = False
+    started = time.perf_counter()
     try:
         sm = get_session_maker()
         async with sm() as session:
-            for attempt in range(2):
-                try:
-                    await session.execute(text("SELECT 1"))
-                    db_ok = True
-                    break
-                except Exception:
-                    if attempt == 0:
-                        await asyncio.sleep(1.5)
-                        await session.close()
-                        continue
-                    raise
-            if db_ok:
-                checks["database"] = "connected"
+            await asyncio.wait_for(session.execute(text("SELECT 1")), timeout=2.0)
+            db_ok = True
+            checks["database"] = "connected"
     except Exception as e:
         checks["database"] = f"error: {str(e)[:60]}"
+    checks["database_ms"] = round((time.perf_counter() - started) * 1000, 1)
 
-    try:
-        import time
-        if not hasattr(app.state, "started_at"):
-            app.state.started_at = time.time()
-        checks["uptime"] = round(time.time() - app.state.started_at, 1)
-    except Exception:
-        checks["uptime"] = None
+    if not hasattr(app.state, "started_at"):
+        app.state.started_at = time.time()
+    checks["uptime"] = round(time.time() - app.state.started_at, 1)
 
-    status = "ok" if db_ok else "degraded"
     return {
-        "status": status,
+        "status": "ok" if db_ok else "degraded",
         "version": app.version,
         "commit": GIT_COMMIT,
         "checks": checks,
@@ -186,6 +171,26 @@ async def health():
         "sentry_configured": bool(os.environ.get("SENTRY_DSN")),
         "routers": len(api.routes),
     }
+
+
+@api.get("/ready")
+async def ready():
+    """Readiness probe with a short DB warm-up allowance."""
+    deadline = time.time() + 10
+    last_error = None
+    while time.time() < deadline:
+        try:
+            sm = get_session_maker()
+            async with sm() as session:
+                await asyncio.wait_for(session.execute(text("SELECT 1")), timeout=3.0)
+            return {"status": "ready"}
+        except Exception as e:  # noqa: BLE001 — retried until the deadline
+            last_error = str(e)[:80]
+            await asyncio.sleep(0.5)
+    return JSONResponse(
+        status_code=503,
+        content={"status": "not_ready", "detail": last_error or "database unavailable"},
+    )
 
 
 @api.get("/csrf-token")
@@ -415,7 +420,14 @@ async def startup():
     if not os.environ.get("TRUELAYER_CLIENT_ID") or not os.environ.get("TRUELAYER_CLIENT_SECRET"):
         logger.warning("TRUELAYER_CLIENT_ID/SECRET not set — Open Banking sync disabled")
 
-    # Start background sync loop for TrueLayer
+    # Start background sync loop for TrueLayer. Only one process should own it:
+    # the web service sets RUN_BACKGROUND_SYNC=0 and the dedicated worker runs it.
+    run_sync = os.environ.get("RUN_BACKGROUND_SYNC", "1").strip().lower() not in {
+        "0", "false", "no", "off",
+    }
+    if not run_sync:
+        logger.info("Background TrueLayer sync disabled on this instance")
+        return
     try:
         from truelayer import SYNC_INTERVAL_SECONDS, run_background_sync
 

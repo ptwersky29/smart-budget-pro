@@ -4,6 +4,7 @@ import NativePopup from "../components/ui/NativePopup";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
+import { cacheGetEntry } from "../lib/cache";
 import { fetchAllTransactions } from "../lib/transactionsQuery";
 import { Plus, Trash2, Loader2, Pencil, Search, Sparkles, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, BarChart3, Star, Receipt, Download, MoreHorizontal, RefreshCw, CheckCircle2, PieChart as PieChartIcon, ArrowDownLeft, ArrowUpRight, CalendarDays, Tag, Wallet, StickyNote, Building2, Scissors, Link2, Link2Off, AlertTriangle, Calculator, TrendingUp, TrendingDown, LayoutGrid, List, Copy, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -578,21 +579,35 @@ const Transactions = React.memo(function Transactions() {
 
   const load = useCallback(async () => {
     const requestId = ++ledgerRequestId.current;
-    setLoading(true); setAiResults(null);
+    setAiResults(null);
+    const params = { offset, limit, sort: filters.sort, order: filters.order };
+    if (filters.search) params.search = filters.search;
+    if (filters.category) params.category = filters.category;
+    if (filters.source) params.source = filters.source;
+    if (filters.tx_type) params.tx_type = filters.tx_type;
+    if (filters.approval_status) params.approval_status = filters.approval_status;
+    if (filters.merchant) params.merchant = filters.merchant;
+    if (filters.date_from) params.date_from = filters.date_from;
+    if (filters.date_to) params.date_to = filters.date_to;
+    if (filters.amount_min && !isNaN(filters.amount_min)) params.amount_min = parseFloat(filters.amount_min);
+    if (filters.amount_max && !isNaN(filters.amount_max)) params.amount_max = parseFloat(filters.amount_max);
+    if (filters.account_id) params.account_id = filters.account_id;
+
+    // Paint the page from cache while the fresh request runs. Paging back and
+    // forth between filters no longer flashes a skeleton each time.
+    const cached = cacheGetEntry("/transactions", params)?.data;
+    if (cached) {
+      setTxs(cached.transactions || []);
+      setTotal(cached.total || 0);
+      setIncomeTotal(cached.income_total || 0);
+      setExpenseTotal(cached.expense_total || 0);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     try {
-      const params = { offset, limit, sort: filters.sort, order: filters.order };
-      if (filters.search) params.search = filters.search;
-      if (filters.category) params.category = filters.category;
-      if (filters.source) params.source = filters.source;
-      if (filters.tx_type) params.tx_type = filters.tx_type;
-      if (filters.approval_status) params.approval_status = filters.approval_status;
-      if (filters.merchant) params.merchant = filters.merchant;
-      if (filters.date_from) params.date_from = filters.date_from;
-      if (filters.date_to) params.date_to = filters.date_to;
-      if (filters.amount_min && !isNaN(filters.amount_min)) params.amount_min = parseFloat(filters.amount_min);
-      if (filters.amount_max && !isNaN(filters.amount_max)) params.amount_max = parseFloat(filters.amount_max);
-      if (filters.account_id) params.account_id = filters.account_id;
-      const { data } = await api.get("/transactions", { params });
+      const data = await api.swrGet("/transactions", params, 30_000).fresh;
       if (requestId !== ledgerRequestId.current) return;
       setTxs(data.transactions || []);
       setTotal(data.total || 0);
@@ -616,13 +631,17 @@ const Transactions = React.memo(function Transactions() {
           })
           .catch(() => {});
       }
-    } catch (err) { if (requestId === ledgerRequestId.current) toast.error("Could not load transactions"); }
+    } catch (err) { if (requestId === ledgerRequestId.current && !cached) toast.error("Could not load transactions"); }
     finally { if (requestId === ledgerRequestId.current) setLoading(false); }
   }, [offset, limit, filters]);
 
   const loadCats = useCallback(async () => {
+    const cached = cacheGetEntry("/categories", {})?.data;
+    if (cached) {
+      setSelectedCats({ categories: cached.categories || [], hierarchy: cached.hierarchy || {} });
+    }
     try {
-      const { data } = await api.get("/categories");
+      const data = await api.swrGet("/categories", {}, 5 * 60_000).fresh;
       setSelectedCats({ categories: data.categories || [], hierarchy: data.hierarchy || {} });
     } catch { console.warn("[transactions] failed to load categories"); }
   }, []);
@@ -637,8 +656,10 @@ const Transactions = React.memo(function Transactions() {
   useEffect(() => { loadCats(); }, [loadCats]);
 
   const loadAccounts = useCallback(async () => {
+    const cached = cacheGetEntry("/accounts", {})?.data;
+    if (cached) setAccounts(cached.accounts || []);
     try {
-      const { data } = await api.get("/accounts");
+      const data = await api.swrGet("/accounts", {}, 30_000).fresh;
       setAccounts(data.accounts || []);
     } catch { toast.error("Could not load accounts"); }
   }, []);
@@ -646,9 +667,11 @@ const Transactions = React.memo(function Transactions() {
 
   useEffect(() => {
     let cancelled = false;
-    api.get("/dashboard/overview")
-      .then(({ data }) => { if (!cancelled) setOverview(data || null); })
-      .catch(() => { if (!cancelled) setOverview(null); });
+    const cached = cacheGetEntry("/dashboard/overview", {})?.data;
+    if (cached) setOverview(cached);
+    api.swrGet("/dashboard/overview", {}, 30_000).fresh
+      .then((data) => { if (!cancelled) setOverview(data || null); })
+      .catch(() => { if (!cancelled && !cached) setOverview(null); });
     return () => { cancelled = true; };
   }, []);
 

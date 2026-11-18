@@ -12,7 +12,9 @@ function registerValidSW(swUrl) {
         const installingWorker = registration.installing;
         installingWorker.onstatechange = () => {
           if (installingWorker.state === "installed" && navigator.serviceWorker.controller) {
-            console.log("New content available; please refresh.");
+            window.dispatchEvent(
+              new CustomEvent("penni:update-available", { detail: { registration } })
+            );
           }
         };
       };

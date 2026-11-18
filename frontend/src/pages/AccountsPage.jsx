@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "../lib/api";
+import { cacheGetEntry } from "../lib/cache";
 import { getDisplayName } from "../lib/utils";
 import { accountGradient } from "../design-system/account-gradients";
 import { getBankLogoOrFallback, pickBankInstitution } from "../data/bankLogos";
@@ -189,9 +190,13 @@ export default function AccountsPage() {
     document.title = "Accounts & Import | Penni";
   }, []);
   const [searchParams, setSearchParams] = useSearchParams();
-  const [accounts, setAccounts] = useState([]);
+  const [accounts, setAccounts] = useState(
+    () => cacheGetEntry("/accounts", {})?.data?.accounts || []
+  );
   const accountStripRef = useRef(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(
+    () => !cacheGetEntry("/accounts", {})?.data?.accounts
+  );
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editAccount, setEditAccount] = useState(null);
   const [selectedAccountId, setSelectedAccountId] = useState("");
@@ -200,7 +205,9 @@ export default function AccountsPage() {
   const [transactionQuery, setTransactionQuery] = useState("");
   const [transactionType, setTransactionType] = useState("all");
   const [status, setStatus] = useState("idle");
-  const [conns, setConns] = useState([]);
+  const [conns, setConns] = useState(
+    () => cacheGetEntry("/truelayer/connections", {})?.data?.connections || []
+  );
   const [totalTx, setTotalTx] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [needsSetup, setNeedsSetup] = useState(false);
@@ -211,11 +218,12 @@ export default function AccountsPage() {
   });
 
   const loadAccounts = useCallback(async (refreshTrading212 = false) => {
-    setLoading(true);
+    if (!cacheGetEntry("/accounts", {})?.data) setLoading(true);
     try {
-      const { data } = await api.get("/accounts", {
-        params: refreshTrading212 === true ? { refresh_trading212: true } : {},
-      });
+      const request = refreshTrading212 === true
+        ? api.get("/accounts", { params: { refresh_trading212: true } })
+        : api.swrGet("/accounts", {}, 30_000).fresh;
+      const data = refreshTrading212 === true ? (await request).data : await request;
       setAccounts(data.accounts || []);
     } catch (error) {
       toast.error(formatApiError(error) || "Could not load accounts");
@@ -226,7 +234,7 @@ export default function AccountsPage() {
 
   const loadConns = useCallback(async () => {
     try {
-      const { data } = await api.get("/truelayer/connections");
+      const data = await api.swrGet("/truelayer/connections", {}, 60_000).fresh;
       setConns(Array.isArray(data.connections) ? data.connections : []);
       setTotalTx(Number(data.total_transactions || 0));
     } catch (error) {

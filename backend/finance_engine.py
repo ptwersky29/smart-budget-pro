@@ -10,7 +10,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
-from sqlalchemy import delete, func, or_, select, update
+from sqlalchemy import and_, case, delete, func, or_, select, update
 
 import maaser
 from auth import get_current_user
@@ -3907,7 +3907,17 @@ Output ONLY valid JSON, no markdown, no explanation:
             return cached
         sm = request.app.state.db
         async with sm() as session:
-            lines = await _effective_transaction_lines(session, user["user_id"])
+            # Only load the window the response can contain.
+            window_start = datetime.now(timezone.utc).replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0
+            )
+            for _ in range(max(int(months) - 1, 0)):
+                window_start = (window_start - timedelta(days=1)).replace(
+                    day=1, hour=0, minute=0, second=0, microsecond=0
+                )
+            lines = await _effective_transaction_lines(
+                session, user["user_id"], date_from=window_start
+            )
             monthly = defaultdict(lambda: {"income": 0.0, "spend": 0.0, "net": 0.0})
             for line in lines:
                 if not line["date"]:
@@ -4137,14 +4147,6 @@ Output ONLY valid JSON, no markdown, no explanation:
             return cached
         sm = request.app.state.db
         async with sm() as session:
-            result = await session.execute(
-                select(Transaction)
-                .where(Transaction.user_id == uid)
-                .order_by(Transaction.date.desc())
-                .limit(2000)
-            )
-            txs = result.scalars().all()
-
             now = datetime.now(timezone.utc)
             month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             try:
@@ -4154,44 +4156,170 @@ Output ONLY valid JSON, no markdown, no explanation:
                     raise ValueError("End date must be on or after start date")
             except ValueError as exc:
                 raise HTTPException(400, f"Invalid report date range: {exc}") from exc
-            lines = await _effective_transaction_lines(session, uid)
-            balance = sum(float(line["amount"] or 0) for line in lines)
-            month_lines = [
-                line for line in lines if line["date"] and line["date"] >= period_start
-                and (period_end is None or line["date"] < period_end)
-            ]
-            income = sum(line["amount"] for line in month_lines if line["amount"] > 0)
-            spend = sum(-line["amount"] for line in month_lines if line["amount"] < 0)
 
-            cats = defaultdict(float)
-            for line in month_lines:
-                if line["amount"] < 0:
-                    cats[line["category"] or "uncategorized"] += -line["amount"]
-            monthly = defaultdict(lambda: {"income": 0, "spend": 0})
-            for line in lines:
-                if line["date"]:
-                    d = line["date"].strftime("%Y-%m")
-                    if line["amount"] > 0:
-                        monthly[d]["income"] += line["amount"]
-                    else:
-                        monthly[d]["spend"] += -line["amount"]
+            # Aggregate in SQL. The previous implementation loaded every
+            # approved transaction (plus splits) and summed in Python, so the
+            # dashboard got slower with every month of history a user added.
+            def effective_filters():
+                return and_(
+                    Transaction.approval_status == "approved",
+                    or_(Transaction.tx_type.is_(None), Transaction.tx_type != "transfer"),
+                    Transaction.transfer_pair_id.is_(None),
+                )
+
+            period_filter = [Transaction.date >= period_start]
+            if period_end is not None:
+                period_filter.append(Transaction.date < period_end)
+
+            parent_ids = select(SplitTransaction.parent_transaction_id).where(
+                SplitTransaction.user_id == uid,
+                SplitTransaction.parent_transaction_id.is_not(None),
+            )
+            base = and_(
+                Transaction.user_id == uid,
+                effective_filters(),
+                ~Transaction.transaction_id.in_(parent_ids),
+            )
+            split_match = and_(
+                SplitTransaction.user_id == uid,
+                Transaction.user_id == uid,
+                effective_filters(),
+            )
+            split_join = Transaction.transaction_id == SplitTransaction.parent_transaction_id
+            split_signed = func.abs(SplitTransaction.amount) * case(
+                (Transaction.amount >= 0, 1), else_=-1
+            )
+
+            # 1. Balance across all history (a split replaces its parent).
+            base_balance = await session.scalar(
+                select(func.coalesce(func.sum(Transaction.amount), 0)).where(base)
+            )
+            split_balance = await session.scalar(
+                select(func.coalesce(func.sum(split_signed), 0))
+                .select_from(SplitTransaction)
+                .join(Transaction, split_join)
+                .where(split_match)
+            )
+            balance = float(base_balance or 0) + float(split_balance or 0)
+
+            # 2. Income and spend for the selected period.
+            base_period = (
+                await session.execute(
+                    select(
+                        func.coalesce(
+                            func.sum(case((Transaction.amount > 0, Transaction.amount), else_=0)), 0
+                        ),
+                        func.coalesce(
+                            func.sum(case((Transaction.amount < 0, -Transaction.amount), else_=0)), 0
+                        ),
+                    ).where(base, *period_filter)
+                )
+            ).one()
+            split_period = (
+                await session.execute(
+                    select(
+                        func.coalesce(
+                            func.sum(
+                                case(
+                                    (Transaction.amount > 0, func.abs(SplitTransaction.amount)),
+                                    else_=0,
+                                )
+                            ),
+                            0,
+                        ),
+                        func.coalesce(
+                            func.sum(
+                                case(
+                                    (Transaction.amount < 0, func.abs(SplitTransaction.amount)),
+                                    else_=0,
+                                )
+                            ),
+                            0,
+                        ),
+                    )
+                    .select_from(SplitTransaction)
+                    .join(Transaction, split_join)
+                    .where(split_match, *period_filter)
+                )
+            ).one()
+            income = float(base_period[0] or 0) + float(split_period[0] or 0)
+            spend = float(base_period[1] or 0) + float(split_period[1] or 0)
+
+            # 3. Category totals for the period.
+            cats: dict = defaultdict(float)
+            cat_rows = await session.execute(
+                select(Transaction.category, func.sum(-Transaction.amount))
+                .where(base, *period_filter, Transaction.amount < 0)
+                .group_by(Transaction.category)
+            )
+            for cat, total in cat_rows:
+                cats[cat or "uncategorized"] += float(total or 0)
+
+            split_category = func.coalesce(SplitTransaction.category, Transaction.category)
+            split_cat_rows = await session.execute(
+                select(split_category, func.sum(func.abs(SplitTransaction.amount)))
+                .select_from(SplitTransaction)
+                .join(Transaction, split_join)
+                .where(split_match, *period_filter, Transaction.amount < 0)
+                .group_by(split_category)
+            )
+            for cat, total in split_cat_rows:
+                cats[cat or "uncategorized"] += float(total or 0)
+
+            # 4. Six-month flow — bounded window, not all history.
+            flow_start = month_start
+            for _ in range(5):
+                flow_start = (flow_start - timedelta(days=1)).replace(
+                    day=1, hour=0, minute=0, second=0, microsecond=0
+                )
+            flow_lines = await _effective_transaction_lines(
+                session, uid, date_from=flow_start
+            )
+            monthly: dict = defaultdict(lambda: {"income": 0.0, "spend": 0.0})
+            for line in flow_lines:
+                if not line["date"]:
+                    continue
+                bucket = monthly[line["date"].strftime("%Y-%m")]
+                if line["amount"] > 0:
+                    bucket["income"] += line["amount"]
+                else:
+                    bucket["spend"] += -line["amount"]
             flow = sorted(
                 [{"month": k, **v} for k, v in monthly.items()],
                 key=lambda x: x["month"],
             )[-6:]
+
             savings_rate = ((income - spend) / income * 100) if income > 0 else 0
             score = max(0, min(100, int(savings_rate * 2 + (50 if balance > 0 else 0))))
 
-            sources = defaultdict(int)
-            for t in txs:
-                sources[t.source or "manual"] += 1
-            needs_review = sum(
-                1
-                for t in txs
-                if (getattr(t, "approval_status", None) or "approved") != "approved"
-                or (getattr(t, "category_approval_status", None) or "approved")
-                != "approved"
+            # 5. Counts and sources — indexed aggregates, not a row scan.
+            needs_review = await session.scalar(
+                select(func.count(Transaction.id)).where(
+                    Transaction.user_id == uid,
+                    or_(
+                        Transaction.approval_status != "approved",
+                        Transaction.category_approval_status != "approved",
+                    ),
+                )
             )
+            sources: dict = {}
+            source_rows = await session.execute(
+                select(Transaction.source, func.count(Transaction.id))
+                .where(Transaction.user_id == uid)
+                .group_by(Transaction.source)
+            )
+            for source, count in source_rows:
+                sources[source or "manual"] = count
+
+            # 6. Only the rows the dashboard actually renders.
+            txs = (
+                await session.execute(
+                    select(Transaction)
+                    .where(Transaction.user_id == uid)
+                    .order_by(Transaction.date.desc())
+                    .limit(8)
+                )
+            ).scalars().all()
 
             # Real bank balances from BankAccounts
             acct_result = await session.execute(

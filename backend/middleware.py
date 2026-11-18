@@ -7,7 +7,9 @@ from urllib.parse import urlencode
 
 from fastapi import Request
 from fastapi.responses import JSONResponse, RedirectResponse
+from starlette.datastructures import MutableHeaders
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
 
 logger = logging.getLogger("monitor")
 
@@ -29,6 +31,96 @@ def connections_redirect_url(status: str, reason: str | None = None) -> str:
 
 def is_truelayer_callback_path(path: str) -> bool:
     return path == "/api/truelayer/callback"
+
+
+def _security_headers() -> dict[str, str]:
+    return {
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "X-XSS-Protection": "1; mode=block",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+        "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+        "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+        "Cross-Origin-Resource-Policy": "same-origin",
+    }
+
+
+class RequestContextMiddleware:
+    """One pure-ASGI pass for request ID, timing and security headers.
+
+    Replaces four ``BaseHTTPMiddleware`` wrappers. It also catches unhandled
+    errors after the application's own exception handlers have run, so a crash
+    in another middleware still produces the standard JSON payload.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        request = StarletteRequest(scope)
+        rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:16]
+        state = scope.setdefault("state", {})
+        state["request_id"] = rid
+        start = time.perf_counter()
+        response_started = False
+        status_code = 500
+
+        async def send_with_headers(message):
+            nonlocal response_started, status_code
+            if message["type"] == "http.response.start":
+                response_started = True
+                status_code = message["status"]
+                headers = MutableHeaders(scope=message)
+                elapsed_ms = (time.perf_counter() - start) * 1000
+                headers["X-Request-Id"] = rid
+                headers["X-Response-Time-Ms"] = str(round(elapsed_ms, 1))
+                for key, value in _security_headers().items():
+                    headers[key] = value
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_with_headers)
+        except Exception as exc:  # noqa: BLE001 — last-resort handler
+            logger.exception(
+                "RID=%s Unhandled error %s %s: %s",
+                rid,
+                request.method,
+                request.url.path,
+                exc,
+            )
+            if response_started:
+                raise
+            if is_truelayer_callback_path(request.url.path):
+                response = RedirectResponse(
+                    connections_redirect_url("failed", "callback_error"),
+                    status_code=302,
+                )
+            else:
+                response = JSONResponse(
+                    status_code=500,
+                    content={
+                        "detail": "Internal server error. Our team has been notified.",
+                        "request_id": rid,
+                    },
+                )
+            await response(scope, receive, send_with_headers)
+            return
+
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        if elapsed_ms > SLOW_REQUEST_MS:
+            logger.warning(
+                "RID=%s SLOW_REQUEST: %s %s took %.0fms (status=%s)",
+                rid,
+                request.method,
+                request.url.path,
+                elapsed_ms,
+                status_code,
+            )
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):

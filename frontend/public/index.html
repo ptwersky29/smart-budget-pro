@@ -20,10 +20,44 @@
     <title>Penni - Your penny, planned.</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="preconnect" href="https://budget-pro-4jlg.onrender.com" crossorigin />
+    <link rel="dns-prefetch" href="https://budget-pro-4jlg.onrender.com" />
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      />
+    </noscript>
   </head>
   <body>
-    <script>window.addEventListener("error",function(e){if(e.target&&(e.target.tagName==="SCRIPT"||e.target.tagName==="LINK")&&e.target.src){e.preventDefault();location.reload()}},{capture:true})</script>
+    <script>
+      // Recover from a stale chunk after a deploy — at most once per session so
+      // a broken deploy cannot put the tab into a reload loop.
+      window.addEventListener("error", function (e) {
+        var target = e.target;
+        if (!target || (target.tagName !== "SCRIPT" && target.tagName !== "LINK")) return;
+        if (!(target.src || target.href)) return;
+        e.preventDefault();
+        try {
+          if (sessionStorage.getItem("penni.chunk-reload") === "1") return;
+          sessionStorage.setItem("penni.chunk-reload", "1");
+        } catch (err) {
+          return;
+        }
+        location.reload();
+      }, true);
+    </script>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
   </body>

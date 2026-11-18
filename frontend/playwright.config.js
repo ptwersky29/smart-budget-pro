@@ -10,9 +10,11 @@ const startCommand = process.platform === "win32"
 module.exports = defineConfig({
   testDir: "./e2e",
   timeout: 45_000,
-  expect: { timeout: 8_000 },
+  expect: { timeout: 15_000 },
   fullyParallel: true,
-  retries: process.env.CI ? 2 : 0,
+  // CRA's dev server compiles the bundle on the first request; a cold parallel
+  // run can miss a tight timeout once. Retry absorbs that, CI retries twice.
+  retries: process.env.CI ? 2 : 1,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
@@ -27,7 +29,22 @@ module.exports = defineConfig({
     timeout: 120_000,
   },
   projects: [
-    { name: "desktop-chromium", use: { ...devices["Desktop Chrome"] } },
-    { name: "mobile-chromium", use: { ...devices["Pixel 5"] } },
+    {
+      name: "warmup",
+      testMatch: /warmup\.setup\.js/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "desktop-chromium",
+      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["warmup"],
+      testIgnore: /warmup\.setup\.js/,
+    },
+    {
+      name: "mobile-chromium",
+      use: { ...devices["Pixel 5"] },
+      dependencies: ["warmup"],
+      testIgnore: /warmup\.setup\.js/,
+    },
   ],
 });

@@ -92,6 +92,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: CI=false DISABLE_ESLINT_PLUGIN=true npm run build
+      - run: npm run check:bundle
 
   frontend-unit-tests:
     name: Frontend unit tests
@@ -108,3 +109,30 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: CI=true npm run test:ci -- --runInBand
+
+  frontend-e2e:
+    name: Frontend E2E (reliability)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: frontend/.playwright-browsers
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+      - run: npx playwright install --with-deps chromium
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/frontend/.playwright-browsers
+      - run: npx playwright test e2e/reliability.spec.js e2e/ship-readiness.spec.js --project=desktop-chromium
+        env:
+          CI: "true"
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/frontend/.playwright-browsers

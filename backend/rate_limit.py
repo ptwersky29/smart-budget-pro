@@ -62,6 +62,7 @@ class RateLimiter:
         self.limit = limit
         self.window = window
         self._buckets: dict[str, deque] = defaultdict(deque)
+        self._checks = 0
         self._redis = redis_client
         self._redis_url = (
             redis_url if redis_url is not None else os.environ.get("REDIS_URL", "")
@@ -98,7 +99,19 @@ class RateLimiter:
             return None
         return self._redis
 
+    def _sweep(self) -> None:
+        cutoff = time.time() - self.window
+        for key in list(self._buckets):
+            bucket = self._buckets[key]
+            while bucket and bucket[0] < cutoff:
+                bucket.popleft()
+            if not bucket:
+                del self._buckets[key]
+
     def _check_memory(self, key: str) -> bool:
+        self._checks += 1
+        if self._checks % 1000 == 0:
+            self._sweep()
         now = time.time()
         bucket = self._buckets[key]
         cutoff = now - self.window
