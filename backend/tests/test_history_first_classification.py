@@ -1,4 +1,5 @@
 """History-first categorisation: conservative reuse and AI fallback."""
+# ruff: noqa: I001  # Test import grouping spans both app modules and pytest.
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 
