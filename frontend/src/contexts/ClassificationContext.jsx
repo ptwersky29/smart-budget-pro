@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import api from "../lib/api";
+import { api } from "../lib/api";
 import { isPublicDemo } from "../lib/demoSession";
 
 const ClassificationContext = createContext(null);
@@ -25,7 +25,13 @@ export function ClassificationProvider({ children }) {
     inFlight.current = true;
     try {
       const response = await api.get("/classification/jobs");
-      const serverJobs = response.data.jobs || [];
+      // The API returns newest first; keep only the most recent attempt per transaction.
+      const seen = new Set();
+      const serverJobs = (response.data.jobs || []).filter((job) => {
+        if (seen.has(job.transaction_id)) return false;
+        seen.add(job.transaction_id);
+        return true;
+      });
       const previously = stateRef.current;
       let shouldRefreshTransactions = false;
       for (const job of serverJobs) {
