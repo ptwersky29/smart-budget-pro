@@ -1,22 +1,24 @@
 """Regression checks for background classification safety."""
 from datetime import datetime, timezone
-from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
 
 from classification_jobs import ClassifyBatchIn, _eligible, _snapshot
+from db import Transaction
 
 
 def sample(**changes):
     fields = dict(
+        transaction_id="test-transaction", user_id="test-user",
+        account_id="test-account", date=datetime.now(timezone.utc),
         description="TESCO STORES", merchant_name="Tesco", amount=-23.50,
         category="uncategorized", category_approval_status="unapproved",
         approval_status="unapproved", tx_type="expense", transfer_pair_id=None,
         parent_id=None, updated_at=None,
     )
     fields.update(changes)
-    return SimpleNamespace(**fields)
+    return Transaction(**fields)
 
 
 def test_classification_checks_for_changes_before_applying_result():
