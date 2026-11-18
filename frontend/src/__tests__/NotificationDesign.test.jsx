@@ -31,6 +31,11 @@ describe("unified Penni notification design", () => {
     expect(source("components/NetworkStatus.jsx")).toContain('<NotificationGlyph type="warning" />');
     const css = source("index.css");
     expect(css).toContain("[data-sonner-toast].penni-notification-toast");
+    expect(css).toContain("display: grid !important;");
+    expect(css).toContain("grid-template-columns: 32px minmax(0, 1fr);");
+    expect(css).toContain("[data-sonner-toast].penni-notification-toast [data-content]");
+    expect(css).toContain("grid-column: 2;");
+    expect(css).toContain("transform: translateY(-50%) !important;");
     expect(css).toContain(".penni-notification-panel,");
     expect(css).toContain(".penni-system-notice");
     expect(css).toContain("@media (prefers-reduced-motion: reduce)");
