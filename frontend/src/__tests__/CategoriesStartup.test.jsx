@@ -1,5 +1,5 @@
 import React from "react";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
 import { CategoriesProvider, useCategories } from "../contexts/CategoriesContext";
 import { useAuth } from "../contexts/AuthContext";
 import { api } from "../lib/api";
