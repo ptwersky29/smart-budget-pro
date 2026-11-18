@@ -2,9 +2,8 @@
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 
-import pytest
-
 import finance_engine
+import pytest
 from db import Transaction
 from historical_classification import evaluate_history
 
