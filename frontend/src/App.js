@@ -5,6 +5,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { AssistantProvider } from "./contexts/AssistantContext";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { CategoriesProvider } from "./contexts/CategoriesContext";
+import { ClassificationProvider } from "./contexts/ClassificationContext";
 import AssistantPanel from "./components/assistant/AssistantPanel";
 import { Toaster } from "./components/ui/sonner";
 import { ThemeProvider } from "next-themes";
@@ -97,7 +98,7 @@ function AppRouter() {
         <Route
           element={
             <ProtectedRoute>
-              <AppLayout />
+              <ClassificationProvider><AppLayout /></ClassificationProvider>
             </ProtectedRoute>
           }
         >
