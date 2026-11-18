@@ -292,7 +292,10 @@ async def _process_one(session_maker) -> bool:
                 return True
 
             suggestions = await _suggest_categories_for_tx(
-                session, job.user_id, tx.description or "", tx.merchant_name, float(tx.amount or 0)
+                session, job.user_id, tx.description or "", tx.merchant_name,
+                float(tx.amount or 0),
+                normalized_merchant=tx.normalized_merchant,
+                exclude_transaction_id=tx.transaction_id,
             )
 
             # Lock the row before applying results. Manual edits happening during
@@ -310,12 +313,19 @@ async def _process_one(session_maker) -> bool:
                 await _finish_job(session, job, "skipped", error="Transaction changed during classification")
                 return True
 
-            top = next(
-                (item for item in suggestions
-                 if item.get("category") not in ("uncategorized", "miscellaneous")
-                 and float(item.get("confidence") or 0) >= 0.7),
-                None,
-            )
+            # Verified history can apply immediately. AI is a second-stage
+            # fallback and may auto-fill only when it reports high confidence;
+            # it still requires explicit category approval from the user.
+            top = next((
+                item for item in suggestions
+                if item.get("category") not in ("uncategorized", "miscellaneous")
+                and (
+                    (item.get("source") in ("history_exact", "history_merchant")
+                     and float(item.get("confidence") or 0) >= 0.87)
+                    or (item.get("source") == "ai"
+                        and float(item.get("confidence") or 0) >= 0.90)
+                )
+            ), None)
             auto_applied = False
             # Never replace a non-empty user/previously approved category.
             if top and (not tx.category or tx.category == "uncategorized"):
@@ -329,8 +339,9 @@ async def _process_one(session_maker) -> bool:
             await _finish_job(
                 session, job, "completed",
                 result={"category": top["category"] if top else None,
+                        "source": top.get("source") if top else None,
                         "suggestions": suggestions, "applied": auto_applied,
-                        "needs_review": top is None or not auto_applied},
+                        "needs_review": not auto_applied or (top is not None and top.get("source") == "ai")},
             )
         except asyncio.CancelledError:
             raise
