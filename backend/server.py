@@ -33,16 +33,15 @@ import app_config
 import app_settings
 import auth
 import bank_accounts
-import classification_jobs
 import billing
 import budget_system
+import classification_jobs
 import empty_states
 import finance_engine
 import gdpr
 import hebcal
 import integrations
 import investments
-import trading212
 import jewish
 import jewish_reports
 import manual_accounts
@@ -53,6 +52,7 @@ import reports
 import sms
 import statements
 import support
+import trading212
 import truelayer
 import tyl
 import uk_tools
