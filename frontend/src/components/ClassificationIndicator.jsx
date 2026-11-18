@@ -56,7 +56,7 @@ export default function ClassificationIndicator() {
                     <AlertCircle className="mt-0.5 h-3.5 w-3.5 text-topaz" />}
                 <span className="min-w-0 flex-1 truncate text-foreground">
                   {job.result?.category || "Transaction"} · {
-                    job.status === "completed" ? (job.result?.needs_review ? "Needs review" : "Suggested") :
+                    job.status === "completed" ? (job.result?.source?.startsWith("history_") ? "Matched past transactions" : job.result?.source === "ai" ? "AI suggestion · review" : job.result?.needs_review ? "Needs review" : "Suggested") :
                     job.status === "queued" ? "Queued" :
                     job.status === "running" ? "Classifying" :
                     job.status === "failed" ? "Retry available" : "Changed — skipped"
