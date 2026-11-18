@@ -35,8 +35,16 @@ def _safe_description(value: str | None) -> str:
     return text if len(text) >= 6 and text not in GENERIC_DESCRIPTIONS else ""
 
 
+def _diverse_merchant(key: str) -> bool:
+    return any(key == name or key.startswith(name + " ") for name in MULTI_CATEGORY_MERCHANTS)
+
+
 def _merchant_key(merchant: str | None, normalized: str | None) -> str:
-    key = normalise_text(merchant or normalized)
+    # Use the app's normalized merchant whenever it is specific enough, but
+    # never collapse "Uber Eats" into "Uber" or other multi-purpose sellers.
+    canonical = normalise_text(normalized)
+    raw = normalise_text(merchant)
+    key = canonical if len(canonical) >= 4 and not _diverse_merchant(canonical) else raw or canonical
     if not key or key in GENERIC_DESCRIPTIONS or len(key) < 4:
         return ""
     return key
@@ -105,7 +113,7 @@ def evaluate_history(
         result = _vote(exact, "history_exact")
         if result:
             return result, result["reason"]
-    elif merchant_key and merchant_key not in MULTI_CATEGORY_MERCHANTS:
+    elif merchant_key and not _diverse_merchant(merchant_key):
         result = _vote(same_merchant, "history_merchant")
         if result:
             return result, result["reason"]
