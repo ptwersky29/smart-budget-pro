@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { toast } from "sonner";
@@ -21,6 +22,11 @@ const CategoriesContext = createContext(null);
 
 export function CategoriesProvider({ children }) {
   const { user, loading: authLoading } = useAuth();
+  // /auth/me may replace a cached profile object with a fresh object for the
+  // same account. Use stable identity for category loading and deduplication.
+  const userKey = user ? String(user.user_id || user.id || user.email || "authenticated") : null;
+  const inFlightRef = useRef(new Map());
+  const previousUserKeyRef = useRef(userKey);
   const cachedCategories = cacheGetEntry("/categories", {})?.data;
   const [categories, setCategories] = useState(() =>
     (cachedCategories?.categories || []).map(withCategoryEmoji)
@@ -28,43 +34,76 @@ export function CategoriesProvider({ children }) {
   const [hierarchy, setHierarchy] = useState(() => cachedCategories?.hierarchy || {});
   const [loading, setLoading] = useState(false);
   const [version, setVersion] = useState(0);
+  const [loadError, setLoadError] = useState("");
 
   const refreshCategories = useCallback(async ({ silent = false } = {}) => {
-    if (!user) {
+    if (!userKey) {
       setCategories([]);
       setHierarchy({});
+      setLoadError("");
+      setLoading(false);
       return { categories: [], hierarchy: {} };
     }
 
-    const hasCached = Boolean(cacheGetEntry("/categories", {})?.data);
-    if (!silent && !hasCached) setLoading(true);
-    try {
-      const { data } = await api.swrGet("/categories", {}, 5 * 60_000).fresh;
-      const nextCategories = (data.categories || []).map(withCategoryEmoji);
-      const nextHierarchy = data.hierarchy || {};
-      setCategories(nextCategories);
-      setHierarchy(nextHierarchy);
-      setVersion((current) => current + 1);
-      return { categories: nextCategories, hierarchy: nextHierarchy };
-    } catch (error) {
-      if (!silent) {
-        toast.error(formatApiError(error?.response?.data?.detail));
+    // Avoid duplicate startup requests when auth refreshes the profile object
+    // or React replays an effect. One request per signed-in account at a time.
+    const existing = inFlightRef.current.get(userKey);
+    if (existing) return existing;
+
+    const request = (async () => {
+      const hasCached = Boolean(cacheGetEntry("/categories", {})?.data);
+      if (!hasCached) setLoading(true);
+      setLoadError("");
+      try {
+        const { data } = await api.swrGet("/categories", {}, 5 * 60_000).fresh;
+        const nextCategories = (data.categories || []).map(withCategoryEmoji);
+        const nextHierarchy = data.hierarchy || {};
+        setCategories(nextCategories);
+        setHierarchy(nextHierarchy);
+        setLoadError("");
+        setVersion((current) => current + 1);
+        return { categories: nextCategories, hierarchy: nextHierarchy };
+      } catch (error) {
+        const message = formatApiError(error);
+        setLoadError(message);
+        // Category loading is optional during shell startup. Keep cached or
+        // built-in categories visible; explicit refreshes can still show errors.
+        if (!silent) toast.error(message);
+        throw error;
+      } finally {
+        setLoading(false);
       }
-      throw error;
+    })();
+
+    inFlightRef.current.set(userKey, request);
+    try {
+      return await request;
     } finally {
-      if (!silent) setLoading(false);
+      if (inFlightRef.current.get(userKey) === request) {
+        inFlightRef.current.delete(userKey);
+      }
     }
-  }, [user]);
+  }, [userKey]);
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user) {
+    if (!userKey) {
       setCategories([]);
       setHierarchy({});
+      setLoadError("");
+      setLoading(false);
+      previousUserKeyRef.current = null;
       return;
     }
-    refreshCategories({ silent: false }).catch(() => {});
-  }, [authLoading, user, refreshCategories]);
+    if (previousUserKeyRef.current && previousUserKeyRef.current !== userKey) {
+      setCategories([]);
+      setHierarchy({});
+    }
+    previousUserKeyRef.current = userKey;
+    // A failed optional categories request must not cover the app with a
+    // generic toast each time it opens. The picker offers a retryable fallback.
+    refreshCategories({ silent: true }).catch(() => {});
+  }, [authLoading, userKey, refreshCategories]);
 
   const categoryMap = useMemo(() => {
     const map = {};
@@ -144,6 +183,7 @@ export function CategoriesProvider({ children }) {
     groupedCategories,
     hierarchy,
     loading,
+    error: loadError,
     version,
     sectionOptions,
     resolveCategory,
@@ -160,6 +200,7 @@ export function CategoriesProvider({ children }) {
     groupedCategories,
     hierarchy,
     loading,
+    loadError,
     version,
     sectionOptions,
     resolveCategory,
