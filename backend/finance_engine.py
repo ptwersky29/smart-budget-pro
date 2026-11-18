@@ -16,7 +16,6 @@ from sqlalchemy import and_, case, delete, func, or_, select, update
 import maaser
 from auth import get_current_user
 from cache import TTLCache
-from trading212 import sync_savings_account
 from category_catalog import (
     build_category_payload,
     combine_categories,
@@ -42,6 +41,7 @@ from statements import (
     CATEGORISE_KEYWORDS,
     INCOME_CATEGORIES,
 )
+from trading212 import sync_savings_account
 
 logger = logging.getLogger("finance")
 
