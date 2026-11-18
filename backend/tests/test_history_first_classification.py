@@ -30,6 +30,7 @@ def suggestion(desc, rows, merchant="Tesco", normalized="Tesco", amount=-25):
 
 def test_single_approved_exact_description_is_reused_without_ai():
     found, _ = suggestion("TESCO-AB123", [old("TESCO-AB123", "grocery")])
+    assert found is not None
     assert found["category"] == "grocery"
     assert found["source"] == "history_exact"
     assert found["confidence"] >= 0.9
@@ -57,6 +58,7 @@ def test_repeated_consistent_specific_merchant_can_be_reused():
         for i in range(3)
     ]
     found, _ = suggestion("ACME PETROL NEW", rows, merchant="Acme Fuel", normalized="Acme Fuel")
+    assert found is not None
     assert found["category"] == "petrol_diesel"
     assert found["source"] == "history_merchant"
 
@@ -105,6 +107,7 @@ async def test_approved_history_returns_before_ai(monkeypatch):
     )
     assert results[0]["category"] == "clothing_wife"
     llm.assert_not_called()
+    assert historical.await_args is not None
     assert historical.await_args.kwargs["exclude_transaction_id"] == "current-tx"
 
 
@@ -125,6 +128,7 @@ async def test_inconclusive_history_calls_ai(monkeypatch):
     )
     assert result[0]["source"] == "ai"
     assert result[0]["category"] == "clothing_wife"
+    assert llm.await_args is not None
     assert "inconclusive" in llm.await_args.args[1]
 
 
