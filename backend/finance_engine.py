@@ -1,5 +1,6 @@
 """Smart financial engine: transactions, budgets, analytics, merchant normalization, split, recurring."""
 
+import asyncio
 import logging
 import math
 import re
@@ -944,7 +945,10 @@ async def _suggest_categories_for_tx(
             }
         )
 
-    if len({s["category"] for s in suggestions}) < 3:
+    # Learned and keyword rules are immediate; don't wait for an AI provider to
+    # invent two weaker alternatives when a useful local suggestion already exists.
+    strong_match = any(s.get("confidence", 0) >= 0.7 for s in suggestions)
+    if len({s["category"] for s in suggestions}) < 3 and not strong_match:
         try:
             system_prompt = (
                 "You classify UK personal finance transactions. Output JSON only."
@@ -955,12 +959,19 @@ async def _suggest_categories_for_tx(
                 f"Categories: {', '.join(sorted(active))}\n"
                 f'Return {{"suggestions":[{{"category":"slug","confidence":0.0,"reason":"short reason"}}]}}'
             )
-            raw, provider, model, pt, ct, cost = await call_llm(
-                system_prompt,
-                user_prompt,
-                json_mode=True,
-                temperature=0.1,
-                max_tokens=700,
+            # OpenRouter's free auto-router can be slow, and a Gemini key needs
+            # a real Gemini model ID rather than the generic openrouter/free ID.
+            # Limit this optional suggestion call so review never spins for a minute.
+            raw, provider, model, pt, ct, cost = await asyncio.wait_for(
+                call_llm(
+                    system_prompt,
+                    user_prompt,
+                    model="google/gemini-2.5-flash-lite",
+                    json_mode=True,
+                    temperature=0.0,
+                    max_tokens=280,
+                ),
+                timeout=5.0,
             )
             await track_ai_usage(
                 session,
@@ -990,8 +1001,11 @@ async def _suggest_categories_for_tx(
         if len(merged) == 3:
             break
     while len(merged) < 3:
-        fallback = "uncategorized" if not merged else "miscellaneous"
-        if fallback not in active or fallback in seen:
+        fallback = next(
+            (c for c in ("miscellaneous", "uncategorized") if c in active and c not in seen),
+            None,
+        )
+        if fallback is None:
             break
         merged.append(
             {
