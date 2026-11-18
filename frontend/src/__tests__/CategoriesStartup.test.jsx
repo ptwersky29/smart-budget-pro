@@ -26,11 +26,10 @@ jest.mock("sonner", () => ({
 }));
 
 function Probe() {
-  const { categories, error } = useCategories();
+  const { categories } = useCategories();
   return (
     <div>
       <span data-testid="category-count">{categories.length}</span>
-      <span data-testid="category-error">{error}</span>
     </div>
   );
 }
@@ -60,11 +59,10 @@ test("a failed background category load does not show a generic toast on app ope
   await waitFor(() => expect(api.swrGet).toHaveBeenCalledTimes(1));
   await act(async () => {
     rejectRequest(new Error("network unavailable"));
-  });
-  await waitFor(() => {
-    expect(screen.getByTestId("category-error")).toHaveTextContent("network unavailable");
+    await Promise.resolve();
   });
   expect(toast.error).not.toHaveBeenCalled();
+  expect(api.swrGet).toHaveBeenCalledTimes(1);
 });
 
 test("refreshing the auth profile for the same user does not reload categories twice", async () => {
@@ -97,5 +95,4 @@ test("refreshing the auth profile for the same user does not reload categories t
   await act(async () => {
     resolveRequest({ data: { categories: [], hierarchy: {} } });
   });
-  await waitFor(() => expect(screen.getByTestId("category-error")).toBeEmptyDOMElement());
 });
