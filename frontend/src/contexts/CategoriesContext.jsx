@@ -85,7 +85,6 @@ export function CategoriesProvider({ children }) {
     if (!userKey) {
       setCategories([]);
       setHierarchy({});
-      setLoadError("");
       setLoading(false);
       previousUserKeyRef.current = null;
       return;
