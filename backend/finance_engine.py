@@ -2576,9 +2576,21 @@ Output ONLY valid JSON, no markdown, no explanation:
             tx.ai_selected_category = top.get("category") if top else None
             tx.ai_confidence = top.get("confidence") if top else None
             tx.ai_reason = top.get("reason") if top else None
-            tx.category_approval_status = "unapproved"
-            if top and (not tx.category or tx.category == "uncategorized"):
+            allowed_to_apply = bool(
+                top
+                and top.get("category") not in ("uncategorized", "miscellaneous")
+                and (
+                    (top.get("source") in ("history_exact", "history_merchant")
+                     and float(top.get("confidence") or 0) >= 0.87)
+                    or (top.get("source") == "ai"
+                        and float(top.get("confidence") or 0) >= 0.90)
+                )
+            )
+            if allowed_to_apply and (not tx.category or tx.category == "uncategorized"):
                 tx.category = top["category"]
+                tx.category_approval_status = "unapproved"
+            # A new suggestion must not revoke approval of an existing manually
+            # selected category or silently overwrite it.
             await session.commit()
             await session.refresh(tx)
             return {
