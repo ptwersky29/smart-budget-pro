@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { EmptyState } from "../components/ui/layout";
 import { SkeletonTable } from "../components/ui/Skeleton";
 import { useAssistant } from "../contexts/AssistantContext";
+import { useClassification } from "../contexts/ClassificationContext";
 import { formatCurrency, formatLongDate, formatShortDate } from "../lib/format";
 import Sparkline from "../components/ui/Sparkline";
 import { withUndo } from "../lib/undo";
@@ -246,6 +247,7 @@ function TransactionInspector({ transaction, onClose, onEdit, onDelete, onApprov
 const Transactions = React.memo(function Transactions() {
   useEffect(() => { document.title = "Transactions | Penni"; }, []);
   const { openAssistant } = useAssistant();
+  const { jobsByTransaction, enqueue, enqueueUncategorized } = useClassification();
   const { openAction } = useActions();
   const [txs, setTxs] = useState([]);
   const [total, setTotal] = useState(0);
@@ -1042,26 +1044,40 @@ const Transactions = React.memo(function Transactions() {
     }
   }, []);
 
+  // Queue AI work without opening a modal or blocking transaction entry.
   const classifySavedTx = useCallback(async (t) => {
-    setReviewTx(t);
-    setReviewSuggestions([]);
-    setReviewOpen(true);
-    setReviewLoading(true);
     try {
-      const { data } = await api.post(`/transactions/${t.transaction_id}/classify`);
-      const nextTx = data.transaction || t;
-      const suggestions = data.suggestions || nextTx.ai_suggested_categories?.suggestions || [];
-      setTxs(prev => prev.map(row => row.transaction_id === t.transaction_id ? nextTx : row));
-      setReviewTx(nextTx);
-      setReviewSuggestions(suggestions.slice(0, 3));
-      toast.success("AI suggestions added");
-    } catch (e) {
-      toast.error(formatApiError(e?.response?.data?.detail) || "AI classification failed");
-    } finally {
-      setReviewLoading(false);
-    }
+      const result = await enqueue([t.transaction_id]);
+      if (result.queued) toast.success("Classification started in background");
+      else if (result.already_queued) toast.info("Already classifying this transaction");
+      else toast.info("This transaction cannot be classified");
+    } catch (e) { toast.error(formatApiError(e) || "Could not queue classification"); }
+  }, [enqueue]);
+
+  const openCategoryReview = useCallback((t) => {
+    setReviewTx(t);
+    setReviewSuggestions(t.ai_suggested_categories?.suggestions || []);
+    setReviewLoading(false);
+    setReviewOpen(true);
   }, []);
 
+  const classifySelected = useCallback(async () => {
+    if (!selectedIds.size) return;
+    try {
+      const result = await enqueue(Array.from(selectedIds));
+      if (result.queued) toast.success(result.queued + " transactions queued in background");
+      else toast.info(result.already_queued ? "Already classifying selected transactions" : "No eligible transactions selected");
+      setSelectedIds(new Set());
+    } catch (e) { toast.error(formatApiError(e) || "Could not queue classification"); }
+  }, [selectedIds, enqueue]);
+
+  const classifyUncategorized = useCallback(async () => {
+    try {
+      const result = await enqueueUncategorized(filters);
+      if (result.queued) toast.success(result.queued + " uncategorized transactions queued");
+      else toast.info("No new uncategorized transactions to classify");
+    } catch (e) { toast.error(formatApiError(e) || "Could not start classification"); }
+  }, [enqueueUncategorized, filters]);
   const bulkApprove = useCallback(async (highConfidenceOnly = false) => {
     try {
       const candidates = selectedIds.size
