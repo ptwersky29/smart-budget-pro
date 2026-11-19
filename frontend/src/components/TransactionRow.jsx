@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback } from "react";
 import {
   MoreHorizontal,
   Pencil,
@@ -34,7 +34,6 @@ import {
   pickBankInstitution,
 } from "../data/bankLogos";
 import CategoryBadge from "./CategoryBadge";
-import CategoryCombobox from "./CategoryCombobox";
 import { TransactionTypeMark, TransactionBankMark, TransactionStatusBadge, getTransactionType } from "./GroupedTransactionItems";
 
 const TransactionRow = React.memo(
@@ -54,13 +53,11 @@ const TransactionRow = React.memo(
     onApprove,
     onClassify,
     onReview,
-    onCategoryChange,
     classificationJob,
     onSplit,
     onPairTransfer,
     onUnpairTransfer,
   }) => {
-    const [editingCategory, setEditingCategory] = useState(false);
     const brandInstitution = pickBankInstitution(
       account?.provider,
       account?.name,
@@ -160,27 +157,12 @@ const TransactionRow = React.memo(
             </td>
             <td className="px-2 py-2">
               <div className="flex min-w-0 items-center gap-1.5">
-                {editingCategory && onCategoryChange && type !== "transfer" ? (
-                  <CategoryCombobox autoOpen
-                    label={`Change category for ${description}`}
-                    className="penni-workspace-category-editor"
-                    value={t.category || "uncategorized"}
-                    onChange={value => {
-                      setEditingCategory(false);
-                      if (value && value !== t.category) onCategoryChange(t, value);
-                    }}
-                    onOpenChange={nextOpen => { if (!nextOpen) setEditingCategory(false); }}
-                  />
-                ) : onCategoryChange && type !== "transfer" ? (
-                  <button type="button" className="penni-workspace-category-button"
-                    aria-label={`Change category for ${description}`} title="Edit category"
-                    onClick={event => { event.stopPropagation(); setEditingCategory(true); }}>
-                    <CategoryBadge category={t.category || "uncategorized"} size="sm" truncate showIcon />
-                  </button>
-                ) : (
-                  <CategoryBadge category={type === "transfer" ? "Transfer" : t.category || "uncategorized"}
-                    size="sm" truncate showIcon />
-                )}
+                <CategoryBadge
+                  category={type === "transfer" ? "Transfer" : t.category || "uncategorized"}
+                  size="sm"
+                  truncate
+                  showIcon
+                />
                 {t.is_split ? <span className="shrink-0 rounded-full bg-violet/10 px-1.5 py-0.5 text-[11px] font-medium text-violet">Split</span> : null}
                 {classificationJob && ["queued", "running"].includes(classificationJob.status) && <span className="inline-flex shrink-0 items-center gap-1 text-[10px] text-violet" title="AI classification is running in the background"><Sparkles className="h-3 w-3" /> Classifying</span>}
                 {classificationJob?.status === "failed" && <span className="shrink-0 text-[10px] text-topaz">Retry AI</span>}
@@ -285,7 +267,6 @@ const TransactionRow = React.memo(
     prev.t.approval_status === next.t.approval_status &&
     prev.t.category_approval_status === next.t.category_approval_status &&
     prev.classificationJob?.status === next.classificationJob?.status &&
-    prev.onCategoryChange === next.onCategoryChange &&
     prev.classificationJob?.result?.needs_review === next.classificationJob?.result?.needs_review &&
     prev.t.is_split === next.t.is_split &&
     prev.t.transfer_pair_id === next.t.transfer_pair_id &&

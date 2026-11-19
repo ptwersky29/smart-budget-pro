@@ -87,11 +87,11 @@ export default function TransactionInspectorPanel({
           </p>
           <div className="mt-3 flex items-center gap-1.5">
             {unapproved && onApprove ? (
-              <button type="button" onClick={() => onApprove(transaction)} className="inline-flex h-[34px] flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-[var(--penni-accent)] px-3 text-[11.5px] font-semibold text-white transition hover:opacity-90">
+              <button type="button" onClick={() => onApprove(transaction)} className="inline-flex h-[34px] flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-emerald px-3 text-[11.5px] font-semibold text-white transition hover:bg-emerald/90">
                 <CheckCircle2 className="h-3.5 w-3.5" /> Approve
               </button>
             ) : onClassify ? (
-              <button type="button" onClick={() => onClassify(transaction)} className="inline-flex h-[34px] flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-[var(--penni-accent)]/10 px-3 text-[11.5px] font-semibold text-[var(--penni-accent)] transition hover:bg-secondary">
+              <button type="button" onClick={() => onClassify(transaction)} className="inline-flex h-[34px] flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-emerald/10 px-3 text-[11.5px] font-semibold text-emerald transition hover:bg-emerald/15">
                 <Sparkles className="h-3.5 w-3.5" /> Classify
               </button>
             ) : null}
@@ -148,7 +148,7 @@ export default function TransactionInspectorPanel({
               key={item.key}
               type="button"
               onClick={() => setTab(item.key)}
-              className={`-mb-px h-10 border-b-2 text-[12px] transition ${tab === item.key ? "border-[var(--penni-accent)] font-semibold text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              className={`-mb-px h-10 border-b-2 text-[12px] transition ${tab === item.key ? "border-emerald font-semibold text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
             >
               {item.label}
             </button>

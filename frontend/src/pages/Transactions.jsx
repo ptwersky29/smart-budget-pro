@@ -6,7 +6,7 @@ import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
 import { cacheGetEntry } from "../lib/cache";
 import { fetchAllTransactions } from "../lib/transactionsQuery";
-import { Plus, Trash2, Loader2, Pencil, Search, Sparkles, Filter, PanelLeftClose, PanelLeftOpen, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, BarChart3, Star, Receipt, Download, MoreHorizontal, RefreshCw, CheckCircle2, PieChart as PieChartIcon, ArrowDownLeft, ArrowUpRight, CalendarDays, Tag, Wallet, StickyNote, Building2, Scissors, Link2, Link2Off, AlertTriangle, Calculator, TrendingUp, TrendingDown, LayoutGrid, List, Copy, ArrowLeft } from "lucide-react";
+import { Plus, Trash2, Loader2, Pencil, Search, Sparkles, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, BarChart3, Star, Receipt, Download, MoreHorizontal, RefreshCw, CheckCircle2, PieChart as PieChartIcon, ArrowDownLeft, ArrowUpRight, CalendarDays, Tag, Wallet, StickyNote, Building2, Scissors, Link2, Link2Off, AlertTriangle, Calculator, TrendingUp, TrendingDown, LayoutGrid, List, Copy, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "../components/ui/layout";
 import { SkeletonTable } from "../components/ui/Skeleton";
@@ -51,10 +51,8 @@ import { useKeyboardShortcut } from "../hooks/useKeyboardShortcut";
 
 import CategoryCombobox from "../components/CategoryCombobox";
 import CategoryBadge from "../components/CategoryBadge";
-import TransactionWorkspaceSummary from "../components/TransactionWorkspaceSummary";
-import TransactionFilterRail from "../components/TransactionFilterRail";
+import TransactionSummaryCards from "../components/TransactionSummaryCards";
 import "../design-system/transactions-reference.css";
-import "../design-system/transactions-workspace.css";
 
 const SOURCE_LABELS = { manual: "Manual", csv: "CSV", pdf: "PDF", statement: "Statement", sms: "SMS" };
 
@@ -252,7 +250,7 @@ const Transactions = React.memo(function Transactions() {
   useEffect(() => { document.title = "Transactions | Penni"; }, []);
   const { openAssistant } = useAssistant();
   const { jobsByTransaction, enqueue, enqueueUncategorized } = useClassification();
-  const { openAction, saveTransactionInBackground } = useActions();
+  const { openAction } = useActions();
   const [txs, setTxs] = useState([]);
   const txsRef = useRef(txs);
   txsRef.current = txs;
@@ -311,7 +309,6 @@ const Transactions = React.memo(function Transactions() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [inspectTx, setInspectTx] = useState(null);
   const [inspectorOpen, setInspectorOpen] = useState(false);
-  const [filterRailOpen, setFilterRailOpen] = useState(true);
   const openInspector = useCallback((transaction) => {
     setInspectTx(transaction);
     setInspectorOpen(true);
@@ -835,24 +832,10 @@ const Transactions = React.memo(function Transactions() {
     setOffset(0);
     setFilters((previous) => ({
       ...previous,
-      category: previous.category === "uncategorized" ? "" : previous.category,
       tx_type: tab === "expenses" ? "expense" : tab === "income" ? "income" : tab === "transfers" ? "transfer" : "",
       approval_status: tab === "unapproved" ? "unapproved" : "",
     }));
   }, []);
-
-  const selectQuickView = useCallback((view) => {
-    if (view === "uncategorized") {
-      setLedgerTab("all");
-      setOffset(0);
-      setFilters(previous => ({
-        ...previous,
-        category:"uncategorized", tx_type:"", approval_status:"",
-      }));
-      return;
-    }
-    selectLedgerTab(view);
-  }, [selectLedgerTab]);
 
   const clearAllFilters = useCallback(() => {
     setSearchInput("");
@@ -1354,7 +1337,6 @@ const Transactions = React.memo(function Transactions() {
       unapproved: monthRows.filter((transaction) => (
         transaction.approval_status === "unapproved" || transaction.category_approval_status === "unapproved"
       )).length,
-      uncategorized: monthRows.filter((transaction) => !transaction.category || transaction.category === "uncategorized").length,
       approved: approved.length,
     };
   }, [monthRows, total]);
@@ -1422,26 +1404,11 @@ const Transactions = React.memo(function Transactions() {
   const distinctTransferRows = outgoingTransferRows.length ? outgoingTransferRows : transferMonthRows;
   const transferMonthAmount = distinctTransferRows.reduce((sum, tx) => sum + Math.abs(Number(tx.amount) || 0), 0);
   const transferMonthCount = distinctTransferRows.length;
-  const effectiveLedgerTab = filters.category === "uncategorized" ? "uncategorized"
-    : filters.approval_status === "unapproved" ? "unapproved"
+  const effectiveLedgerTab = filters.approval_status === "unapproved" ? "unapproved"
     : filters.tx_type === "income" ? "income" : filters.tx_type === "expense" ? "expenses"
     : filters.tx_type === "transfer" ? "transfers" : "all";
 
   const selectedTransactions = (aiResults?.transactions || txs).filter((transaction) => selectedIds.has(transaction.transaction_id));
-  const updateCategoryInline = useCallback((transaction, category) => {
-    if (!category || category === transaction.category || transaction._saveStatus === "saving") return;
-    const approved = {
-      ...transaction, category, approval_status:"approved",
-      category_approval_status:"approved", approved_at:new Date().toISOString(),
-    };
-    saveTransactionInBackground({
-      kind:"updated", optimistic:approved, original:transaction,
-      persist:() => api.patch(`/transactions/${transaction.transaction_id}`, {
-        category, approval_status:"approved", category_approval_status:"approved",
-      }).then(response=>response.data),
-      draft:approved,
-    });
-  }, [saveTransactionInBackground]);
   const selectedTotal = selectedTransactions.reduce((sum, transaction) => sum + (Number(transaction.amount) || 0), 0);
   const selectedUnapprovedCount = selectedTransactions.filter((transaction) => (
     transaction.approval_status === "unapproved" || transaction.category_approval_status === "unapproved"
@@ -1480,23 +1447,9 @@ const Transactions = React.memo(function Transactions() {
   }, [txs, aiResults]);
 
   return (
-    <div className={`transactions-reference page-stack pb-0 ${activeTab === "ledger" ? "transactions-ledger transactions-workspace-redesign" : "transactions-other"}`} data-testid="transactions-root">
+    <div className={`transactions-reference page-stack pb-0 ${activeTab === "ledger" ? "transactions-ledger" : "transactions-other"}`} data-testid="transactions-root">
 
-      <div className={`penni-workspace-layout grid min-h-0 items-start gap-3 lg:items-stretch ${activeTab === "ledger" && filterRailOpen ? "has-filter-rail" : ""} ${activeTab === "ledger" && inspectorOpen ? "with-inspector" : ""}`}>
-        {activeTab === "ledger" && filterRailOpen && (
-          <aside className="penni-filter-rail-wrap" aria-label="Transaction filters">
-            <TransactionFilterRail
-              filters={filters} accounts={accounts}
-              categories={selectedCats.categories || []}
-              counts={tabCounts} activeView={effectiveLedgerTab}
-              onFilterChange={setFilter} onViewChange={selectQuickView}
-              onClear={clearAllFilters}
-              onClose={() => setFilterRailOpen(false)}
-              onClassify={classifyUncategorized}
-              onCategoryCreated={loadCats}
-            />
-          </aside>
-        )}
+      <div className={`grid min-h-0 items-start gap-4 lg:items-stretch ${activeTab === "ledger" && inspectorOpen ? "xl:grid-cols-[minmax(0,1fr)_328px]" : ""}`}>
         <div className="transactions-primary min-w-0 lg:flex lg:min-h-0 lg:flex-col">
           <div className="penni-reference-page-top shrink-0">
             <WorkspaceHeader
@@ -1582,19 +1535,19 @@ const Transactions = React.memo(function Transactions() {
 
           {activeTab === "ledger" && (
             <>
-              <TransactionWorkspaceSummary
-                income={shownIncome} expenses={shownExpenses} net={shownNet}
-                reviewCount={tabCounts.unapproved} periodLabel={monthLabel}
-                reviewLabel="To review this month"
+              <TransactionSummaryCards
+                income={shownIncome}
+                expenses={shownExpenses}
+                transfers={transferMonthAmount}
+                transferCount={transferMonthCount}
+                net={shownNet}
+                month={month}
+                monthLabel={monthLabel}
+                filtered={filteredSummary}
+                trendRows={filteredSummary ? [] : monthRows}
               />
 
               <div className="penni-reference-toolbar" role="group" aria-label="Search and filter transactions">
-                <button type="button" className="penni-reference-filter-control penni-workspace-rail-toggle"
-                  onClick={() => setFilterRailOpen(open => !open)}
-                  aria-pressed={filterRailOpen} aria-label={filterRailOpen ? "Hide filter sidebar" : "Show filter sidebar"}>
-                  {filterRailOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
-                  <span>Filters</span>
-                </button>
                 <label className="penni-reference-search">
                   <Search className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
                   <input
@@ -1756,11 +1709,10 @@ const Transactions = React.memo(function Transactions() {
                     { key: "income", label: "Income", count: filteredSummary ? undefined : tabCounts.income },
                     { key: "expenses", label: "Expenses", count: filteredSummary ? undefined : tabCounts.expenses },
                     { key: "transfers", label: "Transfers", count: filteredSummary ? undefined : tabCounts.transfers },
-                    { key: "unapproved", label: "Needs review", count: filteredSummary ? undefined : tabCounts.unapproved },
-                    { key: "uncategorized", label: "Uncategorized", count: filteredSummary ? undefined : tabCounts.uncategorized },
+                    { key: "unapproved", label: "Unapproved", count: filteredSummary ? undefined : tabCounts.unapproved },
                   ]}
                   active={effectiveLedgerTab}
-                  onChange={selectQuickView}
+                  onChange={selectLedgerTab}
                 />
                 <button type="button" onClick={classifyUncategorized}
                   className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-[11px] font-medium text-[var(--penni-accent)] hover:bg-secondary"
@@ -1912,27 +1864,28 @@ const Transactions = React.memo(function Transactions() {
                 </div>
               ) : (
                 <div className="transaction-table-scroll hidden min-h-0 overflow-x-auto sm:block lg:flex-1 lg:overflow-auto" aria-label="Transaction ledger">
-                  <table className={`workspace-table w-full table-fixed text-sm ${filters.sort === "date" ? "min-w-[740px]" : "min-w-[800px]"}`}>
+                  <table className={`workspace-table w-full table-fixed text-sm ${filters.sort === "date" ? "min-w-[1000px]" : "min-w-[1100px]"}`}>
                     <thead className="sticky top-0 z-30 bg-card">
                       <tr className="h-[43px] border-b border-border text-left text-[11px] font-medium text-muted-foreground">
-                        <th className="w-[34px] px-2.5 py-2.5">
+                        <th className="w-[42px] px-2.5 py-2.5">
                           <input type="checkbox" checked={allDisplayedSelected} onChange={toggleSelectAll}
                             className="mx-auto block h-3.5 w-3.5 cursor-pointer rounded border-border accent-emerald" aria-label="Select all transactions" />
                         </th>
-                        {filters.sort !== "date" && <th className="w-[90px] px-2 py-2.5">Date</th>}
+                        {filters.sort !== "date" && <th className="w-[108px] px-2 py-2.5">Date</th>}
+                        <th className="w-[140px] px-2 py-2.5">Type</th>
                         <th className="px-3 py-2.5">Transaction</th>
-                        <th className="w-[136px] px-2 py-2.5">Category</th>
-                        <th className="w-[140px] px-2 py-2.5">Account</th>
+                        <th className="w-[165px] px-2 py-2.5">Category</th>
+                        <th className="w-[195px] px-2 py-2.5">Bank / Account</th>
                         <th className="w-[108px] px-2 py-2.5 text-right">Amount</th>
-                        <th className="w-[99px] px-2 py-2.5">Status</th>
-                        <th className="w-[36px] px-1 py-2.5"></th>
+                        <th className="w-[125px] px-2 py-2.5">Status</th>
+                        <th className="w-[52px] px-1 py-2.5"></th>
                       </tr>
                     </thead>
                     {desktopDateGroups.map((group, groupIndex) => (
                       <tbody key={(group.date || "ungrouped") + "-" + groupIndex}>
                         {group.date && (
                           <tr className="penni-tx-date-row">
-                            <th scope="rowgroup" colSpan={filters.sort === "date" ? 7 : 8} className="sticky top-[43px] z-20 p-0 text-left">
+                            <th scope="rowgroup" colSpan={filters.sort === "date" ? 8 : 9} className="sticky top-[43px] z-20 p-0 text-left">
                               <TransactionDateHeading date={group.date} count={group.items.length} net={group.items.reduce((sum, tx) => sum + (getTransactionType(tx) === "transfer" ? 0 : Number(tx.amount) || 0), 0)} sticky={false} />
                             </th>
                           </tr>
@@ -1942,7 +1895,7 @@ const Transactions = React.memo(function Transactions() {
                           return <TransactionRow key={t.transaction_id || rowIndex} t={t}
                             account={accountsById[t.account_id]}
                             showDate={filters.sort !== "date"}
-                            onCategoryChange={updateCategoryInline}
+                            showTypeColumn
                             isSelected={selectedIds.has(t.transaction_id)}
                             isFocused={focusedIndex === rowIndex}
                             onToggleSelect={toggleSelect} onSelectRow={selectTransactionRow} onEdit={openEdit}
@@ -2040,7 +1993,7 @@ const Transactions = React.memo(function Transactions() {
         ) : null}
         </div>
         {activeTab === "ledger" && inspectorOpen ? (
-          <aside className="transaction-inspector-area hidden xl:block xl:h-full xl:min-h-0 xl:self-stretch">
+          <aside className="transaction-inspector-area sticky top-20 hidden xl:block xl:h-full xl:min-h-0 xl:w-[328px] xl:self-stretch">
             <TransactionInspectorPanel
               transaction={panelTransaction}
               account={panelTransaction ? accountsById[panelTransaction.account_id] : null}

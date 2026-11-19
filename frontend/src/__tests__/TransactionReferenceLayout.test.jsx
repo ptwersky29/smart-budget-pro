@@ -46,15 +46,12 @@ describe("Penni reference transaction workspace", () => {
     expect(heading).toHaveTextContent("Net -£57.00");
   });
 
-  it("uses the compact ledger workspace while preserving editing and advanced filters", () => {
+  it("keeps the reference toolbar, type column, real editor and filter sheet", () => {
     const source = fs.readFileSync(path.join(__dirname,"../pages/Transactions.jsx"),"utf8");
     expect(source).toContain("penni-reference-toolbar");
     expect(source).toContain("penni-reference-tabs-bar");
-    expect(source).toContain("penni-workspace-layout");
-    expect(source).toContain("TransactionFilterRail");
-    expect(source).toContain("TransactionWorkspaceSummary");
-    expect(source).toContain("onCategoryChange={updateCategoryInline}");
-    expect(source).not.toContain("showTypeColumn");
+    expect(source).toContain("showTypeColumn");
+    expect(source).toContain("TransactionSummaryCards");
     expect(source).toContain('openAction("transaction-new"');
     expect(source).toContain("<SheetContent");
   });

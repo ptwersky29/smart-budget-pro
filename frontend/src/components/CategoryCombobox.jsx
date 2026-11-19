@@ -36,8 +36,6 @@ export default function CategoryCombobox({
   label = "Category",
   allowClear = false,
   onCategoryCreated,
-  autoOpen = false,
-  onOpenChange,
 }) {
   const {
     categories: sharedCategories,
@@ -46,7 +44,7 @@ export default function CategoryCombobox({
     createCategory,
     resolveCategory,
   } = useCategories();
-  const [open, setOpen] = useState(autoOpen);
+  const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -63,14 +61,13 @@ export default function CategoryCombobox({
   const categories = usingFallback ? defaultCategoryFallbacks() : validCategories.map(withCategoryEmoji);
   const handlePopoverChange = useCallback((nextOpen) => {
     setOpen(nextOpen);
-    onOpenChange?.(nextOpen);
     if (nextOpen) {
       setSearch("");
       if (usingFallback && typeof refreshCategories === "function") {
         refreshCategories({ silent: true }).catch(() => {});
       }
     }
-  }, [usingFallback, refreshCategories, onOpenChange]);
+  }, [usingFallback, refreshCategories]);
   const selected = value ? resolveCategory(value) : null;
 
   const filteredGroups = useMemo(() => {
