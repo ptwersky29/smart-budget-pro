@@ -22,6 +22,16 @@ export function ActionProvider({ children }) {
     setActive({ type, payload, key: Date.now() });
   }, []);
   const closeAction = useCallback(() => setActive(null), []);
+  // Browsing other pages is safe; closing the tab during an unsaved POST is not.
+  React.useEffect(() => {
+    const warn = event => {
+      if (!pendingTransactionIds.current.size) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, []);
   const changed = useCallback((entity, details = {}) => {
     window.dispatchEvent(new CustomEvent("penni:data-changed", { detail: { entity, ...details } }));
   }, []);

@@ -739,7 +739,8 @@ export default React.memo(function BudgetPage() {
   useEffect(() => {
     let timer;
     const onChanged = event => {
-      const {entity,operation,record} = event.detail || {};
+      const {entity,operation,record,phase} = event.detail || {};
+      if (phase && phase !== "confirmed") return;
       if (entity && !["transactions","budgets","categories"].includes(entity)) return;
       if (entity === "budgets" && record?.budget_id) {
         if (operation === "updated") {

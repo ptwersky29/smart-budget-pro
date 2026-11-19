@@ -147,6 +147,7 @@ export default function Dashboard() {
     let timer;
     const onChanged = event => {
       const entity = event.detail?.entity;
+      if (event.detail?.phase && event.detail.phase !== "confirmed") return;
       if (entity && !["transactions", "budgets", "categories", "accounts"].includes(entity)) return;
       clearTimeout(timer);
       timer = setTimeout(() => loadAll("background"), 800);

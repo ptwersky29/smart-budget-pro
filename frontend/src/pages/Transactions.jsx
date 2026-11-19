@@ -655,8 +655,37 @@ const Transactions = React.memo(function Transactions() {
   useEffect(() => () => { ledgerRequestId.current += 1; }, []);
   useEffect(() => {
     const onChanged = event => {
-      const { entity, operation, record } = event.detail || {};
+      const { entity, operation, record, clientId, phase } = event.detail || {};
       if (entity && entity !== "transactions") return;
+      if (operation === "created-confirmed" && record?.transaction_id && clientId) {
+        ledgerRequestId.current += 1;
+        const temp = txsRef.current.find(row => row.transaction_id === clientId);
+        const exists = txsRef.current.some(row => row.transaction_id === record.transaction_id);
+        if (temp) {
+          setTxs(rows => rows.map(row => row.transaction_id === clientId ? record : row));
+        } else if (!exists && offset === 0 && matchesTransactionFilters(record, filters)) {
+          setTxs(rows => insertTransactionRow(rows, record, filters, limit));
+          setTotal(value => value + 1);
+          const amount = Number(record.amount || 0);
+          if (amount > 0) setIncomeTotal(value => value + amount);
+          else setExpenseTotal(value => value + Math.abs(amount));
+        }
+        api.invalidate("/transactions");
+        api.invalidate("/dashboard/overview");
+        return;
+      }
+      if (operation === "created-rolled-back" && clientId) {
+        const temp = txsRef.current.find(row => row.transaction_id === clientId);
+        setTxs(rows => rows.filter(row => row.transaction_id !== clientId));
+        if (temp) {
+          setTotal(value => Math.max(0,value - 1));
+          const amount = Number(temp.amount || 0);
+          if (amount > 0) setIncomeTotal(value => value - amount);
+          else setExpenseTotal(value => value - Math.abs(amount));
+        }
+        api.invalidate("/transactions");
+        return;
+      }
       if (record?.transaction_id && ["updated", "patched", "classified", "created"].includes(operation)) {
         // Keep row order and current scroll position. Ignore any stale list response.
         ledgerRequestId.current += 1;
@@ -687,8 +716,12 @@ const Transactions = React.memo(function Transactions() {
             setExpenseTotal(value => value + Math.max(0,-after) - Math.max(0,-before));
           }
         }
-        api.invalidate("/transactions");
-        api.invalidate("/dashboard/overview");
+        // Data can still be in-flight: do not request a stale server snapshot.
+        // Once confirmed, dependent summaries can reconcile quietly.
+        if (phase !== "optimistic") {
+          api.invalidate("/transactions");
+          api.invalidate("/dashboard/overview");
+        }
         return;
       }
       // Imports and structural changes can reconcile silently when necessary.
@@ -2520,6 +2553,7 @@ function SwipeableCard({ t, account, isSelected, swipedId, setSwipedId, onToggle
             <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
               <TransactionTypeMark transaction={t} badge compact />
               <CategoryBadge category={getTransactionType(t) === "transfer" ? "Transfer" : t.category || "uncategorized"} size="sm" truncate className="min-w-0" />
+              {t._saveStatus === "saving" && <span className="inline-flex items-center gap-1 text-[10px] text-violet"><Loader2 className="h-3 w-3 animate-spin" /> Saving…</span>}
               {classificationJob && (classificationJob.status === "queued" || classificationJob.status === "running") && <span className="inline-flex items-center gap-1 text-[10px] text-violet"><Loader2 className="h-3 w-3 animate-spin" /> Classifying</span>}
               {classificationJob?.status === "failed" && <span className="text-[10px] text-topaz">Retry AI</span>}
               {classificationJob?.status === "completed" && classificationJob.result?.needs_review && <span className="text-[10px] text-topaz">Review category</span>}
