@@ -79,19 +79,33 @@ test("Add transaction shows actionable errors instead of silently doing nothing"
   expect(api.post).not.toHaveBeenCalled();
 });
 
-test("Failed transaction requests keep the form open and display the server error", async () => {
+test("Failed background saves close the form immediately and reverse the temporary row", async () => {
   api.get.mockResolvedValue({data:{accounts: [
     {account_id:"a1",name:"Current",balance:100,currency:"GBP"},
   ]}});
   api.post.mockRejectedValueOnce({response:{data:{detail:"Account is unavailable"}}});
-  render(<ActionProvider><NewTransactionLauncher/><GlobalActionHost/></ActionProvider>);
-  fireEvent.click(screen.getByRole("button",{name:"New transaction"}));
-  await screen.findByRole("dialog",{name:"New transaction"});
-  await waitFor(() => expect(screen.getByRole("combobox", {name: "Choose option"})).toHaveTextContent("Current"));
-  fireEvent.change(screen.getByTestId("tx-amount"),{target:{value:"17.00"}});
-  fireEvent.change(screen.getByTestId("tx-desc"),{target:{value:"Groceries"}});
-  fireEvent.click(screen.getByTestId("tx-submit"));
-  expect(await screen.findByRole("alert")).toHaveTextContent("Request failed");
-  expect(screen.getByRole("dialog",{name:"New transaction"})).toBeInTheDocument();
-  await waitFor(() => expect(screen.getByTestId("tx-submit")).not.toBeDisabled());
+  const changes = [];
+  const listener = event => changes.push(event.detail);
+  window.addEventListener("penni:data-changed", listener);
+  try {
+    render(<ActionProvider><NewTransactionLauncher/><GlobalActionHost/></ActionProvider>);
+    fireEvent.click(screen.getByRole("button",{name:"New transaction"}));
+    await screen.findByRole("dialog",{name:"New transaction"});
+    await waitFor(() => expect(screen.getByRole("combobox", {name:"Choose option"})).toHaveTextContent("Current"));
+    fireEvent.change(screen.getByTestId("tx-amount"),{target:{value:"17.00"}});
+    fireEvent.change(screen.getByTestId("tx-desc"),{target:{value:"Groceries"}});
+    fireEvent.click(screen.getByTestId("tx-submit"));
+    // The user can immediately work on another transaction, even when the
+    // server returns an error several seconds later.
+    expect(screen.queryByRole("dialog",{name:"New transaction"})).not.toBeInTheDocument();
+    expect(changes).toEqual(expect.arrayContaining([
+      expect.objectContaining({operation:"created",phase:"optimistic"}),
+    ]));
+    await waitFor(() => expect(api.post).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(changes).toEqual(expect.arrayContaining([
+      expect.objectContaining({operation:"created-rolled-back",phase:"rolled-back"}),
+    ])));
+  } finally {
+    window.removeEventListener("penni:data-changed",listener);
+  }
 });
