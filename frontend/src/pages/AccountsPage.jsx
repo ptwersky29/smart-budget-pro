@@ -25,6 +25,7 @@ import { getBankLogoOrFallback, pickBankInstitution } from "../data/bankLogos";
 import { formatCurrency } from "../lib/format";
 import { buildDailyBalanceTrend } from "../lib/balanceTrend";
 import Sparkline from "../components/ui/Sparkline";
+import Trading212Activity from "../components/Trading212Activity";
 import Skeleton from "../components/ui/Skeleton";
 import { Button } from "../components/ui/button";
 import {
@@ -129,7 +130,7 @@ function AccountCard({ account, connection, onSelect }) {
       <div className="relative mt-8 flex items-end justify-between gap-2">
         <div>
           <p className="text-[9.5px] uppercase tracking-[0.1em] text-muted-foreground">
-            {isSavings ? "Saved" : "Available"}
+            {account.provider === "trading212" ? "Portfolio value" : isSavings ? "Saved" : "Available"}
           </p>
           <p className="money-tabular mt-0.5 text-lg font-semibold leading-none">{formatCurrency(account.balance)}</p>
         </div>
@@ -482,9 +483,13 @@ export default function AccountsPage() {
                 </div>
                 <p className="money-tabular mt-5 text-[clamp(32px,3vw,40px)] font-semibold tracking-[-.05em]">{formatCurrency(selectedAccount.balance)}</p>
                 <div className="mt-5">
-                  {transactionLoading?<Skeleton className="h-36 w-full rounded-xl"/>:<Sparkline values={selectedHistory} height={155} stroke="var(--penni-accent)" />}
+                  {selectedAccount?.provider === "trading212" ? (
+                    <div className="flex h-36 items-center rounded-xl border border-dashed border-border bg-secondary/30 px-4 text-xs leading-relaxed text-muted-foreground">
+                      Past portfolio values are not available from Trading 212’s public API. Penni shows the current verified value rather than inventing a historical chart.
+                    </div>
+                  ) : transactionLoading ? <Skeleton className="h-36 w-full rounded-xl"/> : <Sparkline values={selectedHistory} height={155} stroke="var(--penni-accent)" />}
                 </div>
-                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Estimated 90-day balance movement based on recorded transactions, not a bank statement.</p>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{selectedAccount?.provider === "trading212" ? "The activity history below contains real broker-reported events; it is not a historical account-value chart." : "Estimated 90-day balance movement based on recorded transactions, not a bank statement."}</p>
                 <div className="mt-5 grid grid-cols-2 gap-3">
                   <div className="rounded-2xl bg-secondary/60 p-4">
                     <p className="text-xs text-muted-foreground">In this month</p>
@@ -496,6 +501,7 @@ export default function AccountsPage() {
                   </div>
                 </div>
               </div>
+              {selectedAccount.provider === "trading212" && <Trading212Activity compact />}
               <div className="surface p-5">
                 <h3 className="text-[16px] font-semibold">Details</h3>
                 <p className="mt-2 text-xs text-muted-foreground">Account type: {ACCOUNT_TYPE_META[selectedAccount.type]?.label||"Account"}</p>
