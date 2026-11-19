@@ -70,10 +70,14 @@ def normalise_activity(kind: str, record: dict) -> dict:
             "currency": str(record.get("currency") or "GBP").upper()[:3],
             "reference": reference,
         }
-    order = record.get("order") if isinstance(record.get("order"), dict) else record
-    fill = record.get("fill") if isinstance(record.get("fill"), dict) else {}
-    instrument = order.get("instrument") if isinstance(order.get("instrument"), dict) else {}
-    impact = fill.get("walletImpact") if isinstance(fill.get("walletImpact"), dict) else {}
+    order_data = record.get("order")
+    order = order_data if isinstance(order_data, dict) else record
+    fill_data = record.get("fill")
+    fill = fill_data if isinstance(fill_data, dict) else {}
+    instrument_data = order.get("instrument")
+    instrument = instrument_data if isinstance(instrument_data, dict) else {}
+    impact_data = fill.get("walletImpact")
+    impact = impact_data if isinstance(impact_data, dict) else {}
     ticker = str(instrument.get("ticker") or order.get("ticker") or "Investment")[:80]
     timestamp = str(fill.get("filledAt") or order.get("createdAt") or "")[:50]
     order_id = str(fill.get("id") or order.get("id") or "")[:80]
