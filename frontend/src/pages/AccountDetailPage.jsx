@@ -19,6 +19,7 @@ import ConfirmModal from "../components/ui/ConfirmModal";
 import TransactionForm from "../components/TransactionForm";
 import TransactionInspectorPanel from "../components/TransactionInspectorPanel";
 import GroupedTransactionItems from "../components/GroupedTransactionItems";
+import Trading212Activity from "../components/Trading212Activity";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu";
 import { withUndo } from "../lib/undo";
 import { useCategories } from "../contexts/CategoriesContext";
@@ -424,7 +425,7 @@ export default function AccountDetailPage() {
               <div className="mt-2 flex flex-wrap items-end gap-4">
                 <div>
                   <p className="text-xs text-muted-foreground mb-0.5">
-                    {isSavings ? "Saved" : "Available Balance"}
+                    {trading212 ? "Portfolio value" : isSavings ? "Saved" : "Available Balance"}
                   </p>
                   <p className={`text-2xl sm:text-3xl font-bold tracking-tight ${isSavings ? "text-violet" : ""}`}>
                     {CURRENCY_SYMBOL}{balanceFmt}
@@ -466,6 +467,8 @@ export default function AccountDetailPage() {
           )}
         </div>
       </div>
+
+      {trading212 && <Trading212Activity />}
 
       {/* Stats */}
       <div className={`account-detail-main grid min-h-0 min-w-0 grid-cols-1 gap-4 ${inspectedTransaction && wideLayout ? "lg:grid-cols-[minmax(0,1fr)_328px]" : ""}`}>
