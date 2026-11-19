@@ -53,6 +53,7 @@ import sms
 import statements
 import support
 import trading212
+import trading212_history
 import truelayer
 import tyl
 import uk_tools
@@ -222,6 +223,7 @@ api.include_router(jewish.build_router())
 api.include_router(jewish_reports.router)
 api.include_router(investments.build_router())
 api.include_router(trading212.build_router())
+api.include_router(trading212_history.build_router())
 api.include_router(uk_tools.build_router())
 api.include_router(gdpr.build_router())
 api.include_router(onboarding.build_router())
