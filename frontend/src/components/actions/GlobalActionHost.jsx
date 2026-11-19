@@ -117,7 +117,7 @@ export default function GlobalActionHost() {
     } catch(e) { toast.error(formatApiError(e.response?.data?.detail) || "Could not classify transaction"); }
     finally { setClassifying(false); }
   };
-  const afterSave = (entity) => { changed(entity); closeAction(); };
+  const afterSave = (entity, details = {}) => { changed(entity, details); closeAction(); };
   const saveTransaction = async event => {
     event?.preventDefault?.();
     if (savingRef.current || loadingSplit) return;
@@ -184,6 +184,11 @@ export default function GlobalActionHost() {
     };
     savingRef.current = true;
     setSavingTransaction(true);
+    let savedRecord = null;
+    const remember = response => {
+      const record = response?.data?.transaction || response?.data;
+      if (record?.transaction_id) savedRecord = record;
+    };
     try {
       if (pairExisting) {
         await api.post("/transactions/transfer-pairs", {
@@ -212,22 +217,23 @@ export default function GlobalActionHost() {
           exclude_from_maaser:!!transactionForm.exclude_from_maaser,
         };
         if (type === "transaction-edit" && item?.transaction_id) {
-          await api.put(`/transactions/${item.transaction_id}/split-composed`, payload);
+          remember(await api.put(`/transactions/${item.transaction_id}/split-composed`, payload));
         } else {
-          await api.post("/transactions/split-create", payload);
+          remember(await api.post("/transactions/split-create", payload));
         }
       } else if (type === "transaction-edit" && item?.transaction_id) {
-        await api.patch(`/transactions/${item.transaction_id}`, {
+        remember(await api.patch(`/transactions/${item.transaction_id}`, {
           ...body,
           exclude_from_maaser:!!transactionForm.exclude_from_maaser,
-        });
+        }));
         if (item.is_split) {
           await api.delete(`/transactions/${item.transaction_id}/splits`);
+          if (savedRecord) savedRecord = {...savedRecord, is_split:false, split_count:0};
         }
       } else if (classification || transactionForm.budget_type) {
         const suggestions = classification?.suggestions || [];
         const chosenIndex = suggestions.findIndex(s=>s.category === transactionForm.category);
-        await api.post("/budget-system/approve", {
+        remember(await api.post("/budget-system/approve", {
           description:body.description, amount:body.amount,
           budget_type:transactionForm.budget_type || suggestions[0]?.budget_type || "day_to_day",
           occasion:transactionForm.occasion || suggestions[0]?.occasion || "Monthly Living",
@@ -237,15 +243,15 @@ export default function GlobalActionHost() {
           suggestion_id:classification?.suggestion_id || null,
           suggestion_index:chosenIndex>=0 ? chosenIndex : null,
           save_as_recurring:saveAsRecurring,
-        });
+        }));
       } else {
-        await api.post("/transactions", {...body, exclude_from_maaser:!!transactionForm.exclude_from_maaser});
+        remember(await api.post("/transactions", {...body, exclude_from_maaser:!!transactionForm.exclude_from_maaser}));
       }
       toast.success(pairExisting ? "Transactions paired" :
         mode === "transfer" ? "Transfer created" :
         mode === "split" ? "Split saved" :
         type === "transaction-edit" ? "Transaction updated" : "Transaction added");
-      afterSave("transactions");
+      afterSave("transactions", savedRecord ? {operation:type === "transaction-edit" ? "updated" : "created", record:savedRecord} : {});
     } catch(error) {
       const message = formatApiError(error.response?.data?.detail || error) || "Could not save transaction";
       setTransactionError(message);
@@ -281,7 +287,7 @@ export default function GlobalActionHost() {
       showHeader size="md" bodyClassName="penni-native-form">
       <BudgetActionForm budget={type === "budget-edit" ? payload.budget : undefined}
         category={payload.category} month={payload.month} categories={categories}
-        onSaved={() => afterSave("budgets")} />
+        onSaved={details => afterSave("budgets", details)} />
     </NativePopup>;
   }
 

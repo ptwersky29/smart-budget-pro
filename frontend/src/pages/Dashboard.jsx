@@ -108,9 +108,11 @@ export default function Dashboard() {
         ];
   const showWidget = (key) => activeWidgets.includes(key);
 
-  const loadAll = useCallback(async (silent) => {
-    if (silent) setRefreshing(true);
-    else if (!cacheGetEntry("/dashboard/overview", {})?.data) setLoading(true);
+  const loadAll = useCallback(async (mode) => {
+    const manual = mode === true || mode === "manual";
+    const background = mode === "background";
+    if (manual) setRefreshing(true);
+    else if (!background && !cacheGetEntry("/dashboard/overview", {})?.data) setLoading(true);
     try {
       const [ov, bd, al, up] = await Promise.allSettled([
         api.swrGet("/dashboard/overview", {}, 30_000).fresh,
@@ -126,24 +128,31 @@ export default function Dashboard() {
         // Keep showing cached data when a background refresh fails.
         if (!cacheGetEntry("/dashboard/overview", {})?.data) setOverview(null);
         setLoadError(message);
-        if (silent) toast.error(message || "Could not refresh dashboard");
+        if (manual) toast.error(message || "Could not refresh dashboard");
       }
       if (bd.status === "fulfilled") setBudgets(bd.value.budgets || []);
       if (al.status === "fulfilled") setAlerts(al.value.alerts || al.value || []);
       if (up.status === "fulfilled") setUpcoming(up.value.upcoming || up.value || []);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (!background) setLoading(false);
+      if (manual) setRefreshing(false);
     }
   }, []);
 
+  useEffect(() => { loadAll(); }, [loadAll]);
   useEffect(() => {
-    loadAll();
-  }, [loadAll, categoriesVersion]);
+    if (categoriesVersion > 1) loadAll("background");
+  }, [categoriesVersion, loadAll]);
   useEffect(() => {
-    const onChanged = () => loadAll(true);
+    let timer;
+    const onChanged = event => {
+      const entity = event.detail?.entity;
+      if (entity && !["transactions", "budgets", "categories", "accounts"].includes(entity)) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => loadAll("background"), 800);
+    };
     window.addEventListener("penni:data-changed", onChanged);
-    return () => window.removeEventListener("penni:data-changed", onChanged);
+    return () => { clearTimeout(timer); window.removeEventListener("penni:data-changed", onChanged); };
   }, [loadAll]);
 
   const accounts = overview?.accounts || [];

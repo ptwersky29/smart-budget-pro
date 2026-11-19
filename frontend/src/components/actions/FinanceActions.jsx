@@ -39,16 +39,17 @@ export function BudgetActionForm({ budget, category, month, categories, onSaved 
     setError("");
     setSaving(true);
     try {
+      let response;
       if (budget?.budget_id) {
-        await api.patch(`/budgets/${budget.budget_id}`, { category: categoryName.toLowerCase().trim(), limit: Number(amount), ...(type==="event" ? {event_date: eventDate || null} : {}) });
+        response = await api.patch(`/budgets/${budget.budget_id}`, { category: categoryName.toLowerCase().trim(), limit: Number(amount), ...(type==="event" ? {event_date: eventDate || null} : {}) });
       } else {
-        await api.post("/budgets", {
+        response = await api.post("/budgets", {
           category: categoryName.toLowerCase().trim(), limit: Number(amount), period: "monthly", budget_type: type,
           ...(type==="event" ? {event_date: eventDate || undefined, event_group_name: eventName.trim()} : {month: month || monthNow()})
         });
       }
       toast.success(budget ? "Budget updated" : "Budget created");
-      onSaved?.();
+      onSaved?.({operation:budget ? "updated" : "created", record:response?.data});
     } catch (requestError) {
       const message = formatApiError(requestError) || "Could not save budget.";
       setError(message);

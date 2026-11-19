@@ -12,6 +12,7 @@ import { EmptyState } from "../components/ui/layout";
 import { SkeletonTable } from "../components/ui/Skeleton";
 import { useAssistant } from "../contexts/AssistantContext";
 import { useClassification } from "../contexts/ClassificationContext";
+import { patchTransactionRows, insertTransactionRow, matchesTransactionFilters } from "../lib/transactionUpdates";
 import { formatCurrency, formatLongDate, formatShortDate } from "../lib/format";
 import Sparkline from "../components/ui/Sparkline";
 import { withUndo } from "../lib/undo";
@@ -250,6 +251,8 @@ const Transactions = React.memo(function Transactions() {
   const { jobsByTransaction, enqueue, enqueueUncategorized } = useClassification();
   const { openAction } = useActions();
   const [txs, setTxs] = useState([]);
+  const txsRef = useRef(txs);
+  txsRef.current = txs;
   const [total, setTotal] = useState(0);
   const [incomeTotal, setIncomeTotal] = useState(0);
   const [expenseTotal, setExpenseTotal] = useState(0);
@@ -579,9 +582,9 @@ const Transactions = React.memo(function Transactions() {
     setSearchParams(params, { replace: true });
   }, [filters, offset]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ background = false } = {}) => {
     const requestId = ++ledgerRequestId.current;
-    setAiResults(null);
+    if (!background) setAiResults(null);
     const params = { offset, limit, sort: filters.sort, order: filters.order };
     if (filters.search) params.search = filters.search;
     if (filters.category) params.category = filters.category;
@@ -598,13 +601,13 @@ const Transactions = React.memo(function Transactions() {
     // Paint the page from cache while the fresh request runs. Paging back and
     // forth between filters no longer flashes a skeleton each time.
     const cached = cacheGetEntry("/transactions", params)?.data;
-    if (cached) {
+    if (cached && !background) {
       setTxs(cached.transactions || []);
       setTotal(cached.total || 0);
       setIncomeTotal(cached.income_total || 0);
       setExpenseTotal(cached.expense_total || 0);
       setLoading(false);
-    } else {
+    } else if (!background) {
       setLoading(true);
     }
 
@@ -633,8 +636,8 @@ const Transactions = React.memo(function Transactions() {
           })
           .catch(() => {});
       }
-    } catch (err) { if (requestId === ledgerRequestId.current && !cached) toast.error("Could not load transactions"); }
-    finally { if (requestId === ledgerRequestId.current) setLoading(false); }
+    } catch (err) { if (!background && requestId === ledgerRequestId.current && !cached) toast.error("Could not load transactions"); }
+    finally { if (!background && requestId === ledgerRequestId.current) setLoading(false); }
   }, [offset, limit, filters]);
 
   const loadCats = useCallback(async () => {
@@ -651,10 +654,49 @@ const Transactions = React.memo(function Transactions() {
   useEffect(() => { load(); }, [load]);
   useEffect(() => () => { ledgerRequestId.current += 1; }, []);
   useEffect(() => {
-    const onChanged = () => load();
+    const onChanged = event => {
+      const { entity, operation, record } = event.detail || {};
+      if (entity && entity !== "transactions") return;
+      if (record?.transaction_id && ["updated", "patched", "classified", "created"].includes(operation)) {
+        // Keep row order and current scroll position. Ignore any stale list response.
+        ledgerRequestId.current += 1;
+        setLoading(false);
+        const previous = txsRef.current.find(row => row.transaction_id === record.transaction_id);
+        const safe = {onlyIfUncategorized: operation === "classified"};
+        if (operation === "created") {
+          if (offset === 0 && !previous && matchesTransactionFilters(record, filters)) {
+            setTxs(rows => insertTransactionRow(rows, record, filters, limit));
+            setTotal(value => value + 1);
+            const amount = Number(record.amount || 0);
+            if (amount > 0) setIncomeTotal(value => value + amount);
+            else setExpenseTotal(value => value + Math.abs(amount));
+          }
+        } else {
+          setTxs(rows => patchTransactionRows(rows, record, safe));
+          setMonthRows(rows => patchTransactionRows(rows, record, safe));
+          setPreviousMonthRows(rows => patchTransactionRows(rows, record, safe));
+          setAiResults(current => current?.transactions ? {
+            ...current, transactions: patchTransactionRows(current.transactions, record, safe),
+          } : current);
+          setInspectTx(current => current?.transaction_id === record.transaction_id ? {...current,...record} : current);
+          setReviewTx(current => current?.transaction_id === record.transaction_id ? {...current,...record} : current);
+          if (previous && record.amount !== undefined) {
+            const before = Number(previous.amount || 0);
+            const after = Number(record.amount || 0);
+            setIncomeTotal(value => value + Math.max(0,after) - Math.max(0,before));
+            setExpenseTotal(value => value + Math.max(0,-after) - Math.max(0,-before));
+          }
+        }
+        api.invalidate("/transactions");
+        api.invalidate("/dashboard/overview");
+        return;
+      }
+      // Imports and structural changes can reconcile silently when necessary.
+      void load({background:true});
+    };
     window.addEventListener("penni:data-changed", onChanged);
     return () => window.removeEventListener("penni:data-changed", onChanged);
-  }, [load]);
+  }, [load, filters, offset, limit]);
   useEffect(() => { loadCats(); }, [loadCats]);
 
   const loadAccounts = useCallback(async () => {
@@ -1007,8 +1049,6 @@ const Transactions = React.memo(function Transactions() {
     );
   }, [filters, total, load, showConfirm]);
 
-  const txsRef = useRef(txs);
-  txsRef.current = txs;
   const del = useCallback((id) => {
     const tx = txsRef.current.find(t => t.transaction_id === id);
     if (!tx) return;

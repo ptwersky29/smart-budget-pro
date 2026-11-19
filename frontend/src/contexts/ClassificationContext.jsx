@@ -32,22 +32,38 @@ export function ClassificationProvider({ children }) {
         return true;
       });
       const previously = stateRef.current;
-      let shouldRefreshTransactions = false;
+      const completedJobs = [];
       for (const job of serverJobs) {
         const old = previously.get(job.transaction_id);
         if (old && ACTIVE.has(old) && FINISHED.has(job.status)) {
-          shouldRefreshTransactions = true;
+          if (job.status === "completed" && job.result) completedJobs.push(job);
         }
       }
       stateRef.current = new Map(serverJobs.map((job) => [job.transaction_id, job.status]));
       // Retain only in-flight optimistic requests not yet echoed by the server.
-      setJobs((prev) => [
-        ...prev.filter((job) => job.optimistic && !serverJobs.some((next) => next.transaction_id === job.transaction_id)),
-        ...serverJobs,
-      ]);
-      if (shouldRefreshTransactions) {
-        api.invalidate?.("/transactions");
-        window.dispatchEvent(new Event("penni:data-changed"));
+      setJobs(prev => {
+        const next = [
+          ...prev.filter(job => job.optimistic && !serverJobs.some(item => item.transaction_id === job.transaction_id)),
+          ...serverJobs,
+        ];
+        if (next.length === prev.length && next.every((job,i) =>
+          job.job_id === prev[i].job_id && job.status === prev[i].status &&
+          job.completed_at === prev[i].completed_at)) return prev;
+        return next;
+      });
+      for (const job of completedJobs) {
+        const result = job.result;
+        const record = {
+          transaction_id: job.transaction_id,
+          ai_suggested_categories: {suggestions:result.suggestions || []},
+          ai_selected_category: result.category || null,
+          ...(result.applied && result.category ? {
+            category:result.category, category_approval_status:"unapproved",
+          } : {}),
+        };
+        window.dispatchEvent(new CustomEvent("penni:data-changed", {
+          detail:{entity:"transactions",operation:"classified",record},
+        }));
       }
     } catch {
       // Background polling must not interrupt work elsewhere in Penni.

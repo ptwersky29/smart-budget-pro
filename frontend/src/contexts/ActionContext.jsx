@@ -15,8 +15,8 @@ export function ActionProvider({ children }) {
     setActive({ type, payload, key: Date.now() });
   }, []);
   const closeAction = useCallback(() => setActive(null), []);
-  const changed = useCallback((entity) => {
-    window.dispatchEvent(new CustomEvent("penni:data-changed", { detail: { entity } }));
+  const changed = useCallback((entity, details = {}) => {
+    window.dispatchEvent(new CustomEvent("penni:data-changed", { detail: { entity, ...details } }));
   }, []);
   const value = useMemo(() => ({ active, openAction, closeAction, changed }), [active, openAction, closeAction, changed]);
   return <ActionContext.Provider value={value}>{children}</ActionContext.Provider>;

@@ -694,8 +694,9 @@ export default React.memo(function BudgetPage() {
       .sort((a, b) => b.value - a.value);
   }, [categorySpend, budgets]);
 
-  const fetchData = useCallback(async () => {
-    if (!cacheGetEntry("/budgets", { month })?.data) setLoading(true);
+  const fetchData = useCallback(async (options = {}) => {
+    const background = options?.background === true;
+    if (!background && !cacheGetEntry("/budgets", { month })?.data) setLoading(true);
     try {
       const data = await api.swrGet("/budgets", { month }, 30_000).fresh;
       setBudgets(data.budgets || []);
@@ -710,9 +711,9 @@ export default React.memo(function BudgetPage() {
         .then((res) => setRecentTransactions(res.data.transactions || []))
         .catch(() => setRecentTransactions([]));
     } catch (err) {
-      setLoadError(err.response?.data?.detail || "Failed to load budgets");
+      if (!background) setLoadError(err.response?.data?.detail || "Failed to load budgets");
     } finally {
-      setLoading(false);
+      if (!background) setLoading(false);
     }
   }, [month]);
 
@@ -736,10 +737,31 @@ export default React.memo(function BudgetPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
   useEffect(() => {
-    const onChanged = () => fetchData();
+    let timer;
+    const onChanged = event => {
+      const {entity,operation,record} = event.detail || {};
+      if (entity && !["transactions","budgets","categories"].includes(entity)) return;
+      if (entity === "budgets" && record?.budget_id) {
+        if (operation === "updated") {
+          setBudgets(rows => rows.map(row => row.budget_id === record.budget_id ? {...row,...record} : row));
+          api.invalidate("/budgets");
+          return;
+        }
+        if (operation === "created" && (record.budget_type === "event" || record.month === month)) {
+          setBudgets(rows => rows.some(row => row.budget_id === record.budget_id) ? rows : [...rows,record]);
+          api.invalidate("/budgets");
+          if (record.budget_type !== "event") return;
+        }
+      }
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        void fetchData({background:true});
+        if (entity === "categories") void fetchCategories();
+      }, 800);
+    };
     window.addEventListener("penni:data-changed", onChanged);
-    return () => window.removeEventListener("penni:data-changed", onChanged);
-  }, [fetchData]);
+    return () => { clearTimeout(timer); window.removeEventListener("penni:data-changed", onChanged); };
+  }, [fetchData, fetchCategories, month]);
   useEffect(() => {
     let active = true;
     // Build a real six-month history; categories in one month are not a time series.
