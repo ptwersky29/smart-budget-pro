@@ -203,8 +203,11 @@ export default function GlobalActionHost() {
         transaction_id:item.transaction_id,
         merchant_name:body.merchant ?? item.merchant_name,
         category:body.category || item.category || "uncategorized",
-        category_approval_status:body.category && body.category !== item.category
-          ? "approved" : item.category_approval_status,
+        // A deliberate manual edit approves both the transaction and its
+        // category, regardless of which field the user changed.
+        approval_status:"approved",
+        category_approval_status:"approved",
+        approved_at:new Date().toISOString(),
       } : {
         ...body,
         transaction_id:"local_tx_" + Date.now() + "_" + Math.random().toString(36).slice(2,10),
@@ -213,7 +216,14 @@ export default function GlobalActionHost() {
         currency:"GBP", source:"manual", approval_status:"approved",
         category_approval_status:"approved",
       };
-      const requestBody = {...body, exclude_from_maaser:!!transactionForm.exclude_from_maaser};
+      const requestBody = {
+        ...body,
+        exclude_from_maaser:!!transactionForm.exclude_from_maaser,
+        ...(simpleEdit ? {
+          approval_status:"approved",
+          category_approval_status:"approved",
+        } : {}),
+      };
       const persist = simpleEdit
         ? () => api.patch(`/transactions/${item.transaction_id}`, requestBody).then(response => response.data)
         : () => api.post("/transactions", requestBody).then(response => response.data);
@@ -268,6 +278,8 @@ export default function GlobalActionHost() {
         remember(await api.patch(`/transactions/${item.transaction_id}`, {
           ...body,
           exclude_from_maaser:!!transactionForm.exclude_from_maaser,
+          approval_status:"approved",
+          category_approval_status:"approved",
         }));
         if (item.is_split) {
           await api.delete(`/transactions/${item.transaction_id}/splits`);

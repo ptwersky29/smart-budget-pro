@@ -2177,7 +2177,11 @@ Output ONLY valid JSON, no markdown, no explanation:
             tx.category = allocations[0][1]
             tx.notes = payload.notes
             tx.exclude_from_maaser = bool(payload.exclude_from_maaser)
+            # A split-composed save is a deliberate manual edit, not an AI
+            # classification or automatic bank synchronization.
+            tx.approval_status = "approved"
             tx.category_approval_status = "approved"
+            tx.approved_at = datetime.now(timezone.utc)
             if not tx_id:
                 session.add(tx)
             for cents, category, line_description in allocations:

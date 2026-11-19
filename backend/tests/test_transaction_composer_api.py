@@ -1,6 +1,7 @@
 """Transaction composer integration checks: atomic multi-splits and paired transfers."""
 import asyncio
 import os
+from datetime import datetime, timezone
 
 import pytest
 from fastapi import FastAPI
@@ -123,3 +124,75 @@ def test_bad_split_and_same_account_transfer_do_not_change_balances(composer):
             assert sorted(account.balance for account in accounts) == [500, 1000]
             assert txs == []
     asyncio.run(check())
+
+
+def test_manual_edit_approves_transaction_and_category(composer):
+    client, sessions = composer
+
+    async def add_unapproved():
+        async with sessions() as session:
+            session.add(Transaction(
+                transaction_id="tx-manual-review", user_id="test-user",
+                account_id="a1", amount=-12.5, currency="GBP",
+                description="Imported payment", category="grocery",
+                date=datetime(2026, 11, 18, tzinfo=timezone.utc),
+                source="truelayer", approval_status="unapproved",
+                category_approval_status="unapproved",
+            ))
+            await session.commit()
+    asyncio.run(add_unapproved())
+
+    # Background or programmatic edits remain unapproved without an explicit
+    # manual approval request.
+    untouched = client.patch("/api/transactions/tx-manual-review", json={"notes":"Automated note"})
+    assert untouched.status_code == 200, untouched.text
+    assert untouched.json()["approval_status"] == "unapproved"
+    assert untouched.json()["category_approval_status"] == "unapproved"
+
+    edited = client.patch("/api/transactions/tx-manual-review", json={
+        "description":"Corrected by user", "approval_status":"approved",
+        "category_approval_status":"approved",
+    })
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["approval_status"] == "approved"
+    assert edited.json()["category_approval_status"] == "approved"
+
+    async def verify():
+        async with sessions() as session:
+            row = (await session.execute(select(Transaction).where(
+                Transaction.transaction_id == "tx-manual-review"
+            ))).scalar_one()
+            assert row.approval_status == "approved"
+            assert row.category_approval_status == "approved"
+            assert row.approved_at is not None
+    asyncio.run(verify())
+
+
+def test_manual_split_edit_approves_previously_unapproved_parent(composer):
+    client, sessions = composer
+    body = {
+        "account_id":"a1", "amount":40, "is_income":False,
+        "description":"Split shopping", "date":"2026-11-18",
+        "splits":[{"category":"grocery","amount":25},{"category":"house_supplies","amount":15}],
+    }
+    created = client.post("/api/transactions/split-create", json=body)
+    assert created.status_code == 200, created.text
+    identifier = created.json()["transaction_id"]
+
+    async def unapprove():
+        async with sessions() as session:
+            tx = (await session.execute(select(Transaction).where(
+                Transaction.transaction_id == identifier
+            ))).scalar_one()
+            tx.approval_status = "unapproved"
+            tx.category_approval_status = "unapproved"
+            tx.approved_at = None
+            await session.commit()
+    asyncio.run(unapprove())
+
+    result = client.put(f"/api/transactions/{identifier}/split-composed", json={
+        **body, "description":"Split shopping corrected",
+    })
+    assert result.status_code == 200, result.text
+    assert result.json()["approval_status"] == "approved"
+    assert result.json()["category_approval_status"] == "approved"

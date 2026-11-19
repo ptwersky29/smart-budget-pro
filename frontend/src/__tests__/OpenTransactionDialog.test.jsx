@@ -19,6 +19,7 @@ jest.mock("../lib/api", () => ({
       { account_id: "a1", name: "Current", balance: 100, currency: "GBP" },
     ] } })),
     post: jest.fn(() => Promise.resolve({ data: {} })),
+    patch: jest.fn(),
   },
   formatApiError: () => "Request failed",
 }));
@@ -107,5 +108,68 @@ test("Failed background saves close the form immediately and reverse the tempora
     ])));
   } finally {
     window.removeEventListener("penni:data-changed",listener);
+  }
+});
+
+
+function EditTransactionLauncher() {
+  const { openAction } = useActions();
+  const transaction = {
+    transaction_id:"tx-edit-unapproved", account_id:"a1", amount:-19.75,
+    date:"2026-11-18", description:"Shop purchase", category:"grocery",
+    approval_status:"unapproved", category_approval_status:"unapproved",
+    source:"truelayer",
+  };
+  return <button type="button" onClick={() => openAction("transaction-edit", {transaction})}>Edit transaction</button>;
+}
+
+test("manually editing an unapproved transaction approves it instantly and on the server", async () => {
+  api.get.mockResolvedValue({data:{accounts:[
+    {account_id:"a1",name:"Current",balance:100,currency:"GBP"},
+  ]}});
+  api.patch.mockResolvedValue({data:{
+    transaction_id:"tx-edit-unapproved", account_id:"a1", amount:-19.75,
+    date:"2026-11-18", description:"Shop purchase corrected",
+    category:"grocery", approval_status:"approved", category_approval_status:"approved",
+  }});
+  const changes = [];
+  const listener = event => changes.push(event.detail);
+  window.addEventListener("penni:data-changed", listener);
+  try {
+    render(<ActionProvider><EditTransactionLauncher/><GlobalActionHost/></ActionProvider>);
+    fireEvent.click(screen.getByRole("button",{name:"Edit transaction"}));
+    await screen.findByRole("dialog",{name:"Edit transaction"});
+    await waitFor(() => expect(screen.getByRole("combobox",{name:"Choose option"})).toHaveTextContent("Current"));
+    fireEvent.change(screen.getByTestId("tx-desc"),{target:{value:"Shop purchase corrected"}});
+    fireEvent.click(screen.getByTestId("tx-submit"));
+    // Manual approval should be reflected in the optimistic row even before
+    // the API answers, but must still roll back if saving fails.
+    expect(changes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        phase:"optimistic",
+        record:expect.objectContaining({
+          transaction_id:"tx-edit-unapproved",
+          approval_status:"approved",
+          category_approval_status:"approved",
+          _saveStatus:"saving",
+        }),
+      }),
+    ]));
+    expect(screen.queryByRole("dialog",{name:"Edit transaction"})).not.toBeInTheDocument();
+    await waitFor(() => expect(api.patch).toHaveBeenCalledWith(
+      "/transactions/tx-edit-unapproved",
+      expect.objectContaining({
+        approval_status:"approved",category_approval_status:"approved",
+        description:"Shop purchase corrected",
+      }),
+    ));
+    await waitFor(() => expect(changes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        phase:"confirmed",
+        record:expect.objectContaining({approval_status:"approved",category_approval_status:"approved"}),
+      }),
+    ])));
+  } finally {
+    window.removeEventListener("penni:data-changed", listener);
   }
 });
