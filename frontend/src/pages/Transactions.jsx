@@ -13,6 +13,7 @@ import { SkeletonTable } from "../components/ui/Skeleton";
 import { useAssistant } from "../contexts/AssistantContext";
 import { useClassification } from "../contexts/ClassificationContext";
 import { patchTransactionRows, insertTransactionRow, matchesTransactionFilters } from "../lib/transactionUpdates";
+import { canPairTransactions, isPotentialOppositeSide } from "../lib/transferPairing";
 import { formatCurrency, formatLongDate, formatShortDate } from "../lib/format";
 import Sparkline from "../components/ui/Sparkline";
 import { withUndo } from "../lib/undo";
@@ -892,20 +893,26 @@ const Transactions = React.memo(function Transactions() {
   const pairTransfer = useCallback((t) => {
     const selectedOtherId = Array.from(selectedIds).find((id) => {
       const other = allDisplayed.find(row => row.transaction_id === id);
-      return other && id !== t.transaction_id && !other.transfer_pair_id && Number(t.amount || 0) * Number(other.amount || 0) < 0;
+      return canPairTransactions(t, other);
     });
     setTransferTx(t);
     setTransferTargetId(selectedOtherId || "");
     setTransferOpen(true);
   }, [selectedIds, allDisplayed]);
 
+  // Only propose candidates that the server can actually pair. In particular,
+  // equal and opposite payments from the SAME bank account are not transfers.
   const transferCandidates = useMemo(() => {
     if (!transferTx) return [];
-    const baseAmount = Number(transferTx.amount || 0);
-    return allDisplayed.filter((row) => {
-      if (row.transaction_id === transferTx.transaction_id || row.transfer_pair_id) return false;
-      return Number(row.amount || 0) * baseAmount < 0;
-    });
+    return allDisplayed.filter(row => canPairTransactions(transferTx, row));
+  }, [allDisplayed, transferTx]);
+
+  const sameAccountTransferMatches = useMemo(() => {
+    if (!transferTx) return [];
+    return allDisplayed.filter(row =>
+      isPotentialOppositeSide(transferTx, row) &&
+      row.account_id === transferTx.account_id
+    );
   }, [allDisplayed, transferTx]);
   const splitOriginalAmount = Math.abs(Number(splitTxDraft?.amount || 0));
   const splitEnteredTotal = useMemo(
@@ -1257,8 +1264,10 @@ const Transactions = React.memo(function Transactions() {
       return;
     }
     const other = allDisplayed.find(row => row.transaction_id === transferTargetId);
-    if (!other || Number(transferTx.amount || 0) * Number(other.amount || 0) >= 0) {
-      toast.error("Choose one outgoing expense and one incoming income");
+    if (!other || !canPairTransactions(transferTx, other)) {
+      toast.error(other?.account_id === transferTx.account_id
+        ? "Both transactions are in the same account. Correct the account on the incorrectly assigned transaction first."
+        : "Choose an equal and opposite amount in a different account with the same currency.");
       return;
     }
     const outgoing = Number(transferTx.amount) < 0 ? transferTx.transaction_id : transferTargetId;
@@ -2431,9 +2440,11 @@ const Transactions = React.memo(function Transactions() {
             {transferTx && (
               <div className="rounded-xl border border-border bg-secondary/30 p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <div>
+                  <div className="min-w-0">
                     <div className="text-sm font-medium text-foreground">{transferTx.description || "Selected transaction"}</div>
-                    <div className="text-xs text-muted-foreground">{transferTx.date} - {transferTx.account_name || "Account"}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {String(transferTx.date || "").slice(0, 10)} · {accountsById[transferTx.account_id]?.name || transferTx.account_name || "Unknown account"}
+                    </div>
                   </div>
                   <div className={`text-sm font-semibold ${Number(transferTx.amount || 0) >= 0 ? "text-emerald" : "text-rose-600"}`}>
                     {fmt(transferTx.amount)}
@@ -2452,14 +2463,35 @@ const Transactions = React.memo(function Transactions() {
                   <option value="">Choose a match</option>
                   {transferCandidates.map((candidate) => (
                     <option key={candidate.transaction_id} value={candidate.transaction_id}>
-                      {candidate.date} - {candidate.description || candidate.merchant || "Transaction"} - {fmt(candidate.amount)}
+                      {String(candidate.date || "").slice(0, 10)} · {candidate.description || candidate.merchant || "Transaction"} · {fmt(candidate.amount)} · {accountsById[candidate.account_id]?.name || candidate.account_name || "Unknown account"}
                     </option>
                   ))}
                 </PenniSelect>
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
-                No eligible opposite-side transactions are visible. Adjust filters or load more transactions, then try again.
+                <p className="font-medium text-foreground">No valid transfer counterpart in this view.</p>
+                <p className="mt-1">Choose a transaction for {fmt(-Number(transferTx?.amount || 0))} from a <strong>different account</strong>. Check your account and date filters if the other side isn't visible.</p>
+                {sameAccountTransferMatches.length > 0 && (
+                  <div className="mt-3 space-y-2 border-t border-border pt-3">
+                    <p className="font-medium text-rose-600">
+                      {sameAccountTransferMatches.length === 1 ? "A matching payment" : "Matching payments"} found in the same account
+                    </p>
+                    <p>Penni cannot pair entries assigned to the same account. If either transaction was imported into the wrong account, edit that transaction's account first. Don't change an account unless the assignment is actually incorrect.</p>
+                    {sameAccountTransferMatches.slice(0, 3).map(candidate => (
+                      <div key={candidate.transaction_id} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-secondary/30 px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-xs text-foreground">{candidate.description || "Matching transaction"}</p>
+                          <p className="text-xs">{accountsById[candidate.account_id]?.name || candidate.account_name || "Unknown account"} · {fmt(candidate.amount)}</p>
+                        </div>
+                        <button type="button" className="shrink-0 rounded-lg border border-border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-secondary"
+                          onClick={() => { setTransferOpen(false); openAction("transaction-edit", { transaction: candidate }); }}>
+                          Edit account
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
