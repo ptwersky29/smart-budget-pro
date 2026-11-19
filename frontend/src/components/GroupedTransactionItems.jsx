@@ -39,6 +39,7 @@ export function TransactionBankMark({ transaction, account, showName = true }) {
 }
 
 export function getTransactionStatus(transaction) {
+  if (transaction?._saveStatus === "saving") return { label: "Saving…", className: "bg-violet/10 text-violet" };
   if (transaction?.approval_status === "failed") return { label: "Failed", className: "bg-ruby/10 text-ruby" };
   if (transaction?.approval_status === "unapproved" || transaction?.category_approval_status === "unapproved") return { label: "Unapproved", className: "bg-topaz/10 text-topaz" };
   if (transaction?.pending) return { label: "Pending", className: "bg-sky/10 text-sky" };

@@ -31,7 +31,7 @@ const PANEL_TITLES = {
 };
 
 export default function GlobalActionHost() {
-  const { active, openAction, closeAction, changed } = useActions();
+  const { active, openAction, closeAction, changed, saveTransactionInBackground } = useActions();
   const { categories, version } = useCategories();
   const [accounts, setAccounts] = useState([]);
   const [accountLoading, setAccountLoading] = useState(false);
@@ -73,6 +73,14 @@ export default function GlobalActionHost() {
         entry_mode:item.is_split ? "split" : (item.is_transfer || item.tx_type === "transfer") ? "transfer" : "standard",
         exclude_from_maaser:!!item.exclude_from_maaser,budget_type:item.budget_type||"",occasion:item.occasion||"",
         balance_type:item.balance_type||"available",pending:!!item.pending,tags:item.tags||null});
+    } else if (payload.draft) {
+      const draft = payload.draft;
+      setTransactionForm({...emptyTransaction(draft.account_id || ""), ...draft,
+        amount:String(Math.abs(Number(draft.amount) || 0)),
+        date:String(draft.date || today()).slice(0,10),
+        is_income:Number(draft.amount) > 0,
+        entry_mode:"standard",
+      });
     } else setTransactionForm(emptyTransaction(payload.accountId || ""));
   }, [type, active?.key]);
 
@@ -182,6 +190,41 @@ export default function GlobalActionHost() {
       is_income:!!transactionForm.is_income,
       is_transfer:false,
     };
+    // Routine single-record saves never hold the form open for a network
+    // round trip. The pending row is visible instantly; completion and errors
+    // are handled by the route-independent action provider.
+    const simpleEdit = type === "transaction-edit" && item?.transaction_id && !item.is_split &&
+      !item.transfer_pair_id && mode === "standard";
+    const simpleCreate = type === "transaction-new" && mode === "standard" &&
+      !classification && !transactionForm.budget_type;
+    if (simpleEdit || simpleCreate) {
+      const optimistic = simpleEdit ? {
+        ...item, ...body,
+        transaction_id:item.transaction_id,
+        merchant_name:body.merchant ?? item.merchant_name,
+        category:body.category || item.category || "uncategorized",
+        category_approval_status:body.category && body.category !== item.category
+          ? "approved" : item.category_approval_status,
+      } : {
+        ...body,
+        transaction_id:"local_tx_" + Date.now() + "_" + Math.random().toString(36).slice(2,10),
+        category:body.category || "uncategorized",
+        merchant_name:body.merchant || null,
+        currency:"GBP", source:"manual", approval_status:"approved",
+        category_approval_status:"approved",
+      };
+      const requestBody = {...body, exclude_from_maaser:!!transactionForm.exclude_from_maaser};
+      const persist = simpleEdit
+        ? () => api.patch(`/transactions/${item.transaction_id}`, requestBody).then(response => response.data)
+        : () => api.post("/transactions", requestBody).then(response => response.data);
+      const started = saveTransactionInBackground({
+        kind:simpleEdit ? "updated" : "created",
+        optimistic, original:simpleEdit ? item : null, persist,
+        draft:{...transactionForm},
+      });
+      if (started) closeAction();
+      return;
+    }
     savingRef.current = true;
     setSavingTransaction(true);
     let savedRecord = null;

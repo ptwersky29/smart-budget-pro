@@ -262,6 +262,7 @@ const TransactionRow = React.memo(
   (prev, next) =>
     prev.t.transaction_id === next.t.transaction_id &&
     prev.t.amount === next.t.amount &&
+    prev.t._saveStatus === next.t._saveStatus &&
     prev.t.category === next.t.category &&
     prev.t.approval_status === next.t.approval_status &&
     prev.t.category_approval_status === next.t.category_approval_status &&
