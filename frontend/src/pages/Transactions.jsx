@@ -964,18 +964,25 @@ const Transactions = React.memo(function Transactions() {
       action: async () => {
         const { data } = await api.post("/transactions/bulk-category", { transaction_ids: ids, category: cat });
         originalCategories = data.previous_categories || {};
-        await load();
+        const targets = new Set(ids);
+        setTxs(rows => rows.map(row => targets.has(row.transaction_id) ? {...row, category:cat} : row));
+        setMonthRows(rows => rows.map(row => targets.has(row.transaction_id) ? {...row, category:cat} : row));
+        api.invalidate("/transactions");
       },
       undo: async () => {
         if (!originalCategories || !Object.keys(originalCategories).length) return;
         await api.post("/transactions/bulk-category-restore", { categories: originalCategories });
-        await load();
+        const restore = row => Object.prototype.hasOwnProperty.call(originalCategories,row.transaction_id)
+          ? {...row,category:originalCategories[row.transaction_id]} : row;
+        setTxs(rows => rows.map(restore));
+        setMonthRows(rows => rows.map(restore));
+        api.invalidate("/transactions");
       },
       successMsg: `${ids.length} transaction${ids.length > 1 ? "s" : ""} categorised`,
       errorMsg: "Could not update or restore categories",
     });
     setSelectedIds(new Set());
-  }, [selectedIds, load]);
+  }, [selectedIds]);
 
   const bulkDelete = useCallback(async () => {
     if (selectedIds.size === 0) return;
@@ -986,12 +993,16 @@ const Transactions = React.memo(function Transactions() {
         try {
           const { data } = await api.post("/transactions/bulk-delete", { transaction_ids: Array.from(selectedIds) });
           toast.success(`Deleted ${data.deleted}`);
+          const deleted = new Set(selectedIds);
+          setTxs(rows => rows.filter(row => !deleted.has(row.transaction_id)));
+          setMonthRows(rows => rows.filter(row => !deleted.has(row.transaction_id)));
+          setTotal(count => Math.max(0,count - Number(data.deleted || 0)));
           setSelectedIds(new Set());
-          await load();
+          api.invalidate("/transactions");
         } catch (e) { toast.error(formatApiError(e?.response?.data?.detail) || "Could not delete"); }
       }
     );
-  }, [selectedIds, load, showConfirm]);
+  }, [selectedIds, showConfirm]);
 
   const duplicateSelected = useCallback(async () => {
     const rows = (aiResults?.transactions || txs).filter(tx => selectedIds.has(tx.transaction_id));
@@ -1014,8 +1025,17 @@ const Transactions = React.memo(function Transactions() {
     setSelectedIds(new Set(failedIds));
     if (succeeded) toast.success(`Duplicated ${succeeded} transaction${succeeded !== 1 ? "s" : ""}`);
     if (failedIds.length) toast.error(`${failedIds.length} could not be duplicated; only failed rows remain selected for retry.`);
-    await load();
-  }, [aiResults, load, selectedIds, txs]);
+    // The server returns each created row. Insert those that match this view,
+    // leaving the user's filters, scroll and selection intact.
+    const created = results.filter(result => result.status === "fulfilled")
+      .map(result => result.value?.data).filter(row => row?.transaction_id);
+    if (offset === 0 && created.length) {
+      const visible = created.filter(row => matchesTransactionFilters(row,filters));
+      setTxs(previous => visible.reduce((rows,row) => insertTransactionRow(rows,row,filters,limit),previous));
+      setTotal(value => value + visible.length);
+    }
+    api.invalidate("/transactions");
+  }, [aiResults, selectedIds, txs, filters, offset, limit]);
 
   const clearAllMatching = useCallback(async () => {
     const label = filters.source ? `all "${SOURCE_LABELS[filters.source] || filters.source}"` : "all matching";
@@ -1056,14 +1076,15 @@ const Transactions = React.memo(function Transactions() {
       try {
         await api.delete(`/transactions/${id}`);
         setTxs(prev => prev.filter(t => t.transaction_id !== id));
+        setMonthRows(prev => prev.filter(t => t.transaction_id !== id));
+        setTotal(count => Math.max(0,count - 1));
+        api.invalidate("/transactions");
         toast.success("Transaction permanently deleted");
-        await load();
       } catch (e) {
         toast.error(formatApiError(e) || "Could not delete transaction");
-        await load();
       }
     });
-  }, [showConfirm, load]);
+  }, [showConfirm]);
 
   const approveTx = useCallback(async (t, categoryOverride) => {
     const category = categoryOverride || t.ai_selected_category || t.category || "uncategorized";
@@ -1136,7 +1157,18 @@ const Transactions = React.memo(function Transactions() {
       });
       toast.success(`Approved ${data.approved}`);
       setSelectedIds(new Set());
-      await load();
+      if (!highConfidenceOnly) {
+        const approved = new Set(ids);
+        const patch = row => approved.has(row.transaction_id)
+          ? {...row,approval_status:"approved",category_approval_status:"approved"} : row;
+        setTxs(rows => rows.map(patch));
+        setMonthRows(rows => rows.map(patch));
+      } else {
+        // Confidence-restricted results do not include individual IDs.
+        // Reconcile quietly rather than guessing which rows were approved.
+        void load({background:true});
+      }
+      api.invalidate("/transactions");
     } catch (e) {
       toast.error(formatApiError(e?.response?.data?.detail) || "Could not approve transactions");
     }
