@@ -32,8 +32,18 @@ _engine = None
 _async_session_maker = None
 
 
+def _normalize_async_database_url(database_url: str) -> str:
+    """Accept standard Postgres URLs and convert them for SQLAlchemy's asyncpg driver."""
+    if database_url.startswith("postgres://"):
+        return "postgresql+asyncpg://" + database_url[len("postgres://") :]
+    if database_url.startswith("postgresql://"):
+        return "postgresql+asyncpg://" + database_url[len("postgresql://") :]
+    return database_url
+
+
 def init_engine(database_url: str, echo: bool = False):
     global _engine, _async_session_maker
+    database_url = _normalize_async_database_url(database_url)
     if database_url.startswith("sqlite"):
         from sqlalchemy.ext.asyncio import create_async_engine as _create
 
