@@ -6,15 +6,14 @@ centralised in the application.
 """
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
-
 import hashlib
-import html
 import hmac
+import html
 import logging
 import os
 import secrets
 import time
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any, Literal
 from urllib.parse import parse_qs, quote, urlparse
@@ -22,10 +21,6 @@ from urllib.parse import parse_qs, quote, urlparse
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from pydantic import AnyHttpUrl
-from sqlalchemy import DateTime, Integer, JSON, String, select
-from sqlalchemy.orm import Mapped, mapped_column
-
 from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.provider import (
     AccessToken,
@@ -37,9 +32,16 @@ from mcp.server.auth.provider import (
     TokenError,
     construct_redirect_uri,
 )
-from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
+from mcp.server.auth.settings import (
+    AuthSettings,
+    ClientRegistrationOptions,
+    RevocationOptions,
+)
 from mcp.server.mcpserver import MCPServer
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
+from pydantic import AnyHttpUrl
+from sqlalchemy import JSON, DateTime, Integer, String, select
+from sqlalchemy.orm import Mapped, mapped_column
 
 import auth as penni_auth
 from db import Base, get_session_maker
