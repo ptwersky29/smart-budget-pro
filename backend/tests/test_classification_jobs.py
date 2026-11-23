@@ -2,10 +2,10 @@
 import asyncio
 from datetime import datetime, timezone
 
-import classification_jobs
 import pytest
 from pydantic import ValidationError
 
+import classification_jobs
 from classification_jobs import ClassifyBatchIn, _eligible, _snapshot
 from db import Transaction
 
