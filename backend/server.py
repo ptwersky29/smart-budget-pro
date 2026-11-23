@@ -143,30 +143,23 @@ async def root():
 
 @api.get("/health")
 async def health():
-    """Liveness probe. Never sleeps: Render restarts on health-check timeouts."""
-    stripe_vars = ["STRIPE_API_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_MONTHLY_PRICE_ID", "STRIPE_YEARLY_PRICE_ID"]
-    checks = {"database": "unavailable", "version": app.version, "uptime": None}
-    db_ok = False
-    started = time.perf_counter()
-    try:
-        sm = get_session_maker()
-        async with sm() as session:
-            await asyncio.wait_for(session.execute(text("SELECT 1")), timeout=2.0)
-            db_ok = True
-            checks["database"] = "connected"
-    except Exception as e:
-        checks["database"] = f"error: {str(e)[:60]}"
-    checks["database_ms"] = round((time.perf_counter() - started) * 1000, 1)
-
+    """Database-free liveness probe for uptime monitors and backend warm-up."""
+    stripe_vars = [
+        "STRIPE_API_KEY",
+        "STRIPE_WEBHOOK_SECRET",
+        "STRIPE_MONTHLY_PRICE_ID",
+        "STRIPE_YEARLY_PRICE_ID",
+    ]
     if not hasattr(app.state, "started_at"):
         app.state.started_at = time.time()
-    checks["uptime"] = round(time.time() - app.state.started_at, 1)
-
     return {
-        "status": "ok" if db_ok else "degraded",
+        "status": "ok",
         "version": app.version,
         "commit": GIT_COMMIT,
-        "checks": checks,
+        "checks": {
+            "database": "not_checked_by_liveness_probe",
+            "uptime": round(time.time() - app.state.started_at, 1),
+        },
         "auth_configured": bool(os.environ.get("JWT_SECRET")),
         "frontend_url_set": bool(os.environ.get("FRONTEND_URL")),
         "stripe_configured": all(os.environ.get(v) for v in stripe_vars),
@@ -426,8 +419,12 @@ async def startup():
 
     # Classification runs on the server independently of any browser tab, even
     # when TrueLayer's dedicated background-sync process is disabled here.
+    app.state.classification_wakeup = asyncio.Event()
     app.state.classification_worker = asyncio.create_task(
-        classification_jobs.classification_worker(sm)
+        classification_jobs.classification_worker(
+            sm,
+            app.state.classification_wakeup,
+        )
     )
 
     # Start background sync loop for TrueLayer. Only one process should own it:

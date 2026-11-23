@@ -45,7 +45,16 @@ SCOPES = "info accounts balance cards transactions direct_debits standing_orders
 SYNC_PAGE_SIZE = 500
 MAX_RETRIES = 3
 MAX_ERROR_TEXT = 500
-SYNC_INTERVAL_SECONDS = 300  # 5 minutes
+try:
+    # Leave enough idle time for Neon's five-minute scale-to-zero window.
+    # A 30-minute default keeps automatic bank refresh while avoiding a
+    # permanent compute wake-up. Operators may increase this, never lower it.
+    SYNC_INTERVAL_SECONDS = max(
+        1800,
+        int(os.environ.get("TRUELAYER_SYNC_INTERVAL_SECONDS", "1800")),
+    )
+except (TypeError, ValueError):
+    SYNC_INTERVAL_SECONDS = 1800
 
 
 # ── Encrypted token storage (AES-GCM authenticated encryption) ────────────
@@ -941,17 +950,38 @@ async def run_background_sync(db_maker) -> dict:
 
 # ── Sync engine ───────────────────────────────────────────────────────────
 
+def _sync_from_date(conn: BankConnection, overlap_days: int = 7) -> str | None:
+    """Use a bounded overlap to catch delayed bank postings without full-history downloads."""
+    start_date = conn.import_start_date
+    last_sync_at = conn.last_sync_at
+    if last_sync_at is not None:
+        if last_sync_at.tzinfo is None:
+            last_sync_at = last_sync_at.replace(tzinfo=timezone.utc)
+        overlap_start = (last_sync_at - timedelta(days=overlap_days)).date()
+        if start_date is None or overlap_start > start_date:
+            start_date = overlap_start
+    if start_date is None:
+        return None
+    return f"{start_date.isoformat()}T00:00:00Z"
+
+
 async def _sync_connection(session, conn: BankConnection, user_id: str) -> tuple:
     new_count = 0
     dup_count = 0
     page = 1
     has_more = True
-    from_date = conn.import_start_date.isoformat() + "T00:00:00Z" if conn.import_start_date else None
+    from_date = _sync_from_date(conn)
     started_at = datetime.now(timezone.utc)
     existing_hashes = set()
 
     await _log_sync(session, user_id, conn.connection_id, "sync_started", "info", f"Starting sync for {conn.account_name}")
-    result = await session.execute(select(Transaction.transaction_id).where(Transaction.user_id == user_id))
+    result = await session.execute(
+        select(Transaction.transaction_id).where(
+            Transaction.user_id == user_id,
+            Transaction.account_id == conn.account_id,
+            Transaction.source == "truelayer",
+        )
+    )
     for row in result.scalars().all():
         existing_hashes.add(row)
 
@@ -1025,52 +1055,70 @@ async def _sync_connection(session, conn: BankConnection, user_id: str) -> tuple
         conn.update_count = (conn.update_count or 0) + 1
         await session.commit()
 
-        # AI suggests categories after every sync; imports remain unapproved.
+        # Categorise only imported rows that do not already have a suggestion.
+        # This avoids re-running AI for the same unapproved transactions on every sync.
         try:
             result = await session.execute(
-                select(Transaction).where(
+                select(Transaction)
+                .where(
                     Transaction.connection_id == conn.connection_id,
                     Transaction.user_id == user_id,
                     Transaction.approval_status == "unapproved",
+                    Transaction.ai_suggested_categories.is_(None),
                 )
+                .order_by(Transaction.date.desc())
+                .limit(50)
             )
-            unapproved = result.scalars().all()
-            if unapproved:
+            unclassified = result.scalars().all()
+            if unclassified:
                 cat_count = 0
-                for tx in unapproved[:50]:
-                    new_cat = await _ai_categorise(tx.description, tx.merchant_name, tx.amount, session, user_id)
-                    if new_cat and new_cat != "uncategorized":
-                        tx.category = new_cat
-                        tx.ai_selected_category = new_cat
-                        tx.ai_confidence = 0.75
-                        tx.ai_reason = "Suggested during bank import review."
-                        tx.ai_suggested_categories = {
-                            "suggestions": [
-                                {
-                                    "category": new_cat,
-                                    "confidence": 0.75,
-                                    "reason": "Suggested during bank import review.",
-                                    "source": "ai",
-                                },
-                                {
-                                    "category": "miscellaneous",
-                                    "confidence": 0.2,
-                                    "reason": "Fallback option.",
-                                    "source": "fallback",
-                                },
-                                {
-                                    "category": "uncategorized",
-                                    "confidence": 0,
-                                    "reason": "Review manually.",
-                                    "source": "fallback",
-                                },
-                            ]
-                        }
-                        tx.category_approval_status = "unapproved"
-                        cat_count += 1
+                for tx in unclassified:
+                    new_cat = await _ai_categorise(
+                        tx.description,
+                        tx.merchant_name,
+                        tx.amount,
+                        session,
+                        user_id,
+                    )
+                    if not new_cat or new_cat == "uncategorized":
+                        tx.ai_suggested_categories = {"suggestions": []}
+                        tx.ai_reason = "No reliable category suggestion available."
+                        continue
+                    tx.category = new_cat
+                    tx.ai_selected_category = new_cat
+                    tx.ai_confidence = 0.75
+                    tx.ai_reason = "Suggested during bank import review."
+                    tx.ai_suggested_categories = {
+                        "suggestions": [
+                            {
+                                "category": new_cat,
+                                "confidence": 0.75,
+                                "reason": "Suggested during bank import review.",
+                                "source": "ai",
+                            },
+                            {
+                                "category": "miscellaneous",
+                                "confidence": 0.2,
+                                "reason": "Fallback option.",
+                                "source": "fallback",
+                            },
+                            {
+                                "category": "uncategorized",
+                                "confidence": 0,
+                                "reason": "Review manually.",
+                                "source": "fallback",
+                            },
+                        ]
+                    }
+                    tx.category_approval_status = "unapproved"
+                    cat_count += 1
+                await session.commit()
                 if cat_count:
-                    await session.commit()
-                    logger.info("AI suggested categories for %s transactions for %s", cat_count, conn.connection_id)
+                    logger.info(
+                        "AI suggested categories for %s transactions for %s",
+                        cat_count,
+                        conn.connection_id,
+                    )
         except Exception as e:
             logger.warning("AI categorisation failed for %s: %s", conn.connection_id, e)
 

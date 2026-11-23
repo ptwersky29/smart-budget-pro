@@ -72,12 +72,19 @@ export function ClassificationProvider({ children }) {
     }
   }, []);
 
+  const hasActiveJobs = jobs.some((job) => ACTIVE.has(job.status));
+
   useEffect(() => {
     if (isPublicDemo()) return undefined;
     refresh();
-    const interval = window.setInterval(refresh, 3000);
-    return () => window.clearInterval(interval);
+    return undefined;
   }, [refresh]);
+
+  useEffect(() => {
+    if (isPublicDemo() || !hasActiveJobs) return undefined;
+    const interval = window.setInterval(refresh, 5000);
+    return () => window.clearInterval(interval);
+  }, [refresh, hasActiveJobs]);
 
   const enqueue = useCallback(async (ids) => {
     const uniqueIds = [...new Set(ids)].filter(Boolean);

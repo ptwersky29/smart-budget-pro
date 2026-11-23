@@ -1,15 +1,20 @@
 import os
 import sys
+from datetime import date, datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
+from typing import cast
 
 os.environ.setdefault("JWT_SECRET", "test-jwt-secret-for-truelayer-auth-params")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from db import BankConnection
 from truelayer import (
     _build_auth_link_params,
     _connections_url,
     _frontend_base_url,
     _normalize_accounts_payload,
+    _sync_from_date,
     _token_value,
 )
 
@@ -80,3 +85,45 @@ def test_frontend_base_url_defaults(monkeypatch):
 def test_frontend_base_url_env(monkeypatch):
     monkeypatch.setenv("FRONTEND_URL", "https://app.example.com/")
     assert _frontend_base_url() == "https://app.example.com"
+
+
+
+def test_sync_from_date_uses_import_start_for_first_sync():
+    conn = cast(
+        BankConnection,
+        SimpleNamespace(import_start_date=date(2026, 1, 1), last_sync_at=None),
+    )
+    assert _sync_from_date(conn) == "2026-01-01T00:00:00Z"
+
+
+def test_sync_from_date_uses_seven_day_overlap_after_successful_sync():
+    conn = cast(
+        BankConnection,
+        SimpleNamespace(
+            import_start_date=date(2026, 1, 1),
+            last_sync_at=datetime(2026, 11, 23, 12, 0, tzinfo=timezone.utc),
+        ),
+    )
+    assert _sync_from_date(conn) == "2026-11-16T00:00:00Z"
+
+
+def test_sync_from_date_never_moves_before_user_import_start():
+    conn = cast(
+        BankConnection,
+        SimpleNamespace(
+            import_start_date=date(2026, 11, 20),
+            last_sync_at=datetime(2026, 11, 23, 12, 0, tzinfo=timezone.utc),
+        ),
+    )
+    assert _sync_from_date(conn) == "2026-11-20T00:00:00Z"
+
+
+def test_sync_from_date_handles_legacy_naive_timestamps():
+    conn = cast(
+        BankConnection,
+        SimpleNamespace(
+            import_start_date=None,
+            last_sync_at=datetime(2026, 11, 23, 12, 0),
+        ),
+    )
+    assert _sync_from_date(conn) == "2026-11-16T00:00:00Z"

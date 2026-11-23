@@ -23,6 +23,13 @@ MAX_BATCH = 200
 WORKER_CONCURRENCY = 3
 
 
+def _wake_worker(request: Request) -> None:
+    """Wake this process's worker after a durable classification enqueue."""
+    wakeup = getattr(request.app.state, "classification_wakeup", None)
+    if wakeup is not None:
+        wakeup.set()
+
+
 class ClassifyBatchIn(BaseModel):
     transaction_ids: list[str] = Field(min_length=1, max_length=MAX_BATCH)
 
@@ -152,7 +159,10 @@ def build_router() -> APIRouter:
     ):
         sm = request.app.state.db
         async with sm() as session:
-            return await _enqueue(session, user["user_id"], payload.transaction_ids)
+            result = await _enqueue(session, user["user_id"], payload.transaction_ids)
+        if result["queued"]:
+            _wake_worker(request)
+        return result
 
     @router.post("/uncategorized")
     async def enqueue_uncategorized(
@@ -202,7 +212,10 @@ def build_router() -> APIRouter:
             ids = (await session.execute(query)).scalars().all()
             if not ids:
                 return {"queued": 0, "already_queued": 0, "skipped": 0, "jobs": []}
-            return await _enqueue(session, user["user_id"], ids)
+            result = await _enqueue(session, user["user_id"], ids)
+        if result["queued"]:
+            _wake_worker(request)
+        return result
 
     @router.get("/jobs")
     async def list_jobs(request: Request, user: dict = Depends(get_current_user)):
@@ -354,26 +367,44 @@ async def _process_one(session_maker) -> bool:
     return True
 
 
-async def classification_worker(session_maker) -> None:
-    """Small parallel worker; durable queue survives browser navigation and restarts."""
-    logger.info("Transaction classification worker started")
-    iteration = 0
+async def _drain_queue(session_maker) -> None:
+    """Process all currently queued jobs, then return without idle polling."""
+    while True:
+        results = await asyncio.gather(
+            *(_process_one(session_maker) for _ in range(WORKER_CONCURRENCY)),
+            return_exceptions=True,
+        )
+        processed = False
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error("Classification worker tick failed: %s", result)
+            elif result is True:
+                processed = True
+        if not processed:
+            return
+
+
+async def classification_worker(
+    session_maker,
+    wakeup: asyncio.Event | None = None,
+) -> None:
+    """Process durable jobs on startup and when the API enqueues new work.
+
+    Waiting on an in-process event avoids a constant PostgreSQL polling loop,
+    allowing Neon to suspend its compute while the application is idle.
+    """
+    if wakeup is None:
+        wakeup = asyncio.Event()
+    wakeup.set()
+    logger.info("Transaction classification worker started (event-driven)")
     while True:
         try:
-            if iteration % 60 == 0:
-                await _recover_stale_jobs(session_maker)
-            results = await asyncio.gather(
-                *(_process_one(session_maker) for _ in range(WORKER_CONCURRENCY)),
-                return_exceptions=True,
-            )
-            for result in results:
-                if isinstance(result, Exception):
-                    logger.error("Classification worker tick failed: %s", result)
-            iteration += 1
-            await asyncio.sleep(1.0 if any(result is True for result in results) else 3.0)
+            await wakeup.wait()
+            wakeup.clear()
+            await _recover_stale_jobs(session_maker)
+            await _drain_queue(session_maker)
         except asyncio.CancelledError:
             logger.info("Classification worker stopped")
             raise
         except Exception as exc:
             logger.exception("Classification worker failure: %s", exc)
-            await asyncio.sleep(5.0)

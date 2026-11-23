@@ -1,6 +1,8 @@
 """Regression checks for background classification safety."""
+import asyncio
 from datetime import datetime, timezone
 
+import classification_jobs
 import pytest
 from pydantic import ValidationError
 
@@ -47,3 +49,41 @@ def test_classification_limits_work_size():
         ClassifyBatchIn(transaction_ids=[])
     with pytest.raises(ValidationError):
         ClassifyBatchIn(transaction_ids=[str(i) for i in range(201)])
+
+
+
+@pytest.mark.asyncio
+async def test_classification_worker_waits_until_new_work_is_signalled(monkeypatch):
+    wakeup = asyncio.Event()
+    processed = asyncio.Event()
+    calls = 0
+
+    async def recover(_session_maker):
+        return None
+
+    async def process(_session_maker):
+        nonlocal calls
+        calls += 1
+        processed.set()
+        return False
+
+    monkeypatch.setattr(classification_jobs, "WORKER_CONCURRENCY", 1)
+    monkeypatch.setattr(classification_jobs, "_recover_stale_jobs", recover)
+    monkeypatch.setattr(classification_jobs, "_process_one", process)
+
+    worker = asyncio.create_task(
+        classification_jobs.classification_worker(object(), wakeup)
+    )
+    try:
+        await asyncio.wait_for(processed.wait(), timeout=1)
+        await asyncio.sleep(0.05)
+        assert calls == 1
+
+        processed.clear()
+        wakeup.set()
+        await asyncio.wait_for(processed.wait(), timeout=1)
+        assert calls == 2
+    finally:
+        worker.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await worker
