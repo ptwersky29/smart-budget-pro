@@ -40,7 +40,6 @@ from mcp.server.auth.settings import (
 )
 from mcp.server.mcpserver import MCPServer
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
-from pydantic import AnyHttpUrl
 from sqlalchemy import JSON, DateTime, Integer, String, select
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -391,18 +390,21 @@ class PenniOAuthProvider:
 oauth_provider = PenniOAuthProvider()
 mcp = MCPServer(
     "Penni",
-    auth=AuthSettings(
-        issuer_url=AnyHttpUrl(_public_base_url()),
-        resource_server_url=AnyHttpUrl(f"{_public_base_url()}/mcp"),
-        required_scopes=["penni:read"],
-        client_registration_options=ClientRegistrationOptions(
+    # Parse issuer from a *string* under AuthSettings' url_preserve_empty_path
+    # policy. Pre-constructing AnyHttpUrl appends '/' and breaks exact-match
+    # OAuth issuer validation for the base origin.
+    auth=AuthSettings.model_validate({
+        "issuer_url": _public_base_url(),
+        "resource_server_url": f"{_public_base_url()}/mcp",
+        "required_scopes": ["penni:read"],
+        "client_registration_options": ClientRegistrationOptions(
             enabled=True,
             valid_scopes=SUPPORTED_SCOPES,
             default_scopes=DEFAULT_SCOPES,
         ),
-        revocation_options=RevocationOptions(enabled=True),
-        validate_token_resource=True,
-    ),
+        "revocation_options": RevocationOptions(enabled=True),
+        "validate_token_resource": True,
+    }),
     auth_server_provider=oauth_provider,
 )
 
