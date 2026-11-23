@@ -32,3 +32,21 @@ The MCP does not expose delete/clear finance actions. Financial data and account
 - Visual charts are rendered in ChatGPT from the report data, rather than server-side image files.
 - Account and ledger changes through a write tool take effect in the user's Penni records; confirm amounts and categories.
 - Current ChatGPT product/plan limitations may restrict connecting custom MCP write actions.
+## Verified Render layout (23 November 2026)
+
+- Primary active API: `budget pro`, `srv-d8bhekm7r5hc73frdo20`, at `https://budget-pro-4jlg.onrender.com`. Root directory `backend`, tracked branch `master`, automatic deployment enabled. This is the intended future production MCP host, **not yet MCP-enabled**.
+- Secondary old API: `financeai-api`, `srv-d8bha2jbc2fs73dob3l0`, at `https://financeai-api-k2w1.onrender.com`; recent Render deploys failed. Do not point the ChatGPT connection at this host.
+- No independent staging service was present in the connected Render workspace at inspection. Create a dedicated staging service using `feat/penni-mcp-integration` and a separate test-only PostgreSQL database before a real OAuth connection test. Do not reuse the production database, secrets, bank integration credentials, or token issuers.
+- Both existing Render API services track `master`. Merging the PR may cause deployments on both; inspect their automatic deploy policies before merging.
+- `MCP_PUBLIC_BASE_URL` on staging must match the staging backend HTTPS URL exactly. On production it must match `https://budget-pro-4jlg.onrender.com`.
+- The current backend is served by Render's Python runtime; confirm the deployed Python version against MCP 2.x compatibility, and test the parent/child Starlette lifespan integration on the same version.
+
+## GitHub CI caveat (23 November 2026)
+
+- PR backend tests and lint/type checks pass, including isolated HTTP OAuth metadata/consent tests.
+- Concurrent changes on the `master` branch introduced invalid/unparseable characters in the frontend files `NotificationCenter.jsx`, `Connections.jsx`, and `IdlePolling.test.jsx`. PR merge-check CI can therefore fail frontend jobs independently of MCP changes; address this on the relevant frontend branch before merge.
+- Isolated tests are not a replacement for real OAuth code exchange, refresh, and revocation tests using a deployed staging server. Nothing has been deployed for this MCP yet.
+
+## ChatGPT account eligibility
+
+- OpenAI's current custom MCP documentation offers full read/write custom MCP connections for Business and Enterprise/Edu accounts; Pro can use read/fetch only. It does not list Plus as eligible for arbitrary custom remote MCP connections. Check the user's actual available Plugins UI before promising an in-ChatGPT connection on Plus.
