@@ -26,6 +26,7 @@ from mcp.server.auth.provider import (
     AccessToken,
     AuthorizationCode,
     AuthorizationParams,
+    IdentityAssertionParams,
     AuthorizeError,
     RefreshToken,
     RegistrationError,
@@ -163,6 +164,17 @@ class PenniOAuthProvider:
                 if (row.payload or {}).get("family_id") == family_id:
                     row.revoked_at = now
             await session.commit()
+
+    async def exchange_identity_assertion(
+        self,
+        client: OAuthClientInformationFull,
+        params: IdentityAssertionParams,
+    ) -> OAuthToken:
+        """Enterprise identity assertions are deliberately not enabled for Penni."""
+        raise TokenError(
+            error="unsupported_grant_type",
+            error_description="Penni only accepts the OAuth authorization-code flow.",
+        )
 
     async def get_client(self, client_id: str) -> OAuthClientInformationFull | None:
         cached = await self._load("client", client_id)
