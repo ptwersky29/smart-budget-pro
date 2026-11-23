@@ -8,11 +8,14 @@ import pytest
 from fastapi import FastAPI
 
 import mcp_server
+from rate_limit import CsrfProtectionMiddleware
 
 
 @pytest.mark.asyncio
 async def test_mcp_discovery_and_anonymous_access_denied(monkeypatch):
     app = FastAPI()
+    # Simulate the same browser CSRF protection used by the real Penni app.
+    app.add_middleware(CsrfProtectionMiddleware)
     previous = mcp_server._parent_app
     mcp_server.install(app)
     try:
