@@ -152,12 +152,13 @@ async def health():
     ]
     if not hasattr(app.state, "started_at"):
         app.state.started_at = time.time()
+    db_ready = getattr(app.state, "database_ready", False)
     return {
-        "status": "ok",
+        "status": "ok" if db_ready else "degraded",
         "version": app.version,
         "commit": GIT_COMMIT,
         "checks": {
-            "database": "not_checked_by_liveness_probe",
+            "database": "not_checked_by_liveness_probe" if db_ready else "awaiting_database_recovery",
             "uptime": round(time.time() - app.state.started_at, 1),
         },
         "auth_configured": bool(os.environ.get("JWT_SECRET")),
@@ -379,6 +380,17 @@ async def financeai_exception_handler(request: StarletteRequest, exc: FinanceAIE
 # Global exception handler — catches every unhandled error and logs it
 @app.exception_handler(Exception)
 async def global_exception_handler(request: StarletteRequest, exc: Exception):
+    if _is_neon_quota_error(exc):
+        logger.warning("Database quota unavailable on %s %s", request.method, request.url.path)
+        return JSONResponse(
+            status_code=503,
+            content=_error_payload(
+                request,
+                "Penni's database is temporarily unavailable. Please try again later.",
+                "database_unavailable",
+            ),
+            headers=_cors_headers(request),
+        )
     logger.exception("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
     return JSONResponse(
         status_code=500,
@@ -400,14 +412,56 @@ app.add_middleware(
 )
 
 
+def _is_neon_quota_error(error: BaseException) -> bool:
+    """Only treat an exhausted Neon quota as a temporary bootstrap failure."""
+    current: BaseException | None = error
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        message = str(current).lower()
+        if "exceeded the quota" in message or "insufficientresourceserror" in message:
+            return True
+        current = current.__cause__ or current.__context__
+    return False
+
+
+async def _retry_database_startup() -> None:
+    """Retry quota-blocked startup infrequently, without keeping Neon awake."""
+    while True:
+        await asyncio.sleep(1800)
+        try:
+            await startup()
+            if getattr(app.state, "database_ready", False):
+                logger.info("Database recovered; application services resumed.")
+                return
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Database recovery startup failed; will retry.")
+
+
 @app.on_event("startup")
 async def startup():
     logger.info("Running DB migrations (v1.1.0) ...")
-    await create_tables()
-    logger.info("DB tables created / verified.")
-    sm = get_session_maker()
-    async with sm() as session:
-        await auth.seed_admin(session)
+    try:
+        await create_tables()
+        logger.info("DB tables created / verified.")
+        sm = get_session_maker()
+        async with sm() as session:
+            await auth.seed_admin(session)
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        if not _is_neon_quota_error(exc):
+            raise
+        app.state.database_ready = False
+        logger.warning("Neon compute quota is exhausted; starting API in degraded mode.")
+        task = getattr(app.state, "database_recovery_task", None)
+        if task is None or task.done():
+            app.state.database_recovery_task = asyncio.create_task(_retry_database_startup())
+        return
+
+    app.state.database_ready = True
     if not os.environ.get("FRONTEND_URL"):
         logger.warning("FRONTEND_URL not set — Google OAuth redirects will fail")
     if not os.environ.get("OPENROUTER_API_KEY"):
@@ -458,6 +512,13 @@ async def startup():
 
 @app.on_event("shutdown")
 async def shutdown():
+    recovery = getattr(app.state, "database_recovery_task", None)
+    if recovery and not recovery.done():
+        recovery.cancel()
+        try:
+            await recovery
+        except asyncio.CancelledError:
+            pass
     worker = getattr(app.state, "classification_worker", None)
     if worker:
         worker.cancel()
