@@ -6,6 +6,8 @@ centralised in the application.
 """
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 import hashlib
 import html
 import hmac
@@ -35,7 +37,7 @@ from mcp.server.auth.provider import (
     TokenError,
     construct_redirect_uri,
 )
-from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions
+from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
 from mcp.server.mcpserver import MCPServer
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 
@@ -347,7 +349,7 @@ class PenniOAuthProvider:
         common = {
             "client_id": client_id,
             "scopes": scopes,
-            "resource": resource,
+            "resource": resource or f"{_public_base_url()}/mcp",
             "subject": subject,
             "family_id": family_id,
         }
@@ -384,6 +386,7 @@ mcp = MCPServer(
             valid_scopes=SUPPORTED_SCOPES,
             default_scopes=DEFAULT_SCOPES,
         ),
+        revocation_options=RevocationOptions(enabled=True),
         validate_token_resource=True,
     ),
     auth_server_provider=oauth_provider,
@@ -497,7 +500,7 @@ async def penni_get_uncategorized_transactions(limit: int = 50) -> dict[str, Any
     result = await _api_request(
         "GET",
         "/api/transactions",
-        params={"limit": max(1, min(int(limit), 200)), "sort": "date", "order": "desc"},
+        params={"limit": max(1, min(int(limit), 200)), "sort": "date", "order": "desc", "category": "uncategorized"},
     )
     rows = result.get("transactions", []) if isinstance(result, dict) else []
     uncategorized = [
@@ -575,21 +578,21 @@ async def penni_get_category_rules() -> dict[str, Any]:
 
 @mcp.tool()
 async def penni_suggest_transaction_category(transaction_id: str) -> dict[str, Any]:
-    """Ask Penni's existing classifier for category suggestions for one transaction."""
-    _require_scope("penni:read")
+    """Ask Penni's classifier to save category suggestions for one transaction."""
+    _require_scope("penni:write")
     return await _api_request(
         "POST", f"/api/transactions/{quote(transaction_id, safe='')}/classify"
     )
 
 
 @mcp.tool()
-async def penni_review_uncategorized_transactions(limit: int = 20) -> dict[str, Any]:
-    """Return uncategorized transactions with Penni's AI category suggestions for review."""
-    _require_scope("penni:read")
+async def penni_review_uncategorized_transactions(limit: int = 10) -> dict[str, Any]:
+    """Classify up to ten uncategorized transactions and return suggestions for review."""
+    _require_scope("penni:write")
     result = await _api_request(
         "GET",
         "/api/transactions",
-        params={"limit": max(1, min(int(limit), 30)), "sort": "date", "order": "desc"},
+        params={"limit": max(1, min(int(limit), 10)), "sort": "date", "order": "desc", "category": "uncategorized"},
     )
     rows = result.get("transactions", []) if isinstance(result, dict) else []
     rows = [
@@ -1066,7 +1069,21 @@ def install(app: FastAPI) -> None:
     # This route has its own one-time CSRF token check; OAuth protocol endpoints
     # are separately protected by PKCE, client validation, and bearer tokens.
     app.add_route("/oauth/consent", _oauth_consent, methods=["GET", "POST"], name="penni-mcp-consent")
-    app.mount("/", mcp.streamable_http_app())
+    mcp_app = mcp.streamable_http_app(
+        streamable_http_path="/mcp", stateless_http=True, json_response=True, host="0.0.0.0"
+    )
+    original_lifespan = app.router.lifespan_context
+
+    @asynccontextmanager
+    async def penni_mcp_lifespan(application: FastAPI):
+        # Parent and mounted child lifespans must both run. Starlette does not
+        # automatically start the lifespan of a mounted application.
+        async with original_lifespan(application):
+            async with mcp_app.router.lifespan_context(mcp_app):
+                yield
+
+    app.router.lifespan_context = penni_mcp_lifespan
+    app.mount("/", mcp_app)
     app.state.penni_mcp_installed = True
     logger.info("Penni MCP mounted at /mcp")
 
