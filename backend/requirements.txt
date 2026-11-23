@@ -31,4 +31,4 @@ pypdf>=4.2.0,<5.0.0
 reportlab>=4.1.0,<5.0.0
 
 # Remote Model Context Protocol server (OAuth 2.1 + Streamable HTTP)
-mcp>=2.0.0,<3.0.0
+mcp>=2.3.0,<3.0.0
