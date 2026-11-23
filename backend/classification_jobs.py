@@ -408,3 +408,5 @@ async def classification_worker(
             raise
         except Exception as exc:
             logger.exception("Classification worker failure: %s", exc)
+            # Do not busy-loop during a transient or quota-related DB outage.
+            await asyncio.sleep(30.0)

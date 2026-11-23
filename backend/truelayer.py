@@ -47,14 +47,14 @@ MAX_RETRIES = 3
 MAX_ERROR_TEXT = 500
 try:
     # Leave enough idle time for Neon's five-minute scale-to-zero window.
-    # A 30-minute default keeps automatic bank refresh while avoiding a
-    # permanent compute wake-up. Operators may increase this, never lower it.
+    # Two hours of idle time between automatic refreshes lets Neon sleep.
+    # Users can still request a manual refresh when they need fresh data.
     SYNC_INTERVAL_SECONDS = max(
-        1800,
-        int(os.environ.get("TRUELAYER_SYNC_INTERVAL_SECONDS", "1800")),
+        7200,
+        int(os.environ.get("TRUELAYER_SYNC_INTERVAL_SECONDS", "7200")),
     )
 except (TypeError, ValueError):
-    SYNC_INTERVAL_SECONDS = 1800
+    SYNC_INTERVAL_SECONDS = 7200
 
 
 # ── Encrypted token storage (AES-GCM authenticated encryption) ────────────
