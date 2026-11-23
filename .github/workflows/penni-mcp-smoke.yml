@@ -1,6 +1,8 @@
 name: Penni MCP staging smoke test
 
 on:
+  push:
+    branches: [master]
   pull_request:
     branches: [master]
     paths:
@@ -14,15 +16,17 @@ jobs:
   remote-mcp:
     name: Confirm OAuth discovery and anonymous access protections
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 12
     steps:
       - name: Verify staging OAuth and MCP endpoints
         env:
-          MCP_STAGING_BASE: https://penni-mcp-staging-2026.onrender.com
+          MCP_STAGING_BASE: ${{ github.event_name == 'push' && 'https://budget-pro-4jlg.onrender.com' || 'https://penni-mcp-staging-2026.onrender.com' }}
+          MCP_IS_PRODUCTION: ${{ github.event_name == 'push' }}
         run: |
           python - <<'PY'
           import json
           import os
+          import time
           import urllib.error
           import urllib.request
 
@@ -42,11 +46,21 @@ jobs:
               except urllib.error.HTTPError as e:
                   return e.code, dict(e.headers),e.read(20000).decode()
 
-          health, _, body = request("/api/health")
-          assert health == 200, f"health status: {health}: {body[:300]}"
-
-          auth_status, _, body = request("/.well-known/oauth-authorization-server")
+          # On production pushes Render deploys asynchronously after GitHub;
+          # retry until the new OAuth endpoints are available.
+          is_production = os.environ.get("MCP_IS_PRODUCTION", "").lower() == "true"
+          for attempt in range(30 if is_production else 1):
+              health, _, health_body = request("/api/health")
+              auth_status, _, body = request("/.well-known/oauth-authorization-server")
+              if health == 200 and auth_status == 200:
+                  break
+              if not is_production:
+                  raise AssertionError(f"staging probe: health={health}; oauth={auth_status}; {body[:200]}")
+              print(f"production MCP not yet deployed: health={health}, oauth={auth_status}, check={attempt + 1}")
+              time.sleep(15)
+          assert health == 200, f"health status: {health}: {health_body[:300]}"
           assert auth_status == 200, f"oauth discovery status: {auth_status}: {body[:300]}"
+          assert json.loads(health_body).get("status") == "ok", "Penni database is not ready"
           oauth=json.loads(body)
           assert oauth["issuer"] == base
           assert oauth["authorization_endpoint"] == base+"/authorize"
@@ -62,5 +76,5 @@ jobs:
           status, headers, body=request("/mcp","POST",req)
           assert status == 401, f"unauthenticated MCP call must return 401, got {status}: {body[:300]}"
           assert "www-authenticate" in {k.lower() for k in headers}, "Missing OAuth challenge header"
-          print("Staging remote OAuth discovery and unauthenticated MCP protection: PASS")
+          print("Remote OAuth discovery and unauthenticated MCP protection: PASS")
           PY
