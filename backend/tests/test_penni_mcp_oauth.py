@@ -26,6 +26,7 @@ async def test_mcp_discovery_and_anonymous_access_denied(monkeypatch):
             authorization = await client.get("/.well-known/oauth-authorization-server")
             assert authorization.status_code == 200
             metadata = authorization.json()
+            assert metadata["issuer"] == mcp_server._public_base_url()
             assert metadata["authorization_endpoint"].endswith("/authorize")
             assert metadata["token_endpoint"].endswith("/token")
             assert "S256" in metadata["code_challenge_methods_supported"]
