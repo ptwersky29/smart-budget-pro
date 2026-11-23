@@ -15,6 +15,8 @@ DEFAULT_LIMIT = 120
 DEFAULT_WINDOW = 60
 CSRF_SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 CSRF_SAFE_PATHS = {
+    # Consent POST has its own strict double-submit CSRF token check.
+    "/oauth/consent",
     "/api/auth/login",
     "/api/auth/register",
     "/api/auth/forgot-password",
