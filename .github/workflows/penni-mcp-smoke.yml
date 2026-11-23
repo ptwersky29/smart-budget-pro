@@ -1,0 +1,66 @@
+name: Penni MCP staging smoke test
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "backend/mcp_server.py"
+      - "backend/rate_limit.py"
+      - "backend/tests/test_penni_mcp_oauth.py"
+      - ".github/workflows/penni-mcp-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  remote-mcp:
+    name: Confirm OAuth discovery and anonymous access protections
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify staging OAuth and MCP endpoints
+        env:
+          MCP_STAGING_BASE: https://penni-mcp-staging-2026.onrender.com
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+
+          base = os.environ["MCP_STAGING_BASE"]
+          def request(path, method="GET", data=None):
+              req = urllib.request.Request(
+                  base+path, method=method, data=data,
+                  headers={
+                    "Accept":"application/json, text/event-stream",
+                    "Content-Type":"application/json",
+                    "MCP-Protocol-Version":"2025-06-18",
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(req,timeout=40) as r:
+                      return r.status, dict(r.headers),r.read(20000).decode()
+              except urllib.error.HTTPError as e:
+                  return e.code, dict(e.headers),e.read(20000).decode()
+
+          health, _, body = request("/api/health")
+          assert health == 200, f"health status: {health}: {body[:300]}"
+
+          auth_status, _, body = request("/.well-known/oauth-authorization-server")
+          assert auth_status == 200, f"oauth discovery status: {auth_status}: {body[:300]}"
+          oauth=json.loads(body)
+          assert oauth["issuer"] == base
+          assert oauth["authorization_endpoint"] == base+"/authorize"
+          assert oauth["token_endpoint"] == base+"/token"
+          assert "S256" in oauth["code_challenge_methods_supported"]
+
+          resource_status, _, body=request("/.well-known/oauth-protected-resource/mcp")
+          assert resource_status == 200, f"resource metadata: {resource_status}: {body[:300]}"
+          meta=json.loads(body)
+          assert meta["resource"] == base+"/mcp"
+
+          req=json.dumps({"jsonrpc":"2.0","id":1,"method":"tools/list"}).encode()
+          status, headers, body=request("/mcp","POST",req)
+          assert status == 401, f"unauthenticated MCP call must return 401, got {status}: {body[:300]}"
+          assert "www-authenticate" in {k.lower() for k in headers}, "Missing OAuth challenge header"
+          print("Staging remote OAuth discovery and unauthenticated MCP protection: PASS")
+          PY
