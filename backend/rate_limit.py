@@ -15,6 +15,16 @@ DEFAULT_LIMIT = 120
 DEFAULT_WINDOW = 60
 CSRF_SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 CSRF_SAFE_PATHS = {
+    # MCP POST requests use mandatory OAuth bearer authentication, not browser cookies.
+    "/mcp",
+    # Consent POST has its own strict double-submit CSRF token check.
+    "/oauth/consent",
+    # Machine-to-machine OAuth requests are protected by client validation,
+    # authorization codes/PKCE, and token revocation checks, not browser CSRF.
+    "/authorize",
+    "/token",
+    "/register",
+    "/revoke",
     "/api/auth/login",
     "/api/auth/register",
     "/api/auth/forgot-password",

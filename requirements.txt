@@ -1,0 +1,2 @@
+# Render staging service with repository-root build context.
+-r backend/requirements.txt

@@ -45,6 +45,7 @@ import investments
 import jewish
 import jewish_reports
 import manual_accounts
+import mcp_server
 import notifications
 import onboarding
 import prices
@@ -438,6 +439,9 @@ async def _retry_database_startup() -> None:
             raise
         except Exception:
             logger.exception("Database recovery startup failed; will retry.")
+
+
+mcp_server.install(app)
 
 
 @app.on_event("startup")
