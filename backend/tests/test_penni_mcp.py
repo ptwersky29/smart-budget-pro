@@ -1,6 +1,8 @@
 """Regression tests for Penni MCP tools; no live database is needed."""
 import asyncio
+
 import pytest
+
 import mcp_server
 
 
